@@ -1,0 +1,67 @@
+name: uFast
+options:
+  bundleIdPrefix: com.example
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "26.0"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  minimumXcodeGenVersion: "2.46.0"
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    DEVELOPMENT_TEAM: QY9XGBM7T5
+    ENABLE_USER_SCRIPT_SANDBOXING: true
+    GENERATE_INFOPLIST_FILE: true
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    MARKETING_VERSION: 0.1.0
+    SWIFT_VERSION: "6.0"
+targets:
+  uFast:
+    type: application
+    platform: iOS
+    sources:
+      - path: uFast
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.uFast
+        PRODUCT_NAME: uFast
+        SUPPORTS_MACCATALYST: false
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: uFast/SupportingFiles/Info.plist
+      properties:
+        CFBundleDisplayName: uFast
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    scheme:
+      testTargets:
+        - uFastTests
+        - uFastUITests
+      gatherCoverageData: true
+  uFastTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: uFastTests
+    dependencies:
+      - target: uFast
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.uFastTests
+  uFastUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: uFastUITests
+    dependencies:
+      - target: uFast
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.uFastUITests
+        TEST_TARGET_NAME: uFast

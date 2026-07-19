@@ -10,7 +10,7 @@
 
 ## Rules
 
-- BR-01: Goal cannot be below 12 hours.
+- BR-01: Goal cannot be below 8 hours.
 - BR-02: Goal changes do not alter completed history.
 - BR-03: Only one active fast can exist.
 - BR-04: End must be after start; both can be backdated.

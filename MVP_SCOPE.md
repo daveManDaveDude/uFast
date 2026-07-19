@@ -2,7 +2,7 @@
 
 ## In
 
-- Fasting goal from 12 to 24 whole hours; default 12.
+- Fasting goal from 8 to 24 whole hours; default 12.
 - Manual start, end, edit, delete and backdate of fasts.
 - Active-fast elapsed time, target and history.
 - Lock Screen and Dynamic Island Live Activity where supported.
@@ -34,4 +34,3 @@
 3. Catch-up: backdate and reconstruct with confirmation.
 4. Progress: HealthKit weight and steps.
 5. Glanceability and quality: Live Activity, accessibility, privacy and reliability.
-

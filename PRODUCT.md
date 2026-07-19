@@ -1,4 +1,4 @@
-# Open Window product context
+# uFast product context
 
 ## Promise
 
@@ -37,4 +37,3 @@ A busy, self-directed adult who wants lightweight structure for weight-managemen
 - A user can repair three missed days and explain which history is reconstructed.
 - A user can explain what Apple Health data is read and why.
 - Core records survive relaunch, backgrounding and time-zone tests without loss or duplication.
-

@@ -1,0 +1,27 @@
+included:
+  - uFast
+  - uFastTests
+  - uFastUITests
+excluded:
+  - .derived-data
+  - uFast.xcodeproj
+analyzer_rules:
+  - unused_declaration
+  - unused_import
+opt_in_rules:
+  - accessibility_label_for_image
+  - accessibility_trait_for_button
+  - empty_count
+  - empty_string
+  - fatal_error_message
+  - first_where
+  - force_unwrapping
+  - sorted_imports
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+line_length:
+  warning: 120
+  ignores_comments: true
+type_body_length: 300
+file_length: 500
+
