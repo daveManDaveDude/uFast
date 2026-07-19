@@ -30,13 +30,30 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository {
         modelContext.insert(fast)
 
         do {
-            if simulateSaveFailure {
-                throw ActiveFastPersistenceError.simulatedSaveFailure
-            }
+            try failIfRequested()
             try modelContext.save()
         } catch {
             modelContext.delete(fast)
             throw error
+        }
+    }
+
+    func updateStartDate(of fast: FastRecord, to startDate: Date) throws {
+        let originalStartDate = fast.startDate
+        fast.correctStartDate(to: startDate)
+
+        do {
+            try failIfRequested()
+            try modelContext.save()
+        } catch {
+            fast.correctStartDate(to: originalStartDate)
+            throw error
+        }
+    }
+
+    private func failIfRequested() throws {
+        if simulateSaveFailure {
+            throw ActiveFastPersistenceError.simulatedSaveFailure
         }
     }
 }

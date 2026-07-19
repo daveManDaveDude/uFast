@@ -28,7 +28,8 @@ All decisions below were accepted on 18 July 2026 for the MVP.
 
 - **Status:** Accepted
 - **Decision:** Guide catch-up over seven days; continue to permit older manual entry.
-- **Consequence:** The guided flow stays bounded without blocking corrections.
+- **Consequence:** The guided flow stays bounded without blocking explicit older
+  manual entry; D-010 separately limits correction of an active fast.
 
 ## D-005 Health data
 
@@ -57,3 +58,22 @@ All decisions below were accepted on 18 July 2026 for the MVP.
 - **Status:** Accepted
 - **Decision:** Use **uFast** as the working product and project name.
 - **Consequence:** Naming checks can happen later without delaying internal builds.
+
+## D-009 Active timer precision
+
+- **Status:** Accepted
+- **Accepted:** 19 July 2026
+- **Decision:** Show the active-fast elapsed timer to completed-second precision
+  and refresh it once per second while Today is visible.
+- **Consequence:** The timer visibly counts up without persisting timer ticks;
+  completed-history duration can retain whole-minute formatting.
+
+## D-010 Active-start correction window
+
+- **Status:** Accepted
+- **Accepted:** 19 July 2026
+- **Decision:** Limit correction of an existing active fast's start to the
+  preceding 24 absolute hours. Continue to permit older starts when explicitly
+  creating a new backdated fast.
+- **Consequence:** Both the editor and domain service enforce the correction
+  window, while manual entry and later catch-up remain separate behaviors.

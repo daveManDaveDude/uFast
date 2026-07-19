@@ -9,8 +9,8 @@
 - OW-001 P0 — Minimal onboarding and product promise.
 - OW-002 P0 — Set and change a goal of 8–24 whole hours. **Done 19 July 2026.**
 - OW-101 P0 — Start a fast now. **Done 19 July 2026.**
-- OW-102 P0 — Start or correct with a past time.
-- OW-103 P0 — See elapsed time, progress and target.
+- OW-102 P0 — Start or correct with a past time. **Done 19 July 2026.**
+- OW-103 P0 — See elapsed time, progress and target. **Done 19 July 2026.**
 - OW-104 P0 — End now or at a past time.
 - OW-105 P0 — View, edit and delete completed fasts.
 
@@ -52,7 +52,7 @@
 - OW-F103 — Confidence and estimate basis.
 - OW-F104 — User-controlled reusable meals.
 
-`READY_STORIES.md` contains implementation-ready versions of OW-002, OW-101 and
-OW-102, plus preliminary refinement for OW-103. The complete product pack also
-contains detailed examples for OW-203, OW-201, OW-302 and OW-401; copy those into
-individual story files as each slice is refined.
+`READY_STORIES.md` contains implementation-ready versions of OW-002, OW-101,
+OW-102, OW-103 and OW-104, plus initial refinement for OW-105. The complete
+product pack also contains detailed examples for OW-203, OW-201, OW-302 and
+OW-401; copy those into individual story files as each slice is refined.

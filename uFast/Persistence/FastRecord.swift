@@ -40,4 +40,8 @@ final class FastRecord {
         let goal = presentationGoal(currentGoal: currentGoal)
         return startDate.addingTimeInterval(TimeInterval(goal.hours * 60 * 60))
     }
+
+    func correctStartDate(to startDate: Date) {
+        self.startDate = startDate
+    }
 }

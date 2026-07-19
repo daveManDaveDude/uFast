@@ -38,6 +38,162 @@ final class FastStartServiceTests: XCTestCase {
         XCTAssertEqual(repeatedFast.startDate, firstFast.startDate)
     }
 
+    func testPastStartCreatesActiveFastAtExactInstantWithCurrentGoal() throws {
+        let repository = ActiveFastRepositorySpy()
+        let goal = try XCTUnwrap(FastingGoal(hours: 18))
+        let pastStart = now.addingTimeInterval(-3 * 24 * 60 * 60)
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+
+        let fast = try service.startFast(at: pastStart, goal: goal)
+
+        XCTAssertEqual(repository.savedFasts.count, 1)
+        XCTAssertEqual(fast.startDate, pastStart)
+        XCTAssertEqual(fast.historicalGoal, goal)
+        XCTAssertTrue(fast.isActive)
+    }
+
+    func testCorrectionUpdatesExistingFastAndPreservesIdentityAndHistoricalGoal() throws {
+        let historicalGoal = try XCTUnwrap(FastingGoal(hours: 16))
+        let currentGoal = try XCTUnwrap(FastingGoal(hours: 14))
+        let originalStart = now.addingTimeInterval(-7200)
+        let correctedStart = now.addingTimeInterval(-10800)
+        let existingFast = FastRecord(startDate: originalStart, goalAtStart: historicalGoal)
+        let repository = ActiveFastRepositorySpy(savedFasts: [existingFast])
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+
+        let correctedFast = try service.correctActiveFastStart(to: correctedStart)
+
+        XCTAssertEqual(repository.savedFasts.count, 1)
+        XCTAssertEqual(correctedFast.id, existingFast.id)
+        XCTAssertEqual(correctedFast.startDate, correctedStart)
+        XCTAssertEqual(correctedFast.historicalGoal, historicalGoal)
+        XCTAssertEqual(
+            correctedFast.targetDate(currentGoal: currentGoal),
+            correctedStart.addingTimeInterval(14 * 60 * 60)
+        )
+    }
+
+    func testFutureStartAndCorrectionAreRejectedWithoutMutation() throws {
+        let originalStart = now.addingTimeInterval(-7200)
+        let existingFast = FastRecord(startDate: originalStart, goalAtStart: .default)
+        let repository = ActiveFastRepositorySpy(savedFasts: [existingFast])
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+        let futureStart = now.addingTimeInterval(1)
+
+        XCTAssertThrowsError(try service.startFast(at: futureStart, goal: .default)) { error in
+            XCTAssertEqual(error as? FastStartError, .futureStartTime)
+        }
+        XCTAssertThrowsError(try service.correctActiveFastStart(to: futureStart)) { error in
+            XCTAssertEqual(error as? FastStartError, .futureStartTime)
+        }
+        XCTAssertEqual(repository.savedFasts.count, 1)
+        XCTAssertEqual(existingFast.startDate, originalStart)
+        XCTAssertTrue(repository.updatedStartDates.isEmpty)
+    }
+
+    func testCorrectionAllowsExactlyTwentyFourHoursAgo() throws {
+        let existingFast = FastRecord(
+            startDate: now.addingTimeInterval(-3600),
+            goalAtStart: .default
+        )
+        let repository = ActiveFastRepositorySpy(savedFasts: [existingFast])
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+        let earliestAllowedStart = now.addingTimeInterval(
+            -FastStartService.maximumCorrectionAge
+        )
+
+        let correctedFast = try service.correctActiveFastStart(to: earliestAllowedStart)
+
+        XCTAssertEqual(correctedFast.startDate, earliestAllowedStart)
+        XCTAssertEqual(repository.updatedStartDates, [earliestAllowedStart])
+    }
+
+    func testCorrectionRejectsMoreThanTwentyFourHoursAgoWithoutMutation() throws {
+        let originalStart = now.addingTimeInterval(-3600)
+        let existingFast = FastRecord(
+            startDate: originalStart,
+            goalAtStart: .default
+        )
+        let repository = ActiveFastRepositorySpy(savedFasts: [existingFast])
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+        let tooOldStart = now.addingTimeInterval(
+            -FastStartService.maximumCorrectionAge - 1
+        )
+
+        XCTAssertThrowsError(
+            try service.correctActiveFastStart(to: tooOldStart)
+        ) { error in
+            XCTAssertEqual(error as? FastStartError, .startTimeBeyondCorrectionLimit)
+        }
+        XCTAssertEqual(existingFast.startDate, originalStart)
+        XCTAssertTrue(repository.updatedStartDates.isEmpty)
+    }
+
+    func testCorrectionRequiresAnActiveFast() {
+        let repository = ActiveFastRepositorySpy()
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+
+        XCTAssertThrowsError(try service.correctActiveFastStart(to: now)) { error in
+            XCTAssertEqual(error as? FastStartError, .noActiveFast)
+        }
+    }
+
+    func testRepeatedPastStartKeepsSingleOriginalActiveFast() throws {
+        let repository = ActiveFastRepositorySpy()
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+        let firstStart = now.addingTimeInterval(-7200)
+        let duplicateStart = now.addingTimeInterval(-10800)
+
+        let firstFast = try service.startFast(at: firstStart, goal: .default)
+        let duplicateResult = try service.startFast(at: duplicateStart, goal: .default)
+
+        XCTAssertEqual(repository.savedFasts.count, 1)
+        XCTAssertEqual(duplicateResult.id, firstFast.id)
+        XCTAssertEqual(duplicateResult.startDate, firstStart)
+    }
+
+    func testExactInstantsAroundLondonClockChangesArePreserved() throws {
+        let formatter = ISO8601DateFormatter()
+        var instants: [Date] = []
+        try instants.append(XCTUnwrap(formatter.date(from: "2026-03-29T00:59:59Z")))
+        try instants.append(XCTUnwrap(formatter.date(from: "2026-03-29T01:00:00Z")))
+        try instants.append(XCTUnwrap(formatter.date(from: "2026-10-25T00:59:59Z")))
+        try instants.append(XCTUnwrap(formatter.date(from: "2026-10-25T01:00:00Z")))
+
+        for instant in instants {
+            let repository = ActiveFastRepositorySpy()
+            let service = FastStartService(
+                repository: repository,
+                clock: FixedClock(now: now)
+            )
+
+            let fast = try service.startFast(at: instant, goal: .default)
+
+            XCTAssertEqual(fast.startDate, instant)
+        }
+    }
+
     func testSaveFailureDoesNotExposeAnActiveFastAndCanBeRetried() throws {
         let repository = ActiveFastRepositorySpy()
         repository.saveError = TestError.saveFailed
@@ -63,8 +219,13 @@ private struct FixedClock: AppClock {
 
 @MainActor
 private final class ActiveFastRepositorySpy: ActiveFastRepository {
-    var savedFasts: [FastRecord] = []
+    var savedFasts: [FastRecord]
+    var updatedStartDates: [Date] = []
     var saveError: Error?
+
+    init(savedFasts: [FastRecord] = []) {
+        self.savedFasts = savedFasts
+    }
 
     func activeFast() throws -> FastRecord? {
         savedFasts.first(where: \.isActive)
@@ -75,6 +236,14 @@ private final class ActiveFastRepositorySpy: ActiveFastRepository {
             throw saveError
         }
         savedFasts.append(fast)
+    }
+
+    func updateStartDate(of fast: FastRecord, to startDate: Date) throws {
+        if let saveError {
+            throw saveError
+        }
+        fast.correctStartDate(to: startDate)
+        updatedStartDates.append(startDate)
     }
 }
 

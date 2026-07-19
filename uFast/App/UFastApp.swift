@@ -4,8 +4,11 @@ import SwiftUI
 @main
 struct UFastApp: App {
     private let modelContainer: ModelContainer
+    private let clock: any AppClock
 
     init() {
+        clock = AppClockConfiguration.clock()
+
         do {
             modelContainer = try PersistenceContainer.make()
             try resetDataIfRequested(in: modelContainer)
@@ -16,7 +19,7 @@ struct UFastApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppRootView()
+            AppRootView(clock: clock)
         }
         .modelContainer(modelContainer)
     }

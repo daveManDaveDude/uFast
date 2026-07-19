@@ -25,4 +25,5 @@
 - BR-13: Apple Health weight and steps are read-only in MVP.
 - BR-14: Health permission denial never blocks manual features.
 - BR-15: Copy describes records and patterns, not diagnosis or guaranteed physiology.
-
+- BR-16: Correcting an active fast's start is limited to the preceding 24
+  absolute hours; creating a new manually backdated fast may use an older start.
