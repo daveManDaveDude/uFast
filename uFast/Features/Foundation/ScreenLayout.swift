@@ -6,18 +6,29 @@ struct ScreenLayout<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("screen-title.\(identifier)")
+        ZStack {
+            UFastTheme.canvas
+                .ignoresSafeArea()
 
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.uFastDisplay())
+                        .foregroundStyle(UFastTheme.primary)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("screen-title.\(identifier)")
+                    Spacer()
+                    UFastBrandMark(compact: true)
+                        .accessibilityHidden(true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, UFastTheme.Spacing.standard)
+                .padding(.bottom, UFastTheme.Spacing.compact)
+
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
+        .tint(UFastTheme.action)
     }
 }

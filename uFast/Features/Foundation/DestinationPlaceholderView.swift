@@ -8,11 +8,24 @@ struct DestinationPlaceholderView: View {
             title: destination.title,
             identifier: destination.rawValue
         ) {
-            ContentUnavailableView {
-                Label(destination.title, systemImage: destination.systemImage)
-            } description: {
-                Text("This area is ready for the next uFast story.")
+            VStack(spacing: UFastTheme.Spacing.generous) {
+                Image(systemName: destination.systemImage)
+                    .font(.system(size: 38, weight: .light))
+                    .foregroundStyle(UFastTheme.action)
+                    .accessibilityHidden(true)
+                UFastSectionHeading("Not available yet", eyebrow: destination.title)
+                Text("This part of uFast will arrive in a later story.")
+                    .foregroundStyle(UFastTheme.secondaryText)
+                    .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity)
+            .uFastCard(accent: UFastTheme.sky)
+            .padding()
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                "\(destination.title). Not available yet. " +
+                    "This part of uFast will arrive in a later story."
+            )
         }
     }
 }

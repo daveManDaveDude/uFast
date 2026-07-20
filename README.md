@@ -80,5 +80,9 @@ your Apple Developer team and replace the example bundle identifier in
 - `DOMAIN_RULES.md` — shared terms and numbered behavioural rules
 - `BACKLOG.md` — ordered starter backlog
 - `READY_STORIES.md` — implementation-ready user stories
+- `SLICE_1_5_UX_STORIES.md` — visual contract and implementation-ready fasting
+  experience stories
+- `UX_STYLE_GUIDE.md` — quick-reference design tokens, components, artwork,
+  accessibility rules and visual Definition of Done
 - `DECISIONS.md` — accepted product and architecture choices
 - `AGENTS.md` — repository map, commands and Definition of Done

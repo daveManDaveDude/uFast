@@ -36,6 +36,16 @@ struct CompletedFastEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                        UFastSectionHeading("Recorded boundaries", eyebrow: "Edit fast")
+                        Text("Review both boundaries before saving. The recorded goal is unchanged.")
+                            .font(.subheadline)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                    }
+                    .listRowBackground(UFastTheme.formSurface)
+                }
+
                 Section("Start") {
                     DatePicker(
                         "Start date",
@@ -51,6 +61,8 @@ struct CompletedFastEditor: View {
                     )
                     .accessibilityIdentifier("history.edit.start-time")
                 }
+                .listRowBackground(UFastTheme.formSurface)
+                .listSectionSeparatorTint(UFastTheme.border)
 
                 Section {
                     DatePicker(
@@ -71,39 +83,49 @@ struct CompletedFastEditor: View {
                 } footer: {
                     if let message = validationMessage {
                         Text(message)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(UFastTheme.error)
                             .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityLabel("Validation error. \(message)")
                             .accessibilityIdentifier("history.edit.validation")
                     }
                 }
+                .listRowBackground(UFastTheme.formSurface)
+                .listSectionSeparatorTint(UFastTheme.border)
 
                 if let saveError {
                     Section {
-                        Text(saveError)
-                            .foregroundStyle(.secondary)
+                        Label(saveError, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(UFastTheme.error)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("history.edit.save-error")
                     }
+                    .listRowBackground(UFastTheme.formSurface)
                 }
 
                 if let deleteError {
                     Section {
-                        Text(deleteError)
-                            .foregroundStyle(.secondary)
+                        Label(deleteError, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(UFastTheme.error)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("history.edit.delete-error")
                     }
+                    .listRowBackground(UFastTheme.formSurface)
                 }
 
                 Section {
                     Button("Delete fast", role: .destructive) {
                         isDeleteConfirmationPresented = true
                     }
+                    .buttonStyle(UFastDestructiveButtonStyle())
                     .accessibilityIdentifier("history.edit.delete")
                 }
+                .listRowBackground(Color.clear)
             }
             .navigationTitle("Edit fast")
             .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(UFastTheme.canvas)
+            .tint(UFastTheme.action)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
@@ -161,4 +183,33 @@ struct CompletedFastEditor: View {
             deleteError = "This fast couldn’t be deleted. Please try again."
         }
     }
+}
+
+#Preview("Completed fast · Edit") {
+    CompletedFastEditor(
+        presentation: CompletedFastEditorPresentation(
+            id: UUID(),
+            startDate: Date(timeIntervalSince1970: 1_800_000_000 - 46800),
+            endDate: Date(timeIntervalSince1970: 1_800_000_000)
+        ),
+        validation: { _, _ in nil },
+        onSave: { _, _ in },
+        onDelete: {},
+        onCancel: {}
+    )
+}
+
+#Preview("Completed fast · Validation") {
+    CompletedFastEditor(
+        presentation: CompletedFastEditorPresentation(
+            id: UUID(),
+            startDate: Date(timeIntervalSince1970: 1_800_000_000),
+            endDate: Date(timeIntervalSince1970: 1_800_000_000)
+        ),
+        validation: { _, _ in .startTimeNotBeforeEndTime },
+        onSave: { _, _ in },
+        onDelete: {},
+        onCancel: {}
+    )
+    .environment(\.dynamicTypeSize, .accessibility2)
 }

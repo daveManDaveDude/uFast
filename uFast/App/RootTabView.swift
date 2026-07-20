@@ -21,6 +21,9 @@ struct RootTabView: View {
                 .accessibilityIdentifier(destination.accessibilityIdentifier)
             }
         }
+        .tint(UFastTheme.action)
+        .toolbarBackground(UFastTheme.canvas, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
     }
 
     @ViewBuilder

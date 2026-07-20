@@ -9,16 +9,42 @@ struct SettingsView: View {
 
     var body: some View {
         ScreenLayout(title: "Settings", identifier: "settings") {
-            List {
-                Section("Fasting goal") {
-                    FastingGoalPicker(selection: goalBinding)
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                        UFastSectionHeading(
+                            "Fasting goal",
+                            eyebrow: "\(selection.hours) hours selected"
+                        )
+                        Text(
+                            "This updates the target for an active fast. "
+                                + "Completed records keep their historical goal."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                if let saveError {
-                    Text(saveError)
-                        .foregroundStyle(.red)
-                        .accessibilityIdentifier("settings.goal.save-error")
+                        FastingGoalPicker(selection: goalBinding)
+                    }
+                    .uFastCard(accent: UFastTheme.sage)
+
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                        Label("Private by default", systemImage: "lock")
+                            .font(.headline)
+                            .foregroundStyle(UFastTheme.primary)
+                        Text("Your fasting goal and records stay on this device.")
+                            .foregroundStyle(UFastTheme.secondaryText)
+                    }
+                    .uFastCard()
+
+                    if let saveError {
+                        Label(saveError, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(UFastTheme.error)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("settings.goal.save-error")
+                    }
                 }
+                .padding(UFastTheme.Spacing.standard)
             }
         }
         .onAppear {
@@ -45,6 +71,9 @@ struct SettingsView: View {
         settings.setFastingGoal(goal)
 
         do {
+            if ProcessInfo.processInfo.arguments.contains("--simulate-goal-save-failure") {
+                throw GoalSaveFixtureError.simulated
+            }
             try modelContext.save()
             saveError = nil
         } catch {
@@ -53,4 +82,19 @@ struct SettingsView: View {
             saveError = "Your goal couldn’t be saved. Please try again."
         }
     }
+}
+
+private enum GoalSaveFixtureError: Error {
+    case simulated
+}
+
+#Preview("Settings") {
+    SettingsView()
+        .modelContainer(PreviewFixtures.modelContainer)
+}
+
+#Preview("Settings · Accessibility") {
+    SettingsView()
+        .modelContainer(PreviewFixtures.modelContainer)
+        .environment(\.dynamicTypeSize, .accessibility3)
 }

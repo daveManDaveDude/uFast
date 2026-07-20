@@ -28,6 +28,44 @@ final class FastStartUITests: XCTestCase {
     }
 
     @MainActor
+    func testInactiveTodayShowsStateGoalAndDerivedTargetBeforeStarting() {
+        let app = XCUIApplication()
+        app.launchArguments = fixedLaunchArguments(
+            now: fixedStart,
+            resetData: true
+        )
+        app.launch()
+        completeOnboarding(in: app)
+
+        XCTAssertEqual(app.staticTexts["fast.inactive-state"].label, "No fast is running.")
+        XCTAssertTrue(app.staticTexts["Your fasting goal is 12 hours."].exists)
+        XCTAssertTrue(app.staticTexts["fast.preview-target"].exists)
+        XCTAssertTrue(app.buttons["fast.start"].isHittable)
+        XCTAssertTrue(app.buttons["fast.start-past"].exists)
+        XCTAssertFalse(app.staticTexts["fast.elapsed"].exists)
+    }
+
+    @MainActor
+    func testInactiveTodayKeepsPrimaryActionsReachableAtAccessibilityTextSize() {
+        let app = XCUIApplication()
+        app.launchArguments = fixedLaunchArguments(
+            now: fixedStart,
+            resetData: true
+        ) + ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityExtraLarge"]
+        app.launch()
+        completeOnboarding(in: app)
+
+        let startButton = app.buttons["fast.start"]
+        XCTAssertTrue(startButton.waitForExistence(timeout: 2))
+        if !startButton.isHittable {
+            app.swipeUp()
+        }
+
+        XCTAssertTrue(startButton.isHittable)
+        XCTAssertTrue(app.buttons["fast.start-past"].exists)
+    }
+
+    @MainActor
     func testRelaunchAtAdvancedTimeCatchesUpAndShowsReachedTarget() {
         let app = XCUIApplication()
         app.launchArguments = fixedLaunchArguments(

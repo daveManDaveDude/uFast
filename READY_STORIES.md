@@ -5,6 +5,9 @@ persistence choice are accepted and OW-000 establishes the repository. A story
 marked **Ready** has no known material product question; a story marked **Draft**
 is preparation for later refinement and must not be implemented as if ready.
 
+The shared visual contract and implementation-ready Slice 1.5 stories OW-150
+through OW-155 are maintained in `SLICE_1_5_UX_STORIES.md`.
+
 ## OW-002 Set a fasting goal
 
 **Epic:** E0 Product foundation  

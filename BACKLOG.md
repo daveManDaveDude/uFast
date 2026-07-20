@@ -6,13 +6,26 @@
 
 ## Slice 1 — Fasting loop
 
-- OW-001 P0 — Minimal onboarding and product promise.
+- OW-001 P0 — Minimal onboarding and product promise. **Done 20 July 2026.**
 - OW-002 P0 — Set and change a goal of 8–24 whole hours. **Done 19 July 2026.**
 - OW-101 P0 — Start a fast now. **Done 19 July 2026.**
 - OW-102 P0 — Start or correct with a past time. **Done 19 July 2026.**
 - OW-103 P0 — See elapsed time, progress and target. **Done 19 July 2026.**
 - OW-104 P0 — End now or at a past time. **Done 19 July 2026.**
 - OW-105 P0 — View, edit and delete completed fasts. **Done 19 July 2026.**
+
+## Slice 1.5 — Fasting experience
+
+Slice 2 is paused until these stories are complete. The implementation-ready
+stories and shared visual contract are in `SLICE_1_5_UX_STORIES.md`.
+
+- OW-150 P0 — Establish the uFast visual foundation and app shell. **Done 20 July 2026.**
+- OW-151 P0 — Introduce uFast and choose a fasting goal. **Also completes the
+  product-promise outcome originally listed as OW-001. Done 20 July 2026.**
+- OW-152 P0 — Make the ready-to-fast Today state calm and obvious. **Done 20 July 2026.**
+- OW-153 P0 — Make an active fast glanceable and honest. **Done 20 July 2026.**
+- OW-154 P0 — Refine fasting corrections, completion and feedback. **Done 20 July 2026.**
+- OW-155 P0 — Make history and settings coherent and pass the UX quality gate. **Done 20 July 2026.**
 
 ## Slice 2 — Today
 
@@ -57,6 +70,8 @@
 
 `READY_STORIES.md` contains implementation-ready versions of OW-002, OW-101,
 OW-102, OW-103, OW-104 and OW-105, a full refinement of OW-106 pending two
-product decisions, and initial discovery for OW-107. The complete product pack
-also contains detailed examples for OW-203, OW-201, OW-302 and OW-401; copy those
-into individual story files as each slice is refined.
+product decisions, and initial discovery for OW-107.
+`SLICE_1_5_UX_STORIES.md` contains the implementation-ready visual contract and
+stories OW-150 through OW-155. The complete product pack also contains detailed
+examples for OW-203, OW-201, OW-302 and OW-401; copy those into individual story
+files as each slice is refined.

@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct TodayGoalView: View {
     @Environment(\.calendar) private var calendar
@@ -39,46 +40,40 @@ struct TodayGoalView: View {
                     .id(activeTimelineID)
                 } else {
                     let goal = settingsRecords.first?.fastingGoal ?? .default
+                    let presentation = InactiveFastPresentation(
+                        now: clock.now,
+                        goal: goal
+                    )
 
-                    ContentUnavailableView {
-                        Label("Today", systemImage: "sun.max")
-                    } description: {
-                        Text("Your fasting goal is \(goal.hours) hours.")
-                    } actions: {
-                        Button(startError == nil ? "Start fast" : "Try again") {
+                    InactiveFastView(
+                        goal: goal,
+                        target: formatted(presentation.targetDate),
+                        fastRecorded: fastRecorded,
+                        startError: startError,
+                        onStart: {
                             startFast(goal: goal)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .accessibilityIdentifier("fast.start")
-
-                        Button("Start at a past time") {
+                        },
+                        onStartPast: {
                             startTimeEditor = StartTimeEditorPresentation(
                                 mode: .create,
                                 initialStartDate: clock.now
                             )
                         }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("fast.start-past")
-
-                        if fastRecorded {
-                            Text("Fast recorded.")
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("fast.recorded")
-                        }
-
-                        if let startError {
-                            Text(startError)
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("fast.start-error")
-                        }
-                    }
+                    )
                 }
             }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 activeTimelineID = UUID()
+            }
+        }
+        .onChange(of: fastRecorded) { _, isRecorded in
+            if isRecorded {
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: "Fast recorded."
+                )
             }
         }
         .alert("End this fast?", isPresented: $isEndConfirmationPresented) {
@@ -135,19 +130,13 @@ struct TodayGoalView: View {
             targetDate: activeFast.targetDate(currentGoal: goal),
             now: now
         )
-        let target = presentation.targetDate.formatted(
-            Date.FormatStyle(
-                date: .abbreviated,
-                time: .shortened,
-                locale: locale,
-                calendar: calendar,
-                timeZone: timeZone
-            )
-        )
+        let target = formatted(presentation.targetDate)
+        let started = formatted(activeFast.startDate)
 
         return ActiveFastProgressView(
             presentation: presentation,
             goal: goal,
+            started: started,
             target: target,
             canEndNow: now > activeFast.startDate,
             endError: endError,
@@ -166,6 +155,18 @@ struct TodayGoalView: View {
                     initialEndDate: clock.now
                 )
             }
+        )
+    }
+
+    private func formatted(_ date: Date) -> String {
+        date.formatted(
+            Date.FormatStyle(
+                date: .abbreviated,
+                time: .shortened,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone
+            )
         )
     }
 
@@ -261,6 +262,92 @@ struct TodayGoalView: View {
             repository: repository,
             clock: clock
         )
+    }
+}
+
+private struct InactiveFastView: View {
+    let goal: FastingGoal
+    let target: String
+    let fastRecorded: Bool
+    let startError: String?
+    let onStart: () -> Void
+    let onStartPast: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: UFastTheme.Spacing.generous) {
+                HStack(spacing: UFastTheme.Spacing.standard) {
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                        Text("Ready when you are")
+                            .font(.uFastDisplay(.title))
+                            .foregroundStyle(UFastTheme.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("No fast is running.")
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .accessibilityIdentifier("fast.inactive-state")
+                    }
+                    Spacer(minLength: 0)
+                    FastingBotanicalThumbnail()
+                        .frame(width: 104)
+                }
+
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                    UFastSectionHeading("Your next target", eyebrow: "\(goal.hours)-hour goal")
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("If started now")
+                                .font(.caption)
+                                .foregroundStyle(UFastTheme.secondaryText)
+                            Text(target)
+                                .font(.uFastDisplay(.title2))
+                                .foregroundStyle(UFastTheme.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityLabel("Target if started now")
+                                .accessibilityValue(target)
+                                .accessibilityIdentifier("fast.preview-target")
+                        }
+                        Spacer()
+                        Image(systemName: "sun.horizon.fill")
+                            .font(.title)
+                            .foregroundStyle(UFastTheme.apricot)
+                            .accessibilityHidden(true)
+                    }
+                    Text("Your fasting goal is \(goal.hours) hours.")
+                        .font(.subheadline)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .uFastCard(accent: UFastTheme.sky)
+
+                if fastRecorded {
+                    Label("Fast recorded.", systemImage: "checkmark.circle")
+                        .font(.headline)
+                        .foregroundStyle(UFastTheme.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .uFastCard(accent: UFastTheme.sage)
+                        .accessibilityIdentifier("fast.recorded")
+                }
+
+                if let startError {
+                    Label(startError, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(UFastTheme.error)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("fast.start-error")
+                }
+
+                VStack(spacing: UFastTheme.Spacing.standard) {
+                    Button(startError == nil ? "Start fast" : "Try again", action: onStart)
+                        .buttonStyle(UFastPrimaryButtonStyle())
+                        .accessibilityIdentifier("fast.start")
+
+                    Button("Start at a past time", action: onStartPast)
+                        .buttonStyle(UFastSecondaryButtonStyle())
+                        .accessibilityIdentifier("fast.start-past")
+                }
+            }
+            .padding(UFastTheme.Spacing.standard)
+        }
     }
 }
 

@@ -31,4 +31,34 @@ enum PreviewFixtures {
             fatalError("Unable to create preview persistence: \(error)")
         }
     }
+
+    @MainActor
+    static var emptyModelContainer: ModelContainer {
+        do {
+            return try PersistenceContainer.make(inMemory: true)
+        } catch {
+            fatalError("Unable to create empty preview persistence: \(error)")
+        }
+    }
+
+    @MainActor
+    static var completedFastModelContainer: ModelContainer {
+        do {
+            let container = try PersistenceContainer.make(inMemory: true)
+            let now = Date(timeIntervalSince1970: 1_800_000_000)
+            container.mainContext.insert(
+                AppSettingsRecord(hasCompletedOnboarding: true)
+            )
+            container.mainContext.insert(
+                FastRecord(
+                    startDate: now.addingTimeInterval(-13 * 60 * 60),
+                    endDate: now,
+                    goalAtStart: .default
+                )
+            )
+            return container
+        } catch {
+            fatalError("Unable to create completed-fast preview persistence: \(error)")
+        }
+    }
 }

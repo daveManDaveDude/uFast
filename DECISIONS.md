@@ -92,3 +92,29 @@ is shown.
   rejected without changing either record. Conflicting data from an older build
   remains visible and can be deleted or edited into a valid interval, but is
   never silently repaired.
+
+## D-012 Slice 1.5 visual direction
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Amended:** 20 July 2026
+- **Decision:** Pause Slice 2 and use the six composite mockups in `images/` as
+  the visual direction for a bounded fasting-experience pass. Carry forward
+  their warm ivory foundation, deep evergreen hierarchy, restrained natural
+  accents, a consistent legible system sans-serif type family, rounded cards,
+  generous spacing, nature/window motifs and one-obvious-action composition.
+  Continue to use **uFast** as the working name.
+- **Consequence:** OW-150 through OW-155 establish and apply a reusable visual
+  system to onboarding, Today, active fasting, editors, History and Settings
+  before Slice 2 begins. The mockups are inspiration rather than a feature
+  specification: photo capture, AI interpretation, coaching, biological claims,
+  cloud features and other out-of-scope content shown in them remain excluded.
+  Composite mockup pixels are not shipped as interface assets; implementation
+  uses accessible native text, controls and purpose-made or code-native
+  decoration. Calm, non-interactive empty or explanatory states may use the
+  shared **illustrated information card** pattern: a rounded tonal surface with
+  restrained decorative artwork, a concise native heading and one short
+  supporting message placed over a quiet area. Text remains sufficient without
+  the artwork, and the pattern is not used for actions, warnings, forms or dense
+  data. `UX_STYLE_GUIDE.md` records the resulting semantic tokens, reusable
+  patterns, artwork rules and visual quality checklist for later slices.

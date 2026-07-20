@@ -37,6 +37,16 @@ struct EndTimeEditor: View {
         NavigationStack {
             Form {
                 Section {
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                        UFastSectionHeading("When did this fast end?", eyebrow: "End time")
+                        Text("The end must be after the recorded start and no later than now.")
+                            .font(.subheadline)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                    }
+                    .listRowBackground(UFastTheme.surface)
+                }
+
+                Section {
                     DatePicker(
                         "Date",
                         selection: $selectedEndDate,
@@ -52,22 +62,27 @@ struct EndTimeEditor: View {
                     .accessibilityIdentifier("fast.end-time")
                 } footer: {
                     if let validationMessage {
-                        Text(validationMessage)
-                            .foregroundStyle(.red)
+                        Label(validationMessage, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(UFastTheme.error)
+                            .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("fast.end-validation")
                     }
                 }
 
                 if let saveError {
                     Section {
-                        Text(saveError)
-                            .foregroundStyle(.secondary)
+                        Label(saveError, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(UFastTheme.error)
+                            .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("fast.end-save-error")
                     }
                 }
             }
             .navigationTitle("End time")
             .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(UFastTheme.canvas)
+            .tint(UFastTheme.action)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
@@ -97,4 +112,24 @@ struct EndTimeEditor: View {
             saveError = "Your end time couldn’t be saved. Please try again."
         }
     }
+}
+
+#Preview("End fast · Past time") {
+    EndTimeEditor(
+        startDate: Date(timeIntervalSince1970: 1_800_000_000 - 10800),
+        initialEndDate: Date(timeIntervalSince1970: 1_800_000_000 - 3600),
+        clock: FixedAppClock(now: Date(timeIntervalSince1970: 1_800_000_000)),
+        onConfirm: { _ in },
+        onCancel: {}
+    )
+}
+
+#Preview("End fast · Validation") {
+    EndTimeEditor(
+        startDate: Date(timeIntervalSince1970: 1_800_000_000),
+        initialEndDate: Date(timeIntervalSince1970: 1_800_000_000),
+        clock: FixedAppClock(now: Date(timeIntervalSince1970: 1_800_000_000)),
+        onConfirm: { _ in },
+        onCancel: {}
+    )
 }

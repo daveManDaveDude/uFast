@@ -73,6 +73,23 @@ struct StartTimeEditor: View {
         NavigationStack {
             Form {
                 Section {
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                        UFastSectionHeading(
+                            mode == .create ? "When did this fast start?" : "Correct the recorded start",
+                            eyebrow: "Start time"
+                        )
+                        Text(
+                            mode == .create
+                                ? "Choose the date and time you intend to record."
+                                : "Corrections are available for the preceding 24 hours."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                    }
+                    .listRowBackground(UFastTheme.surface)
+                }
+
+                Section {
                     DatePicker(
                         "Date",
                         selection: $selectedStartDate,
@@ -90,30 +107,31 @@ struct StartTimeEditor: View {
                     .accessibilityIdentifier("fast.start-time")
                 } footer: {
                     if isFutureStart {
-                        Text("Start time can’t be in the future.")
-                            .foregroundStyle(.red)
+                        validationLabel("Start time can’t be in the future.")
                             .accessibilityIdentifier("fast.start-validation")
                     } else if isBeyondCorrectionLimit {
-                        Text("Start time must be within the past 24 hours.")
-                            .foregroundStyle(.red)
+                        validationLabel("Start time must be within the past 24 hours.")
                             .accessibilityIdentifier("fast.start-validation")
                     } else if hasConflict(selectedStartDate) {
-                        Text("This fast overlaps another recorded fast.")
-                            .foregroundStyle(.red)
+                        validationLabel("This fast overlaps another recorded fast.")
                             .accessibilityIdentifier("fast.start-validation")
                     }
                 }
 
                 if let saveError {
                     Section {
-                        Text(saveError)
-                            .foregroundStyle(.secondary)
+                        Label(saveError, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(UFastTheme.error)
+                            .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("fast.start-save-error")
                     }
                 }
             }
             .navigationTitle("Start time")
             .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(UFastTheme.canvas)
+            .tint(UFastTheme.action)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
@@ -131,6 +149,12 @@ struct StartTimeEditor: View {
         }
     }
 
+    private func validationLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.circle")
+            .foregroundStyle(UFastTheme.error)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private func confirm() {
         guard !isInvalidStart else {
             return
@@ -143,4 +167,25 @@ struct StartTimeEditor: View {
             saveError = "Your start time couldn’t be saved. Please try again."
         }
     }
+}
+
+#Preview("Start fast · Past time") {
+    StartTimeEditor(
+        mode: .create,
+        initialStartDate: Date(timeIntervalSince1970: 1_800_000_000 - 3600),
+        clock: FixedAppClock(now: Date(timeIntervalSince1970: 1_800_000_000)),
+        onConfirm: { _ in },
+        onCancel: {}
+    )
+}
+
+#Preview("Start fast · Accessibility") {
+    StartTimeEditor(
+        mode: .correct,
+        initialStartDate: Date(timeIntervalSince1970: 1_800_000_000 - 3600),
+        clock: FixedAppClock(now: Date(timeIntervalSince1970: 1_800_000_000)),
+        onConfirm: { _ in },
+        onCancel: {}
+    )
+    .environment(\.dynamicTypeSize, .accessibility3)
 }

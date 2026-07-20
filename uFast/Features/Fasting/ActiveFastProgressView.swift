@@ -1,8 +1,11 @@
 import SwiftUI
 
 struct ActiveFastProgressView: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var timerSize = 50
+
     let presentation: ActiveFastPresentation
     let goal: FastingGoal
+    let started: String
     let target: String
     let canEndNow: Bool
     let endError: String?
@@ -12,67 +15,116 @@ struct ActiveFastProgressView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
+                VStack(spacing: UFastTheme.Spacing.compact) {
+                    Color.clear
+                        .frame(height: 1)
+                        .accessibilityElement()
+                        .accessibilityLabel(accessibilitySummary)
+                        .accessibilityIdentifier("fast.summary")
+
                     Label("Fast in progress", systemImage: "timer")
-                        .font(.headline)
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(UFastTheme.primary)
+                        .padding(.top, UFastTheme.Spacing.compact)
 
                     elapsedView
 
-                    ProgressView(value: presentation.progress)
-                        .accessibilityLabel("Progress")
-                        .accessibilityValue(presentation.progressAccessibilityValue(goal: goal))
-                        .accessibilityIdentifier("fast.progress")
-
-                    Text("Goal: \(goal.hours) hours")
-                        .accessibilityLabel("Goal")
-                        .accessibilityValue("\(goal.hours) hours")
-                        .accessibilityIdentifier("fast.goal")
-                    Text("Target: \(target)")
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel("Target")
-                        .accessibilityValue(target)
-                        .accessibilityIdentifier("fast.target")
-
                     if presentation.hasReachedGoal {
-                        Text("Goal time reached")
-                            .fontWeight(.semibold)
+                        Label("Goal time reached", systemImage: "checkmark.circle")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(UFastTheme.primary)
                             .accessibilityIdentifier("fast.goal-reached")
                     }
 
+                    ProgressView(value: presentation.progress)
+                        .progressViewStyle(UFastThickProgressStyle())
+                        .padding(.top, UFastTheme.Spacing.compact)
+                        .accessibilityLabel("Progress")
+                        .accessibilityValue(
+                            presentation.progressAccessibilityValue(goal: goal)
+                        )
+                        .accessibilityIdentifier("fast.progress")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, UFastTheme.Spacing.standard)
+                .padding(.horizontal, UFastTheme.Spacing.standard)
+                .background {
+                    ZStack {
+                        UFastTheme.sky.opacity(0.72)
+                        FastingBotanicalArtwork()
+                    }
+                }
+                .clipShape(.rect(cornerRadius: UFastTheme.Radius.hero))
+
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                    HStack(alignment: .top, spacing: UFastTheme.Spacing.standard) {
+                        fact(
+                            label: "Started",
+                            value: started,
+                            identifier: "fast.started",
+                            symbol: "clock"
+                        )
+                        Divider()
+                        fact(
+                            label: "Goal",
+                            value: "\(goal.hours) hours",
+                            identifier: "fast.goal",
+                            symbol: "scope"
+                        )
+                    }
+                    Divider()
+                    fact(
+                        label: "Target",
+                        value: target,
+                        identifier: "fast.target",
+                        symbol: "sun.horizon"
+                    )
+
+                    Button(action: onEditStart) {
+                        HStack(spacing: UFastTheme.Spacing.compact) {
+                            Label("Edit start time", systemImage: "pencil")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .buttonStyle(UFastActionRowButtonStyle())
+                    .accessibilityIdentifier("fast.edit-start")
+                }
+                .uFastCard()
+
+                if !canEndNow {
+                    Label(
+                        "This fast can’t end until after its recorded start time.",
+                        systemImage: "exclamationmark.circle"
+                    )
+                    .foregroundStyle(UFastTheme.error)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("fast.end-unavailable")
+                }
+
+                if let endError {
+                    Label(endError, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(UFastTheme.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("fast.end-error")
+                }
+
+                VStack(spacing: UFastTheme.Spacing.standard) {
                     Button("End fast", action: onEnd)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        .buttonStyle(UFastPrimaryButtonStyle())
                         .disabled(!canEndNow)
                         .accessibilityIdentifier("fast.end")
 
-                    if !canEndNow {
-                        Text("This fast can’t end until after its recorded start time.")
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("fast.end-unavailable")
-                    }
-
-                    if let endError {
-                        Text(endError)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("fast.end-error")
-                    }
+                    Button("End at a past time", action: onEndAtPastTime)
+                        .buttonStyle(UFastSecondaryButtonStyle())
+                        .accessibilityIdentifier("fast.end-past")
                 }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel(accessibilitySummary)
-
-                Button("Edit start time", action: onEditStart)
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("fast.edit-start")
-
-                Button("End at a past time", action: onEndAtPastTime)
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("fast.end-past")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
+            .padding(UFastTheme.Spacing.standard)
         }
     }
 
@@ -82,11 +134,14 @@ struct ActiveFastProgressView: View {
             let accessibilityText = presentation.elapsedAccessibilityText ?? elapsedText
 
             Text("Elapsed time")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.title3.weight(.medium))
+                .foregroundStyle(UFastTheme.secondaryText)
             Text(elapsedText)
-                .font(.largeTitle)
-                .fontWeight(.semibold)
+                .font(.system(size: timerSize, weight: .semibold, design: .default))
+                .monospacedDigit()
+                .foregroundStyle(UFastTheme.primary)
+                .minimumScaleFactor(0.62)
+                .lineLimit(1)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel("Elapsed time")
                 .accessibilityValue(accessibilityText)
@@ -95,6 +150,34 @@ struct ActiveFastProgressView: View {
             Text("Elapsed time isn’t available while the recorded start is in the future.")
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("fast.elapsed-unavailable")
+        }
+    }
+
+    private func fact(
+        label: String,
+        value: String,
+        identifier: String,
+        symbol: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: UFastTheme.Spacing.compact) {
+            Image(systemName: symbol)
+                .foregroundStyle(UFastTheme.action)
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(UFastTheme.secondaryText)
+                Text(value)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(UFastTheme.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(label)
+            .accessibilityValue(value)
+            .accessibilityIdentifier(identifier)
         }
     }
 
@@ -110,6 +193,7 @@ struct ActiveFastProgressView: View {
         }
 
         components.append("Goal \(goal.hours) hours")
+        components.append("Started \(started)")
         components.append("Target \(target)")
 
         if presentation.hasReachedGoal {
@@ -117,5 +201,44 @@ struct ActiveFastProgressView: View {
         }
 
         return components.joined(separator: ", ")
+    }
+}
+
+#Preview("Active fast · In progress") {
+    ActiveFastProgressPreview(elapsedHours: 6)
+}
+
+#Preview("Active fast · Goal reached") {
+    ActiveFastProgressPreview(elapsedHours: 13)
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Active fast · Accessibility") {
+    ActiveFastProgressPreview(elapsedHours: 6)
+        .environment(\.dynamicTypeSize, .accessibility3)
+}
+
+private struct ActiveFastProgressPreview: View {
+    let elapsedHours: Double
+
+    private let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    var body: some View {
+        ActiveFastProgressView(
+            presentation: ActiveFastPresentation(
+                startDate: start,
+                targetDate: start.addingTimeInterval(12 * 60 * 60),
+                now: start.addingTimeInterval(elapsedHours * 60 * 60)
+            ),
+            goal: .default,
+            started: "Jan 15, 7:00 PM",
+            target: "Jan 16, 7:00 AM",
+            canEndNow: true,
+            endError: nil,
+            onEnd: {},
+            onEditStart: {},
+            onEndAtPastTime: {}
+        )
+        .background(UFastTheme.canvas)
     }
 }

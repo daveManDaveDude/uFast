@@ -7,9 +7,12 @@ final class FastingGoalUITests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-data"]
         app.launch()
 
-        let picker = app.buttons["goal.picker"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 2))
-        XCTAssertEqual(picker.value as? String, "12 hours")
+        XCTAssertTrue(app.staticTexts["goal.promise"].waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            app.staticTexts["goal.promise"].label,
+            "A calm, private companion for recording your fasts."
+        )
+        XCTAssertTrue(app.buttons["goal.option.12"].isSelected)
         XCTAssertTrue(app.buttons["goal.continue"].isEnabled)
 
         selectGoal(16, in: app)
@@ -21,9 +24,8 @@ final class FastingGoalUITests: XCTestCase {
         app.launch()
         app.tabBars.buttons["Settings"].tap()
 
-        let persistedPicker = app.buttons["goal.picker"]
-        XCTAssertTrue(persistedPicker.waitForExistence(timeout: 2))
-        XCTAssertEqual(persistedPicker.value as? String, "16 hours")
+        XCTAssertTrue(app.buttons["goal.option.16"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["goal.option.16"].isSelected)
     }
 
     @MainActor
@@ -57,14 +59,72 @@ final class FastingGoalUITests: XCTestCase {
     }
 
     @MainActor
-    private func selectGoal(_ hours: Int, in app: XCUIApplication) {
-        let picker = app.buttons["goal.picker"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 2))
-        picker.tap()
+    func testEveryWholeHourChoiceIsAvailableAndSelectedWithoutColourAlone() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launch()
 
-        let option = app.buttons["\(hours) hours"]
+        for hours in 8 ... 24 {
+            XCTAssertTrue(
+                app.buttons["goal.option.\(hours)"].exists,
+                "Missing \(hours)-hour goal"
+            )
+        }
+
+        selectGoal(24, in: app)
+        XCTAssertTrue(app.buttons["goal.option.24"].isSelected)
+        XCTAssertFalse(app.buttons["goal.option.12"].isSelected)
+    }
+
+    @MainActor
+    func testOnboardingSaveFailureRetainsSelectionAndShowsRetryMessage() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-data", "--simulate-goal-save-failure"]
+        app.launch()
+
+        selectGoal(16, in: app)
+        app.buttons["goal.continue"].tap()
+
+        XCTAssertTrue(app.staticTexts["goal.save-error"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["goal.option.16"].isSelected)
+        XCTAssertTrue(app.buttons["goal.continue"].isHittable)
+        XCTAssertFalse(app.tabBars.buttons["Today"].exists)
+    }
+
+    @MainActor
+    func testSettingsSaveFailureRestoresPreviousGoal() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launch()
+        app.buttons["goal.continue"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 2))
+
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--simulate-goal-save-failure"]
+        app.launch()
+        app.tabBars.buttons["Settings"].tap()
+        let sixteenHours = app.buttons["goal.option.16"]
+        XCTAssertTrue(sixteenHours.waitForExistence(timeout: 2))
+        if !sixteenHours.isHittable {
+            app.swipeUp()
+        }
+        sixteenHours.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["settings.goal.save-error"].waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(app.buttons["goal.option.12"].isSelected)
+        XCTAssertFalse(app.buttons["goal.option.16"].isSelected)
+    }
+
+    @MainActor
+    private func selectGoal(_ hours: Int, in app: XCUIApplication) {
+        let option = app.buttons["goal.option.\(hours)"]
         XCTAssertTrue(option.waitForExistence(timeout: 2))
+        if !option.isHittable {
+            app.swipeUp()
+        }
         option.tap()
-        XCTAssertEqual(picker.value as? String, "\(hours) hours")
+        XCTAssertTrue(option.isSelected)
     }
 }

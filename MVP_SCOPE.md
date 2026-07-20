@@ -30,6 +30,8 @@
 
 0. Foundation: repository, navigation, persistence, test harness and guidance.
 1. Fasting loop: set goal, start, observe, end.
+1.5. Fasting experience: establish the visual system and make the complete
+   fasting loop calm, glanceable and recognisably uFast before expanding it.
 2. Today: manual food and hydration timeline.
 3. Catch-up: backdate and reconstruct with confirmation.
 4. Progress: HealthKit weight and steps.

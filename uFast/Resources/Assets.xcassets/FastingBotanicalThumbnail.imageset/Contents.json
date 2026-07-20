@@ -1,10 +1,9 @@
 {
   "images" : [
     {
-      "filename" : "AppIcon.png",
+      "filename" : "FastingBotanicalThumbnail.png",
       "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "scale" : "1x"
     },
     {
       "appearances" : [
@@ -13,10 +12,9 @@
           "value" : "dark"
         }
       ],
-      "filename" : "AppIcon-dark.png",
+      "filename" : "FastingBotanicalThumbnail-dark.png",
       "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "scale" : "1x"
     }
   ],
   "info" : {
