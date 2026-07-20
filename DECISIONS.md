@@ -135,3 +135,73 @@ is shown.
   succeed or neither is presented as successful. There is no **Save entry
   only** path for a caloric event during an active fast. Non-caloric events do
   not change the fast, and no event silently changes it.
+
+## S2-D1 Food fields and input bounds
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Decision:** Optional manual details are energy in kcal and protein,
+  carbohydrate, fat, fibre, sugar and salt in grams. Each field is independently
+  optional and non-negative. Food descriptions are limited to 200
+  user-perceived characters. The app performs no calculation or estimation.
+  Numeric values must be finite and no greater than 1,000,000; this is a
+  defensive storage limit, not intake guidance.
+- **Consequence:** Omitted values remain absent, descriptions are never silently
+  truncated, and invalid numeric storage is rejected without presenting goals
+  or recommendations.
+
+## S2-D2 Hydration defaults, units and input bounds
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Decision:** Use metric millilitres only for MVP. Initial favourites are
+  Water 500 ml, Tea 300 ml and Coffee 300 ml. OW-204 adds Settings controls for
+  changing those defaults, affecting future events only. Accept 1–5,000 ml per
+  event. Custom drinks default to non-caloric, always expose an editable
+  classification and limit names to 80 user-perceived characters. Do not add
+  hydration targets.
+- **Consequence:** Every event retains its recorded volume and all hydration
+  totals remain neutral descriptions rather than goals.
+
+## S2-D3 Two-tap hydration
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Decision:** From Today, the first tap opens **Add a drink**. The second tap
+  selects Water, Tea or Coffee and immediately saves the configured amount at
+  the current time. On success the sheet dismisses, Today updates and the
+  result is announced accessibly. Editing happens from the timeline.
+- **Consequence:** Favourite hydration meets the two-tap outcome without adding
+  permanent competing actions to the fasting hero.
+
+## S2-D4 Caloric events during an active fast
+
+- **Status:** Accepted as D-013
+- **Accepted:** 20 July 2026
+- **Decision:** D-013 is the complete Slice 2 decision. A caloric event after
+  an active fast starts requires **Save and end fast** or **Cancel**; event save
+  and fast completion are atomic. An event before the start does not affect the
+  fast, and an event exactly at the start must be corrected or cancelled.
+- **Consequence:** Slice 2 offers no path that saves a caloric event during an
+  active fast while leaving the fast active.
+
+## S2-D5 Backdating in Slice 2
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Decision:** Permit any non-future time within today in the current local
+  calendar. Opening or adding to earlier calendar days begins with OW-301.
+  Stored instants remain unchanged across time-zone changes.
+- **Consequence:** Slice 2 stays focused on Today while preserving BR-12.
+
+## S2-D6 Today timeline and fluid total
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Decision:** Show food and hydration events only, newest first, below the
+  fasting hero and logging actions. For equal occurrence times, order by
+  `createdAt` descending and then stable identifier. Every hydration event
+  contributes its recorded volume to the neutral **Fluids today** total,
+  including caloric custom drinks.
+- **Consequence:** Fasts are not timeline rows, food never implies fluid, and
+  the app adds no hydration target or judgment.

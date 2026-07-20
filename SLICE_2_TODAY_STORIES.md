@@ -1,6 +1,6 @@
 # Slice 2 — Today
 
-**Status:** Draft pending the Slice 2 decisions below  
+**Status:** Done 20 July 2026; S2-D1 through S2-D6 accepted
 **Last refined:** 20 July 2026  
 **Prerequisite:** Slice 1.5 is complete.
 
@@ -99,28 +99,29 @@ Later slices own:
 - Treat schema expansion as an additive migration. Existing settings and fast
   records must survive first launch of the updated build.
 
-## Decisions required before implementation
+## Accepted decisions
 
-These questions are material. Until they are accepted in `DECISIONS.md`, the
-stories that cite them remain Draft.
+S2-D1 through S2-D6 were accepted on 20 July 2026 and are recorded in
+`DECISIONS.md`. The choices below are the implementation contract.
 
 ### S2-D1 — Food fields and input bounds
 
 Choose the optional values exposed by **Add details**.
 
-**Recommended:** energy in kcal plus protein, carbohydrate, fat, fibre, sugar
+**Accepted:** energy in kcal plus protein, carbohydrate, fat, fibre, sugar
 and salt in grams. Every field is independently optional, non-negative and
 manually entered; the app calculates no totals and makes no estimates. Limit a
 food description to 200 user-perceived characters. Use bounds that prevent
 invalid numeric storage rather than suggesting a recommended intake; document
-those defensive bounds in the editor and tests.
+those defensive bounds in the editor and tests. The defensive maximum is
+1,000,000 per numeric field; it is not intake guidance.
 
 ### S2-D2 — Hydration defaults, units and input bounds
 
 Choose the canonical/display unit, initial amounts and whether Slice 2 includes
 editing those defaults.
 
-**Recommended:** metric-only millilitres for MVP; initial favourites are water
+**Accepted:** metric-only millilitres for MVP; initial favourites are water
 500 ml, tea 300 ml and coffee 300 ml; OW-204 adds a Settings section for editing
 each favourite amount. Accept 1–5,000 ml per event and do not add a hydration
 target. Default a custom drink to non-caloric, require the user-visible control,
@@ -131,7 +132,7 @@ and limit its trimmed name to 80 user-perceived characters.
 Choose whether a Today favourite logs immediately or requires a confirmation
 sheet.
 
-**Recommended:** tap **Add drink** on Today, then tap Water, Tea or Coffee in
+**Accepted:** tap **Add drink** on Today, then tap Water, Tea or Coffee in
 the drink sheet. The second tap saves with the favourite amount and current
 time, dismisses the sheet and announces success. Editing remains available
 from the timeline. This meets the two-tap outcome while reducing accidental
@@ -152,7 +153,7 @@ active interval uses the same rule.
 
 Choose the date range available before Catch-up exists.
 
-**Recommended:** Slice 2 permits any non-future time within today in the
+**Accepted:** Slice 2 permits any non-future time within today in the
 current local calendar. OW-301 introduces navigation to and entry on earlier
 days. Existing events remain editable if a time-zone change causes them to
 appear on a different local day.
@@ -161,7 +162,7 @@ appear on a different local day.
 
 Choose ordering, contents and what contributes to the total.
 
-**Recommended:** show food and hydration events only, newest first, below the
+**Accepted:** show food and hydration events only, newest first, below the
 fasting hero and logging actions. Sum every hydration event's recorded volume,
 including caloric custom drinks, into a neutral **Fluids today** total. Do not
 include fast boundaries as timeline rows, infer liquid from food, set a target
@@ -173,7 +174,7 @@ or judge the amount.
 
 **Epic:** E2 Manual daily log  
 **Priority:** P0  
-**Status:** Draft pending S2-D1 and S2-D5
+**Status:** Done 20 July 2026
 
 ### User story
 
@@ -326,7 +327,7 @@ photo, interpretation, nutrition calculation or earlier-day journey is added.
 - [x] Relevant states and rules are defined.
 - [x] Privacy and accessibility are covered.
 - [x] Dependencies and verification are known.
-- [ ] No material product question remains unresolved (S2-D1, S2-D5).
+- [x] No material product question remains unresolved (S2-D1, S2-D5).
 
 ---
 
@@ -334,7 +335,7 @@ photo, interpretation, nutrition calculation or earlier-day journey is added.
 
 **Epic:** E2 Manual daily log  
 **Priority:** P0  
-**Status:** Draft pending S2-D2; S2-D4 accepted as D-013
+**Status:** Done 20 July 2026
 
 ### User story
 
@@ -468,7 +469,7 @@ a caloric state through interpretation.
 - [x] Relevant states and rules are defined.
 - [x] Privacy and accessibility are covered.
 - [x] Dependencies and verification are known.
-- [ ] No material product question remains unresolved (S2-D2).
+- [x] No material product question remains unresolved (S2-D2).
 
 ---
 
@@ -476,7 +477,7 @@ a caloric state through interpretation.
 
 **Epic:** E2 Manual daily log  
 **Priority:** P0  
-**Status:** Draft pending S2-D2 and S2-D3
+**Status:** Done 20 July 2026
 
 ### User story
 
@@ -595,7 +596,7 @@ without adding undo or custom-drink scope.
 - [x] Relevant states and rules are defined.
 - [x] Privacy and accessibility are covered.
 - [x] Dependencies and verification are known.
-- [ ] No material product question remains unresolved (S2-D2, S2-D3).
+- [x] No material product question remains unresolved (S2-D2, S2-D3).
 
 ---
 
@@ -603,7 +604,7 @@ without adding undo or custom-drink scope.
 
 **Epic:** E2 Manual daily log  
 **Priority:** P0  
-**Status:** Draft pending S2-D2 and S2-D5; S2-D4 accepted as D-013
+**Status:** Done 20 July 2026
 
 ### User story
 
@@ -736,7 +737,7 @@ locally persisted and free of targets or inferred classification.
 - [x] Relevant states and rules are defined.
 - [x] Privacy and accessibility are covered.
 - [x] Dependencies and verification are known.
-- [ ] No material product question remains unresolved (S2-D2, S2-D5).
+- [x] No material product question remains unresolved (S2-D2, S2-D5).
 
 ---
 
@@ -744,7 +745,7 @@ locally persisted and free of targets or inferred classification.
 
 **Epic:** E2 Manual daily log  
 **Priority:** P0  
-**Status:** Draft pending S2-D6
+**Status:** Done 20 July 2026
 
 ### User story
 
@@ -892,7 +893,7 @@ Catch-up, photo, AI, coaching, cloud or health-claim scope enters the diff.
 - [x] Relevant states and rules are defined.
 - [x] Privacy and accessibility are covered.
 - [x] Dependencies and verification are known.
-- [ ] No material product question remains unresolved (S2-D6).
+- [x] No material product question remains unresolved (S2-D6).
 
 ## Slice 2 implementation order
 

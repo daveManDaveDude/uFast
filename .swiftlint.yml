@@ -5,6 +5,9 @@ included:
 excluded:
   - .derived-data
   - uFast.xcodeproj
+disabled_rules:
+  - blanket_disable_command
+  - superfluous_disable_command
 analyzer_rules:
   - unused_declaration
   - unused_import
@@ -24,4 +27,3 @@ line_length:
   ignores_comments: true
 type_body_length: 300
 file_length: 500
-

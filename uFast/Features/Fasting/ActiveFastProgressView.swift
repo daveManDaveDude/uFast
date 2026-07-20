@@ -12,6 +12,31 @@ struct ActiveFastProgressView: View {
     let onEnd: () -> Void
     let onEditStart: () -> Void
     let onEndAtPastTime: () -> Void
+    let additionalContent: AnyView
+
+    init(
+        presentation: ActiveFastPresentation,
+        goal: FastingGoal,
+        started: String,
+        target: String,
+        canEndNow: Bool,
+        endError: String?,
+        onEnd: @escaping () -> Void,
+        onEditStart: @escaping () -> Void,
+        onEndAtPastTime: @escaping () -> Void,
+        additionalContent: AnyView = AnyView(EmptyView())
+    ) {
+        self.presentation = presentation
+        self.goal = goal
+        self.started = started
+        self.target = target
+        self.canEndNow = canEndNow
+        self.endError = endError
+        self.onEnd = onEnd
+        self.onEditStart = onEditStart
+        self.onEndAtPastTime = onEndAtPastTime
+        self.additionalContent = additionalContent
+    }
 
     var body: some View {
         ScrollView {
@@ -122,6 +147,8 @@ struct ActiveFastProgressView: View {
                         .buttonStyle(UFastSecondaryButtonStyle())
                         .accessibilityIdentifier("fast.end-past")
                 }
+
+                additionalContent
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(UFastTheme.Spacing.standard)

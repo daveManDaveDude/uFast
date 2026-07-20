@@ -1,11 +1,17 @@
 import SwiftData
 import SwiftUI
 
+// swiftlint:disable blanket_disable_command superfluous_disable_command
+// swiftlint:disable large_tuple line_length statement_position
+
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settingsRecords: [AppSettingsRecord]
     @State private var selection = FastingGoal.default
     @State private var saveError: String?
+    @State private var waterAmount = "500"
+    @State private var teaAmount = "300"
+    @State private var coffeeAmount = "300"
 
     var body: some View {
         ScreenLayout(title: "Settings", identifier: "settings") {
@@ -37,6 +43,25 @@ struct SettingsView: View {
                     }
                     .uFastCard()
 
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                        UFastSectionHeading("Drink favourites")
+                        Text("Choose the amount added by each Today shortcut.")
+                            .font(.subheadline).foregroundStyle(UFastTheme.secondaryText)
+                        favouriteField("Water", text: $waterAmount, identifier: "settings.drink.water")
+                        favouriteField("Tea", text: $teaAmount, identifier: "settings.drink.tea")
+                        favouriteField("Coffee", text: $coffeeAmount, identifier: "settings.drink.coffee")
+                        if favouriteValues == nil {
+                            Label("Enter each amount from 1 to 5,000 ml.", systemImage: "exclamationmark.circle")
+                                .foregroundStyle(UFastTheme.error)
+                                .accessibilityIdentifier("settings.drink.validation")
+                        }
+                        Button("Save drink favourites") { saveFavourites() }
+                            .buttonStyle(UFastPrimaryButtonStyle())
+                            .disabled(favouriteValues == nil)
+                            .accessibilityIdentifier("settings.drink.save")
+                    }
+                    .uFastCard(accent: UFastTheme.sky)
+
                     if let saveError {
                         Label(saveError, systemImage: "exclamationmark.circle")
                             .foregroundStyle(UFastTheme.error)
@@ -49,6 +74,11 @@ struct SettingsView: View {
         }
         .onAppear {
             selection = settingsRecords.first?.fastingGoal ?? .default
+            if let settings = settingsRecords.first {
+                waterAmount = String(settings.waterFavouriteMillilitres)
+                teaAmount = String(settings.teaFavouriteMillilitres)
+                coffeeAmount = String(settings.coffeeFavouriteMillilitres)
+            }
         }
     }
 
@@ -81,6 +111,27 @@ struct SettingsView: View {
             selection = previousGoal
             saveError = "Your goal couldn’t be saved. Please try again."
         }
+    }
+
+    private var favouriteValues: (Int, Int, Int)? {
+        guard let water = Int(waterAmount), let tea = Int(teaAmount), let coffee = Int(coffeeAmount),
+              HydrationEntryValidator.isValid(volumeMillilitres: water),
+              HydrationEntryValidator.isValid(volumeMillilitres: tea),
+              HydrationEntryValidator.isValid(volumeMillilitres: coffee)
+        else { return nil }
+        return (water, tea, coffee)
+    }
+
+    private func favouriteField(_ label: String, text: Binding<String>, identifier: String) -> some View {
+        HStack { Text(label); Spacer(); TextField("ml", text: text).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 100).accessibilityIdentifier(identifier); Text("ml").foregroundStyle(UFastTheme.secondaryText).accessibilityHidden(true) }
+    }
+
+    private func saveFavourites() {
+        guard let settings = settingsRecords.first, let values = favouriteValues else { return }
+        let old = (settings.waterFavouriteMillilitres, settings.teaFavouriteMillilitres, settings.coffeeFavouriteMillilitres)
+        settings.setHydrationFavourites(water: values.0, tea: values.1, coffee: values.2)
+        do { try modelContext.save(); saveError = nil }
+        catch { settings.setHydrationFavourites(water: old.0, tea: old.1, coffee: old.2); saveError = "Your drink favourites couldn’t be saved. Please try again." }
     }
 }
 

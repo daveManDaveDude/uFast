@@ -32,16 +32,11 @@ stories and shared visual contract are in `SLICE_1_5_UX_STORIES.md`.
 The fully refined stories, shared behaviour/visual contract, decision gate and
 autonomous-session prompt are in `SLICE_2_TODAY_STORIES.md`.
 
-- OW-201 P0 — Add, edit, backdate and delete a text food event. **Draft pending
-  the Slice 2 decision gate.**
-- OW-202 P0 — Mark whether an event is caloric. **Draft pending the Slice 2
-  decision gate.**
-- OW-203 P0 — Quick-add water, tea or coffee. **Draft pending the Slice 2
-  decision gate.**
-- OW-204 P0 — Add and edit custom hydration. **Draft pending the Slice 2
-  decision gate.**
-- OW-205 P0 — Combined Today timeline. **Draft pending the Slice 2 decision
-  gate.**
+- OW-201 P0 — Add, edit, backdate and delete a text food event. **Done 20 July 2026.**
+- OW-202 P0 — Mark whether an event is caloric. **Done 20 July 2026.**
+- OW-203 P0 — Quick-add water, tea or coffee. **Done 20 July 2026.**
+- OW-204 P0 — Add and edit custom hydration. **Done 20 July 2026.**
+- OW-205 P0 — Combined Today timeline. **Done 20 July 2026.**
 
 ## Slice 3 — Catch-up
 
