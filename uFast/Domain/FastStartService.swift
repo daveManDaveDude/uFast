@@ -3,14 +3,17 @@ import Foundation
 @MainActor
 protocol ActiveFastRepository {
     func activeFast() throws -> FastRecord?
+    func recordedFasts() throws -> [FastRecord]
     func saveNewActiveFast(_ fast: FastRecord) throws
     func updateStartDate(of fast: FastRecord, to startDate: Date) throws
+    func complete(_ fast: FastRecord, at endDate: Date, goal: FastingGoal) throws
 }
 
 enum FastStartError: Error, Equatable {
     case futureStartTime
     case noActiveFast
     case startTimeBeyondCorrectionLimit
+    case conflict
 }
 
 @MainActor
@@ -41,6 +44,10 @@ final class FastStartService {
             return activeFast
         }
 
+        guard try !hasConflict(startDate: startDate) else {
+            throw FastStartError.conflict
+        }
+
         let fast = FastRecord(
             startDate: startDate,
             goalAtStart: goal
@@ -59,8 +66,24 @@ final class FastStartService {
         guard let activeFast = try repository.activeFast() else {
             throw FastStartError.noActiveFast
         }
+        guard try !hasConflict(startDate: startDate, excluding: activeFast.id) else {
+            throw FastStartError.conflict
+        }
 
         try repository.updateStartDate(of: activeFast, to: startDate)
         return activeFast
+    }
+
+    func hasConflict(
+        startDate: Date,
+        excluding excludedID: UUID? = nil
+    ) throws -> Bool {
+        let intervals = try repository.recordedFasts().map(\.recordedInterval)
+        return FastConflictChecker.hasConflict(
+            proposedStart: startDate,
+            proposedEnd: nil,
+            excluding: excludedID,
+            among: intervals
+        )
     }
 }

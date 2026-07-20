@@ -33,4 +33,22 @@ final class FastRecordTests: XCTestCase {
         XCTAssertEqual(fast.targetDate(currentGoal: currentGoal), startDate.addingTimeInterval(16 * 60 * 60))
         XCTAssertEqual(fast.duration, 15 * 60 * 60)
     }
+
+    func testCompletionMutatesActiveFastOnceAndCapturesCompletionGoal() throws {
+        let completionGoal = try XCTUnwrap(FastingGoal(hours: 18))
+        let repeatedGoal = try XCTUnwrap(FastingGoal(hours: 20))
+        let endDate = startDate.addingTimeInterval(18 * 60 * 60)
+        let fast = FastRecord(startDate: startDate, goalAtStart: .default)
+
+        XCTAssertTrue(fast.complete(at: endDate, goal: completionGoal))
+        XCTAssertFalse(
+            fast.complete(
+                at: endDate.addingTimeInterval(60),
+                goal: repeatedGoal
+            )
+        )
+
+        XCTAssertEqual(fast.endDate, endDate)
+        XCTAssertEqual(fast.historicalGoal, completionGoal)
+    }
 }

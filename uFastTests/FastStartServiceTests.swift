@@ -173,6 +173,67 @@ final class FastStartServiceTests: XCTestCase {
         XCTAssertEqual(duplicateResult.startDate, firstStart)
     }
 
+    func testPastStartRejectsCompletedOverlapAndAllowsTouchingBoundary() throws {
+        let completed = FastRecord(
+            startDate: now.addingTimeInterval(-7200),
+            endDate: now.addingTimeInterval(-3600),
+            goalAtStart: .default
+        )
+        let repository = ActiveFastRepositorySpy(savedFasts: [completed])
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+
+        XCTAssertThrowsError(
+            try service.startFast(
+                at: now.addingTimeInterval(-5400),
+                goal: .default
+            )
+        ) { error in
+            XCTAssertEqual(error as? FastStartError, .conflict)
+        }
+        XCTAssertEqual(repository.savedFasts.count, 1)
+
+        let active = try service.startFast(
+            at: now.addingTimeInterval(-3600),
+            goal: .default
+        )
+
+        XCTAssertEqual(active.startDate, completed.endDate)
+        XCTAssertEqual(repository.savedFasts.count, 2)
+    }
+
+    func testCorrectionRejectsCompletedOverlapAndAllowsTouchingBoundary() throws {
+        let completed = FastRecord(
+            startDate: now.addingTimeInterval(-10800),
+            endDate: now.addingTimeInterval(-7200),
+            goalAtStart: .default
+        )
+        let originalStart = now.addingTimeInterval(-3600)
+        let active = FastRecord(startDate: originalStart, goalAtStart: .default)
+        let repository = ActiveFastRepositorySpy(savedFasts: [completed, active])
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+
+        XCTAssertThrowsError(
+            try service.correctActiveFastStart(
+                to: now.addingTimeInterval(-9000)
+            )
+        ) { error in
+            XCTAssertEqual(error as? FastStartError, .conflict)
+        }
+        XCTAssertEqual(active.startDate, originalStart)
+
+        let corrected = try service.correctActiveFastStart(
+            to: now.addingTimeInterval(-7200)
+        )
+
+        XCTAssertEqual(corrected.startDate, completed.endDate)
+    }
+
     func testExactInstantsAroundLondonClockChangesArePreserved() throws {
         let formatter = ISO8601DateFormatter()
         var instants: [Date] = []
@@ -231,6 +292,10 @@ private final class ActiveFastRepositorySpy: ActiveFastRepository {
         savedFasts.first(where: \.isActive)
     }
 
+    func recordedFasts() throws -> [FastRecord] {
+        savedFasts
+    }
+
     func saveNewActiveFast(_ fast: FastRecord) throws {
         if let saveError {
             throw saveError
@@ -244,6 +309,12 @@ private final class ActiveFastRepositorySpy: ActiveFastRepository {
         }
         fast.correctStartDate(to: startDate)
         updatedStartDates.append(startDate)
+    }
+
+    func complete(_: FastRecord, at _: Date, goal _: FastingGoal) throws {
+        if let saveError {
+            throw saveError
+        }
     }
 }
 

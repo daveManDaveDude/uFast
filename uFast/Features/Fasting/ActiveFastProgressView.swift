@@ -4,7 +4,11 @@ struct ActiveFastProgressView: View {
     let presentation: ActiveFastPresentation
     let goal: FastingGoal
     let target: String
+    let canEndNow: Bool
+    let endError: String?
+    let onEnd: () -> Void
     let onEditStart: () -> Void
+    let onEndAtPastTime: () -> Void
 
     var body: some View {
         ScrollView {
@@ -35,6 +39,26 @@ struct ActiveFastProgressView: View {
                             .fontWeight(.semibold)
                             .accessibilityIdentifier("fast.goal-reached")
                     }
+
+                    Button("End fast", action: onEnd)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .disabled(!canEndNow)
+                        .accessibilityIdentifier("fast.end")
+
+                    if !canEndNow {
+                        Text("This fast can’t end until after its recorded start time.")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("fast.end-unavailable")
+                    }
+
+                    if let endError {
+                        Text(endError)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("fast.end-error")
+                    }
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(accessibilitySummary)
@@ -42,6 +66,10 @@ struct ActiveFastProgressView: View {
                 Button("Edit start time", action: onEditStart)
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier("fast.edit-start")
+
+                Button("End at a past time", action: onEndAtPastTime)
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("fast.end-past")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()

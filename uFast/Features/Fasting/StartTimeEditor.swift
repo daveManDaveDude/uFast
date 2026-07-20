@@ -17,6 +17,7 @@ struct StartTimeEditor: View {
 
     let mode: Mode
     let clock: any AppClock
+    let hasConflict: (Date) -> Bool
     let onConfirm: (Date) throws -> Void
     let onCancel: () -> Void
 
@@ -27,11 +28,13 @@ struct StartTimeEditor: View {
         mode: Mode,
         initialStartDate: Date,
         clock: any AppClock,
+        hasConflict: @escaping (Date) -> Bool = { _ in false },
         onConfirm: @escaping (Date) throws -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.mode = mode
         self.clock = clock
+        self.hasConflict = hasConflict
         self.onConfirm = onConfirm
         self.onCancel = onCancel
         _selectedStartDate = State(initialValue: initialStartDate)
@@ -52,7 +55,7 @@ struct StartTimeEditor: View {
     }
 
     private var isInvalidStart: Bool {
-        isFutureStart || isBeyondCorrectionLimit
+        isFutureStart || isBeyondCorrectionLimit || hasConflict(selectedStartDate)
     }
 
     private var allowedStartRange: ClosedRange<Date> {
@@ -92,6 +95,10 @@ struct StartTimeEditor: View {
                             .accessibilityIdentifier("fast.start-validation")
                     } else if isBeyondCorrectionLimit {
                         Text("Start time must be within the past 24 hours.")
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("fast.start-validation")
+                    } else if hasConflict(selectedStartDate) {
+                        Text("This fast overlaps another recorded fast.")
                             .foregroundStyle(.red)
                             .accessibilityIdentifier("fast.start-validation")
                     }

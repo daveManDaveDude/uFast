@@ -27,3 +27,8 @@
 - BR-15: Copy describes records and patterns, not diagnosis or guaranteed physiology.
 - BR-16: Correcting an active fast's start is limited to the preceding 24
   absolute hours; creating a new manually backdated fast may use an older start.
+- BR-17: Saved fast intervals must not overlap, whether recorded or reconstructed.
+  Treat completed intervals as half-open `[start, end)` ranges and an active fast
+  as open-ended from its start for conflict checks, so touching boundaries are
+  allowed. Existing conflicting records remain visible and are never silently
+  rewritten.

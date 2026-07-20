@@ -1,6 +1,7 @@
 # Product and architecture decisions
 
-All decisions below were accepted on 18 July 2026 for the MVP.
+Decisions were accepted on 18 July 2026 unless a later accepted or updated date
+is shown.
 
 ## D-001 Fast start
 
@@ -77,3 +78,17 @@ All decisions below were accepted on 18 July 2026 for the MVP.
   creating a new backdated fast.
 - **Consequence:** Both the editor and domain service enforce the correction
   window, while manual entry and later catch-up remain separate behaviors.
+
+## D-011 Conflicting saved fasts
+
+- **Status:** Accepted
+- **Accepted:** 19 July 2026
+- **Decision:** Do not allow any saved fast to overlap another saved fast,
+  whether recorded or reconstructed. Compare absolute half-open intervals,
+  allowing one fast to end at the exact instant another begins. Treat an active
+  fast as open-ended for conflict checks.
+- **Consequence:** Creating or correcting an active fast and editing a completed
+  fast must check all other saved fasts before save. A conflicting proposal is
+  rejected without changing either record. Conflicting data from an older build
+  remains visible and can be deleted or edited into a valid interval, but is
+  never silently repaired.

@@ -44,4 +44,25 @@ final class FastRecord {
     func correctStartDate(to startDate: Date) {
         self.startDate = startDate
     }
+
+    func correctBoundaries(startDate: Date, endDate: Date) {
+        self.startDate = startDate
+        self.endDate = endDate
+    }
+
+    @discardableResult
+    func complete(at endDate: Date, goal: FastingGoal) -> Bool {
+        guard isActive else {
+            return false
+        }
+
+        self.endDate = endDate
+        goalHoursAtStart = goal.hours
+        return true
+    }
+
+    func restoreActive(goal: FastingGoal) {
+        endDate = nil
+        goalHoursAtStart = goal.hours
+    }
 }

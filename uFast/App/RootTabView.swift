@@ -30,7 +30,9 @@ struct RootTabView: View {
             TodayGoalView(clock: clock)
         case .settings:
             SettingsView()
-        case .history, .progress:
+        case .history:
+            HistoryView(clock: clock)
+        case .progress:
             DestinationPlaceholderView(destination: destination)
         }
     }

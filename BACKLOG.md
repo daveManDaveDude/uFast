@@ -11,8 +11,8 @@
 - OW-101 P0 — Start a fast now. **Done 19 July 2026.**
 - OW-102 P0 — Start or correct with a past time. **Done 19 July 2026.**
 - OW-103 P0 — See elapsed time, progress and target. **Done 19 July 2026.**
-- OW-104 P0 — End now or at a past time.
-- OW-105 P0 — View, edit and delete completed fasts.
+- OW-104 P0 — End now or at a past time. **Done 19 July 2026.**
+- OW-105 P0 — View, edit and delete completed fasts. **Done 19 July 2026.**
 
 ## Slice 2 — Today
 
@@ -40,7 +40,10 @@
 
 ## Slice 5 — Quality
 
-- OW-106 P1 — Active-fast Live Activity.
+- OW-106 P1 — Active-fast Live Activity. **Refined; two privacy and dismissal
+  decisions remain.**
+- OW-107 P1 — Optional fasting target reminder. **Initial discovery; MVP scope
+  and notification-policy decisions required.**
 - OW-501 P0 — Accessibility checks for core journeys.
 - OW-502 P0 — Privacy, purpose strings and disclaimer.
 - OW-503 P0 — Persistence, migration and interruption safety.
@@ -53,6 +56,7 @@
 - OW-F104 — User-controlled reusable meals.
 
 `READY_STORIES.md` contains implementation-ready versions of OW-002, OW-101,
-OW-102, OW-103 and OW-104, plus initial refinement for OW-105. The complete
-product pack also contains detailed examples for OW-203, OW-201, OW-302 and
-OW-401; copy those into individual story files as each slice is refined.
+OW-102, OW-103, OW-104 and OW-105, a full refinement of OW-106 pending two
+product decisions, and initial discovery for OW-107. The complete product pack
+also contains detailed examples for OW-203, OW-201, OW-302 and OW-401; copy those
+into individual story files as each slice is refined.
