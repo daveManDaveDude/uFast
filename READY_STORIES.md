@@ -8,6 +8,10 @@ is preparation for later refinement and must not be implemented as if ready.
 The shared visual contract and implementation-ready Slice 1.5 stories OW-150
 through OW-155 are maintained in `SLICE_1_5_UX_STORIES.md`.
 
+The refined Slice 2 contract and stories OW-201 through OW-205 are maintained
+in `SLICE_2_TODAY_STORIES.md`. They remain Draft until its six decisions are
+accepted in `DECISIONS.md`.
+
 ## OW-002 Set a fasting goal
 
 **Epic:** E0 Product foundation  

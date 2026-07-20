@@ -29,11 +29,19 @@ stories and shared visual contract are in `SLICE_1_5_UX_STORIES.md`.
 
 ## Slice 2 — Today
 
-- OW-201 P0 — Add, edit, backdate and delete a text food event.
-- OW-202 P0 — Mark whether an event is caloric.
-- OW-203 P0 — Quick-add water, tea or coffee.
-- OW-204 P0 — Add and edit custom hydration.
-- OW-205 P0 — Combined Today timeline.
+The fully refined stories, shared behaviour/visual contract, decision gate and
+autonomous-session prompt are in `SLICE_2_TODAY_STORIES.md`.
+
+- OW-201 P0 — Add, edit, backdate and delete a text food event. **Draft pending
+  the Slice 2 decision gate.**
+- OW-202 P0 — Mark whether an event is caloric. **Draft pending the Slice 2
+  decision gate.**
+- OW-203 P0 — Quick-add water, tea or coffee. **Draft pending the Slice 2
+  decision gate.**
+- OW-204 P0 — Add and edit custom hydration. **Draft pending the Slice 2
+  decision gate.**
+- OW-205 P0 — Combined Today timeline. **Draft pending the Slice 2 decision
+  gate.**
 
 ## Slice 3 — Catch-up
 
@@ -72,6 +80,7 @@ stories and shared visual contract are in `SLICE_1_5_UX_STORIES.md`.
 OW-102, OW-103, OW-104 and OW-105, a full refinement of OW-106 pending two
 product decisions, and initial discovery for OW-107.
 `SLICE_1_5_UX_STORIES.md` contains the implementation-ready visual contract and
-stories OW-150 through OW-155. The complete product pack also contains detailed
-examples for OW-203, OW-201, OW-302 and OW-401; copy those into individual story
-files as each slice is refined.
+stories OW-150 through OW-155. `SLICE_2_TODAY_STORIES.md` supersedes the older
+OW-201 and OW-203 examples in the complete product pack and refines OW-201
+through OW-205 against the current domain rules and UX style guide. The product
+pack's OW-302 and OW-401 examples remain inputs when their slices are refined.

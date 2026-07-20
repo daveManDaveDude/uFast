@@ -118,3 +118,20 @@ is shown.
   the artwork, and the pattern is not used for actions, warnings, forms or dense
   data. `UX_STYLE_GUIDE.md` records the resulting semantic tokens, reusable
   patterns, artwork rules and visual quality checklist for later slices.
+
+## D-013 Caloric events during an active fast
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Decision:** A caloric food or hydration event whose timestamp falls after
+  the start of an active fast cannot be saved while leaving that fast active.
+  Before saving, ask the user to **Save and end fast** at the event time or
+  **Cancel** and change nothing. Creating an event or editing an existing event
+  into the active interval uses the same rule. A caloric event before the
+  active fast's start does not affect it. An event exactly at the start cannot
+  produce the strictly later end required by BR-04, so it must be corrected or
+  cancelled rather than saved against the active fast.
+- **Consequence:** The event save and fast end are one atomic user intent: both
+  succeed or neither is presented as successful. There is no **Save entry
+  only** path for a caloric event during an active fast. Non-caloric events do
+  not change the fast, and no event silently changes it.
