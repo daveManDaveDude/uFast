@@ -25,10 +25,19 @@ enum UFastTheme {
         light: UIColor(red: 0.04, green: 0.24, blue: 0.19, alpha: 1),
         dark: UIColor(red: 0.86, green: 0.93, blue: 0.85, alpha: 1)
     )
-    static let action = Color.adaptive(
-        light: UIColor(red: 0.04, green: 0.29, blue: 0.23, alpha: 1),
-        dark: UIColor(red: 0.48, green: 0.67, blue: 0.52, alpha: 1)
-    )
+    static let actionUIColor = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.48, green: 0.67, blue: 0.52, alpha: 1)
+            : UIColor(red: 0.04, green: 0.29, blue: 0.23, alpha: 1)
+    }
+
+    static let action = Color(uiColor: actionUIColor)
+    static let keyboardActionUIColor = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.45, green: 0.57, blue: 0.47, alpha: 1)
+            : UIColor(red: 0.31, green: 0.44, blue: 0.35, alpha: 1)
+    }
+
     static let onAction = Color.adaptive(
         light: .white,
         dark: UIColor(red: 0.05, green: 0.12, blue: 0.09, alpha: 1)

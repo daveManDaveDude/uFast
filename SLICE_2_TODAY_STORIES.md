@@ -41,13 +41,14 @@ Later slices own:
 
 ### Behaviour and language
 
-- A food event is a timestamped user-entered description. It is caloric by
-  default under BR-07.
+- A food event is a timestamped user-entered description. It is always caloric
+  under BR-07 and D-014.
 - A hydration event is a timestamped drink type and amount. Water, tea and
   coffee favourites are non-caloric by default under BR-06. A custom drink has
   an explicit editable classification.
-- **Caloric** means the user intends the event to count as a fasting boundary.
-  It is not a nutrition calculation or a claim about physiology.
+- **Caloric** means the event counts as a fasting boundary. Food always
+  qualifies; hydration follows the user's explicit classification. This is not
+  a nutrition calculation or a claim about physiology.
 - Saving a caloric event during an active recorded fast invokes the agreed
   BR-08 choice. No food or drink silently starts, ends, shortens, deletes or
   reconstructs a fast.
@@ -216,8 +217,8 @@ trust while testing the under-20-second logging outcome.
 
 ### Out of scope
 
-- User correction of caloric classification and active-fast prompting, which
-  belong to OW-202. The model may carry the BR-07 default needed for that story.
+- Hydration classification and active-fast prompting, which belong to OW-202.
+  Food is always caloric under BR-07 and D-014.
 - Photo input, food parsing, database search, portions, favourites, generated
   nutrition or nutrition totals.
 - Entry on an earlier calendar day or reconstruction, which begin in OW-301.
@@ -236,7 +237,7 @@ BR-07, BR-12 and BR-15. D-003 and D-006. S2-D1 and S2-D5.
   `AppClock.now`.
 - Given a description containing visible text and an allowed time, when the
   user saves, then exactly one food event is persisted with the trimmed
-  description, absolute instant, BR-07 caloric default and absent unentered
+  description, absolute instant, BR-07 caloric state and absent unentered
   nutrition values.
 - Given the saved event, when Today refreshes or the app relaunches offline,
   then the same event is visible once with an understandable local time.
@@ -276,7 +277,7 @@ BR-07, BR-12 and BR-15. D-003 and D-006. S2-D1 and S2-D5.
 
 ### Data and privacy
 
-Writes the description, occurrence instant, caloric default, optional manual
+Writes the description, occurrence instant, caloric state, optional manual
 nutrition, stable identifier and audit timestamps to local SwiftData only.
 There is no camera, microphone, photo-library, network, analytics or health-data
 permission. Deletion removes the app-owned food record.
@@ -298,7 +299,7 @@ permission. Deletion removes the app-owned food record.
 
 - OW-150 through OW-155 and existing `AppClock`/SwiftData infrastructure.
 - Accepted S2-D1 and S2-D5.
-- OW-202 will complete caloric correction and active-fast interaction.
+- OW-202 completes hydration classification and active-fast interaction.
 
 ### Verification
 
@@ -331,7 +332,7 @@ photo, interpretation, nutrition calculation or earlier-day journey is added.
 
 ---
 
-## OW-202 Mark whether an event is caloric
+## OW-202 Apply caloric event semantics
 
 **Epic:** E2 Manual daily log  
 **Priority:** P0  
@@ -339,9 +340,9 @@ photo, interpretation, nutrition calculation or earlier-day journey is added.
 
 ### User story
 
-As a user whose food or drink does not fit a default, I want to say whether it
-counts as caloric for my record, so that future fasting boundaries reflect my
-intent without silently changing a recorded fast.
+As a user recording food or a custom drink, I want clear caloric boundary
+semantics, so that my record remains predictable without silently changing a
+recorded fast.
 
 ### Why now
 
@@ -357,10 +358,11 @@ between daily logging and an active fast.
 
 ### In scope
 
-- Store one explicit Boolean caloric state on every food and hydration event.
-- Default new food to caloric, and water/tea/coffee favourites to non-caloric.
-- Show an editable **Counts as caloric** control in food and custom-drink
-  editors with short explanatory text.
+- Retain one Boolean caloric state on every food and hydration event.
+- Save new and edited food as caloric. Do not offer a food classification
+  control.
+- Default water/tea/coffee favourites to non-caloric and show an editable
+  **Counts as caloric** control in the custom-drink editor.
 - Show caloric state in an event's accessible timeline summary and a restrained
   visible label where needed for comprehension; do not rely on colour.
 - Detect creating or editing a caloric event after an active fast's start and
@@ -370,7 +372,7 @@ between daily logging and an active fast.
   caloric event while leaving the fast active.
 - Prompt only when the resulting saved event is caloric and occurs after the
   active start. The exact-start invalid case is explained without saving.
-  Changing an event to non-caloric never changes the fast.
+  Changing custom hydration to non-caloric never changes the fast.
 
 ### Out of scope
 
@@ -382,21 +384,22 @@ between daily logging and an active fast.
 
 ### Product rules
 
-BR-04, BR-06, BR-07, BR-08, BR-12 and BR-15. D-013.
+BR-04, BR-06, BR-07, BR-08, BR-12 and BR-15. D-013 and D-014.
 
 ### Acceptance criteria
 
-- Given a new food event, when its editor opens, then **Counts as caloric** is
-  on by default and can be changed before save.
+- Given a new or existing food event, when its editor opens, then no
+  caloric/non-caloric control is offered and the interface explains that food
+  events count as caloric fasting boundaries.
 - Given a water, tea or coffee favourite, when it is saved without
   customisation, then it is explicitly non-caloric.
 - Given a custom hydration event, when its editor opens, then the S2-D2 default
   is visible and editable rather than inferred from its name.
 - Given no active fast, when any valid classification is saved, then the event
   saves without a fast prompt.
-- Given an active fast and a non-caloric event after its start, when the event
-  saves, then the active fast remains byte-for-byte unchanged and no prompt is
-  shown.
+- Given an active fast and a non-caloric hydration event after its start, when
+  the event saves, then the active fast remains byte-for-byte unchanged and no
+  prompt is shown.
 - Given an active fast and a caloric event after its start, when save is
   requested, then the D-013 prompt appears before any persistent change and
   offers **Save and end fast** or **Cancel** only.
@@ -409,18 +412,18 @@ BR-04, BR-06, BR-07, BR-08, BR-12 and BR-15. D-013.
 - Given a caloric event exactly at the active fast start, then Save is
   unavailable, the interface explains that the event time or fast start must
   be corrected, and neither record changes.
-- Given an existing event is changed from non-caloric to caloric inside an
-  active fast, then the same mandatory-end prompt and atomicity rules apply.
-- Given an existing event is changed from caloric to non-caloric, then the
-  event updates without silently restarting, extending or rewriting a fast.
-- Given VoiceOver, then the control announces its label, Boolean value,
-  explanation and default; timeline state remains understandable without
-  colour.
+- Given existing custom hydration is changed from non-caloric to caloric inside
+  an active fast, then the same mandatory-end prompt and atomicity rules apply.
+- Given existing custom hydration is changed from caloric to non-caloric, then
+  the event updates without silently restarting, extending or rewriting a fast.
+- Given VoiceOver, then the custom-hydration control announces its label,
+  Boolean value, explanation and default; food semantics and timeline state
+  remain understandable without colour.
 
 ### States and edge cases
 
 - No active fast; event before, at and after active start.
-- Food defaults, favourite-drink defaults and custom classification.
+- Fixed food semantics, favourite-drink defaults and custom classification.
 - Create versus edit, repeated confirmation, cancellation and write failure
   between event and fast operations.
 - An active fast conflicting with existing completed records remains subject to
@@ -428,14 +431,16 @@ BR-04, BR-06, BR-07, BR-08, BR-12 and BR-15. D-013.
 
 ### Data and privacy
 
-Persists only the user's explicit classification locally. It is a record-logic
-input, not a diagnosis. No external data or permission is introduced.
+Persists the fixed food classification and user's explicit hydration
+classification locally. These are record-logic inputs, not diagnoses. No
+external data or permission is introduced.
 
 ### Design and content
 
-- Control: **Counts as caloric**.
-- Explanation: **Used as a fasting boundary. If it falls during your active
-  fast, saving it ends the fast at this time.**
+- Custom hydration control: **Counts as caloric**.
+- Food explanation: **Food events count as caloric and are used as fasting
+  boundaries. If this event falls during your active fast, saving it ends the
+  fast at this time.**
 - Prompt title: **This entry is during your recorded fast.**
 - Prompt supporting text should name the event time and describe stored-record
   consequences, not physiology.
@@ -450,16 +455,18 @@ input, not a diagnosis. No external data or permission is introduced.
 
 ### Verification
 
-- Unit-test every default and the prompt decision matrix at before/equal/after
-  active start.
+- Unit-test fixed food semantics, hydration defaults and the prompt decision
+  matrix at before/equal/after active start.
 - Unit-test atomic success/failure, duplicate confirmation and cancellation.
-- UI-test food correction and the mandatory-end active-fast flow.
-- Check the control and timeline summary with VoiceOver and without colour.
+- UI-test the absence of food classification controls and the mandatory-end
+  active-fast flow.
+- Check custom-hydration classification and timeline summaries with VoiceOver
+  and without colour.
 
 ### Done when
 
 All acceptance criteria pass and no event can silently alter a fast or acquire
-a caloric state through interpretation.
+a caloric state through text or nutrition interpretation.
 
 ### Definition of Ready check
 

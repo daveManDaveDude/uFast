@@ -5,7 +5,7 @@ SCHEME := uFast
 DERIVED_DATA := .derived-data
 SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
 
-.PHONY: bootstrap project build deploy-iphone test test-unit test-ui lint format clean
+.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui lint format clean
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -24,6 +24,9 @@ build: project
 
 deploy-iphone:
 	./scripts/deploy_iphone.sh
+
+deploy-iphones:
+	./scripts/deploy_iphones.sh
 
 test: test-unit test-ui
 

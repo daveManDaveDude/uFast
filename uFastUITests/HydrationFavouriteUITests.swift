@@ -47,6 +47,38 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsFavouriteCanBeEditedSavedAndUsedByQuickAdd() {
+        let app = launch()
+        app.tabBars.buttons["Settings"].tap()
+
+        let waterAmount = app.textFields["settings.drink.water"]
+        XCTAssertTrue(waterAmount.waitForExistence(timeout: 2))
+        waterAmount.tap()
+        waterAmount.press(forDuration: 0.7)
+        XCTAssertTrue(app.menuItems["Select All"].waitForExistence(timeout: 1))
+        app.menuItems["Select All"].tap()
+        waterAmount.typeText("650")
+
+        let done = app.buttons["settings.keyboard.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 2))
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.exists)
+        XCTAssertLessThanOrEqual(done.frame.maxY, keyboard.frame.minY)
+        XCTAssertGreaterThan(done.frame.minY, keyboard.frame.minY - 80)
+        done.tap()
+        XCTAssertFalse(keyboard.exists)
+        XCTAssertFalse(app.buttons["settings.drink.save"].exists)
+
+        app.tabBars.buttons["Today"].tap()
+        app.buttons["drink.add"].tap()
+        let water = app.buttons["drink.favourite.water"]
+        XCTAssertTrue(water.waitForExistence(timeout: 2))
+        XCTAssertEqual(water.value as? String, "650 millilitres")
+        water.tap()
+        XCTAssertEqual(app.staticTexts["drink.total"].label, "650 ml")
+    }
+
+    @MainActor
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = arguments

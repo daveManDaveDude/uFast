@@ -54,6 +54,15 @@ The script auto-detects a single connected iPhone and preserves its existing
 app data. When more than one iPhone is connected, select one with
 `DEVICE_ID=<CoreDevice identifier> make deploy-iphone`.
 
+Deploy to both configured development iPhones with:
+
+```sh
+make deploy-iphones
+```
+
+Override the configured set when needed with
+`DEVICE_IDS="<CoreDevice identifier> <CoreDevice identifier>" make deploy-iphones`.
+
 The default test destination is `iPhone 17 Pro`. Override it when needed:
 
 ```sh
@@ -82,6 +91,10 @@ your Apple Developer team and replace the example bundle identifier in
 - `READY_STORIES.md` — implementation-ready user stories
 - `SLICE_1_5_UX_STORIES.md` — visual contract and implementation-ready fasting
   experience stories
+- `SLICE_2_TODAY_STORIES.md` — implementation-ready food, hydration and Today
+  stories
+- `SLICE_3_CATCH_UP_STORIES.md` — implementation-ready historical entry,
+  reconstruction, provenance and invalidation stories
 - `UX_STYLE_GUIDE.md` — quick-reference design tokens, components, artwork,
   accessibility rules and visual Definition of Done
 - `DECISIONS.md` — accepted product and architecture choices

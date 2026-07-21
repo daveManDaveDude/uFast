@@ -8,7 +8,8 @@
 - Lock Screen and Dynamic Island Live Activity where supported.
 - Text food events with optional manually entered nutrition values.
 - Water, tea, coffee and custom hydration events.
-- Explicit caloric/non-caloric state.
+- Food events are caloric; hydration events have an explicit
+  caloric/non-caloric state.
 - Backdated entries and guided reconstruction of missing fasting history.
 - User confirmation and visible provenance for reconstructed fasts.
 - Unknown periods remain unknown.

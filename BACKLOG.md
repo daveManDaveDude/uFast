@@ -33,18 +33,23 @@ The fully refined stories, shared behaviour/visual contract, decision gate and
 autonomous-session prompt are in `SLICE_2_TODAY_STORIES.md`.
 
 - OW-201 P0 — Add, edit, backdate and delete a text food event. **Done 20 July 2026.**
-- OW-202 P0 — Mark whether an event is caloric. **Done 20 July 2026.**
+- OW-202 P0 — Apply caloric event semantics; food is always caloric and custom
+  hydration remains classifiable. **Done 20 July 2026.**
 - OW-203 P0 — Quick-add water, tea or coffee. **Done 20 July 2026.**
 - OW-204 P0 — Add and edit custom hydration. **Done 20 July 2026.**
 - OW-205 P0 — Combined Today timeline. **Done 20 July 2026.**
 
 ## Slice 3 — Catch-up
 
-- OW-301 P0 — Open a past day and add events.
-- OW-302 P0 — Generate proposals between confirmed caloric boundaries.
-- OW-303 P0 — Preview, edit, accept or reject proposals.
-- OW-304 P0 — Label reconstructed fasts and preserve unknowns.
-- OW-305 P0 — Re-evaluate affected history after boundary changes.
+The implementation-ready shared contract, stories, verification gate, approved
+journey concepts and autonomous-session prompt are in
+`SLICE_3_CATCH_UP_STORIES.md`.
+
+- OW-301 P0 — Open and repair a past day. **Ready 21 July 2026.**
+- OW-302 P0 — Generate reconstruction proposals. **Ready 21 July 2026.**
+- OW-303 P0 — Review and save reconstructed history. **Ready 21 July 2026.**
+- OW-304 P0 — Show provenance and preserve unknowns. **Ready 21 July 2026.**
+- OW-305 P0 — Re-evaluate affected history. **Ready 21 July 2026.**
 
 ## Slice 4 — Apple Health
 
@@ -77,5 +82,8 @@ product decisions, and initial discovery for OW-107.
 `SLICE_1_5_UX_STORIES.md` contains the implementation-ready visual contract and
 stories OW-150 through OW-155. `SLICE_2_TODAY_STORIES.md` supersedes the older
 OW-201 and OW-203 examples in the complete product pack and refines OW-201
-through OW-205 against the current domain rules and UX style guide. The product
-pack's OW-302 and OW-401 examples remain inputs when their slices are refined.
+through OW-205 against the current domain rules and UX style guide.
+`SLICE_3_CATCH_UP_STORIES.md` supersedes the product pack's OW-302 example and
+refines OW-301 through OW-305 against the accepted Slice 3 decisions and
+approved journey concepts. The product pack's OW-401 example remains an input
+when Slice 4 is refined.

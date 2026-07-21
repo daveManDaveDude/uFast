@@ -4,7 +4,7 @@ import XCTest
 final class FoodEntryValidationTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func testTrimsDescriptionDefaultsCaloricAndPreservesAbsentNutrition() throws {
+    func testTrimsDescriptionIsAlwaysCaloricAndPreservesAbsentNutrition() throws {
         let draft = try validated(description: "  Soup and bread \n").get()
 
         XCTAssertEqual(draft.description, "Soup and bread")

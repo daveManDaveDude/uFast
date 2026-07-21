@@ -21,6 +21,9 @@ final class FoodEntryUITests: XCTestCase {
         app.buttons["food.details.toggle"].tap()
         app.textFields["Energy"].tap()
         app.textFields["Energy"].typeText("350")
+        XCTAssertTrue(app.staticTexts["food.nutrition.energy.label"].exists)
+        XCTAssertEqual(app.staticTexts["food.nutrition.energy.label"].label, "Energy")
+        XCTAssertEqual(app.staticTexts["food.nutrition.energy.unit"].label, "kcal")
         app.buttons["food.save"].tap()
 
         let savedRow = app.buttons.matching(identifier: "food.entry").firstMatch

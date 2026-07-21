@@ -6,27 +6,6 @@ import XCTest
 final class FoodEntryServiceTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func testNonCaloricEventDuringActiveFastSavesWithoutChangingFast() throws {
-        let fixture = try makeFixture()
-        let originalStart = fixture.fast.startDate
-        let originalGoal = fixture.fast.historicalGoal
-
-        try fixture.service.save(
-            FoodEntryDraft(
-                description: "Black coffee",
-                occurredAt: now,
-                isCaloric: false
-            ),
-            replacing: nil,
-            goal: FastingGoal(hours: 16) ?? .default
-        )
-
-        XCTAssertTrue(fixture.fast.isActive)
-        XCTAssertEqual(fixture.fast.startDate, originalStart)
-        XCTAssertEqual(fixture.fast.historicalGoal, originalGoal)
-        XCTAssertEqual(try foodEntries(in: fixture.container).count, 1)
-    }
-
     func testCaloricEventRequiresConfirmationBeforeEitherRecordChanges() throws {
         let fixture = try makeFixture()
 
@@ -126,8 +105,7 @@ final class FoodEntryServiceTests: XCTestCase {
         let record = try repository.create(
             FoodEntryDraft(
                 description: "Drink",
-                occurredAt: fixture.fast.startDate.addingTimeInterval(-60),
-                isCaloric: false
+                occurredAt: fixture.fast.startDate.addingTimeInterval(-60)
             ),
             at: now.addingTimeInterval(-120)
         )

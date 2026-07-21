@@ -205,3 +205,99 @@ is shown.
   including caloric custom drinks.
 - **Consequence:** Fasts are not timeline rows, food never implies fluid, and
   the app adds no hydration target or judgment.
+
+## D-014 Food events are always caloric
+
+- **Status:** Accepted
+- **Accepted:** 20 July 2026
+- **Decision:** Food events always count as caloric fasting boundaries. The
+  food editor does not offer a caloric/non-caloric control. Custom hydration
+  retains its explicit editable classification under BR-06 and S2-D2.
+- **Consequence:** New and edited food events are saved as caloric. The
+  persisted Boolean remains in the additive schema for compatibility and no
+  bulk migration silently rewrites existing local history.
+
+## S3-D1 Catch-up entry and range
+
+- **Status:** Accepted
+- **Accepted:** 21 July 2026
+- **Decision:** Put an explicit **Catch up** action in History. The user may
+  select up to seven completed local-calendar days ending no later than
+  yesterday. Today remains managed through Today. Absence of records is never
+  automatically described as a missed day.
+- **Consequence:** Catch-up is available without guilt or an inferred absence,
+  and the guided range remains bounded by D-004.
+
+## S3-D2 Historical event entry
+
+- **Status:** Accepted
+- **Accepted:** 21 July 2026
+- **Decision:** A selected past day supports adding, editing and deleting food
+  and hydration with the existing manual fields and rules. Historical drink
+  favourites open an editor with the selected date rather than saving
+  immediately, because the occurrence time requires confirmation.
+- **Consequence:** Past-day repair reuses familiar entry behaviour without
+  inventing a historical timestamp or weakening Today's two-tap quick add.
+
+## S3-D3 Reconstruction candidates
+
+- **Status:** Accepted
+- **Accepted:** 21 July 2026
+- **Decision:** Generate a proposal only between consecutive user-saved caloric
+  events when the absolute interval is at least eight hours. The nearest
+  caloric event immediately outside the selected range may close a candidate,
+  but both boundaries must exist. Open-ended periods remain unknown.
+- **Consequence:** Reconstruction follows confirmed evidence while avoiding a
+  noisy proposal for every ordinary meal-to-meal gap. Daylight-saving and time
+  zone presentation never change the absolute-duration test.
+
+## S3-D4 Proposal review and save
+
+- **Status:** Accepted
+- **Accepted:** 21 July 2026
+- **Decision:** Review each proposal as **Accept**, **Adjust** or **Leave
+  unknown**, then commit the reviewed set through one final **Save reviewed
+  history** action. An adjusted interval must remain within its two supporting
+  boundary instants, remain positive and non-conflicting, and be identified as
+  user-adjusted reconstruction.
+- **Consequence:** No proposal is saved during review, cancellation leaves
+  history unchanged and the final write represents one explicit user intent.
+
+## S3-D5 Preserved unknown periods
+
+- **Status:** Accepted
+- **Accepted:** 21 July 2026
+- **Decision:** Persist an unknown period only when the user explicitly chooses
+  **Leave unknown** or when a reviewed candidate cannot be proposed because its
+  evidence is insufficient or conflicts with saved history. Do not manufacture
+  an exhaustive timeline of unknown time.
+- **Consequence:** Honest gaps survive relaunch and do not immediately reappear
+  as fresh proposals, without implying that every unrecorded minute was
+  evaluated.
+
+## S3-D6 Reconstructed-history invalidation
+
+- **Status:** Accepted
+- **Accepted:** 21 July 2026
+- **Decision:** When a supporting caloric boundary is edited, deleted or
+  reclassified, or a new caloric boundary is added inside a reconstructed
+  interval, keep the affected reconstructed fast visible and mark it **Needs
+  review**. Never silently rewrite or delete it. Review may update and
+  reconfirm it, explicitly convert it to a manually recorded fast, or remove it
+  and leave the affected period unknown.
+- **Consequence:** Previously confirmed history remains visible while its lost
+  or changed evidence is made clear, and every repair is another explicit user
+  choice.
+
+## S3-D7 Reconstructed provenance and goal
+
+- **Status:** Accepted
+- **Accepted:** 21 July 2026
+- **Decision:** Label an accepted candidate **Reconstructed · Confirmed by
+  you** and identify an adjusted candidate as adjusted by the user. Do not show
+  or store a claimed historical fasting goal for reconstructed records because
+  the app cannot know which goal applied during an unrecorded interval.
+  Recorded fasts continue to retain and show their captured historical goal.
+- **Consequence:** History distinguishes recorded, reconstructed, adjusted,
+  needs-review and unknown states without presenting an invented historical
+  target.

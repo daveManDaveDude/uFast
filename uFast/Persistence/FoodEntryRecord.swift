@@ -1,6 +1,12 @@
 import Foundation
 import SwiftData
 
+struct FoodEntryRecordSnapshot {
+    let draft: FoodEntryDraft
+    let isCaloric: Bool
+    let updatedAt: Date
+}
+
 @Model
 final class FoodEntryRecord {
     @Attribute(.unique) var id: UUID
@@ -53,8 +59,15 @@ final class FoodEntryRecord {
         FoodEntryDraft(
             description: foodDescription,
             occurredAt: occurredAt,
-            isCaloric: isCaloric,
             nutrition: nutrition
+        )
+    }
+
+    var snapshot: FoodEntryRecordSnapshot {
+        FoodEntryRecordSnapshot(
+            draft: draft,
+            isCaloric: isCaloric,
+            updatedAt: updatedAt
         )
     }
 
@@ -70,5 +83,10 @@ final class FoodEntryRecord {
         sugarGrams = draft.nutrition.sugarGrams
         saltGrams = draft.nutrition.saltGrams
         updatedAt = updateDate
+    }
+
+    func restore(from snapshot: FoodEntryRecordSnapshot) {
+        update(from: snapshot.draft, at: snapshot.updatedAt)
+        isCaloric = snapshot.isCaloric
     }
 }

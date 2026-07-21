@@ -83,15 +83,14 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         with draft: FoodEntryDraft,
         at updateDate: Date
     ) throws {
-        let previousDraft = record.draft
-        let previousUpdatedAt = record.updatedAt
+        let previousSnapshot = record.snapshot
         record.update(from: draft, at: updateDate)
 
         do {
             try failIfRequested()
             try modelContext.save()
         } catch {
-            record.update(from: previousDraft, at: previousUpdatedAt)
+            record.restore(from: previousSnapshot)
             throw error
         }
     }
@@ -103,8 +102,7 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         ending activeFast: FastRecord,
         goal: FastingGoal
     ) throws {
-        let previousDraft = record.draft
-        let previousUpdatedAt = record.updatedAt
+        let previousSnapshot = record.snapshot
         let previousGoal = activeFast.historicalGoal
         record.update(from: draft, at: updateDate)
         activeFast.complete(at: draft.occurredAt, goal: goal)
@@ -113,7 +111,7 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
             try failIfRequested()
             try modelContext.save()
         } catch {
-            record.update(from: previousDraft, at: previousUpdatedAt)
+            record.restore(from: previousSnapshot)
             activeFast.restoreActive(goal: previousGoal)
             throw error
         }

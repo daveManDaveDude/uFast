@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
 // swiftlint:disable large_tuple line_length statement_position
@@ -7,6 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settingsRecords: [AppSettingsRecord]
+    @State private var focusedFavouriteField: FavouriteField?
     @State private var selection = FastingGoal.default
     @State private var saveError: String?
     @State private var waterAmount = "500"
@@ -14,70 +16,78 @@ struct SettingsView: View {
     @State private var coffeeAmount = "300"
 
     var body: some View {
-        ScreenLayout(title: "Settings", identifier: "settings") {
-            ScrollView {
-                VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
-                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                        UFastSectionHeading(
-                            "Fasting goal",
-                            eyebrow: "\(selection.hours) hours selected"
-                        )
-                        Text(
-                            "This updates the target for an active fast. "
-                                + "Completed records keep their historical goal."
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(UFastTheme.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                        FastingGoalPicker(selection: goalBinding)
-                    }
-                    .uFastCard(accent: UFastTheme.sage)
-
-                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        Label("Private by default", systemImage: "lock")
-                            .font(.headline)
-                            .foregroundStyle(UFastTheme.primary)
-                        Text("Your fasting goal and records stay on this device.")
+        NavigationStack {
+            ScreenLayout(title: "Settings", identifier: "settings") {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
+                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                            UFastSectionHeading(
+                                "Fasting goal",
+                                eyebrow: "\(selection.hours) hours selected"
+                            )
+                            Text(
+                                "This updates the target for an active fast. "
+                                    + "Completed records keep their historical goal."
+                            )
+                            .font(.subheadline)
                             .foregroundStyle(UFastTheme.secondaryText)
-                    }
-                    .uFastCard()
-
-                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                        UFastSectionHeading("Drink favourites")
-                        Text("Choose the amount added by each Today shortcut.")
-                            .font(.subheadline).foregroundStyle(UFastTheme.secondaryText)
-                        favouriteField("Water", text: $waterAmount, identifier: "settings.drink.water")
-                        favouriteField("Tea", text: $teaAmount, identifier: "settings.drink.tea")
-                        favouriteField("Coffee", text: $coffeeAmount, identifier: "settings.drink.coffee")
-                        if favouriteValues == nil {
-                            Label("Enter each amount from 1 to 5,000 ml.", systemImage: "exclamationmark.circle")
-                                .foregroundStyle(UFastTheme.error)
-                                .accessibilityIdentifier("settings.drink.validation")
-                        }
-                        Button("Save drink favourites") { saveFavourites() }
-                            .buttonStyle(UFastPrimaryButtonStyle())
-                            .disabled(favouriteValues == nil)
-                            .accessibilityIdentifier("settings.drink.save")
-                    }
-                    .uFastCard(accent: UFastTheme.sky)
-
-                    if let saveError {
-                        Label(saveError, systemImage: "exclamationmark.circle")
-                            .foregroundStyle(UFastTheme.error)
                             .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("settings.goal.save-error")
+
+                            FastingGoalPicker(selection: goalBinding)
+                        }
+                        .uFastCard(accent: UFastTheme.sage)
+
+                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                            Label("Private by default", systemImage: "lock")
+                                .font(.headline)
+                                .foregroundStyle(UFastTheme.primary)
+                            Text("Your fasting goal and records stay on this device.")
+                                .foregroundStyle(UFastTheme.secondaryText)
+                        }
+                        .uFastCard()
+
+                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                            UFastSectionHeading("Drink favourites")
+                            Text("Choose the amount added by each Today shortcut.")
+                                .font(.subheadline).foregroundStyle(UFastTheme.secondaryText)
+                            favouriteField("Water", field: .water, text: $waterAmount, identifier: "settings.drink.water")
+                            favouriteField("Tea", field: .tea, text: $teaAmount, identifier: "settings.drink.tea")
+                            favouriteField("Coffee", field: .coffee, text: $coffeeAmount, identifier: "settings.drink.coffee")
+                            if favouriteValues == nil {
+                                Label("Enter each amount from 1 to 5,000 ml.", systemImage: "exclamationmark.circle")
+                                    .foregroundStyle(UFastTheme.error)
+                                    .accessibilityIdentifier("settings.drink.validation")
+                            }
+                            Text("Changes save automatically when you finish editing.")
+                                .font(.footnote)
+                                .foregroundStyle(UFastTheme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .uFastCard(accent: UFastTheme.sky)
+
+                        if let saveError {
+                            Label(saveError, systemImage: "exclamationmark.circle")
+                                .foregroundStyle(UFastTheme.error)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("settings.goal.save-error")
+                        }
                     }
+                    .padding(UFastTheme.Spacing.standard)
                 }
-                .padding(UFastTheme.Spacing.standard)
+                .scrollDismissesKeyboard(.interactively)
             }
-        }
-        .onAppear {
-            selection = settingsRecords.first?.fastingGoal ?? .default
-            if let settings = settingsRecords.first {
-                waterAmount = String(settings.waterFavouriteMillilitres)
-                teaAmount = String(settings.teaFavouriteMillilitres)
-                coffeeAmount = String(settings.coffeeFavouriteMillilitres)
+            .onAppear {
+                selection = settingsRecords.first?.fastingGoal ?? .default
+                if let settings = settingsRecords.first {
+                    waterAmount = String(settings.waterFavouriteMillilitres)
+                    teaAmount = String(settings.teaFavouriteMillilitres)
+                    coffeeAmount = String(settings.coffeeFavouriteMillilitres)
+                }
+            }
+            .onChange(of: focusedFavouriteField) { previousField, currentField in
+                if previousField != nil, previousField != currentField {
+                    saveFavouritesIfValid()
+                }
             }
         }
     }
@@ -122,16 +132,127 @@ struct SettingsView: View {
         return (water, tea, coffee)
     }
 
-    private func favouriteField(_ label: String, text: Binding<String>, identifier: String) -> some View {
-        HStack { Text(label); Spacer(); TextField("ml", text: text).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 100).accessibilityIdentifier(identifier); Text("ml").foregroundStyle(UFastTheme.secondaryText).accessibilityHidden(true) }
+    private func favouriteField(
+        _ label: String,
+        field: FavouriteField,
+        text: Binding<String>,
+        identifier: String
+    ) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            FavouriteAmountTextField(
+                text: text,
+                label: label,
+                identifier: identifier,
+                isFocused: Binding(
+                    get: { focusedFavouriteField == field },
+                    set: { isFocused in
+                        if isFocused {
+                            focusedFavouriteField = field
+                        } else if focusedFavouriteField == field {
+                            focusedFavouriteField = nil
+                        }
+                    }
+                )
+            )
+            .frame(width: 100)
+            Text("ml")
+                .foregroundStyle(UFastTheme.secondaryText)
+                .accessibilityHidden(true)
+        }
     }
 
-    private func saveFavourites() {
+    private func saveFavouritesIfValid() {
         guard let settings = settingsRecords.first, let values = favouriteValues else { return }
         let old = (settings.waterFavouriteMillilitres, settings.teaFavouriteMillilitres, settings.coffeeFavouriteMillilitres)
         settings.setHydrationFavourites(water: values.0, tea: values.1, coffee: values.2)
         do { try modelContext.save(); saveError = nil }
         catch { settings.setHydrationFavourites(water: old.0, tea: old.1, coffee: old.2); saveError = "Your drink favourites couldn’t be saved. Please try again." }
+    }
+}
+
+private enum FavouriteField: Hashable {
+    case water
+    case tea
+    case coffee
+}
+
+private struct FavouriteAmountTextField: UIViewRepresentable {
+    @Binding var text: String
+    let label: String
+    let identifier: String
+    @Binding var isFocused: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIView(context: Context) -> UITextField {
+        let textField = UITextField()
+        textField.keyboardType = .numberPad
+        textField.textAlignment = .right
+        textField.placeholder = "Amount"
+        textField.font = .preferredFont(forTextStyle: .body)
+        textField.adjustsFontForContentSizeCategory = true
+        textField.accessibilityLabel = "\(label) amount"
+        textField.accessibilityIdentifier = identifier
+        textField.addTarget(context.coordinator, action: #selector(Coordinator.textChanged), for: .editingChanged)
+        textField.addTarget(context.coordinator, action: #selector(Coordinator.editingBegan), for: .editingDidBegin)
+        textField.addTarget(context.coordinator, action: #selector(Coordinator.editingEnded), for: .editingDidEnd)
+
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+        toolbar.tintColor = UFastTheme.keyboardActionUIColor
+        let done = UIBarButtonItem(
+            barButtonSystemItem: .done,
+            target: context.coordinator,
+            action: #selector(Coordinator.doneTapped)
+        )
+        done.accessibilityIdentifier = "settings.keyboard.done"
+        toolbar.items = [.flexibleSpace(), done]
+        textField.inputAccessoryView = toolbar
+        context.coordinator.textField = textField
+        return textField
+    }
+
+    func updateUIView(_ textField: UITextField, context: Context) {
+        context.coordinator.parent = self
+        if textField.text != text {
+            textField.text = text
+        }
+        if isFocused, !textField.isFirstResponder {
+            textField.becomeFirstResponder()
+        } else if !isFocused, textField.isFirstResponder {
+            textField.resignFirstResponder()
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var parent: FavouriteAmountTextField
+        weak var textField: UITextField?
+
+        init(parent: FavouriteAmountTextField) {
+            self.parent = parent
+        }
+
+        @objc func textChanged() {
+            parent.text = textField?.text ?? ""
+        }
+
+        @objc func editingBegan() {
+            parent.isFocused = true
+        }
+
+        @objc func editingEnded() {
+            parent.isFocused = false
+        }
+
+        @objc func doneTapped() {
+            parent.isFocused = false
+            textField?.resignFirstResponder()
+        }
     }
 }
 

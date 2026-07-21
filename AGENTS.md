@@ -41,6 +41,7 @@ the stories that first require them.
 - Lint: `make lint`
 - Apply formatting: `make format`
 - Deploy to a connected iPhone: `make deploy-iphone`
+- Deploy to both configured iPhones: `make deploy-iphones`
 
 `Makefile` selects `/Applications/Xcode.app/Contents/Developer` with
 `DEVELOPER_DIR`, so commands work even before the optional system-wide

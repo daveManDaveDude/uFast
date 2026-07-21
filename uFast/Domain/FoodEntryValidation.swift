@@ -46,19 +46,20 @@ struct FoodNutrition: Equatable {
 struct FoodEntryDraft: Equatable {
     let description: String
     let occurredAt: Date
-    let isCaloric: Bool
     let nutrition: FoodNutrition
 
     init(
         description: String,
         occurredAt: Date,
-        isCaloric: Bool = true,
         nutrition: FoodNutrition = FoodNutrition()
     ) {
         self.description = description
         self.occurredAt = occurredAt
-        self.isCaloric = isCaloric
         self.nutrition = nutrition
+    }
+
+    var isCaloric: Bool {
+        true
     }
 }
 
@@ -92,7 +93,6 @@ enum FoodEntryValidator {
     static func validated(
         description: String,
         occurredAt: Date,
-        isCaloric: Bool = true,
         nutrition: FoodNutrition,
         now: Date,
         calendar: Calendar
@@ -120,7 +120,6 @@ enum FoodEntryValidator {
             FoodEntryDraft(
                 description: trimmedDescription,
                 occurredAt: occurredAt,
-                isCaloric: isCaloric,
                 nutrition: nutrition
             )
         )

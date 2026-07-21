@@ -12,7 +12,6 @@ struct FoodEntryEditor: View {
     @State private var showsDeleteConfirmation = false
     @State private var showsFastEndConfirmation = false
     @State private var pendingFastEndDraft: FoodEntryDraft?
-    @State private var isCaloric: Bool
 
     let record: FoodEntryRecord?
     let clock: any AppClock
@@ -40,7 +39,6 @@ struct FoodEntryEditor: View {
         let input = FoodNutritionTextInput(nutrition: record?.nutrition ?? FoodNutrition())
         _nutritionInput = State(initialValue: input)
         _showsDetails = State(initialValue: input.hasValues)
-        _isCaloric = State(initialValue: record?.isCaloric ?? true)
     }
 
     var body: some View {
@@ -76,15 +74,15 @@ struct FoodEntryEditor: View {
                 }
 
                 Section {
-                    Toggle("Counts as caloric", isOn: $isCaloric)
-                        .accessibilityIdentifier("food.caloric")
                     Text(
-                        "Used as a fasting boundary. If it falls during your active fast, "
+                        "Food events count as caloric and are used as fasting boundaries. "
+                            + "If this event falls during your active fast, "
                             + "saving it ends the fast at this time."
                     )
                     .font(.footnote)
                     .foregroundStyle(UFastTheme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("food.caloric.explanation")
 
                     if isAtActiveFastStart {
                         validationLabel(
@@ -103,13 +101,18 @@ struct FoodEntryEditor: View {
 
                 if showsDetails {
                     Section("Optional manual details") {
-                        nutritionField("Energy", unit: "kcal", text: $nutritionInput.energy)
-                        nutritionField("Protein", unit: "g", text: $nutritionInput.protein)
-                        nutritionField("Carbohydrate", unit: "g", text: $nutritionInput.carbohydrate)
-                        nutritionField("Fat", unit: "g", text: $nutritionInput.fat)
-                        nutritionField("Fibre", unit: "g", text: $nutritionInput.fibre)
-                        nutritionField("Sugar", unit: "g", text: $nutritionInput.sugar)
-                        nutritionField("Salt", unit: "g", text: $nutritionInput.salt)
+                        nutritionField("Energy", unit: "kcal", identifier: "energy", text: $nutritionInput.energy)
+                        nutritionField("Protein", unit: "g", identifier: "protein", text: $nutritionInput.protein)
+                        nutritionField(
+                            "Carbohydrate",
+                            unit: "g",
+                            identifier: "carbohydrate",
+                            text: $nutritionInput.carbohydrate
+                        )
+                        nutritionField("Fat", unit: "g", identifier: "fat", text: $nutritionInput.fat)
+                        nutritionField("Fibre", unit: "g", identifier: "fibre", text: $nutritionInput.fibre)
+                        nutritionField("Sugar", unit: "g", identifier: "sugar", text: $nutritionInput.sugar)
+                        nutritionField("Salt", unit: "g", identifier: "salt", text: $nutritionInput.salt)
 
                         Text("Each value is optional. Valid range: 0–1,000,000.")
                             .font(.footnote)
@@ -212,7 +215,6 @@ struct FoodEntryEditor: View {
         return try? FoodEntryValidator.validated(
             description: descriptionText,
             occurredAt: occurredAt,
-            isCaloric: isCaloric,
             nutrition: nutrition,
             now: clock.now,
             calendar: calendar
@@ -220,24 +222,31 @@ struct FoodEntryEditor: View {
     }
 
     private var isAtActiveFastStart: Bool {
-        isCaloric && activeFastStart == occurredAt
+        activeFastStart == occurredAt
     }
 
     private func nutritionField(
         _ label: String,
         unit: String,
+        identifier: String,
         text: Binding<String>
     ) -> some View {
         HStack {
-            TextField(label, text: text)
+            Text(label)
+                .accessibilityIdentifier("food.nutrition.\(identifier).label")
+            Spacer(minLength: UFastTheme.Spacing.compact)
+            TextField("Value", text: text)
                 .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .frame(minWidth: 72, idealWidth: 96, maxWidth: 120)
                 .accessibilityLabel(label)
+                .accessibilityIdentifier("food.nutrition.\(identifier).input")
             Text(unit)
                 .foregroundStyle(UFastTheme.secondaryText)
-                .accessibilityHidden(true)
+                .accessibilityIdentifier("food.nutrition.\(identifier).unit")
         }
         .accessibilityElement(children: .contain)
-        .accessibilityHint("Optional, from 0 to 1,000,000 (unit).")
+        .accessibilityHint("Optional, from 0 to 1,000,000 \(unit).")
     }
 
     private func validationLabel(_ message: String, identifier: String) -> some View {

@@ -7,25 +7,17 @@ final class CaloricFoodUITests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     @MainActor
-    func testNonCaloricFoodDuringActiveFastLeavesFastActive() {
+    func testFoodEditorDoesNotOfferNonCaloricClassification() {
         let app = launchWithActiveFast()
         openFoodEditor(in: app)
-        enterDescription("Black coffee", in: app)
-        let caloricSwitch = app.switches["food.caloric"]
-        caloricSwitch.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)
-        ).press(
-            forDuration: 0.1,
-            thenDragTo: caloricSwitch.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)
-            )
-        )
-        XCTAssertEqual(caloricSwitch.value as? String, "0")
-        app.buttons["food.save"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
-        XCTAssertFalse(app.alerts["This entry is during your recorded fast."].exists)
-        XCTAssertFalse(app.navigationBars["Log food"].exists)
+        XCTAssertFalse(app.switches["food.caloric"].exists)
+        XCTAssertFalse(app.buttons["Non-caloric"].exists)
+        XCTAssertEqual(
+            app.staticTexts["food.caloric.explanation"].label,
+            "Food events count as caloric and are used as fasting boundaries. "
+                + "If this event falls during your active fast, saving it ends the fast at this time."
+        )
     }
 
     @MainActor

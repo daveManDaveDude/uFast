@@ -3,7 +3,8 @@
 ## Terms
 
 - **Fast:** a user-recorded or user-confirmed interval, not proof of a biological state.
-- **Caloric event:** an event the user intends to count as ending a fast.
+- **Caloric event:** an event that counts as a fasting boundary. Food events
+  always qualify; hydration follows the user's explicit classification.
 - **Recorded fast:** explicitly started or entered by the user.
 - **Reconstructed fast:** proposed from confirmed boundaries and saved after user confirmation.
 - **Unknown period:** time without enough trusted information to assert a fast.
@@ -16,7 +17,8 @@
 - BR-04: End must be after start; both can be backdated.
 - BR-05: Completed fasts retain the goal applicable when active.
 - BR-06: Hydration does not break a fast unless marked caloric.
-- BR-07: Food is caloric by default but correctable.
+- BR-07: Food events are always caloric. Hydration classification remains
+  explicit and correctable.
 - BR-08: A caloric event inside an active fast prompts; it never silently changes the fast.
 - BR-09: Reconstruction uses confirmed caloric boundaries and requires confirmation before save.
 - BR-10: Insufficient or conflicting evidence remains unknown.
@@ -32,3 +34,17 @@
   as open-ended from its start for conflict checks, so touching boundaries are
   allowed. Existing conflicting records remain visible and are never silently
   rewritten.
+- BR-18: Guided reconstruction considers consecutive user-saved caloric events
+  and proposes only absolute intervals of at least eight hours. Both boundary
+  events must exist; a range edge alone never becomes a boundary.
+- BR-19: Every reconstruction candidate must be reviewed as accepted, adjusted
+  or unknown before one explicit final save. An adjustment must remain within
+  its supporting boundary instants, have positive duration and satisfy BR-17.
+- BR-20: A confirmed reconstructed fast retains visible reconstructed
+  provenance and does not claim a historical fasting goal. An unknown period is
+  stored only after explicit review or when a bounded candidate is blocked by
+  insufficient or conflicting evidence.
+- BR-21: Adding a caloric event inside a reconstructed interval, or editing,
+  deleting or reclassifying one of its supporting boundary events, marks the
+  affected reconstructed fast for review in the same persistent transaction.
+  The app never silently rewrites or deletes the saved fast.
