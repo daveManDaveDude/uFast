@@ -16,6 +16,7 @@ struct FoodEntryEditor: View {
     let record: FoodEntryRecord?
     let clock: any AppClock
     let activeFastStart: Date?
+    let allowedRange: Range<Date>?
     let onSave: (FoodEntryDraft, Bool) throws -> Void
     let onDelete: (() throws -> Void)?
     let onCancel: () -> Void
@@ -24,6 +25,8 @@ struct FoodEntryEditor: View {
         record: FoodEntryRecord?,
         clock: any AppClock,
         activeFastStart: Date?,
+        initialOccurredAt: Date? = nil,
+        allowedRange: Range<Date>? = nil,
         onSave: @escaping (FoodEntryDraft, Bool) throws -> Void,
         onDelete: (() throws -> Void)?,
         onCancel: @escaping () -> Void
@@ -31,11 +34,12 @@ struct FoodEntryEditor: View {
         self.record = record
         self.clock = clock
         self.activeFastStart = activeFastStart
+        self.allowedRange = allowedRange
         self.onSave = onSave
         self.onDelete = onDelete
         self.onCancel = onCancel
         _descriptionText = State(initialValue: record?.foodDescription ?? "")
-        _occurredAt = State(initialValue: record?.occurredAt ?? clock.now)
+        _occurredAt = State(initialValue: record?.occurredAt ?? initialOccurredAt ?? clock.now)
         let input = FoodNutritionTextInput(nutrition: record?.nutrition ?? FoodNutrition())
         _nutritionInput = State(initialValue: input)
         _showsDetails = State(initialValue: input.hasValues)
@@ -59,7 +63,7 @@ struct FoodEntryEditor: View {
                     DatePicker(
                         "Date",
                         selection: $occurredAt,
-                        in: calendar.startOfDay(for: clock.now) ... clock.now,
+                        in: datePickerRange,
                         displayedComponents: .date
                     )
                     .accessibilityIdentifier("food.date")
@@ -67,7 +71,7 @@ struct FoodEntryEditor: View {
                     DatePicker(
                         "Time",
                         selection: $occurredAt,
-                        in: calendar.startOfDay(for: clock.now) ... clock.now,
+                        in: datePickerRange,
                         displayedComponents: .hourAndMinute
                     )
                     .accessibilityIdentifier("food.time")
@@ -217,8 +221,16 @@ struct FoodEntryEditor: View {
             occurredAt: occurredAt,
             nutrition: nutrition,
             now: clock.now,
-            calendar: calendar
+            calendar: calendar,
+            allowedRange: allowedRange
         ).get()
+    }
+
+    private var datePickerRange: ClosedRange<Date> {
+        if let allowedRange {
+            return allowedRange.lowerBound ... allowedRange.upperBound.addingTimeInterval(-1)
+        }
+        return calendar.startOfDay(for: clock.now) ... clock.now
     }
 
     private var isAtActiveFastStart: Bool {

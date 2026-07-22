@@ -1,6 +1,6 @@
 # Slice 3 — Catch-up and history repair
 
-**Status:** Ready; S3-D1 through S3-D7 accepted 21 July 2026  
+**Status:** Done 21 July 2026; S3-D1 through S3-D7 accepted 21 July 2026
 **Last refined:** 21 July 2026  
 **Prerequisite:** Slice 2 is complete.
 
@@ -261,7 +261,7 @@ remains for this slice.
 
 **Epic:** E3 Catch-up and history repair  
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 21 July 2026
 
 ### User story
 
@@ -427,7 +427,7 @@ same trustworthy records as Today, and no reconstruction has yet been saved.
 
 **Epic:** E3 Catch-up and history repair  
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 21 July 2026
 
 ### User story
 
@@ -561,7 +561,7 @@ no range edge, non-caloric event or UI convention becomes invented evidence.
 
 **Epic:** E3 Catch-up and history repair  
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 21 July 2026
 
 ### User story
 
@@ -712,7 +712,7 @@ matches a reviewed choice and partial or stale history cannot be committed.
 
 **Epic:** E3 Catch-up and history repair  
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 21 July 2026
 
 ### User story
 
@@ -874,7 +874,7 @@ and no reconstructed or unknown row presents certainty or a goal the app lacks.
 
 **Epic:** E3 Catch-up and history repair  
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 21 July 2026
 
 ### User story
 

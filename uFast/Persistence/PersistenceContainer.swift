@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
@@ -9,6 +10,7 @@ enum PersistenceContainer {
         FastRecord.self,
         FoodEntryRecord.self,
         HydrationEntryRecord.self,
+        UnknownPeriodRecord.self,
     ])
 
     static func make(inMemory: Bool = false) throws -> ModelContainer {
@@ -22,5 +24,14 @@ enum PersistenceContainer {
             for: schema,
             configurations: [configuration]
         )
+    }
+
+    static func make(storeURL: URL) throws -> ModelContainer {
+        let configuration = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        return try ModelContainer(for: schema, configurations: [configuration])
     }
 }

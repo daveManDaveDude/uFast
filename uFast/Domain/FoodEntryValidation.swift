@@ -69,6 +69,7 @@ enum FoodEntryValidationError: Error, Equatable {
     case invalidNutrition
     case beforeToday
     case futureTime
+    case outsideSelectedRange
 
     var message: String {
         switch self {
@@ -82,6 +83,8 @@ enum FoodEntryValidationError: Error, Equatable {
             "Choose a time from today."
         case .futureTime:
             "Choose a time that isn’t in the future."
+        case .outsideSelectedRange:
+            "Choose a time within the selected catch-up days."
         }
     }
 }
@@ -95,7 +98,8 @@ enum FoodEntryValidator {
         occurredAt: Date,
         nutrition: FoodNutrition,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        allowedRange: Range<Date>? = nil
     ) -> Result<FoodEntryDraft, FoodEntryValidationError> {
         let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedDescription.isEmpty else {
@@ -109,11 +113,23 @@ enum FoodEntryValidator {
         }) else {
             return .failure(.invalidNutrition)
         }
-        guard occurredAt >= calendar.startOfDay(for: now) else {
-            return .failure(.beforeToday)
-        }
-        guard occurredAt <= now else {
-            return .failure(.futureTime)
+        if let allowedRange {
+            guard HistoricalEventRangeValidator.contains(
+                occurredAt,
+                allowedRange: allowedRange
+            ) else {
+                return .failure(.outsideSelectedRange)
+            }
+            guard occurredAt < calendar.startOfDay(for: now) else {
+                return .failure(.futureTime)
+            }
+        } else {
+            guard occurredAt >= calendar.startOfDay(for: now) else {
+                return .failure(.beforeToday)
+            }
+            guard occurredAt <= now else {
+                return .failure(.futureTime)
+            }
         }
 
         return .success(

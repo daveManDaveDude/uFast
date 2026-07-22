@@ -18,18 +18,20 @@ struct HydrationEntryEditor: View {
     let record: HydrationEntryRecord?
     let clock: any AppClock
     let activeFastStart: Date?
+    let allowedRange: Range<Date>?
     let onSave: (HydrationEntryDraft, Bool) throws -> Void
     let onDelete: (() throws -> Void)?
     let onCancel: () -> Void
 
-    init(record: HydrationEntryRecord?, clock: any AppClock, activeFastStart: Date?, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: (() throws -> Void)?, onCancel: @escaping () -> Void) {
+    init(record: HydrationEntryRecord?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: (() throws -> Void)?, onCancel: @escaping () -> Void) {
         self.record = record; self.clock = clock; self.activeFastStart = activeFastStart
+        self.allowedRange = allowedRange
         self.onSave = onSave; self.onDelete = onDelete; self.onCancel = onCancel
-        _type = State(initialValue: record?.drinkType ?? .custom)
-        _name = State(initialValue: record?.customName ?? "")
-        _volume = State(initialValue: record.map { String($0.volumeMillilitres) } ?? "")
-        _occurredAt = State(initialValue: record?.occurredAt ?? clock.now)
-        _isCaloric = State(initialValue: record?.isCaloric ?? false)
+        _type = State(initialValue: record?.drinkType ?? initialDraft?.type ?? .custom)
+        _name = State(initialValue: record?.customName ?? initialDraft?.customName ?? "")
+        _volume = State(initialValue: record.map { String($0.volumeMillilitres) } ?? initialDraft.map { String($0.volumeMillilitres) } ?? "")
+        _occurredAt = State(initialValue: record?.occurredAt ?? initialDraft?.occurredAt ?? clock.now)
+        _isCaloric = State(initialValue: record?.isCaloric ?? initialDraft?.isCaloric ?? false)
     }
 
     var body: some View {
@@ -52,8 +54,8 @@ struct HydrationEntryEditor: View {
                     }
                 }
                 Section("Time") {
-                    DatePicker("Date", selection: $occurredAt, in: calendar.startOfDay(for: clock.now) ... clock.now, displayedComponents: .date)
-                    DatePicker("Time", selection: $occurredAt, in: calendar.startOfDay(for: clock.now) ... clock.now, displayedComponents: .hourAndMinute)
+                    DatePicker("Date", selection: $occurredAt, in: datePickerRange, displayedComponents: .date)
+                    DatePicker("Time", selection: $occurredAt, in: datePickerRange, displayedComponents: .hourAndMinute)
                 }
                 Section {
                     Picker("Fasting classification", selection: $isCaloric) {
@@ -103,7 +105,14 @@ struct HydrationEntryEditor: View {
 
     private var validDraft: HydrationEntryDraft? {
         guard let validVolume, !isAtActiveFastStart else { return nil }
-        return HydrationEntryValidator.validated(type: type, customName: name, volumeMillilitres: validVolume, occurredAt: occurredAt, isCaloric: isCaloric, now: clock.now, calendar: calendar)
+        return HydrationEntryValidator.validated(type: type, customName: name, volumeMillilitres: validVolume, occurredAt: occurredAt, isCaloric: isCaloric, now: clock.now, calendar: calendar, allowedRange: allowedRange)
+    }
+
+    private var datePickerRange: ClosedRange<Date> {
+        if let allowedRange {
+            return allowedRange.lowerBound ... allowedRange.upperBound.addingTimeInterval(-1)
+        }
+        return calendar.startOfDay(for: clock.now) ... clock.now
     }
 
     private func validation(_ text: String, id: String) -> some View {

@@ -24,12 +24,19 @@ enum HydrationEntryValidator {
         occurredAt: Date,
         isCaloric: Bool,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        allowedRange: Range<Date>? = nil
     ) -> HydrationEntryDraft? {
-        guard isValid(volumeMillilitres: volumeMillilitres),
-              occurredAt <= now,
-              calendar.isDate(occurredAt, inSameDayAs: now)
-        else { return nil }
+        guard isValid(volumeMillilitres: volumeMillilitres) else { return nil }
+        if let allowedRange {
+            guard allowedRange.contains(occurredAt),
+                  occurredAt < calendar.startOfDay(for: now)
+            else { return nil }
+        } else {
+            guard occurredAt <= now,
+                  calendar.isDate(occurredAt, inSameDayAs: now)
+            else { return nil }
+        }
         let name = type == .custom ? validatedCustomName(customName) : nil
         guard type != .custom || name != nil else { return nil }
         return HydrationEntryDraft(

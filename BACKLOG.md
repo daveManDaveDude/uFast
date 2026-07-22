@@ -45,11 +45,11 @@ The implementation-ready shared contract, stories, verification gate, approved
 journey concepts and autonomous-session prompt are in
 `SLICE_3_CATCH_UP_STORIES.md`.
 
-- OW-301 P0 — Open and repair a past day. **Ready 21 July 2026.**
-- OW-302 P0 — Generate reconstruction proposals. **Ready 21 July 2026.**
-- OW-303 P0 — Review and save reconstructed history. **Ready 21 July 2026.**
-- OW-304 P0 — Show provenance and preserve unknowns. **Ready 21 July 2026.**
-- OW-305 P0 — Re-evaluate affected history. **Ready 21 July 2026.**
+- OW-301 P0 — Open and repair a past day. **Done 21 July 2026.**
+- OW-302 P0 — Generate reconstruction proposals. **Done 21 July 2026.**
+- OW-303 P0 — Review and save reconstructed history. **Done 21 July 2026.**
+- OW-304 P0 — Show provenance and preserve unknowns. **Done 21 July 2026.**
+- OW-305 P0 — Re-evaluate affected history. **Done 21 July 2026.**
 
 ## Slice 4 — Apple Health
 

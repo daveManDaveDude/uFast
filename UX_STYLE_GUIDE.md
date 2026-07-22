@@ -182,6 +182,17 @@ therefore clamps at 100%.
 
 Do not reproduce this geometry in a feature screen; reuse the shared style.
 
+## History evidence states
+
+History must name provenance in text, not colour alone. Use **Recorded by you**
+for directly recorded fasts, **Reconstructed · Confirmed by you** for reviewed
+reconstruction, **Adjusted by you** when its interval was changed, **Needs
+review** when supporting evidence changes, and **Unknown period** when no fast
+was saved. Reconstructed and converted records without a captured goal omit the
+historical-goal row. Changed-history review presents **Currently saved** before
+**Updated evidence** and keeps conversion and removal subordinate to **Update
+and reconfirm**.
+
 ## Accessibility and adaptation
 
 Every new or changed screen must be checked for:

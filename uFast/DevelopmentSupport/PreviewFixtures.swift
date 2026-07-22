@@ -65,6 +65,47 @@ enum PreviewFixtures {
                     goalAtStart: .default
                 )
             )
+            let start = FoodEntryRecord(
+                draft: .init(
+                    description: "Dinner",
+                    occurredAt: now.addingTimeInterval(-40 * 60 * 60)
+                ),
+                createdAt: now.addingTimeInterval(-40 * 60 * 60)
+            )
+            let end = FoodEntryRecord(
+                draft: .init(
+                    description: "Breakfast",
+                    occurredAt: now.addingTimeInterval(-28 * 60 * 60)
+                ),
+                createdAt: now.addingTimeInterval(-28 * 60 * 60)
+            )
+            container.mainContext.insert(start)
+            container.mainContext.insert(end)
+            let pair = ReconstructionBoundaryPair(
+                start: .init(kind: .food, id: start.id),
+                end: .init(kind: .food, id: end.id)
+            )
+            let needsReview = FastRecord(
+                reconstructedStart: start.occurredAt,
+                endDate: end.occurredAt,
+                boundaries: pair,
+                adjustedByUser: true
+            )
+            needsReview.markNeedsReview()
+            container.mainContext.insert(needsReview)
+            container.mainContext.insert(
+                UnknownPeriodRecord(
+                    startDate: now.addingTimeInterval(-26 * 60 * 60),
+                    endDate: now.addingTimeInterval(-18 * 60 * 60),
+                    boundaries: .init(
+                        start: .init(kind: .food, id: UUID()),
+                        end: .init(kind: .hydration, id: UUID())
+                    ),
+                    reason: .userChoice,
+                    createdAt: now
+                )
+            )
+            try container.mainContext.save()
             return container
         } catch {
             fatalError("Unable to create completed-fast preview persistence: \(error)")
