@@ -301,3 +301,83 @@ is shown.
 - **Consequence:** History distinguishes recorded, reconstructed, adjusted,
   needs-review and unknown states without presenting an invented historical
   target.
+
+## D-015 Slice 3.5 temporal history direction
+
+- **Status:** Accepted
+- **Accepted:** 22 July 2026
+- **Decision:** Use the OW-350 **C — Temporal ribbon** family as the core
+  presentation direction for History and Catch up. A compact locale-derived
+  date navigator keeps the selected day in context, while a horizontally
+  scrolling ribbon places evening, midnight and morning on one continuous
+  absolute-time axis. A native month-jump sheet and explicit continuation copy
+  may be borrowed from family A as subordinate navigation and accessibility
+  aids. Every ribbon has an equivalent grouped semantic list or VoiceOver
+  representation. Family B's seven-column canvas is not combined with the
+  ribbon.
+- **Consequence:** OW-351 through OW-355 may add immutable presentation models,
+  timeline geometry and SwiftUI views, but they do not add stored day segments,
+  selected-date persistence, record semantics, inference, statistics or scoring.
+  A fast remains one absolute interval when clipped by a viewport or rendered
+  across midnight. Calendar, Locale and TimeZone determine navigation and
+  labels; Europe/London 23- and 25-hour days use their actual elapsed intervals.
+
+## D-016 Direct History navigation and repair
+
+- **Status:** Accepted
+- **Accepted:** 23 July 2026
+- **Decision:** History owns one transient selected local-calendar date shared
+  by its month heading, native date picker, compact date navigator, paged
+  temporal detail and structured accessibility detail. A deliberate horizontal
+  swipe over temporal detail moves exactly one local-calendar day, using
+  Calendar and TimeZone arithmetic rather than a 24-hour offset. The ribbon no
+  longer owns a competing horizontal pan, and the visible **Catch up** button
+  is removed.
+- **Decision:** An empty point in a completed-day temporal page may select an
+  in-memory absolute instant through that page's actual ribbon window. The app
+  confirms the unambiguous local date and time before offering **Food**,
+  **Drink** or **Cancel**, then reuses the existing historical editors,
+  validation, D-013 handling, invalidation and persistence services. Existing
+  marks take precedence, accessibility sizes expose an explicit alternative to
+  precision tapping, and Today or future instants remain ineligible.
+- **Decision:** Contextual reconstruction review begins with the selected
+  completed day while preserving the existing one-to-seven-day CatchUpRange
+  capability. Consecutive saved caloric events at least eight absolute hours
+  apart remain an unsaved **Suggested fast · Needs review** proposal until
+  every candidate receives Accept, Adjust or Leave unknown and the existing
+  final atomic save succeeds.
+- **Consequence:** OW-361 through OW-365 may replace History gesture ownership,
+  navigation, draft presentation and routing only. They do not change
+  persistence schema or record semantics, reconstruction boundary extraction,
+  threshold, conflicts, suppression, rollback, provenance, invalidation,
+  ordering, saved-fast identity, Today behaviour or any external capability.
+
+## D-017 Analog History scrolling
+
+- **Status:** Accepted
+- **Accepted:** 23 July 2026
+- **Decision:** Replace History's threshold-triggered one-day temporal swipe
+  with a continuously moving, native-inertial horizontal carousel of
+  local-calendar day pages. Content follows the finger throughout a drag,
+  adjacent pages remain visibly connected, and release may travel across
+  several days before aligning to one whole-day resting position. The centered
+  page is the sole transient selected date; fractional position and velocity
+  are presentation state only and are never persisted.
+- **Decision:** The compact date navigator becomes a stable continuous rail
+  rather than being rebuilt around a new week after every selection. Carousel,
+  rail, month heading, native picker and accessibility detail remain
+  synchronized without issuing competing programmatic movement during direct
+  manipulation or deceleration. Today remains the forward boundary. Existing
+  marks, empty-timeline entry and contextual repair operate only on the settled
+  selected page, with buttons and native controls as equivalent alternatives.
+- **Consequence:** OW-371 through OW-375 may introduce deterministic
+  carousel-state and bounded local-day presentation primitives, then replace
+  the completed Slice 3.6 command-paging gesture and week-rebuilding date rail.
+  Native direct manipulation uses unrestricted view-aligned inertia.
+  Deliberate button, chip, picker and accessibility selections align without a
+  travel animation because animating the same unrestricted bound scroll
+  position can fail to reach an idle phase on iOS 26; this avoids a
+  synchronization loop without introducing custom velocity physics.
+  They do not restore free within-day time panning or change persistence,
+  record semantics, absolute-time ribbon mapping, reconstruction, invalidation,
+  provenance, ordering, Today journeys or any external capability.

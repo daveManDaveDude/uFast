@@ -1,0 +1,32 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "2EEEE688-8384-4016-9BAF-3A6268A5A1B7",
+        "deviceName" : "iPhone 16e",
+        "exportedFileName" : "40E7D4A5-F82B-4103-801A-4EDD7784DE8C.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "history-year-boundary-en-GB_0_418D0881-8828-40D6-B2FD-48922C5F9272.png",
+        "timestamp" : 1784826131.685
+      }
+    ],
+    "testIdentifier" : "HistoryUITests/testCarouselRailAndHeadingStaySynchronizedAcrossYearBoundary()",
+    "testIdentifierURL" : "test://com.apple.xcode/uFast/uFastUITests/HistoryUITests/testCarouselRailAndHeadingStaySynchronizedAcrossYearBoundary"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "2EEEE688-8384-4016-9BAF-3A6268A5A1B7",
+        "deviceName" : "iPhone 16e",
+        "exportedFileName" : "DAD77A7B-0042-49CF-9C6F-3738509B5D0E.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "history-multi-day-settled-en-GB_0_138A293F-602A-4702-B67A-B8FAF623EC44.png",
+        "timestamp" : 1784826145.459
+      }
+    ],
+    "testIdentifier" : "HistoryUITests/testFastHistoryFlickCrossesSeveralDaysAndCannotPassToday()",
+    "testIdentifierURL" : "test://com.apple.xcode/uFast/uFastUITests/HistoryUITests/testFastHistoryFlickCrossesSeveralDaysAndCannotPassToday"
+  }
+]

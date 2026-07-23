@@ -1,7 +1,7 @@
 # Slice 3.5 — Visual history and catch-up experience
 
-**Sprint status:** OW-350 complete; explicit direction approval required  
-**Production status:** Not started  
+**Sprint status:** OW-350 through OW-355 complete
+**Production status:** Family C delivered; physical-device walkthrough pending unlock
 **Story order:** OW-350 → OW-351 → OW-352 → OW-353 → OW-354 → OW-355
 
 This pack defines a presentation, navigation and interaction-design sprint over
@@ -32,7 +32,7 @@ or an unjustified trust claim:
 
 ## OW-350 — Research and approve the visual direction
 
-**Status:** Complete, awaiting explicit approval  
+**Status:** Accepted 22 July 2026
 **Gate:** OW-351 must not begin until a direction is approved and recorded in
 `DECISIONS.md`.
 
@@ -255,23 +255,16 @@ The month grid should not become a second competing overview, and B's
 seven-column canvas should not be combined with the ribbon. That would create
 two axes, excessive density and an accessibility burden.
 
-### Approval required
+### Approved direction
 
-Approve one of the following before OW-351:
-
-- **C — Temporal ribbon (recommended)**, with the two subordinate A elements;
-- **A — Calendar + day rail**;
-- **B — Seven-day columns**; or
-- request a targeted revision to one family.
-
-After approval, record the accepted direction in `DECISIONS.md`. Do not begin
-production implementation before that edit is accepted.
+The user approved **C — Temporal ribbon** on 22 July 2026, with the two
+subordinate family-A elements described above. D-015 records the decision.
 
 ---
 
 ## OW-351 — Establish temporal presentation primitives
 
-**Status:** Not started; blocked by OW-350 approval
+**Status:** Done 22 July 2026
 
 ### Scope
 
@@ -299,7 +292,7 @@ production implementation before that edit is accepted.
 
 ## OW-352 — Redesign History overview
 
-**Status:** Not started
+**Status:** Done 22 July 2026
 
 ### Acceptance criteria
 
@@ -318,7 +311,7 @@ production implementation before that edit is accepted.
 
 ## OW-353 — Add visual day detail and record disclosure
 
-**Status:** Not started
+**Status:** Done 22 July 2026
 
 ### Acceptance criteria
 
@@ -336,7 +329,7 @@ production implementation before that edit is accepted.
 
 ## OW-354 — Rework Catch up around the shared temporal model
 
-**Status:** Not started
+**Status:** Done 22 July 2026
 
 ### Acceptance criteria
 
@@ -354,7 +347,7 @@ production implementation before that edit is accepted.
 
 ## OW-355 — Complete visual integration and quality gate
 
-**Status:** Not started
+**Status:** Done 22 July 2026
 
 ### Acceptance criteria
 
@@ -377,3 +370,39 @@ production implementation before that edit is accepted.
 Report the accepted direction, changed files, reusable primitives,
 accessibility treatment, locale/DST verification, migration impact, full
 verification, assumptions and remaining device/visual risks.
+
+## Delivery and verification record
+
+Delivered Family C as a code-native evening-to-evening temporal ribbon with a
+locale-derived seven-day navigator and native month jump sheet. History,
+selected-day disclosure, past-day repair and proposal review now use the same
+temporal grammar. Visual clipping produces viewport segments only: stored fast
+identity, absolute instants, provenance and all repository/service transaction
+boundaries remain unchanged.
+
+Reusable presentation primitives cover ribbon windows, local midnight markers,
+interval clipping and continuation, deterministic lane allocation, stable event
+ordering, provenance text, locale-aware summaries and narrow/wide Dynamic Type
+geometry. The custom visual layer is hidden from accessibility and paired with
+a structured, chronological semantic list whose items open the existing native
+edit/detail destinations.
+
+Verification completed 22 July 2026:
+
+- `make format`: pass; 0 files required formatting;
+- `make project`: pass;
+- `make build`: pass;
+- `make test-unit`: 135 passed, 0 failed;
+- `make test-ui`: 48 passed, 0 failed;
+- `make lint`: 0 violations across 93 Swift files;
+- deterministic coverage: en_GB and en_US, Monday-first calendar handling,
+  Europe/London spring/autumn DST, 12/24-hour output, month/year continuation,
+  clipping without mutation, stable ordering/lanes and narrow/wide geometry;
+- migration and rollback coverage remained green in the complete suites;
+- one connected iPhone was detected and the app was installed without resetting
+  its data; launch and the manual principal-journey walkthrough were blocked
+  because the device was locked.
+
+No persistence schema or migration was added. Remaining risk is limited to the
+locked-device visual walkthrough; simulator coverage includes narrow/wide,
+light/dark, increased contrast, Reduce Motion and accessibility XXXL scenarios.

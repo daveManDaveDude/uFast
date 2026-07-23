@@ -46,6 +46,9 @@ struct UFastApp: App {
         if arguments.contains("--seed-slice3-history") {
             try seedSlice3History(in: context)
         }
+        if arguments.contains("--seed-slice36-proposal") {
+            seedSlice36Proposal(in: context)
+        }
         if let index = arguments.firstIndex(of: "--seed-active-fast-start"),
            arguments.indices.contains(index + 1),
            let interval = TimeInterval(arguments[index + 1])
@@ -106,6 +109,26 @@ struct UFastApp: App {
                 ),
                 reason: .userChoice,
                 createdAt: now
+            )
+        )
+    }
+
+    private func seedSlice36Proposal(in context: ModelContext) {
+        context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        let start = clock.now.addingTimeInterval(-24 * 60 * 60)
+        let end = clock.now.addingTimeInterval(-12 * 60 * 60)
+        context.insert(
+            FoodEntryRecord(
+                id: UUID(uuidString: "36000000-0000-0000-0000-000000000001") ?? UUID(),
+                draft: .init(description: "Evening meal", occurredAt: start),
+                createdAt: start
+            )
+        )
+        context.insert(
+            FoodEntryRecord(
+                id: UUID(uuidString: "36000000-0000-0000-0000-000000000002") ?? UUID(),
+                draft: .init(description: "Morning meal", occurredAt: end),
+                createdAt: end
             )
         )
     }

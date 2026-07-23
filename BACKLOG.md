@@ -51,6 +51,54 @@ journey concepts and autonomous-session prompt are in
 - OW-304 P0 — Show provenance and preserve unknowns. **Done 21 July 2026.**
 - OW-305 P0 — Re-evaluate affected history. **Done 21 July 2026.**
 
+## Slice 3.5 — Visual history and catch-up experience
+
+The research, approved direction, implementation-ready stories and verification
+record are in `SLICE_3_5_HISTORY_UX_STORIES.md`.
+
+- OW-350 P0 — Research and approve the visual direction. **Done 22 July 2026.**
+- OW-351 P0 — Establish temporal presentation primitives. **Done 22 July 2026.**
+- OW-352 P0 — Redesign History overview. **Done 22 July 2026.**
+- OW-353 P0 — Add visual day detail and record disclosure. **Done 22 July 2026.**
+- OW-354 P0 — Rework Catch up around the shared temporal model. **Done 22 July 2026.**
+- OW-355 P0 — Complete visual integration and quality gate. **Done 22 July 2026.**
+
+## Slice 3.6 — Direct history navigation and repair
+
+The approved interaction contract and completed stories are in
+`SLICE_3_6_HISTORY_INTERACTION_STORIES.md`.
+
+- OW-360 P0 — Approve the direct-History interaction contract. **Done 23 July 2026.**
+- OW-361 P0 — Establish synchronised day-paging primitives. **Done 23 July 2026.**
+- OW-362 P0 — Make History a swipeable date experience. **Done 23 July 2026.**
+- OW-363 P0 — Add food or drink from temporal detail. **Done 23 July 2026.**
+- OW-364 P0 — Surface existing reconstruction review contextually. **Done 23 July 2026.**
+- OW-365 P0 — Complete the History interaction quality gate. **Done 23 July 2026.**
+
+## Slice 3.7 — Analog History scrolling
+
+The approval-gated continuous-scroll plan is in
+`SLICE_3_7_ANALOG_HISTORY_SCROLL_STORIES.md`.
+
+- OW-370 P0 — Approve and prototype analog History scrolling. **Done 23 July 2026.**
+- OW-371 P0 — Establish deterministic carousel primitives. **Done 23 July 2026.**
+- OW-372 P0 — Replace command paging with an analog temporal carousel. **Done 23 July 2026.**
+- OW-373 P0 — Synchronize the stable date rail and History controls. **Done 23 July 2026.**
+- OW-374 P0 — Complete accessible and resilient analog interaction. **Done 23 July 2026.**
+- OW-375 P0 — Complete the analog-scroll quality gate. **Done 23 July 2026.**
+
+## Slice 3.8 — Coupled History date rail
+
+The approval-gated real-time rail-coupling plan is in
+`SLICE_3_8_COUPLED_HISTORY_SCROLL_STORIES.md`.
+
+- OW-380 P0 — Approve and prototype coupled History motion. **Proposed.**
+- OW-381 P0 — Establish deterministic coupled-scroll primitives. **Blocked by OW-380.**
+- OW-382 P0 — Couple the upper rail to lower-carousel motion. **Blocked by OW-381.**
+- OW-383 P0 — Preserve deliberate rail and date-control behavior. **Blocked by OW-382.**
+- OW-384 P0 — Complete accessibility, resilience and performance. **Blocked by OW-383.**
+- OW-385 P0 — Complete the coupled-scroll quality gate. **Blocked by OW-384.**
+
 ## Slice 4 — Apple Health
 
 - OW-401 P0 — Contextual weight authorization.
@@ -85,5 +133,12 @@ OW-201 and OW-203 examples in the complete product pack and refines OW-201
 through OW-205 against the current domain rules and UX style guide.
 `SLICE_3_CATCH_UP_STORIES.md` supersedes the product pack's OW-302 example and
 refines OW-301 through OW-305 against the accepted Slice 3 decisions and
-approved journey concepts. The product pack's OW-401 example remains an input
-when Slice 4 is refined.
+approved journey concepts. `SLICE_3_5_HISTORY_UX_STORIES.md` records the
+approved temporal-ribbon direction and delivered OW-350 through OW-355 visual
+integration. `SLICE_3_6_HISTORY_INTERACTION_STORIES.md` proposes OW-360 through
+OW-365 behind an explicit interaction-contract approval gate.
+`SLICE_3_7_ANALOG_HISTORY_SCROLL_STORIES.md` records the approved analog
+carousel contract and delivered OW-370 through OW-375 implementation.
+`SLICE_3_8_COUPLED_HISTORY_SCROLL_STORIES.md` proposes OW-380 through OW-385
+for real-time visual coupling between the delivered carousel and date rail.
+The product pack's OW-401 example remains an input when Slice 4 is refined.

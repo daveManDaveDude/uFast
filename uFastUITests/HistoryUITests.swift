@@ -1,5 +1,7 @@
 import XCTest
 
+// swiftlint:disable file_length trailing_comma type_body_length
+
 final class HistoryUITests: XCTestCase {
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 
@@ -15,6 +17,309 @@ final class HistoryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No completed fasts"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Completed fasts will appear here."].exists)
         XCTAssertFalse(app.buttons["fast.start"].exists)
+        XCTAssertTrue(app.buttons["history.choose-date"].exists)
+        XCTAssertFalse(app.buttons["history.catch-up"].exists)
+    }
+
+    @MainActor
+    func testHistoryUsesAccessibleTemporalNavigatorAndRibbonAlternative() {
+        let app = launchCompletedFast()
+        app.tabBars.buttons["History"].tap()
+
+        XCTAssertTrue(app.buttons["history.choose-date"].exists)
+        let structuredFastRow = recordedFastRow(in: app)
+        XCTAssertTrue(structuredFastRow.waitForExistence(timeout: 2))
+        XCTAssertTrue(structuredFastRow.label.contains("start"))
+        XCTAssertTrue(structuredFastRow.label.contains("end"))
+    }
+
+    @MainActor
+    func testHistorySwipeButtonsAndDateChipShareOneSelectedDay() {
+        let app = launchOnboardedHistory()
+        app.tabBars.buttons["History"].tap()
+
+        let selectedDate = app.staticTexts["history.selected-date"]
+        XCTAssertTrue(selectedDate.waitForExistence(timeout: 2))
+        let todayLabel = selectedDate.label
+        XCTAssertFalse(app.buttons["history.next-day"].isEnabled)
+
+        let today = Calendar.current.startOfDay(for: start)
+        let page = app.otherElements["history.day-page.\(today.timeIntervalSince1970)"]
+        XCTAssertTrue(page.waitForExistence(timeout: 2))
+        page.swipeRight(velocity: .slow)
+        XCTAssertNotEqual(selectedDate.label, todayLabel)
+        let previousLabel = selectedDate.label
+        XCTAssertTrue(app.buttons["history.next-day"].isEnabled)
+
+        app.buttons["history.next-day"].tap()
+        XCTAssertEqual(selectedDate.label, todayLabel)
+
+        guard let previousDay = Calendar.current.date(
+            byAdding: .day,
+            value: -1,
+            to: Calendar.current.startOfDay(for: start)
+        ) else {
+            XCTFail("Expected a previous local-calendar day.")
+            return
+        }
+        let chip = app.buttons["temporal.date.\(previousDay.timeIntervalSince1970)"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 2))
+        chip.tap()
+        XCTAssertEqual(selectedDate.label, previousLabel)
+    }
+
+    @MainActor
+    func testFastHistoryFlickCrossesSeveralDaysAndCannotPassToday() {
+        let app = launchOnboardedHistory(
+            additionalArguments: ["-AppleLocale", "en_GB"]
+        )
+        app.tabBars.buttons["History"].tap()
+
+        let selectedDate = app.staticTexts["history.selected-date"]
+        XCTAssertTrue(selectedDate.waitForExistence(timeout: 2))
+        let todayLabel = selectedDate.label
+        app.buttons["history.previous-day"].tap()
+        let yesterdayLabel = selectedDate.label
+        app.buttons["history.next-day"].tap()
+        XCTAssertEqual(selectedDate.label, todayLabel)
+
+        let today = Calendar.current.startOfDay(for: start)
+        let todayPage = app.otherElements[
+            "history.day-page.\(today.timeIntervalSince1970)"
+        ]
+        XCTAssertTrue(todayPage.waitForExistence(timeout: 2))
+
+        todayPage.swipeRight(velocity: .fast)
+        XCTAssertNotEqual(selectedDate.label, todayLabel)
+        XCTAssertNotEqual(
+            selectedDate.label,
+            yesterdayLabel,
+            "A fast native flick should be able to settle more than one day back."
+        )
+        captureScreenshot(named: "history-multi-day-settled-en-GB", in: app)
+
+        let next = app.buttons["history.next-day"]
+        XCTAssertTrue(next.isEnabled)
+        next.tap()
+        XCTAssertTrue(next.isEnabled)
+
+        app.terminate()
+        let boundaryApp = launchOnboardedHistory(
+            additionalArguments: ["-AppleLocale", "en_GB"]
+        )
+        boundaryApp.tabBars.buttons["History"].tap()
+        let boundaryDate = boundaryApp.staticTexts["history.selected-date"]
+        XCTAssertTrue(boundaryDate.waitForExistence(timeout: 2))
+        let boundaryTodayLabel = boundaryDate.label
+        let boundaryPage = boundaryApp.otherElements[
+            "history.day-page.\(today.timeIntervalSince1970)"
+        ]
+        XCTAssertTrue(boundaryPage.waitForExistence(timeout: 2))
+        boundaryPage.swipeLeft(velocity: .fast)
+        XCTAssertEqual(boundaryDate.label, boundaryTodayLabel)
+        XCTAssertFalse(boundaryApp.buttons["history.next-day"].isEnabled)
+    }
+
+    @MainActor
+    func testCarouselRailAndHeadingStaySynchronizedAcrossYearBoundary() throws {
+        let calendar = Calendar.current
+        let now = try XCTUnwrap(
+            calendar.date(
+                from: DateComponents(
+                    year: 2027,
+                    month: 1,
+                    day: 2,
+                    hour: 12
+                )
+            )
+        )
+        let app = launchOnboardedHistory(
+            now: now,
+            additionalArguments: ["-AppleLocale", "en_GB"]
+        )
+        app.tabBars.buttons["History"].tap()
+
+        let heading = app.staticTexts["history.month-heading"]
+        let selectedDate = app.staticTexts["history.selected-date"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 2))
+        let januaryHeading = heading.label
+        let januaryDate = selectedDate.label
+
+        app.buttons["history.previous-day"].tap()
+        app.buttons["history.previous-day"].tap()
+
+        let decemberDay = try XCTUnwrap(
+            calendar.date(
+                from: DateComponents(year: 2026, month: 12, day: 31)
+            )
+        )
+        let canonicalDecemberDay = calendar.startOfDay(for: decemberDay)
+        XCTAssertNotEqual(heading.label, januaryHeading)
+        XCTAssertNotEqual(selectedDate.label, januaryDate)
+        XCTAssertTrue(app.buttons[
+            "temporal.date.\(canonicalDecemberDay.timeIntervalSince1970)"
+        ].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.otherElements[
+            "history.day-page.\(canonicalDecemberDay.timeIntervalSince1970)"
+        ].waitForExistence(timeout: 2))
+        captureScreenshot(named: "history-year-boundary-en-GB", in: app)
+
+        app.buttons["history.next-day"].tap()
+        app.buttons["history.next-day"].tap()
+        XCTAssertEqual(heading.label, januaryHeading)
+        XCTAssertEqual(selectedDate.label, januaryDate)
+    }
+
+    @MainActor
+    func testHistoryAlternativesRemainReachableWithAccessibilityTextAndReduceMotion() {
+        let app = launchOnboardedHistory(
+            additionalArguments: [
+                "-AppleLocale", "en_US",
+                "-AppleInterfaceStyle", "Dark",
+                "-UIAccessibilityDarkerSystemColorsEnabled", "YES",
+                "-UIAccessibilityReduceMotionEnabled", "YES",
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryAccessibilityXXXL",
+            ]
+        )
+        app.tabBars.buttons["History"].tap()
+
+        XCTAssertTrue(app.staticTexts["history.selected-date"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["history.previous-day"].exists)
+        XCTAssertTrue(app.buttons["history.next-day"].exists)
+        XCTAssertTrue(app.buttons["history.choose-date"].exists)
+        let today = Calendar.current.startOfDay(for: start)
+        XCTAssertTrue(app.buttons[
+            "temporal.date.\(today.timeIntervalSince1970)"
+        ].waitForExistence(timeout: 2))
+
+        app.buttons["history.previous-day"].tap()
+        let addAlternative = app.buttons["history.add-at-selected-time"]
+        if !addAlternative.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(addAlternative.exists)
+        XCTAssertTrue(addAlternative.isHittable)
+        let dragStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.72))
+        let dragEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.56))
+        dragStart.press(forDuration: 0.1, thenDragTo: dragEnd)
+        XCTAssertTrue(addAlternative.isHittable)
+        captureScreenshot(named: "history-dark-accessibility-en-US", in: app)
+    }
+
+    @MainActor
+    func testDirectHistoryEntryConfirmsTimeAndSavesFoodAndFavouriteDrink() {
+        let app = launchOnboardedHistory()
+        app.tabBars.buttons["History"].tap()
+        selectYesterday(in: app)
+
+        app.buttons["history.add-at-selected-time"].tap()
+        XCTAssertTrue(app.navigationBars["Add to history"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["history.add.summary"].exists)
+        XCTAssertTrue(app.datePickers["history.add.date"].exists)
+        XCTAssertTrue(app.datePickers["history.add.time"].exists)
+        app.buttons["history.add.food"].tap()
+        XCTAssertTrue(app.textFields["food.description"].waitForExistence(timeout: 2))
+        app.textFields["food.description"].tap()
+        app.textFields["food.description"].typeText("Historical lunch")
+        app.buttons["food.save"].tap()
+        XCTAssertTrue(app.staticTexts["Historical lunch"].waitForExistence(timeout: 2))
+
+        app.buttons["history.add-at-selected-time"].tap()
+        app.buttons["history.add.drink"].tap()
+        XCTAssertTrue(app.buttons["drink.favourite.water"].waitForExistence(timeout: 2))
+        app.buttons["drink.favourite.water"].tap()
+        XCTAssertTrue(app.buttons["drink.editor.save"].waitForExistence(timeout: 2))
+        app.buttons["drink.editor.save"].tap()
+        XCTAssertTrue(app.staticTexts["Water"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testDirectHistoryEntryCancellationWritesNothingAndFailedSaveRetainsDraft() {
+        let app = XCUIApplication()
+        app.launchArguments = launchArguments(now: start, resetData: true) + [
+            "--seed-onboarded",
+            "--simulate-food-save-failure",
+        ]
+        app.launch()
+        app.tabBars.buttons["History"].tap()
+        selectYesterday(in: app)
+
+        app.buttons["history.add-at-selected-time"].tap()
+        app.buttons["history.add.cancel"].tap()
+        XCTAssertFalse(app.navigationBars["Add to history"].exists)
+        XCTAssertFalse(app.staticTexts["Unpersisted meal"].exists)
+
+        app.buttons["history.add-at-selected-time"].tap()
+        app.buttons["history.add.food"].tap()
+        let description = app.textFields["food.description"]
+        XCTAssertTrue(description.waitForExistence(timeout: 2))
+        description.tap()
+        description.typeText("Unpersisted meal")
+        app.buttons["food.save"].tap()
+
+        XCTAssertTrue(app.staticTexts["food.save-error"].waitForExistence(timeout: 2))
+        XCTAssertEqual(description.value as? String, "Unpersisted meal")
+        app.buttons["food.cancel"].tap()
+        XCTAssertFalse(app.staticTexts["Unpersisted meal"].exists)
+    }
+
+    @MainActor
+    func testDirectHistoryEntrySavesCustomNonCaloricAndCaloricDrinks() {
+        let app = launchOnboardedHistory()
+        app.tabBars.buttons["History"].tap()
+        selectYesterday(in: app)
+
+        addCustomDrink(
+            named: "Sparkling water",
+            volume: "330",
+            caloric: false,
+            in: app
+        )
+        XCTAssertTrue(app.staticTexts["Sparkling water"].waitForExistence(timeout: 2))
+
+        addCustomDrink(
+            named: "Orange juice",
+            volume: "200",
+            caloric: true,
+            in: app
+        )
+        XCTAssertTrue(app.staticTexts["Orange juice"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Caloric drink")
+        ).firstMatch.exists)
+    }
+
+    @MainActor
+    func testHistoricalFoodEditorKeepsStoredLocalDateAndTime() {
+        let now = Date(timeIntervalSince1970: 2_300_000_000)
+        let app = XCUIApplication()
+        app.launchArguments = launchArguments(now: now, resetData: true) + [
+            "--seed-slice3-history",
+            "-AppleLocale",
+            "en_GB",
+        ]
+        app.launch()
+        app.tabBars.buttons["History"].tap()
+        app.buttons["history.previous-day"].tap()
+        app.buttons["history.previous-day"].tap()
+
+        let breakfast = app.buttons.matching(
+            NSPredicate(
+                format: "label CONTAINS %@ AND enabled == true",
+                "Breakfast"
+            )
+        ).firstMatch
+        XCTAssertTrue(breakfast.waitForExistence(timeout: 2))
+        if !breakfast.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(breakfast.isHittable)
+        breakfast.tap()
+
+        XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 2))
+        XCTAssertTrue((app.buttons["Date Picker"].value as? String)?.contains("17 Nov 2042") == true)
+        XCTAssertEqual(app.buttons["Time Picker"].value as? String, "08:53")
     }
 
     @MainActor
@@ -161,6 +466,65 @@ final class HistoryUITests: XCTestCase {
     }
 
     @MainActor
+    private func launchOnboardedHistory(
+        now: Date? = nil,
+        additionalArguments: [String] = []
+    ) -> XCUIApplication {
+        let app = XCUIApplication()
+        let appearanceArguments = additionalArguments.contains(
+            "-AppleInterfaceStyle"
+        ) ? [] : ["-AppleInterfaceStyle", "Light"]
+        app.launchArguments = launchArguments(
+            now: now ?? start,
+            resetData: true
+        ) + ["--seed-onboarded"] + appearanceArguments + additionalArguments
+        app.launch()
+        return app
+    }
+
+    @MainActor
+    private func selectYesterday(in app: XCUIApplication) {
+        let previous = app.buttons["history.previous-day"]
+        XCTAssertTrue(previous.waitForExistence(timeout: 2))
+        previous.tap()
+        XCTAssertTrue(app.buttons["history.add-at-selected-time"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    private func addCustomDrink(
+        named name: String,
+        volume: String,
+        caloric: Bool,
+        in app: XCUIApplication
+    ) {
+        app.buttons["history.add-at-selected-time"].tap()
+        app.buttons["history.add.drink"].tap()
+        app.buttons["drink.custom"].tap()
+        XCTAssertTrue(app.navigationBars["Add another drink"].waitForExistence(timeout: 2))
+        app.textFields["drink.name"].tap()
+        app.textFields["drink.name"].typeText(name)
+        let volumeField = app.textFields["drink.volume"]
+        volumeField.tap()
+        volumeField.press(forDuration: 0.7)
+        if app.menuItems["Select All"].waitForExistence(timeout: 1) {
+            app.menuItems["Select All"].tap()
+        }
+        volumeField.typeText(volume)
+        if caloric {
+            app.buttons["Caloric"].tap()
+        }
+        app.buttons["drink.editor.save"].tap()
+    }
+
+    @MainActor
+    private func captureScreenshot(named name: String, in app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
     private func completeOnboarding(in app: XCUIApplication) {
         let continueButton = app.buttons["goal.continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 2))
@@ -168,10 +532,15 @@ final class HistoryUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 2))
     }
 
+    @MainActor
     private func recordedFastRow(in app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(
+        let row = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Recorded fast")
         ).firstMatch
+        for _ in 0 ..< 4 where !row.exists {
+            app.swipeUp()
+        }
+        return row
     }
 
     private func launchArguments(

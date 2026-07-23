@@ -7,46 +7,76 @@ final class Slice3CatchUpUITests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 2_300_000_000)
 
     @MainActor
-    func testCatchUpDefaultsToSevenCompletedDaysAndNavigatesChronologically() {
-        let app = launch(reset: true)
+    func testSelectedCompletedDayReviewsAndAcceptsSuggestedFast() {
+        let app = launchProposal()
         app.tabBars.buttons["History"].tap()
-        app.buttons["history.catch-up"].tap()
+        app.buttons["history.previous-day"].tap()
+        XCTAssertTrue(app.buttons["history.review-suggestions"].waitForExistence(timeout: 2))
+        app.buttons["history.review-suggestions"].tap()
 
-        XCTAssertTrue(app.navigationBars["Catch up"].waitForExistence(timeout: 2))
-        XCTAssertEqual(app.staticTexts["catch-up.day-count"].label, "7 days selected")
-        app.buttons["catch-up.review-days"].tap()
+        XCTAssertTrue(app.staticTexts["Suggested fast · Needs review"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Accept"].exists)
+        XCTAssertTrue(app.buttons["Adjust"].exists)
+        XCTAssertTrue(app.buttons["Leave unknown"].exists)
+        XCTAssertFalse(app.staticTexts["Reconstructed · Confirmed by you"].exists)
+        app.buttons["Accept"].tap()
+        app.buttons["reconstruction.save"].tap()
 
-        XCTAssertEqual(app.staticTexts["catch-up.day-progress"].label, "Day 1 of 7")
-        XCTAssertTrue(app.staticTexts["catch-up.day-empty"].exists)
-        app.buttons["catch-up.add-entry"].tap()
-        app.buttons["Food"].tap()
-        XCTAssertTrue(app.textFields["food.description"].waitForExistence(timeout: 2))
-        app.textFields["food.description"].tap()
-        app.textFields["food.description"].typeText("Remembered supper")
-        app.buttons["food.save"].tap()
-        XCTAssertTrue(app.staticTexts["Remembered supper"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Reconstructed · Confirmed by you"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.staticTexts["Suggested fast · Needs review"].exists)
+    }
 
-        app.buttons["catch-up.next"].tap()
-        XCTAssertEqual(app.staticTexts["catch-up.day-progress"].label, "Day 2 of 7")
-        XCTAssertTrue(app.buttons["catch-up.previous"].exists)
-        app.buttons["catch-up.add-entry"].tap()
-        app.buttons["Drink"].tap()
-        XCTAssertTrue(app.buttons["drink.favourite.water"].waitForExistence(timeout: 2))
-        app.buttons["drink.favourite.water"].tap()
-        XCTAssertTrue(app.buttons["drink.editor.save"].waitForExistence(timeout: 4))
-        XCTAssertTrue(app.buttons["drink.editor.save"].isEnabled)
-        app.navigationBars["Add another drink"].buttons["Cancel"].tap()
-        XCTAssertTrue(app.staticTexts["catch-up.day-empty"].waitForExistence(timeout: 2))
+    @MainActor
+    func testContextualReviewFailureKeepsSuggestionUnsavedForRetry() {
+        let app = launchProposal(simulateFailure: true)
+        app.tabBars.buttons["History"].tap()
+        app.buttons["history.previous-day"].tap()
+        app.buttons["history.review-suggestions"].tap()
+        XCTAssertTrue(app.buttons["Accept"].waitForExistence(timeout: 2))
+        app.buttons["Accept"].tap()
+        app.buttons["reconstruction.save"].tap()
 
-        app.buttons["catch-up.next"].tap()
-        XCTAssertEqual(app.staticTexts["catch-up.day-progress"].label, "Day 3 of 7")
-        XCTAssertTrue(app.buttons["catch-up.add-entry"].exists)
+        XCTAssertTrue(app.staticTexts["reconstruction.save-error"].waitForExistence(timeout: 2))
+        app.buttons["history.review-suggestions-cancel"].tap()
+        XCTAssertFalse(app.staticTexts["Reconstructed · Confirmed by you"].exists)
+    }
+
+    @MainActor
+    func testContextualReviewCanAdjustBeforeAtomicSave() {
+        let app = launchProposal()
+        openContextualReview(in: app)
+
+        app.buttons["Adjust"].tap()
+        XCTAssertTrue(app.navigationBars["Adjust reconstructed fast"].waitForExistence(timeout: 2))
+        app.buttons["Save adjustment"].tap()
+        XCTAssertTrue(app.buttons["reconstruction.save"].waitForExistence(timeout: 2))
+        app.buttons["reconstruction.save"].tap()
+
+        XCTAssertTrue(app.staticTexts["Reconstructed · Confirmed by you"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Adjusted by you"].exists)
+    }
+
+    @MainActor
+    func testContextualReviewCanLeavePeriodUnknown() {
+        let app = launchProposal()
+        openContextualReview(in: app)
+
+        app.buttons["Leave unknown"].tap()
+        app.buttons["reconstruction.save"].tap()
+
+        XCTAssertTrue(app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Unknown period")
+        ).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Reconstructed · Confirmed by you"].exists)
     }
 
     @MainActor
     func testHistoryDistinguishesProvenanceAndChangedHistoryCanBeReconfirmed() {
         let app = launch(reset: true, seedHistory: true)
         app.tabBars.buttons["History"].tap()
+        attachScreenshot(named: "history-temporal-ribbon", from: app)
+
+        revealHistory(in: app)
 
         XCTAssertTrue(app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", "Unknown period")
@@ -55,9 +85,13 @@ final class Slice3CatchUpUITests: XCTestCase {
             NSPredicate(format: "label BEGINSWITH %@", "Needs review")
         ).firstMatch
         XCTAssertTrue(needsReview.exists)
-        XCTAssertTrue(app.buttons.matching(
+        let confirmed = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Reconstructed · Confirmed by you")
-        ).firstMatch.exists)
+        ).firstMatch
+        for _ in 0 ..< 5 where !confirmed.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(confirmed.exists)
 
         needsReview.tap()
         XCTAssertTrue(app.navigationBars["Review changed history"].waitForExistence(timeout: 2))
@@ -86,6 +120,7 @@ final class Slice3CatchUpUITests: XCTestCase {
     func testFailedChangedHistoryResolutionStaysNeedsReviewAcrossRelaunch() {
         let app = launch(reset: true, seedHistory: true, simulateFailure: true)
         app.tabBars.buttons["History"].tap()
+        revealHistory(in: app)
         app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Needs review")
         ).firstMatch.tap()
@@ -98,6 +133,7 @@ final class Slice3CatchUpUITests: XCTestCase {
         app.launchArguments = arguments()
         app.launch()
         app.tabBars.buttons["History"].tap()
+        revealHistory(in: app)
         XCTAssertTrue(app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Needs review")
         ).firstMatch.waitForExistence(timeout: 2))
@@ -149,6 +185,32 @@ final class Slice3CatchUpUITests: XCTestCase {
         return app
     }
 
+    @MainActor
+    private func launchProposal(simulateFailure: Bool = false) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--fixed-now",
+            String(now.timeIntervalSince1970),
+            "--seed-slice36-proposal",
+        ]
+        if simulateFailure {
+            app.launchArguments.append("--simulate-reconstruction-save-failure")
+        }
+        app.launch()
+        return app
+    }
+
+    @MainActor
+    private func openContextualReview(in app: XCUIApplication) {
+        app.tabBars.buttons["History"].tap()
+        app.buttons["history.previous-day"].tap()
+        XCTAssertTrue(app.buttons["history.review-suggestions"].waitForExistence(timeout: 2))
+        app.buttons["history.review-suggestions"].tap()
+        XCTAssertTrue(app.staticTexts["Suggested fast · Needs review"].waitForExistence(timeout: 2))
+    }
+
     private func arguments(
         reset: Bool = false,
         seedHistory: Bool = false,
@@ -169,5 +231,23 @@ final class Slice3CatchUpUITests: XCTestCase {
             result.append("--simulate-reconstruction-save-failure")
         }
         return result
+    }
+
+    @MainActor
+    private func revealHistory(in app: XCUIApplication) {
+        let needsReview = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Needs review")
+        ).firstMatch
+        for _ in 0 ..< 5 where !needsReview.exists {
+            app.swipeUp()
+        }
+    }
+
+    @MainActor
+    private func attachScreenshot(named name: String, from app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

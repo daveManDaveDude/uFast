@@ -1,0 +1,17 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "2EEEE688-8384-4016-9BAF-3A6268A5A1B7",
+        "deviceName" : "iPhone 16e",
+        "exportedFileName" : "28C4C0EA-5FED-475E-B40A-4A905F1EF356.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "history-dark-accessibility-en-US_0_0C6776EB-B6E1-4272-AD49-191CB727EEBE.png",
+        "timestamp" : 1784826282.517
+      }
+    ],
+    "testIdentifier" : "HistoryUITests/testHistoryAlternativesRemainReachableWithAccessibilityTextAndReduceMotion()",
+    "testIdentifierURL" : "test://com.apple.xcode/uFast/uFastUITests/HistoryUITests/testHistoryAlternativesRemainReachableWithAccessibilityTextAndReduceMotion"
+  }
+]

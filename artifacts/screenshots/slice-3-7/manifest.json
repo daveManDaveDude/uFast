@@ -1,0 +1,47 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "2EEEE688-8384-4016-9BAF-3A6268A5A1B7",
+        "deviceName" : "iPhone 16e",
+        "exportedFileName" : "ADD04C4D-6640-4FCE-8362-3DAAFAE70C01.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "history-year-boundary-en-GB_0_8CA54408-2ECF-47F1-8C9D-C4ABEA728D01.png",
+        "timestamp" : 1784825930.391
+      }
+    ],
+    "testIdentifier" : "HistoryUITests/testCarouselRailAndHeadingStaySynchronizedAcrossYearBoundary()",
+    "testIdentifierURL" : "test://com.apple.xcode/uFast/uFastUITests/HistoryUITests/testCarouselRailAndHeadingStaySynchronizedAcrossYearBoundary"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "2EEEE688-8384-4016-9BAF-3A6268A5A1B7",
+        "deviceName" : "iPhone 16e",
+        "exportedFileName" : "DBE18FFE-2F86-4896-B6B6-F9AA71B418B0.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "history-multi-day-settled-en-GB_0_4C88FDC4-4312-49B4-A230-ED91D26867C4.png",
+        "timestamp" : 1784825945.098
+      }
+    ],
+    "testIdentifier" : "HistoryUITests/testFastHistoryFlickCrossesSeveralDaysAndCannotPassToday()",
+    "testIdentifierURL" : "test://com.apple.xcode/uFast/uFastUITests/HistoryUITests/testFastHistoryFlickCrossesSeveralDaysAndCannotPassToday"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "2EEEE688-8384-4016-9BAF-3A6268A5A1B7",
+        "deviceName" : "iPhone 16e",
+        "exportedFileName" : "A5A138C1-9BA2-4EE2-AB8C-7C242962A60E.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "history-dark-accessibility-en-US_0_5D2B306A-61E0-478C-85A4-C50251F05CAC.png",
+        "timestamp" : 1784825965.864
+      }
+    ],
+    "testIdentifier" : "HistoryUITests/testHistoryAlternativesRemainReachableWithAccessibilityTextAndReduceMotion()",
+    "testIdentifierURL" : "test://com.apple.xcode/uFast/uFastUITests/HistoryUITests/testHistoryAlternativesRemainReachableWithAccessibilityTextAndReduceMotion"
+  }
+]

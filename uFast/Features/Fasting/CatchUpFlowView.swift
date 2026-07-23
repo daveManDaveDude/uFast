@@ -7,12 +7,15 @@ import SwiftUI
 struct CatchUpFlowView: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var modelContext
     @Environment(\.timeZone) private var timeZone
     @Query private var settings: [AppSettingsRecord]
     @Query(filter: #Predicate<FastRecord> { $0.endDate == nil }) private var activeFasts: [FastRecord]
+    @Query(filter: #Predicate<FastRecord> { $0.endDate != nil }) private var completedFasts: [FastRecord]
     @Query private var foodEntries: [FoodEntryRecord]
     @Query private var hydrationEntries: [HydrationEntryRecord]
+    @Query private var unknownPeriods: [UnknownPeriodRecord]
 
     @State private var fromDate: Date
     @State private var toDate: Date
@@ -138,6 +141,20 @@ struct CatchUpFlowView: View {
                 Text("Choose up to 7 completed days.")
                     .foregroundStyle(UFastTheme.secondaryText)
 
+                if case let .success(range) = resolvedRange {
+                    TemporalDateNavigator(
+                        dates: TemporalHistoryPresentation.week(
+                            containing: toDate,
+                            calendar: calendar
+                        ),
+                        selection: $toDate,
+                        selectedRange: range.interval
+                    )
+                    Text("The dots show the selected date range, not progress or completion.")
+                        .font(.caption)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                }
+
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
                     Label("Date range", systemImage: "calendar")
                         .font(.headline)
@@ -208,16 +225,6 @@ struct CatchUpFlowView: View {
                         .foregroundStyle(UFastTheme.secondaryText)
                 }
 
-                if entries.isEmpty {
-                    Text("No food or drinks recorded for this day. Add only what you remember.")
-                        .foregroundStyle(UFastTheme.secondaryText)
-                        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                        .uFastCard()
-                        .accessibilityIdentifier("catch-up.day-empty")
-                } else {
-                    historicalEntries(entries)
-                }
-
                 Button {
                     showsEntryChoice = true
                 } label: {
@@ -232,21 +239,25 @@ struct CatchUpFlowView: View {
                 .buttonStyle(UFastSecondaryButtonStyle())
                 .accessibilityIdentifier("catch-up.add-entry")
 
-                HStack(spacing: UFastTheme.Spacing.standard) {
-                    if selectedDayIndex > 0 {
-                        Button("Previous") { selectedDayIndex -= 1 }
-                            .buttonStyle(UFastSecondaryButtonStyle())
-                            .accessibilityIdentifier("catch-up.previous")
-                    }
-                    Button(selectedDayIndex + 1 == range.dayCount ? "Review fasting history" : "Next") {
-                        if selectedDayIndex + 1 < range.dayCount {
-                            selectedDayIndex += 1
-                        } else {
-                            startReview(range: range)
+                TemporalRibbonView(
+                    selectedDate: day,
+                    intervals: ribbonIntervals,
+                    events: ribbonEvents,
+                    onSelectInterval: nil,
+                    onSelectEvent: { id in
+                        if let entry = entries.first(where: { $0.id == id }) {
+                            open(entry)
                         }
-                    }
-                    .buttonStyle(UFastPrimaryButtonStyle())
-                    .accessibilityIdentifier("catch-up.next")
+                    },
+                    accessibilityIdentifierPrefix: "catch-up"
+                )
+
+                if entries.isEmpty {
+                    Text("No food or drinks recorded for this day. Add only what you remember.")
+                        .foregroundStyle(UFastTheme.secondaryText)
+                        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                        .uFastCard()
+                        .accessibilityIdentifier("catch-up.day-empty")
                 }
             }
             .padding(UFastTheme.Spacing.standard)
@@ -268,6 +279,12 @@ struct CatchUpFlowView: View {
                 foodEditor = pendingFoodEditor
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            dayNavigation(range)
+                .padding(.horizontal, UFastTheme.Spacing.standard)
+                .padding(.vertical, UFastTheme.Spacing.compact)
+                .background(UFastTheme.canvas)
+        }
         .sheet(isPresented: $showsDrinkChoice, onDismiss: presentPendingHydrationEditor) {
             AddDrinkSheet(
                 favourites: HydrationFavouriteProvider.favourites(settings: settings.first),
@@ -284,42 +301,95 @@ struct CatchUpFlowView: View {
         }
     }
 
-    private func historicalEntries(_ entries: [TodayTimelineEntry]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(entries) { entry in
-                Button { open(entry) } label: {
-                    HStack(alignment: .top, spacing: UFastTheme.Spacing.standard) {
-                        Text(entry.occurredAt, style: .time)
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(UFastTheme.primary)
-                            .frame(minWidth: 58, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(entryName(entry))
-                                .foregroundStyle(UFastTheme.primary)
-                            Text(entryDetail(entry))
-                                .font(.caption)
-                                .foregroundStyle(UFastTheme.secondaryText)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(UFastTheme.action)
-                            .accessibilityHidden(true)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(entryName(entry)), \(entryDetail(entry))")
-                .accessibilityValue(entry.occurredAt.formatted(date: .omitted, time: .shortened))
-                .accessibilityHint("Opens this event for editing.")
-                .accessibilityIdentifier("catch-up.entry.\(entry.id.uuidString)")
-
-                if entries.last?.id != entry.id {
-                    Divider()
+    private func dayNavigation(_ range: CatchUpRange) -> some View {
+        HStack(spacing: UFastTheme.Spacing.standard) {
+            if selectedDayIndex > 0 {
+                Button("Previous") { selectedDayIndex -= 1 }
+                    .buttonStyle(UFastSecondaryButtonStyle())
+                    .accessibilityIdentifier("catch-up.previous")
+            }
+            Button(selectedDayIndex + 1 == range.dayCount ? "Review fasting history" : "Next") {
+                if selectedDayIndex + 1 < range.dayCount {
+                    selectedDayIndex += 1
+                } else {
+                    startReview(range: range)
                 }
             }
+            .buttonStyle(UFastPrimaryButtonStyle())
+            .accessibilityIdentifier("catch-up.next")
         }
-        .uFastCard()
+    }
+
+    private var ribbonIntervals: [TemporalRibbonIntervalItem] {
+        let fasts = completedFasts.compactMap { fast -> TemporalRibbonIntervalItem? in
+            guard let end = fast.endDate else { return nil }
+            let provenance: TemporalProvenancePresentation = fast.origin == .recorded
+                ? .recorded
+                : .reconstructed(
+                    adjusted: fast.wasAdjustedByUser,
+                    needsReview: fast.reviewState == .needsReview
+                )
+            return TemporalRibbonIntervalItem(
+                id: fast.id,
+                start: fast.startDate,
+                end: end,
+                title: provenance.title,
+                detail: "Existing saved fast",
+                accessibilityLabel: TemporalHistoryPresentation.intervalSummary(
+                    provenance: provenance,
+                    start: fast.startDate,
+                    end: end,
+                    context: formattingContext
+                ),
+                kind: fast.reviewState == .needsReview
+                    ? .needsReview : (fast.origin == .recorded ? .recorded : .reconstructed)
+            )
+        }
+        let unknowns = unknownPeriods.map {
+            TemporalRibbonIntervalItem(
+                id: $0.id,
+                start: $0.startDate,
+                end: $0.endDate,
+                title: "Unknown period",
+                detail: $0.reason.explanation,
+                accessibilityLabel: TemporalHistoryPresentation.intervalSummary(
+                    provenance: .unknown,
+                    start: $0.startDate,
+                    end: $0.endDate,
+                    context: formattingContext
+                ),
+                kind: .unknown
+            )
+        }
+        return fasts + unknowns
+    }
+
+    private var ribbonEvents: [TemporalRibbonEventItem] {
+        foodEntries.map {
+            TemporalRibbonEventItem(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                title: $0.foodDescription,
+                detail: "Food · \($0.isCaloric ? "Caloric" : "Non-caloric")",
+                accessibilityLabel: "\($0.foodDescription), food, \($0.isCaloric ? "caloric" : "non-caloric")",
+                kind: .food
+            )
+        } + hydrationEntries.map {
+            TemporalRibbonEventItem(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                title: $0.displayName,
+                detail: "\($0.volumeMillilitres) ml · \($0.isCaloric ? "Caloric drink" : "Non-caloric drink")",
+                accessibilityLabel: "\($0.displayName), "
+                    + "\($0.volumeMillilitres) millilitres, "
+                    + ($0.isCaloric ? "caloric drink" : "non-caloric drink"),
+                kind: $0.isCaloric ? .caloricDrink : .nonCaloricDrink
+            )
+        }
+    }
+
+    private var formattingContext: TemporalFormattingContext {
+        TemporalFormattingContext(locale: locale, calendar: calendar, timeZone: timeZone)
     }
 
     private func setDefaultRangeIfNeeded() {
@@ -443,21 +513,6 @@ struct CatchUpFlowView: View {
 
     private func startReview(range: CatchUpRange) {
         reviewGeneration = try? makeReconstructionRepository().generation(range: range.interval)
-    }
-
-    private func entryName(_ entry: TodayTimelineEntry) -> String {
-        switch entry.kind {
-        case let .food(_, name, _), let .drink(_, name, _, _): name
-        }
-    }
-
-    private func entryDetail(_ entry: TodayTimelineEntry) -> String {
-        switch entry.kind {
-        case let .food(_, _, isCaloric):
-            "Food · \(isCaloric ? "Caloric" : "Non-caloric")"
-        case let .drink(_, _, volume, isCaloric):
-            "\(volume) ml · \(isCaloric ? "Caloric" : "Non-caloric")"
-        }
     }
 }
 

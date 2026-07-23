@@ -1,7 +1,7 @@
 import SwiftUI
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable file_length line_length type_body_length
+// swiftlint:disable file_length function_body_length line_length type_body_length
 
 struct ReviewReconstructionView: View {
     @Environment(\.calendar) private var calendar
@@ -15,6 +15,7 @@ struct ReviewReconstructionView: View {
     let generation: ReconstructionGeneration
     let onSave: ([ReviewedReconstruction]) throws -> Void
     let onRefresh: () -> Void
+    var eyebrow = "Catch up"
 
     private var reviewableResults: [ReconstructionResult] {
         generation.results.filter { $0.candidate != nil }
@@ -29,7 +30,7 @@ struct ReviewReconstructionView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
-                UFastSectionHeading("Review fasting history", eyebrow: "Catch up")
+                UFastSectionHeading("Review fasting history", eyebrow: eyebrow)
                 Text("Review each period before anything is saved.")
                     .foregroundStyle(UFastTheme.secondaryText)
 
@@ -102,9 +103,19 @@ struct ReviewReconstructionView: View {
         blockedReason: ReconstructionBlockedReason?
     ) -> some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+            Label("Suggested fast · Needs review", systemImage: "sparkles")
+                .font(.headline)
+                .foregroundStyle(UFastTheme.action)
+                .accessibilityIdentifier("reconstruction.suggested-status")
             Text(ElapsedTimeFormatter.string(from: candidate.duration))
                 .font(.uFastDisplay(.title2))
                 .foregroundStyle(UFastTheme.primary)
+            TemporalProposalRibbon(
+                start: candidate.startDate,
+                end: candidate.endDate,
+                startTitle: candidate.startBoundary.description,
+                endTitle: candidate.endBoundary.description
+            )
             boundary(candidate.startBoundary, label: "From")
             boundary(candidate.endBoundary, label: "To")
             Text("Between two saved caloric entries.")

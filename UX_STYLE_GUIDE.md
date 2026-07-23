@@ -1,7 +1,7 @@
 # uFast UX style guide
 
-**Status:** Current after Slice 1.5  
-**Last reviewed:** 20 July 2026  
+**Status:** Current after Slice 3.7
+**Last reviewed:** 23 July 2026
 **Source of truth:** `uFast/Features/Foundation/UFastDesignSystem.swift`
 
 This is the quick reference for extending uFast without rediscovering the visual
@@ -193,6 +193,70 @@ historical-goal row. Changed-history review presents **Currently saved** before
 **Updated evidence** and keeps conversion and removal subordinate to **Update
 and reconfirm**.
 
+## Temporal history language
+
+History and Catch up use a shared, evening-to-evening temporal ribbon. This is
+a viewport over existing absolute records, never a stored day model.
+
+- History has one transient selected local date shared by the month heading,
+  native date picker, stable date rail, centered temporal page and structured
+  detail. Fractional scroll position is never a selected date, and automatic
+  alignment must not feed a second selection change back into that state.
+- History temporal detail is a native-inertial, day-aligned carousel. Content
+  tracks the finger continuously; a fast release may cross several adjacent
+  local-calendar dates before settling. It does not restore within-day
+  horizontal panning.
+- While either horizontal surface is being manipulated or the carousel is
+  decelerating, automatic rail and page alignment pauses. The settled centered
+  page becomes the selected day exactly once. Deliberate buttons, chips, picker
+  and accessibility actions align immediately to avoid competing travel
+  animations.
+- The locale-derived date rail keeps stable day identity across week, month and
+  year boundaries. Its selected date uses text, fill, a visible border and the
+  word **Selected**; blank dates are neutral. Manual rail scrolling does not
+  select a date.
+- The default ribbon begins at 18:00 on the preceding local date and ends at
+  18:00 on the following local date. Geometry uses the actual elapsed interval,
+  so London clock changes naturally produce 47- or 49-hour two-date windows.
+- Fasts use capsule intervals. A clipped interval shows doubled chevrons when
+  space permits; a very short segment uses its status symbol alone instead of
+  clipping text. Both keep one record identity and one detail destination.
+- Recorded intervals use sage; reconstructed intervals use sky; Needs review
+  uses restrained apricot plus its warning symbol and text; unknown periods use
+  a dashed outline, question-mark symbol and explicit copy.
+- Food and caloric drinks use warm filled marks with distinct system symbols.
+  Non-caloric drinks use an outlined circular drop mark and never appear as a
+  fasting boundary.
+- Dense visual marks use deterministic lanes. Lane position is presentation
+  only and is never persisted.
+- On completed days, an empty ribbon point maps through the actual absolute
+  window to an in-memory instant. Existing marks take precedence. The selected
+  date and time are shown with native controls before **Food**, **Drink** or
+  **Cancel**, and nothing is recorded until the reused full editor saves.
+- Every ribbon has a structured chronological alternative for VoiceOver.
+  History exposes actionable semantic rows; Catch up follows its summary with
+  the existing editable event list.
+- The selected-day heading supports adjustable Previous/Next day actions.
+  Named buttons, the native picker and date chips remain complete alternatives
+  to drag precision, and no accessibility announcement represents a fractional
+  page offset.
+- At accessibility sizes, replace the non-semantic visual axis with a calm
+  **Timeline details are listed below** card, make the structured list the
+  primary precision-independent representation, and expose a vertically
+  expanding **Add at selected time** control as the explicit alternative to
+  canvas tapping.
+- Eligible eight-hour-or-longer caloric gaps are labelled **Suggested fast ·
+  Needs review** until Accept, Adjust or Leave unknown review and the final
+  atomic save. They must not resemble confirmed reconstructed fasts before that
+  save.
+- A native graphical date picker is the subordinate month jump. Do not add a
+  competing month dashboard or seven-column time canvas.
+
+Axis labels must be formatted through the injected Calendar, Locale and
+TimeZone. Do not divide geometry by 24 hours, hardcode weekday order or use an
+ambiguous numeric date. Repeated autumn times include GMT/BST context when
+needed; geometry must not invent a missing spring time.
+
 ## Accessibility and adaptation
 
 Every new or changed screen must be checked for:
@@ -252,6 +316,10 @@ variants.
 ## Related documents
 
 - `SLICE_1_5_UX_STORIES.md` — accepted visual contract and story criteria.
+- `SLICE_3_5_HISTORY_UX_STORIES.md` — temporal History/Catch-up research,
+  accepted direction and delivery criteria.
+- `SLICE_3_7_ANALOG_HISTORY_SCROLL_STORIES.md` — analog carousel, stable date
+  rail and movement-state verification.
 - `DECISIONS.md` — D-012 and other accepted product decisions.
 - `DOMAIN_RULES.md` — authoritative fasting and persistence behaviour.
 - `PRODUCT.md` and `MVP_SCOPE.md` — product principles and scope boundary.

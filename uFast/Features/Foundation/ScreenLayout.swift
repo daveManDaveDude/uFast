@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ScreenLayout<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let title: String
     let identifier: String
     @ViewBuilder let content: Content
@@ -15,11 +17,15 @@ struct ScreenLayout<Content: View>: View {
                     Text(title)
                         .font(.uFastDisplay())
                         .foregroundStyle(UFastTheme.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityIdentifier("screen-title.\(identifier)")
-                    Spacer()
-                    UFastBrandMark(compact: true)
-                        .accessibilityHidden(true)
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Spacer()
+                        UFastBrandMark(compact: true)
+                            .accessibilityHidden(true)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, UFastTheme.Spacing.standard)
