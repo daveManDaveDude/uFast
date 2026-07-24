@@ -81,9 +81,7 @@ final class Slice3CatchUpUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", "Unknown period")
         ).firstMatch.waitForExistence(timeout: 2))
-        let needsReview = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Needs review")
-        ).firstMatch
+        let needsReview = needsReviewRecord(in: app)
         XCTAssertTrue(needsReview.exists)
         let confirmed = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Reconstructed · Confirmed by you")
@@ -111,9 +109,7 @@ final class Slice3CatchUpUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Review changed history"].exists)
 
         app.buttons["history.needs-review.update"].tap()
-        XCTAssertFalse(app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Needs review")
-        ).firstMatch.waitForExistence(timeout: 1))
+        XCTAssertFalse(needsReviewRecord(in: app).waitForExistence(timeout: 1))
     }
 
     @MainActor
@@ -121,9 +117,7 @@ final class Slice3CatchUpUITests: XCTestCase {
         let app = launch(reset: true, seedHistory: true, simulateFailure: true)
         app.tabBars.buttons["History"].tap()
         revealHistory(in: app)
-        app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Needs review")
-        ).firstMatch.tap()
+        needsReviewRecord(in: app).tap()
         app.buttons["history.needs-review.update"].tap()
         XCTAssertTrue(app.staticTexts[
             "This fast couldn’t be updated. Your saved fast is unchanged."
@@ -134,9 +128,7 @@ final class Slice3CatchUpUITests: XCTestCase {
         app.launch()
         app.tabBars.buttons["History"].tap()
         revealHistory(in: app)
-        XCTAssertTrue(app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Needs review")
-        ).firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(needsReviewRecord(in: app).waitForExistence(timeout: 2))
     }
 
     @MainActor
@@ -151,9 +143,7 @@ final class Slice3CatchUpUITests: XCTestCase {
         ]
         app.launch()
         app.tabBars.buttons["History"].tap()
-        let needsReview = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Needs review")
-        ).firstMatch
+        let needsReview = needsReviewRecord(in: app)
         for _ in 0 ..< 5 where !needsReview.isHittable {
             app.swipeUp()
         }
@@ -235,12 +225,21 @@ final class Slice3CatchUpUITests: XCTestCase {
 
     @MainActor
     private func revealHistory(in app: XCUIApplication) {
-        let needsReview = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Needs review")
-        ).firstMatch
+        let needsReview = needsReviewRecord(in: app)
         for _ in 0 ..< 5 where !needsReview.exists {
             app.swipeUp()
         }
+    }
+
+    @MainActor
+    private func needsReviewRecord(in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@",
+                "history.fast.",
+                "Needs review"
+            )
+        ).firstMatch
     }
 
     @MainActor

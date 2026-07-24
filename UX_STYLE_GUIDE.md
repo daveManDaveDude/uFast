@@ -1,7 +1,7 @@
 # uFast UX style guide
 
-**Status:** Current after Slice 3.7
-**Last reviewed:** 23 July 2026
+**Status:** Current after Slice 3.8
+**Last reviewed:** 24 July 2026
 **Source of truth:** `uFast/Features/Foundation/UFastDesignSystem.swift`
 
 This is the quick reference for extending uFast without rediscovering the visual
@@ -202,22 +202,51 @@ a viewport over existing absolute records, never a stored day model.
   native date picker, stable date rail, centered temporal page and structured
   detail. Fractional scroll position is never a selected date, and automatic
   alignment must not feed a second selection change back into that state.
-- History temporal detail is a native-inertial, day-aligned carousel. Content
+- History temporal detail is a native-inertial continuous time carousel. Content
   tracks the finger continuously; a fast release may cross several adjacent
-  local-calendar dates before settling. It does not restore within-day
-  horizontal panning.
+  local-calendar dates. The continuous timeline may settle at any fractional
+  time position and does not snap to a whole-day target.
+- While the lower carousel owns tracking, deceleration or native target
+  alignment, a presentation-only copy of the upper rail follows the same
+  fractional local-calendar-day progress. One measured lower-page stride maps
+  to one measured upper-chip stride, including Dynamic Type and right-to-left
+  layouts. This follower is decorative and hidden from accessibility; it never
+  becomes a selected date or an editor target.
 - While either horizontal surface is being manipulated or the carousel is
   decelerating, automatic rail and page alignment pauses. The settled centered
-  page becomes the selected day exactly once. Deliberate buttons, chips, picker
-  and accessibility actions align immediately to avoid competing travel
+  local day becomes the selected day exactly once. At settlement, filter the
+  structured detail card to the exact visible start and end instants rather
+  than a predetermined day window. Deliberate buttons, chips, picker and
+  accessibility actions center their requested day without competing travel
   animations.
+- Lower History page frames touch with zero inter-page spacing. The carousel
+  timeline omits repeated side borders, side radii and horizontal insets, using
+  one uninterrupted surface with shared-looking top and bottom separators, so
+  a drag reads as one continuous temporal canvas. While either horizontal
+  surface is moving, or the lower surface is decelerating or aligning, hide the
+  structured timeline-detail card without collapsing its layout space. Restore
+  it only for the settled selected page; passing detail is neither actionable
+  nor exposed to accessibility.
+- Manual upper-rail motion remains independent. Lower-driven presentation
+  updates cannot feed selection or page alignment back into either surface.
+  Settlement reconciles the real interactive rail without a second animation,
+  overshoot or visible correction. Reduce Motion retains the direct positional
+  coupling and omits secondary travel effects.
 - The locale-derived date rail keeps stable day identity across week, month and
   year boundaries. Its selected date uses text, fill, a visible border and the
   word **Selected**; blank dates are neutral. Manual rail scrolling does not
   select a date.
-- The default ribbon begins at 18:00 on the preceding local date and ends at
-  18:00 on the following local date. Geometry uses the actual elapsed interval,
-  so London clock changes naturally produce 47- or 49-hour two-date windows.
+- History opens with Today centered in a bounded local-calendar buffer. Both
+  the date rail and day carousel may browse future display days. Future chips
+  and the selected future page are explicitly **Read only**; timeline marks,
+  empty-space add, direct add and contextual repair are non-actionable there.
+  The native picker remains capped at Today.
+- The default ribbon fills one page with the complete selected local day plus
+  one hour of context at each edge: 23:00 on the preceding date through 01:00
+  on the following date. Geometry uses the actual elapsed interval, so a normal
+  page spans 26 hours and London clock changes naturally produce 25- or
+  27-elapsed-hour pages. Keep the compact grid legible with midnight, 06:00,
+  12:00 and 18:00 markers rather than crowding labels into the one-hour edges.
 - Fasts use capsule intervals. A clipped interval shows doubled chevrons when
   space permits; a very short segment uses its status symbol alone instead of
   clipping text. Both keep one record identity and one detail destination.
@@ -320,6 +349,8 @@ variants.
   accepted direction and delivery criteria.
 - `SLICE_3_7_ANALOG_HISTORY_SCROLL_STORIES.md` — analog carousel, stable date
   rail and movement-state verification.
-- `DECISIONS.md` — D-012 and other accepted product decisions.
+- `SLICE_3_8_COUPLED_HISTORY_SCROLL_STORIES.md` — coupled date-rail contract,
+  follower presentation and quality-gate verification.
+- `DECISIONS.md` — D-012, D-018 and other accepted product decisions.
 - `DOMAIN_RULES.md` — authoritative fasting and persistence behaviour.
 - `PRODUCT.md` and `MVP_SCOPE.md` — product principles and scope boundary.

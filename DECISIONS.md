@@ -381,3 +381,111 @@ is shown.
   They do not restore free within-day time panning or change persistence,
   record semantics, absolute-time ribbon mapping, reconstruction, invalidation,
   provenance, ordering, Today journeys or any external capability.
+
+## D-018 Coupled History date-rail motion
+
+- **Status:** Accepted
+- **Accepted:** 23 July 2026
+- **Decision:** While the lower History carousel owns direct manipulation,
+  native deceleration or target alignment, render the upper date rail at the
+  same continuous normalized calendar-day progress. One measured lower page
+  stride maps proportionally to one measured upper chip stride. Fractional
+  progress is presentation state only: the shared selected date, month
+  heading, picker, structured detail, add target and contextual repair target
+  remain bound to the last settled valid day. Passing chips are decorative,
+  non-actionable and hidden from accessibility. The selected date changes once
+  when the lower carousel settles under the existing D-017 rules.
+- **Decision:** Use a presentation-only follower rail during lower-owned motion
+  and reconcile to the real interactive rail without a second animation at
+  settlement. The real rail remains the only chip action and accessibility
+  surface, and manual upper-rail scrolling remains independent. Deliberate chip,
+  Previous/Next, picker and accessibility commands align both settled surfaces
+  directly. A fine-grained presentation channel isolates high-frequency lower
+  geometry from low-frequency selected-date state so follower updates cannot
+  invalidate their source or feed back into selection.
+- **Decision:** Motion ownership is exclusive and explicit: lower tracking,
+  lower deceleration and lower alignment may publish preview; upper direct
+  motion never drives the carousel; deliberate programmatic alignment publishes
+  no fractional preview; settled and interrupted states publish none. Today is
+  the maximum selectable and previewable day. Sheets, tab changes,
+  backgrounding, Dynamic Type changes and History invalidation end preview
+  deterministically.
+- **Decision:** Use native iOS 26 scroll geometry, positioning and deceleration.
+  Resolve adjacent day identities with `Calendar` and `TimeZone`, never elapsed
+  24-hour arithmetic. Reduce Motion retains positional coupling but removes
+  secondary reconciliation animation, overshoot and decorative travel. No
+  custom velocity or deceleration physics is introduced.
+- **Prototype record:** On an iPhone 16e simulator, directly updating observed
+  parent state from every lower geometry frame prevented native scrolling from
+  becoming idle, demonstrating the feedback-loop risk of real-scroll or broad
+  state coupling. Isolating preview in a follower-only observation channel
+  restored normal fast multi-day settlement and Today resistance while keeping
+  passing chips out of the accessibility tree.
+- **Consequence:** OW-381 through OW-385 may add deterministic day-space
+  progress, ownership, rebasing and reconciliation primitives and the
+  presentation-only follower. They do not change persistence, record semantics,
+  reconstruction, direct entry, Today behavior or any external capability.
+
+## D-019 Read-only future History browsing
+
+- **Status:** Accepted
+- **Accepted:** 23 July 2026
+- **Decision:** Supersede D-017 and D-018 only where they make Today the
+  maximum History display or selection boundary. History opens with Today
+  centered inside a bounded 400-day-past and 400-day-future local-calendar
+  buffer. The upper date rail and lower day carousel may both browse and settle
+  on those future display days; future chips identify themselves as read only,
+  and the native picker remains capped at Today.
+- **Decision:** A future selected day is presentation-only History context. Its
+  timeline, structured marks, empty-space target, direct-add alternative and
+  contextual reconstruction target are non-actionable. Historical entry
+  remains limited to completed days, and no future browse action reaches an
+  editor, repository or write service.
+- **Consequence:** Today begins in the visual center and coupled motion has
+  symmetric room in both directions without weakening direct-entry validation,
+  persistence semantics, reconstruction rules or Today functionality. Stable
+  day identity and the future horizon use `Calendar` and `TimeZone`, never
+  elapsed 24-hour arithmetic.
+
+## D-020 Continuous 26-hour History pages
+
+- **Status:** Accepted
+- **Accepted:** 24 July 2026
+- **Decision:** Each lower History page shows the selected local-calendar day
+  with one hour of temporal context on each side: 23:00 on the preceding date
+  through 01:00 on the following date. Page frames have zero inter-page spacing
+  and the carousel variant omits per-page side borders, side radii and
+  horizontal canvas insets, so direct manipulation reads as one continuous
+  strip rather than separate cards.
+- **Decision:** While either History horizontal surface is tracking, the lower
+  carousel is decelerating or aligning, or a deliberate page alignment is in
+  progress, the structured timeline-detail card is visually hidden,
+  non-actionable and absent from accessibility. Its layout space remains stable
+  during motion, and it returns only for the settled selected page.
+- **Consequence:** A normal page spans 26 elapsed hours; Europe/London spring
+  and autumn clock-change pages span 25 and 27 elapsed hours respectively.
+  Window construction and grid markers use `Calendar` and local day identity.
+  Persistence, record boundaries, direct-entry validation, reconstruction and
+  settled detail semantics do not change.
+
+## D-021 Free-scrolling History time window
+
+- **Status:** Accepted
+- **Accepted:** 24 July 2026
+- **Decision:** Supersede D-017 and D-020 where they require the lower History
+  timeline to align to a whole local-calendar day after direct manipulation.
+  Render calendar days as touching segments in one continuous timeline, with
+  24 local hours occupying 24/26 of the viewport. Native scrolling may stop at
+  any fractional time position without target snapping.
+- **Decision:** While motion is unresolved, keep structured detail hidden and
+  non-actionable. At native idle, derive the exact visible start and end
+  instants from the settled scroll geometry and local-calendar segments, then
+  filter the detail card to intervals intersecting that visible range and
+  events contained by it. The local day under the viewport center remains the
+  low-frequency selected date used by the heading, date rail and deliberate
+  navigation controls.
+- **Consequence:** Today still opens with approximately one hour of context on
+  each edge, but users may leave the timeline at any later 26-local-hour view.
+  Previous/Next, chip and picker commands center their requested day. Geometry
+  uses actual local-day durations across DST and does not divide calendar
+  movement by 86,400. Persistence and record semantics do not change.

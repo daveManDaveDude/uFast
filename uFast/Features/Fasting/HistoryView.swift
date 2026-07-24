@@ -5,10 +5,13 @@ import SwiftUI
 // swiftlint:disable file_length type_body_length
 
 struct HistoryView: View {
+    private static let futureDisplayDayCount = 400
+
     @Environment(\.calendar) private var calendar
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.timeZone) private var timeZone
     @Query(filter: #Predicate<FastRecord> { $0.endDate != nil }) private var completedFasts: [FastRecord]
     @Query(filter: #Predicate<FastRecord> { $0.endDate == nil }) private var activeFasts: [FastRecord]
@@ -28,6 +31,9 @@ struct HistoryView: View {
     @State private var selectedDate: Date
     @State private var historyDayBuffer: TemporalDayBuffer?
     @State private var temporalMovementPhase = TemporalCarouselMovementPhase.settled
+    @State private var coupledScrollPresentation = TemporalCoupledScrollPresentation()
+    @State private var historyInteractionRevision = 0
+    @State private var isDateRailMoving = false
 
     private let clock: any AppClock
 
@@ -72,11 +78,16 @@ struct HistoryView: View {
                     TemporalDateNavigator(
                         dates: historyDates,
                         selection: selectedDateBinding(source: .dateChip),
-                        maximumDate: clock.now,
+                        maximumDate: historyDisplayMaximumDay,
+                        readOnlyAfterDate: clock.now,
                         automaticScrollEnabled: !temporalMovementPhase
-                            .suppressesAutomaticAlignment
+                            .suppressesAutomaticAlignment && !isDateRailMoving,
+                        coupledPresentation: coupledScrollPresentation,
+                        onDirectScrollPhaseChange: updateDateRailMovement
                     )
                     .padding(.horizontal, UFastTheme.Spacing.standard)
+                    .allowsHitTesting(!temporalMovementPhase.suppressesAutomaticAlignment)
+                    .id(historyInteractionRevision)
 
                     TemporalHistoryCarousel(
                         dates: historyDates,
@@ -88,9 +99,19 @@ struct HistoryView: View {
                         onSelectEmpty: beginHistoricalEntry,
                         onNavigateDay: navigateDay,
                         canNavigateForward: canNavigateForward,
-                        onMovementPhaseChange: updateTemporalMovementPhase
+                        allowsRecordActivation: !isFutureSelection,
+                        allowsEmptySelection: isCompletedSelection,
+                        showsTimelineDetails: temporalMovementPhase.showsTimelineDetails
+                            && !isDateRailMoving,
+                        onMovementPhaseChange: updateTemporalMovementPhase,
+                        onCoupledPresentationChange: coupledScrollPresentation.handle
                     )
                     .padding(.horizontal, UFastTheme.Spacing.standard)
+                    .allowsHitTesting(!isDateRailMoving)
+
+                    if isFutureSelection {
+                        futureReadOnlyNotice
+                    }
 
                     if isCompletedSelection {
                         directAddAlternative
@@ -157,6 +178,23 @@ struct HistoryView: View {
         }
         .onAppear {
             ensureHistoryDayCoverage(around: selectedDate)
+        }
+        .onDisappear {
+            interruptTemporalMotion()
+        }
+        .onChange(of: dynamicTypeSize) { _, _ in
+            interruptTemporalMotion()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase != .active else { return }
+            interruptTemporalMotion()
+        }
+        .onChange(of: presentedHistorySheetID) { _, sheetID in
+            guard sheetID != "none" else { return }
+            interruptTemporalMotion()
+        }
+        .onChange(of: historyContentRevision) { _, _ in
+            interruptTemporalMotion()
         }
         .sheet(isPresented: $isCalendarPresented) {
             NavigationStack {
@@ -345,15 +383,73 @@ struct HistoryView: View {
     }
 
     private var canNavigateForward: Bool {
-        calendar.startOfDay(for: selectedDate) < calendar.startOfDay(for: clock.now)
+        calendar.startOfDay(for: selectedDate) < historyDisplayMaximumDay
     }
 
     private var isCompletedSelection: Bool {
         calendar.startOfDay(for: selectedDate) < calendar.startOfDay(for: clock.now)
     }
 
+    private var isFutureSelection: Bool {
+        calendar.startOfDay(for: selectedDate) > calendar.startOfDay(for: clock.now)
+    }
+
+    private var historyDisplayMaximumDay: Date {
+        calendar.date(
+            byAdding: .day,
+            value: Self.futureDisplayDayCount,
+            to: calendar.startOfDay(for: clock.now)
+        ) ?? calendar.startOfDay(for: clock.now)
+    }
+
     private var historyDates: [Date] {
         historyDayBuffer?.days ?? [calendar.startOfDay(for: selectedDate)]
+    }
+
+    private var presentedHistorySheetID: String {
+        if isCalendarPresented {
+            return "calendar"
+        }
+        if let editor {
+            return "fast-\(editor.id)"
+        }
+        if let reconstructedDetail {
+            return "reconstructed-\(reconstructedDetail.id)"
+        }
+        if let unknownDetail {
+            return "unknown-\(unknownDetail.id)"
+        }
+        if let foodEditor {
+            return "food-\(foodEditor.id)"
+        }
+        if let hydrationEditor {
+            return "drink-\(hydrationEditor.id)"
+        }
+        if let directHistoricalEntry {
+            return "add-\(directHistoricalEntry.id)"
+        }
+        if let contextualReview {
+            return "review-\(contextualReview.id)"
+        }
+        return "none"
+    }
+
+    private var historyContentRevision: String {
+        let fasts = completedFasts.map {
+            "\($0.id):\($0.startDate.timeIntervalSinceReferenceDate):"
+                + "\($0.endDate?.timeIntervalSinceReferenceDate ?? 0):\($0.reviewStateRaw)"
+        }
+        let foods = foodEntries.map {
+            "\($0.id):\($0.occurredAt.timeIntervalSinceReferenceDate)"
+        }
+        let drinks = hydrationEntries.map {
+            "\($0.id):\($0.occurredAt.timeIntervalSinceReferenceDate):\($0.isCaloric)"
+        }
+        let unknowns = unknownPeriods.map {
+            "\($0.id):\($0.startDate.timeIntervalSinceReferenceDate):"
+                + "\($0.endDate.timeIntervalSinceReferenceDate)"
+        }
+        return (fasts + foods + drinks + unknowns).sorted().joined(separator: "|")
     }
 
     private var hasCaloricEvidence: Bool {
@@ -391,6 +487,19 @@ struct HistoryView: View {
         .padding(.horizontal, UFastTheme.Spacing.standard)
         .accessibilityHint("Opens native date and time controls before choosing food or drink.")
         .accessibilityIdentifier("history.add-at-selected-time")
+    }
+
+    private var futureReadOnlyNotice: some View {
+        Label(
+            "Future day · History is read only",
+            systemImage: "calendar.badge.clock"
+        )
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(UFastTheme.secondaryText)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .padding(.horizontal, UFastTheme.Spacing.standard)
+        .accessibilityHint("Return to a completed day to add or repair history.")
+        .accessibilityIdentifier("history.future-read-only")
     }
 
     private var contextualReviewButton: some View {
@@ -434,12 +543,19 @@ struct HistoryView: View {
     }
 
     private func selectDay(_ date: Date, source: TemporalDaySelectionSource) {
+        if source != .carousel {
+            if temporalMovementPhase != .settled || isDateRailMoving {
+                interruptTemporalMotion()
+            } else {
+                coupledScrollPresentation.handle(.end)
+            }
+        }
         var coordinator = TemporalDaySelectionCoordinator(
             selectedDate: selectedDate,
             calendar: calendar
         )
         guard let change = coordinator.select(date, source: source, calendar: calendar),
-              change.day <= calendar.startOfDay(for: clock.now)
+              change.day <= historyDisplayMaximumDay
         else { return }
         selectedDate = change.day
         if source != .carousel || temporalMovementPhase == .settled {
@@ -463,15 +579,35 @@ struct HistoryView: View {
         }
     }
 
+    private func interruptTemporalMotion() {
+        guard temporalMovementPhase != .settled
+            || isDateRailMoving
+            || coupledScrollPresentation.preview != nil
+            || coupledScrollPresentation.isReconciling
+        else { return }
+        coupledScrollPresentation.handle(.end)
+        temporalMovementPhase = .settled
+        isDateRailMoving = false
+        historyInteractionRevision += 1
+        ensureHistoryDayCoverage(around: selectedDate)
+    }
+
+    private func updateDateRailMovement(_ isMoving: Bool) {
+        isDateRailMoving = isMoving
+        if isMoving {
+            coupledScrollPresentation.handle(.end)
+        }
+    }
+
     private func ensureHistoryDayCoverage(around date: Date) {
         var buffer = historyDayBuffer ?? TemporalDayBuffer(
             centeredOn: date,
-            maximumDate: clock.now,
+            maximumDate: historyDisplayMaximumDay,
             calendar: calendar
         )
         buffer.ensureCoverage(
             around: date,
-            maximumDate: clock.now,
+            maximumDate: historyDisplayMaximumDay,
             calendar: calendar
         )
         historyDayBuffer = buffer

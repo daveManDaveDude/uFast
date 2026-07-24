@@ -41,42 +41,95 @@ struct TemporalDateNavigator: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.timeZone) private var timeZone
 
     let dates: [Date]
     @Binding var selection: Date
     var selectedRange: Range<Date>?
     var maximumDate: Date?
+    var readOnlyAfterDate: Date?
     var automaticScrollEnabled = true
+    var coupledPresentation: TemporalCoupledScrollPresentation?
+    var onDirectScrollPhaseChange: (Bool) -> Void = { _ in }
 
     @State private var isDirectlyScrolling = false
+    @State private var measuredChipStride: CGFloat = 57
+    @State private var selectedChipMidX: CGFloat?
+    @State private var navigatorWidth: CGFloat = 0
+    @State private var coupledAnchorX: CGFloat?
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 5) {
-                    ForEach(dates, id: \.self) { date in
-                        dateChip(date)
+            let coupledPreview = coupledPresentation?.preview
+            ZStack {
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 5) {
+                        ForEach(dates, id: \.self) { date in
+                            dateChip(date)
+                        }
                     }
                 }
+                .scrollIndicators(.hidden)
+                .opacity(coupledPreview == nil ? 1 : 0)
+                .onScrollPhaseChange { _, newPhase in
+                    let isUserDriven = newPhase == .tracking
+                        || newPhase == .interacting
+                        || newPhase == .decelerating
+                    guard isUserDriven != isDirectlyScrolling else { return }
+                    isDirectlyScrolling = isUserDriven
+                    onDirectScrollPhaseChange(isUserDriven)
+                }
+                .onAppear {
+                    keepSelectedChipVisible(using: proxy)
+                }
+                .onChange(of: selection) { _, _ in
+                    keepSelectedChipVisible(using: proxy)
+                    coupledPresentation?.finishReconciliation()
+                }
+                .onChange(of: dates) { _, _ in
+                    keepSelectedChipVisible(using: proxy)
+                }
+                .onChange(of: automaticScrollEnabled) { _, isEnabled in
+                    guard isEnabled else { return }
+                    keepSelectedChipVisible(using: proxy)
+                }
+
+                if let coupledPreview {
+                    coupledFollower(coupledPreview)
+                        .accessibilityHidden(true)
+                        .allowsHitTesting(false)
+                }
             }
-            .scrollIndicators(.hidden)
-            .onScrollPhaseChange { _, newPhase in
-                isDirectlyScrolling = newPhase.isScrolling
+            .frame(height: navigatorHeight)
+            .coordinateSpace(name: TemporalDateNavigatorCoordinateSpace.name)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: TemporalDateNavigatorWidthKey.self,
+                        value: geometry.size.width
+                    )
+                }
             }
-            .onAppear {
-                keepSelectedChipVisible(using: proxy)
+            .onChange(of: coupledPreview != nil) { _, isCoupled in
+                if isCoupled {
+                    coupledAnchorX = coupledAnchorX ?? selectedChipMidX
+                } else {
+                    coupledAnchorX = nil
+                }
             }
-            .onChange(of: selection) { _, _ in
-                keepSelectedChipVisible(using: proxy)
-            }
-            .onChange(of: dates) { _, _ in
-                keepSelectedChipVisible(using: proxy)
-            }
-            .onChange(of: automaticScrollEnabled) { _, isEnabled in
-                guard isEnabled else { return }
-                keepSelectedChipVisible(using: proxy)
-            }
+        }
+        .onPreferenceChange(TemporalDateChipStrideKey.self) { stride in
+            guard stride > 0 else { return }
+            measuredChipStride = stride
+        }
+        .onPreferenceChange(TemporalSelectedDateChipMidXKey.self) { midX in
+            guard let midX else { return }
+            selectedChipMidX = midX
+        }
+        .onPreferenceChange(TemporalDateNavigatorWidthKey.self) { width in
+            guard width > 0 else { return }
+            navigatorWidth = width
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Date navigator")
@@ -93,15 +146,15 @@ struct TemporalDateNavigator: View {
         let isSelectable = maximumDate.map {
             calendar.startOfDay(for: date) <= calendar.startOfDay(for: $0)
         } ?? true
-        let accessibilityValue = if isSelected {
-            "Selected"
-        } else if isInRange {
-            "In selected range"
-        } else if isSelectable {
-            ""
-        } else {
-            "Future date"
-        }
+        let isReadOnly = readOnlyAfterDate.map {
+            calendar.startOfDay(for: date) > calendar.startOfDay(for: $0)
+        } ?? false
+        let accessibilityValue = dateChipAccessibilityValue(
+            isSelected: isSelected,
+            isInRange: isInRange,
+            isSelectable: isSelectable,
+            isReadOnly: isReadOnly
+        )
         return Button { selection = date } label: {
             VStack(spacing: 4) {
                 Text(weekday(date))
@@ -111,8 +164,8 @@ struct TemporalDateNavigator: View {
                 dateChipStatus(isSelected: isSelected, isInRange: isInRange)
             }
             .foregroundStyle(isSelected ? UFastTheme.onAction : UFastTheme.primary)
-            .frame(width: dynamicTypeSize.isAccessibilitySize ? 82 : 52)
-            .frame(minHeight: 58)
+            .frame(width: chipWidth)
+            .frame(minHeight: chipHeight)
             .background(isSelected ? UFastTheme.action : UFastTheme.raisedSurface)
             .clipShape(.rect(cornerRadius: UFastTheme.Radius.control))
             .overlay {
@@ -128,9 +181,128 @@ struct TemporalDateNavigator: View {
         .opacity(isSelectable ? 1 : 0.45)
         .accessibilityLabel(fullDate(date))
         .accessibilityValue(accessibilityValue)
+        .accessibilityHint(isReadOnly ? "Future day, history is read only." : "")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("temporal.date.\(date.timeIntervalSince1970)")
         .id(date)
+        .background {
+            dateChipGeometry(isSelected: isSelected)
+        }
+    }
+
+    private func dateChipGeometry(isSelected: Bool) -> some View {
+        GeometryReader { proxy in
+            Color.clear
+                .preference(
+                    key: TemporalDateChipStrideKey.self,
+                    value: proxy.size.width + 5
+                )
+                .preference(
+                    key: TemporalSelectedDateChipMidXKey.self,
+                    value: isSelected
+                        ? proxy.frame(
+                            in: .named(TemporalDateNavigatorCoordinateSpace.name)
+                        ).midX
+                        : nil
+                )
+        }
+    }
+
+    private func dateChipAccessibilityValue(
+        isSelected: Bool,
+        isInRange: Bool,
+        isSelectable: Bool,
+        isReadOnly: Bool
+    ) -> String {
+        if isSelected, isReadOnly {
+            "Selected, Future date, Read only"
+        } else if isSelected {
+            "Selected"
+        } else if isReadOnly {
+            "Future date, Read only"
+        } else if isInRange {
+            "In selected range"
+        } else if isSelectable {
+            ""
+        } else {
+            "Future date"
+        }
+    }
+
+    private func coupledFollower(_ preview: TemporalDaySpaceProgress) -> some View {
+        GeometryReader { proxy in
+            if let anchorIndex = dates.firstIndex(of: preview.leadingDay),
+               dates.indices.contains(anchorIndex + 1),
+               dates[anchorIndex + 1] == preview.trailingDay
+            {
+                let lowerBound = max(0, anchorIndex - 8)
+                let upperBound = min(dates.count, anchorIndex + 10)
+                let chronologicalDates = Array(dates[lowerBound ..< upperBound])
+                let isRightToLeft = layoutDirection == .rightToLeft
+                let visibleDates = isRightToLeft
+                    ? Array(chronologicalDates.reversed())
+                    : chronologicalDates
+                let relativeProgress = isRightToLeft
+                    ? CGFloat(upperBound - 1 - anchorIndex) - CGFloat(preview.fraction)
+                    : CGFloat(anchorIndex - lowerBound) + CGFloat(preview.fraction)
+                let anchorX = resolvedCoupledAnchorX(in: proxy.size.width)
+                ZStack(alignment: .top) {
+                    HStack(spacing: 5) {
+                        ForEach(visibleDates, id: \.self) { date in
+                            followerChip(date)
+                        }
+                    }
+                    .offset(
+                        x: anchorX
+                            - (measuredChipStride - 5) / 2
+                            - relativeProgress * measuredChipStride
+                    )
+                    .frame(maxHeight: .infinity)
+                    Capsule()
+                        .fill(UFastTheme.primary.opacity(0.35))
+                        .frame(width: 20, height: 2)
+                        .offset(y: 1)
+                }
+                .clipped()
+                .environment(\.layoutDirection, .leftToRight)
+            }
+        }
+        .frame(height: navigatorHeight)
+    }
+
+    private func followerChip(_ date: Date) -> some View {
+        let isSelected = calendar.isDate(date, inSameDayAs: selection)
+        return VStack(spacing: 4) {
+            Text(weekday(date))
+                .font(.caption2.weight(.semibold))
+            Text(date, format: .dateTime.day())
+                .font(.headline.monospacedDigit())
+            dateChipStatus(isSelected: isSelected, isInRange: false)
+        }
+        .foregroundStyle(isSelected ? UFastTheme.onAction : UFastTheme.primary)
+        .frame(width: measuredChipStride - 5)
+        .frame(minHeight: chipHeight)
+        .background(isSelected ? UFastTheme.action : UFastTheme.raisedSurface)
+        .clipShape(.rect(cornerRadius: UFastTheme.Radius.control))
+        .overlay {
+            RoundedRectangle(cornerRadius: UFastTheme.Radius.control)
+                .stroke(
+                    isSelected ? UFastTheme.primary : UFastTheme.border,
+                    lineWidth: isSelected ? 2 : 1
+                )
+        }
+    }
+
+    private var chipWidth: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 112 : 52
+    }
+
+    private var chipHeight: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 140 : 58
+    }
+
+    private var navigatorHeight: CGFloat {
+        chipHeight + 4
     }
 
     @ViewBuilder
@@ -176,12 +348,41 @@ struct TemporalDateNavigator: View {
               !isDirectlyScrolling,
               let selectedChipDate
         else { return }
-        proxy.scrollTo(selectedChipDate, anchor: .center)
+        proxy.scrollTo(
+            selectedChipDate,
+            anchor: coupledScrollAnchor ?? .center
+        )
+    }
+
+    private func resolvedCoupledAnchorX(in width: CGFloat) -> CGFloat {
+        guard let anchorX = coupledAnchorX ?? selectedChipMidX,
+              anchorX.isFinite,
+              anchorX >= 0,
+              anchorX <= width
+        else {
+            return width / 2
+        }
+        return anchorX
+    }
+
+    private var coupledScrollAnchor: UnitPoint? {
+        guard let coupledAnchorX,
+              navigatorWidth > measuredChipStride - 5
+        else { return nil }
+        let measuredChipWidth = measuredChipStride - 5
+        let scrollableAnchorWidth = navigatorWidth - measuredChipWidth
+        let normalizedAnchor = (coupledAnchorX - measuredChipWidth / 2)
+            / scrollableAnchorWidth
+        return UnitPoint(
+            x: min(max(normalizedAnchor, 0), 1),
+            y: 0.5
+        )
     }
 }
 
 struct TemporalHistoryCarousel: View {
     @Environment(\.calendar) private var calendar
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.scenePhase) private var scenePhase
 
     let dates: [Date]
@@ -193,23 +394,31 @@ struct TemporalHistoryCarousel: View {
     let onSelectEmpty: (Date) -> Void
     let onNavigateDay: (Int) -> Void
     let canNavigateForward: Bool
+    let allowsRecordActivation: Bool
+    let allowsEmptySelection: Bool
+    let showsTimelineDetails: Bool
     let onMovementPhaseChange: (TemporalCarouselMovementPhase) -> Void
+    let onCoupledPresentationChange: (TemporalCoupledPresentationUpdate) -> Void
 
     @State private var centeredDay: Date?
     @State private var movementPhase = TemporalCarouselMovementPhase.settled
     @State private var selectedPageHeight: CGFloat?
+    @State private var lowerMotionInFlight = false
+    @State private var settledVisibleWindow: TemporalRibbonWindow?
+    @State private var geometrySnapshot = TemporalCarouselGeometrySnapshot()
 
     var body: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
             dayHeader
             ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: 12) {
+                LazyHStack(alignment: .top, spacing: 0) {
                     ForEach(dates, id: \.self) { date in
-                        dayPage(date)
+                        daySegment(date)
                             .containerRelativeFrame(
                                 .horizontal,
-                                count: 1,
-                                spacing: 12
+                                count: 26,
+                                span: 24,
+                                spacing: 0
                             )
                             .id(date)
                     }
@@ -217,7 +426,6 @@ struct TemporalHistoryCarousel: View {
                 .scrollTargetLayout()
             }
             .scrollIndicators(.hidden)
-            .scrollTargetBehavior(.viewAligned(limitBehavior: .never))
             .scrollPosition(id: $centeredDay, anchor: .center)
             .frame(height: selectedPageHeight)
             .onPreferenceChange(TemporalSelectedPageHeightKey.self) { height in
@@ -225,10 +433,51 @@ struct TemporalHistoryCarousel: View {
                 selectedPageHeight = height
             }
             .onScrollPhaseChange { _, newPhase in
+                if newPhase == .tracking || newPhase == .interacting || newPhase == .decelerating {
+                    lowerMotionInFlight = true
+                }
+                if newPhase != .idle {
+                    geometrySnapshot.hasActiveMotion = true
+                }
                 setMovementPhase(movementPhase(for: newPhase))
+                if newPhase == .idle {
+                    lowerMotionInFlight = false
+                }
             }
+            .onScrollGeometryChange(
+                for: TemporalContinuousTimelineGeometry.self,
+                of: { geometry in
+                    TemporalContinuousTimelineGeometry(
+                        contentOffset: geometry.contentOffset.x,
+                        contentWidth: geometry.contentSize.width,
+                        containerWidth: geometry.containerSize.width
+                    )
+                },
+                action: { _, geometry in
+                    geometrySnapshot.geometry = geometry
+                    let direction = layoutDirection == .rightToLeft
+                        ? TemporalHorizontalLayoutDirection.rightToLeft
+                        : .leftToRight
+                    if movementPhase != .settled,
+                       let preview = geometry.centerProgress(
+                           days: dates,
+                           layoutDirection: direction
+                       )
+                    {
+                        onCoupledPresentationChange(.preview(preview))
+                    } else if movementPhase == .settled,
+                              geometrySnapshot.hasActiveMotion
+                    {
+                        settleVisibleGeometry(geometry)
+                    }
+                }
+            )
             .onAppear {
                 centeredDay = canonicalSelection
+                settledVisibleWindow = TemporalHistoryPresentation.ribbonWindow(
+                    containing: canonicalSelection,
+                    calendar: calendar
+                )
             }
             .onChange(of: centeredDay) { _, newDay in
                 if movementPhase == .programmatic,
@@ -238,9 +487,12 @@ struct TemporalHistoryCarousel: View {
                     return
                 }
                 guard movementPhase == .settled else { return }
-                commitSelection(newDay)
+                reconcileAndCommitSelection(newDay)
             }
             .onChange(of: selection) { _, _ in
+                if movementPhase == .programmatic {
+                    onCoupledPresentationChange(.end)
+                }
                 alignToExternalSelection()
             }
             .onChange(of: dates) { _, newDates in
@@ -254,12 +506,37 @@ struct TemporalHistoryCarousel: View {
                 guard newPhase != .active else { return }
                 setMovementPhase(.settled)
             }
-            .accessibilityElement(children: .contain)
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("History day carousel")
             .accessibilityValue(
                 movementPhase == .settled ? "Settled" : "Moving"
             )
             .accessibilityIdentifier("history.day-carousel")
+
+            if let settledVisibleWindow {
+                TemporalRibbonView(
+                    selectedDate: settledVisibleWindow.selectedDay,
+                    intervals: intervals,
+                    events: events,
+                    onSelectInterval: allowsRecordActivation ? onSelectInterval : nil,
+                    onSelectEvent: { id in
+                        guard allowsRecordActivation else { return }
+                        onSelectEvent(id)
+                    },
+                    onSelectEmpty: allowsEmptySelection ? onSelectEmpty : nil,
+                    onNavigateDay: nil,
+                    canNavigateForward: true,
+                    accessibilityIdentifierPrefix: "history",
+                    showsDayHeader: false,
+                    isInteractive: movementPhase.allowsTimelineInteraction
+                        && allowsRecordActivation,
+                    showsSemanticItems: showsTimelineDetails
+                        && movementPhase.showsTimelineDetails,
+                    showsVisualRibbon: false,
+                    windowOverride: settledVisibleWindow,
+                    emptySemanticMessage: "No recorded items in this time window."
+                )
+            }
         }
         .accessibilityAction(named: "Previous day") {
             onNavigateDay(-1)
@@ -333,24 +610,34 @@ struct TemporalHistoryCarousel: View {
         }
     }
 
-    private func dayPage(_ date: Date) -> some View {
+    private func daySegment(_ date: Date) -> some View {
         let isSelected = calendar.isDate(date, inSameDayAs: selection)
-        let isInteractive = isSelected && movementPhase.allowsTimelineInteraction
+        let canActivateRecord = movementPhase.allowsTimelineInteraction
+            && allowsRecordActivation
+        let canSelectEmpty = movementPhase.allowsTimelineInteraction
+            && allowsEmptySelection
         return TemporalRibbonView(
             selectedDate: date,
             intervals: intervals,
             events: events,
-            onSelectInterval: isInteractive ? onSelectInterval : nil,
+            onSelectInterval: canActivateRecord ? onSelectInterval : nil,
             onSelectEvent: { id in
-                guard isInteractive else { return }
+                guard canActivateRecord else { return }
                 onSelectEvent(id)
             },
-            onSelectEmpty: isInteractive ? onSelectEmpty : nil,
+            onSelectEmpty: canSelectEmpty ? onSelectEmpty : nil,
             onNavigateDay: nil,
             canNavigateForward: true,
             accessibilityIdentifierPrefix: "history",
             showsDayHeader: false,
-            isInteractive: isInteractive
+            isInteractive: canActivateRecord || canSelectEmpty,
+            showsSemanticItems: false,
+            usesContinuousSurface: true,
+            includesSemanticItems: false,
+            windowOverride: TemporalHistoryPresentation.calendarDayWindow(
+                containing: date,
+                calendar: calendar
+            )
         )
         .background {
             GeometryReader { proxy in
@@ -375,7 +662,7 @@ struct TemporalHistoryCarousel: View {
         case .decelerating:
             .decelerating
         case .animating:
-            centeredDay == canonicalSelection ? .settled : .programmatic
+            lowerMotionInFlight ? .aligning : .programmatic
         }
     }
 
@@ -383,20 +670,50 @@ struct TemporalHistoryCarousel: View {
         guard newPhase != movementPhase else { return }
         movementPhase = newPhase
         if newPhase == .settled {
-            commitSelection(centeredDay)
+            if let geometry = geometrySnapshot.geometry {
+                settleVisibleGeometry(geometry)
+            } else {
+                reconcileAndCommitSelection(centeredDay)
+            }
+        } else if newPhase == .programmatic {
+            onCoupledPresentationChange(.end)
         }
         onMovementPhaseChange(newPhase)
     }
 
-    private func commitSelection(_ day: Date?) {
-        let settledDay = TemporalHistoryPresentation.settledCarouselDay(
+    private func settleVisibleGeometry(_ geometry: TemporalContinuousTimelineGeometry) {
+        let direction = layoutDirection == .rightToLeft
+            ? TemporalHorizontalLayoutDirection.rightToLeft
+            : .leftToRight
+        guard let window = geometry.visibleWindow(
+            days: dates,
+            calendar: calendar,
+            layoutDirection: direction
+        ) else { return }
+        settledVisibleWindow = window
+        geometrySnapshot.hasActiveMotion = false
+        reconcileAndCommitSelection(window.selectedDay)
+    }
+
+    private func resolvedSettledDay(_ day: Date?) -> Date {
+        TemporalHistoryPresentation.settledCarouselDay(
             centeredPage: day,
             currentSelection: selection,
             availableDays: dates,
             maximumDate: dates.last ?? selection,
             calendar: calendar
         )
-        guard settledDay != canonicalSelection else { return }
+    }
+
+    private func reconcileAndCommitSelection(_ day: Date?) {
+        let settledDay = resolvedSettledDay(day)
+        guard settledDay != canonicalSelection else {
+            onCoupledPresentationChange(.end)
+            return
+        }
+        onCoupledPresentationChange(
+            .reconcile(day: settledDay, dates: dates)
+        )
         selection = settledDay
     }
 
@@ -405,8 +722,131 @@ struct TemporalHistoryCarousel: View {
               centeredDay != canonicalSelection,
               !movementPhase.suppressesAutomaticAlignment
         else { return }
+        settledVisibleWindow = TemporalHistoryPresentation.ribbonWindow(
+            containing: canonicalSelection,
+            calendar: calendar
+        )
         centeredDay = canonicalSelection
     }
+}
+
+@Observable
+@MainActor
+final class TemporalCoupledScrollPresentation {
+    private(set) var preview: TemporalDaySpaceProgress?
+    private(set) var isReconciling = false
+
+    func handle(_ update: TemporalCoupledPresentationUpdate) {
+        switch update {
+        case let .preview(preview):
+            isReconciling = false
+            guard preview != self.preview else { return }
+            self.preview = preview
+        case let .reconcile(day, dates):
+            guard let index = dates.firstIndex(of: day),
+                  dates.count > 1
+            else {
+                finishReconciliation()
+                return
+            }
+            let lowerStride = preview?.lowerPageStride ?? 1
+            if dates.indices.contains(index + 1) {
+                preview = TemporalDaySpaceProgress(
+                    leadingDay: dates[index],
+                    trailingDay: dates[index + 1],
+                    fraction: 0,
+                    lowerPageStride: lowerStride
+                )
+            } else {
+                preview = TemporalDaySpaceProgress(
+                    leadingDay: dates[index - 1],
+                    trailingDay: dates[index],
+                    fraction: 1,
+                    lowerPageStride: lowerStride
+                )
+            }
+            isReconciling = true
+        case .end:
+            finishReconciliation()
+        }
+    }
+
+    func finishReconciliation() {
+        isReconciling = false
+        preview = nil
+    }
+}
+
+enum TemporalCoupledPresentationUpdate {
+    case preview(TemporalDaySpaceProgress)
+    case reconcile(day: Date, dates: [Date])
+    case end
+}
+
+private struct TemporalDateChipStrideKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private enum TemporalDateNavigatorCoordinateSpace {
+    static let name = "temporal-date-navigator"
+}
+
+private struct TemporalSelectedDateChipMidXKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        value = nextValue() ?? value
+    }
+}
+
+private struct TemporalDateNavigatorWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct TemporalRibbonSurfaceModifier: ViewModifier {
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    let isContinuous: Bool
+
+    func body(content: Content) -> some View {
+        if isContinuous {
+            content
+                .padding(.vertical, UFastTheme.Spacing.standard)
+                .background(UFastTheme.surface)
+                .overlay(alignment: .top) {
+                    separator
+                }
+                .overlay(alignment: .bottom) {
+                    separator
+                }
+        } else {
+            content.uFastCard()
+        }
+    }
+
+    private var separator: some View {
+        Rectangle()
+            .fill(
+                UFastTheme.border.opacity(
+                    contrast == .increased ? 1 : 0.72
+                )
+            )
+            .frame(height: contrast == .increased ? 2 : 1)
+    }
+}
+
+@MainActor
+private final class TemporalCarouselGeometrySnapshot {
+    var geometry: TemporalContinuousTimelineGeometry?
+    var hasActiveMotion = false
 }
 
 private struct TemporalSelectedPageHeightKey: PreferenceKey {
@@ -434,9 +874,19 @@ struct TemporalRibbonView: View {
     var accessibilityIdentifierPrefix = "history"
     var showsDayHeader = true
     var isInteractive = true
+    var showsSemanticItems = true
+    var usesContinuousSurface = false
+    var showsVisualRibbon = true
+    var includesSemanticItems = true
+    var windowOverride: TemporalRibbonWindow?
+    var emptySemanticMessage = "No recorded items for this date."
 
     private var window: TemporalRibbonWindow? {
-        TemporalHistoryPresentation.ribbonWindow(containing: selectedDate, calendar: calendar)
+        windowOverride
+            ?? TemporalHistoryPresentation.ribbonWindow(
+                containing: selectedDate,
+                calendar: calendar
+            )
     }
 
     var body: some View {
@@ -476,22 +926,29 @@ struct TemporalRibbonView: View {
             }
 
             if let window {
-                if dynamicTypeSize.isAccessibilitySize {
-                    Text("Timeline details are listed below.")
-                        .font(.body)
-                        .foregroundStyle(UFastTheme.secondaryText)
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: 72,
-                            alignment: .leading
-                        )
-                        .uFastCard()
-                        .accessibilityHidden(true)
-                } else {
-                    visualRibbon(window)
-                        .accessibilityHidden(true)
+                if showsVisualRibbon {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text("Timeline details are listed below.")
+                            .font(.body)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .frame(
+                                maxWidth: .infinity,
+                                minHeight: 72,
+                                alignment: .leading
+                            )
+                            .uFastCard()
+                            .accessibilityHidden(true)
+                    } else {
+                        visualRibbon(window)
+                            .accessibilityHidden(true)
+                    }
                 }
-                semanticItems(window)
+                if includesSemanticItems {
+                    semanticItems(window)
+                        .opacity(showsSemanticItems ? 1 : 0)
+                        .allowsHitTesting(showsSemanticItems)
+                        .accessibilityHidden(!showsSemanticItems)
+                }
             }
         }
         .accessibilityAction(named: "Previous day") {
@@ -539,14 +996,23 @@ struct TemporalRibbonView: View {
             .allowsHitTesting(isInteractive)
         }
         .frame(height: dynamicTypeSize.isAccessibilitySize ? 252 : 220)
-        .uFastCard()
+        .modifier(
+            TemporalRibbonSurfaceModifier(
+                isContinuous: usesContinuousSurface
+            )
+        )
         .accessibilityIdentifier("temporal.ribbon")
     }
 
     private func ribbonBackground(window: TemporalRibbonWindow, width: Double) -> some View {
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: UFastTheme.Radius.control)
-                .fill(UFastTheme.formSurface)
+            if usesContinuousSurface {
+                Rectangle()
+                    .fill(UFastTheme.formSurface)
+            } else {
+                RoundedRectangle(cornerRadius: UFastTheme.Radius.control)
+                    .fill(UFastTheme.formSurface)
+            }
             ForEach(axisMarkers(window), id: \.self) { marker in
                 let markerX = width * window.fraction(for: marker)
                 Rectangle()
@@ -555,7 +1021,15 @@ struct TemporalRibbonView: View {
                     .frame(width: 1, height: 160)
                     .offset(x: markerX, y: 32)
                 axisMark(marker)
-                    .offset(x: max(4, markerX + 4), y: 8)
+                    .frame(
+                        width: 64,
+                        height: 30,
+                        alignment: .topLeading
+                    )
+                    .position(
+                        x: min(max(32, markerX), max(32, width - 32)),
+                        y: 23
+                    )
             }
         }
     }
@@ -672,7 +1146,7 @@ struct TemporalRibbonView: View {
         let visibleEvents = events.filter { window.contains($0.occurredAt) }
         return VStack(spacing: 0) {
             if visibleIntervals.isEmpty, visibleEvents.isEmpty {
-                Text("No recorded items for this date.")
+                Text(emptySemanticMessage)
                     .foregroundStyle(UFastTheme.secondaryText)
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .accessibilityIdentifier("temporal.empty")
@@ -768,14 +1242,20 @@ struct TemporalRibbonView: View {
     }
 
     private func axisMarkers(_ window: TemporalRibbonWindow) -> [Date] {
-        var markers: [Date] = []
-        var cursor = window.interval.start
-        while cursor < window.interval.end {
-            markers.append(cursor)
-            guard let next = calendar.date(byAdding: .hour, value: 6, to: cursor), next > cursor else { break }
-            cursor = next
+        let intradayMarkers = [6, 12, 18].compactMap { hour in
+            localTime(hour: hour, on: window.selectedDay)
         }
-        return Array(Set(markers + window.midnightMarkers)).sorted()
+        return Array(Set(window.midnightMarkers + intradayMarkers))
+            .filter { $0 > window.interval.start && $0 < window.interval.end }
+            .sorted()
+    }
+
+    private func localTime(hour: Int, on date: Date) -> Date? {
+        var components = calendar.dateComponents([.era, .year, .month, .day], from: date)
+        components.hour = hour
+        components.minute = 0
+        components.second = 0
+        return calendar.date(from: components)
     }
 
     private func axisMark(_ date: Date) -> some View {

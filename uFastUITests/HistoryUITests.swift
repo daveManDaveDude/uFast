@@ -41,35 +41,93 @@ final class HistoryUITests: XCTestCase {
         let selectedDate = app.staticTexts["history.selected-date"]
         XCTAssertTrue(selectedDate.waitForExistence(timeout: 2))
         let todayLabel = selectedDate.label
-        XCTAssertFalse(app.buttons["history.next-day"].isEnabled)
+        XCTAssertTrue(app.buttons["history.next-day"].isEnabled)
+
+        app.buttons["history.previous-day"].tap()
+        let deliberatePreviousLabel = selectedDate.label
+        XCTAssertNotEqual(deliberatePreviousLabel, todayLabel)
 
         let today = Calendar.current.startOfDay(for: start)
-        let page = app.otherElements["history.day-page.\(today.timeIntervalSince1970)"]
-        XCTAssertTrue(page.waitForExistence(timeout: 2))
-        page.swipeRight(velocity: .slow)
+        let todayChip = app.buttons["temporal.date.\(today.timeIntervalSince1970)"]
+        XCTAssertTrue(todayChip.waitForExistence(timeout: 2))
+        todayChip.tap()
+        XCTAssertEqual(selectedDate.label, todayLabel)
+
+        let carousel = app.otherElements["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 2))
+        carousel.swipeRight(velocity: .slow)
         XCTAssertNotEqual(selectedDate.label, todayLabel)
-        let previousLabel = selectedDate.label
+        let freelySettledLabel = selectedDate.label
         XCTAssertTrue(app.buttons["history.next-day"].isEnabled)
 
         app.buttons["history.next-day"].tap()
-        XCTAssertEqual(selectedDate.label, todayLabel)
-
-        guard let previousDay = Calendar.current.date(
-            byAdding: .day,
-            value: -1,
-            to: Calendar.current.startOfDay(for: start)
-        ) else {
-            XCTFail("Expected a previous local-calendar day.")
-            return
-        }
-        let chip = app.buttons["temporal.date.\(previousDay.timeIntervalSince1970)"]
-        XCTAssertTrue(chip.waitForExistence(timeout: 2))
-        chip.tap()
-        XCTAssertEqual(selectedDate.label, previousLabel)
+        XCTAssertNotEqual(selectedDate.label, freelySettledLabel)
+        app.buttons["history.previous-day"].tap()
+        XCTAssertEqual(selectedDate.label, freelySettledLabel)
     }
 
     @MainActor
-    func testFastHistoryFlickCrossesSeveralDaysAndCannotPassToday() {
+    func testManualDateRailScrollingRemainsIndependentFromSettledTimelineSelection() {
+        let app = launchOnboardedHistory()
+        app.tabBars.buttons["History"].tap()
+
+        let selectedDate = app.staticTexts["history.selected-date"]
+        XCTAssertTrue(selectedDate.waitForExistence(timeout: 2))
+        let originalSelection = selectedDate.label
+        let today = Calendar.current.startOfDay(for: start)
+        let selectedChip = app.buttons["temporal.date.\(today.timeIntervalSince1970)"]
+        XCTAssertTrue(selectedChip.waitForExistence(timeout: 2))
+
+        selectedChip.swipeRight(velocity: .slow)
+
+        XCTAssertEqual(selectedDate.label, originalSelection)
+        XCTAssertTrue(app.buttons["history.next-day"].isEnabled)
+        XCTAssertEqual(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "temporal.date.")
+            ).matching(
+                NSPredicate(format: "value == %@", "Selected")
+            ).count,
+            1
+        )
+    }
+
+    @MainActor
+    func testFirstBackwardSwipePreservesInitialDateRailAnchor() {
+        let app = launchOnboardedHistory()
+        app.tabBars.buttons["History"].tap()
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: start)
+        let todayChip = app.buttons[
+            "temporal.date.\(today.timeIntervalSince1970)"
+        ]
+        XCTAssertTrue(todayChip.waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            todayChip.frame.midX,
+            app.windows.firstMatch.frame.midX,
+            accuracy: 4
+        )
+        let initialAnchorX = todayChip.frame.midX
+
+        let carousel = app.otherElements["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 2))
+        carousel.swipeRight(velocity: .slow)
+
+        let settledChip = app.buttons.matching(
+            NSPredicate(format: "value == %@", "Selected")
+        ).firstMatch
+        XCTAssertTrue(settledChip.waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            settledChip.frame.midX,
+            initialAnchorX,
+            accuracy: 4,
+            "The rail should keep the freely settled center day on its initial anchor."
+        )
+    }
+
+    @MainActor
+    func testFastHistoryFlickCrossesSeveralDaysAndFutureDaysRemainReadOnly() {
         let app = launchOnboardedHistory(
             additionalArguments: ["-AppleLocale", "en_GB"]
         )
@@ -83,13 +141,10 @@ final class HistoryUITests: XCTestCase {
         app.buttons["history.next-day"].tap()
         XCTAssertEqual(selectedDate.label, todayLabel)
 
-        let today = Calendar.current.startOfDay(for: start)
-        let todayPage = app.otherElements[
-            "history.day-page.\(today.timeIntervalSince1970)"
-        ]
-        XCTAssertTrue(todayPage.waitForExistence(timeout: 2))
+        let carousel = app.otherElements["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 2))
 
-        todayPage.swipeRight(velocity: .fast)
+        carousel.swipeRight(velocity: .fast)
         XCTAssertNotEqual(selectedDate.label, todayLabel)
         XCTAssertNotEqual(
             selectedDate.label,
@@ -111,13 +166,14 @@ final class HistoryUITests: XCTestCase {
         let boundaryDate = boundaryApp.staticTexts["history.selected-date"]
         XCTAssertTrue(boundaryDate.waitForExistence(timeout: 2))
         let boundaryTodayLabel = boundaryDate.label
-        let boundaryPage = boundaryApp.otherElements[
-            "history.day-page.\(today.timeIntervalSince1970)"
-        ]
-        XCTAssertTrue(boundaryPage.waitForExistence(timeout: 2))
-        boundaryPage.swipeLeft(velocity: .fast)
-        XCTAssertEqual(boundaryDate.label, boundaryTodayLabel)
-        XCTAssertFalse(boundaryApp.buttons["history.next-day"].isEnabled)
+        boundaryApp.buttons["history.next-day"].tap()
+        XCTAssertNotEqual(boundaryDate.label, boundaryTodayLabel)
+        XCTAssertTrue(
+            boundaryApp.staticTexts["history.future-read-only"]
+                .waitForExistence(timeout: 2)
+        )
+        XCTAssertFalse(boundaryApp.buttons["history.add-at-selected-time"].exists)
+        XCTAssertFalse(boundaryApp.buttons["history.review-suggestions"].exists)
     }
 
     @MainActor
@@ -159,9 +215,9 @@ final class HistoryUITests: XCTestCase {
         XCTAssertTrue(app.buttons[
             "temporal.date.\(canonicalDecemberDay.timeIntervalSince1970)"
         ].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.otherElements[
-            "history.day-page.\(canonicalDecemberDay.timeIntervalSince1970)"
-        ].waitForExistence(timeout: 2))
+        XCTAssertTrue(
+            app.otherElements["history.day-carousel"].waitForExistence(timeout: 2)
+        )
         captureScreenshot(named: "history-year-boundary-en-GB", in: app)
 
         app.buttons["history.next-day"].tap()

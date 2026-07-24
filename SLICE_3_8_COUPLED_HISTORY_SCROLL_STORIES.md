@@ -1,7 +1,7 @@
 # Slice 3.8 — Coupled History date rail
 
-**Sprint status:** Proposed; explicit interaction approval required
-**Production status:** Not started
+**Sprint status:** Delivered 23 July 2026
+**Production status:** Complete
 **Story order:** OW-380 → OW-381 → OW-382 → OW-383 → OW-384 → OW-385
 
 ## Outcome
@@ -17,6 +17,38 @@ waiting for the lower carousel to settle and then snapping the rail.
 
 This is a presentation refinement of the delivered Slice 3.7 analog carousel.
 It does not introduce a continuously selectable fractional date.
+
+## Post-delivery amendment — D-019
+
+On 23 July 2026, the user approved read-only future History browsing on both
+surfaces. D-019 supersedes this delivered slice only where it names Today as
+the maximum selectable or previewable display day. Today now opens centered in
+a bounded 400-day-past and 400-day-future Calendar-derived buffer. Future days
+may settle as read-only viewing context, while marks, empty-space add, direct
+entry and contextual repair remain non-actionable and perform no writes. The
+native picker remains capped at Today.
+
+## Post-delivery amendment — D-020
+
+On 24 July 2026, the user approved continuous flush lower pages using a
+26-local-hour viewport: the selected day plus one hour of context at each edge.
+The carousel timeline has no repeated page-side border, radius or horizontal
+inset, so adjacent pages render as one uninterrupted strip rather than cards
+placed against each other.
+The structured timeline-detail card is hidden, non-actionable and excluded from
+accessibility during either surface's live motion, lower deceleration and
+alignment, then restored for the settled selected page without collapsing its
+reserved layout space. Calendar-derived London clock-change pages retain their
+actual 25- or 27-hour elapsed duration.
+
+## Post-delivery amendment — D-021
+
+On 24 July 2026, the user removed lower-timeline day snapping. Calendar days
+remain stable touching render segments, but native inertia may settle at any
+fractional time offset. The center local day drives the settled heading and
+date rail; the structured detail card is filtered only after settlement using
+the exact visible start and end instants. Fractional position remains transient
+presentation state and performs no persistence writes.
 
 ## Interaction contract
 
@@ -46,8 +78,8 @@ It does not introduce a continuously selectable fractional date.
   not announced as selected and do not become editor targets during motion.
 - On settlement, the visual rail position reconciles exactly to the selected
   day without a second animation, bounce or visible correction.
-- Today remains the maximum selectable and previewable date. Coupled motion
-  must not reveal a real future chip as a valid target.
+- D-019 supersedes the original Today display boundary: bounded future chips
+  are valid read-only viewing targets, never editor or write targets.
 
 ### Direct upper-rail interaction
 
@@ -149,7 +181,12 @@ spring gaps and repeated hours.
 
 ## OW-380 — Approve and prototype coupled motion
 
-**Status:** Proposed
+**Status:** Done 23 July 2026
+
+**Verification:** D-018 records the approved contract and the selected
+presentation-only follower prototype. Narrow-iPhone slow and fast coupling,
+native deceleration, exact settlement, Today resistance and interruption were
+verified without custom velocity or deceleration physics.
 
 ### Scope
 
@@ -179,7 +216,12 @@ spring gaps and repeated hours.
 
 ## OW-381 — Establish deterministic coupled-scroll primitives
 
-**Status:** Blocked by OW-380
+**Status:** Done 23 July 2026
+
+**Verification:** Deterministic tests cover normalized forward, backward,
+reversal and multi-day progress; measured lower/upper strides; exclusive
+ownership; stale, future and out-of-buffer rejection; rebasing; interruption;
+and Calendar-derived month, year, leap-day and Europe/London DST neighbours.
 
 ### Scope
 
@@ -205,7 +247,13 @@ spring gaps and repeated hours.
 
 ## OW-382 — Couple the upper rail to lower-carousel motion
 
-**Status:** Blocked by OW-381
+**Status:** Done 23 July 2026
+
+**Verification:** Native lower scroll geometry drives a decorative follower
+rail throughout tracking, deceleration and target alignment. Stable adjacent
+day identities plus fractional layout progress reconcile to the settled
+interactive rail before preview is removed, with timeline actions suppressed
+until motion resolves.
 
 ### Scope
 
@@ -230,7 +278,12 @@ spring gaps and repeated hours.
 
 ## OW-383 — Preserve deliberate rail and date-control behavior
 
-**Status:** Blocked by OW-382
+**Status:** Done 23 July 2026
+
+**Verification:** Focused UI tests preserve independent manual rail scrolling,
+chip/Previous/Next synchronization, multi-day flick settlement, year-boundary
+alignment and Today clamping. Deliberate commands interrupt stale preview and
+remain the only two-surface synchronization path.
 
 ### Scope
 
@@ -256,7 +309,14 @@ spring gaps and repeated hours.
 
 ## OW-384 — Complete accessibility, resilience and performance
 
-**Status:** Blocked by OW-383
+**Status:** Done 23 July 2026
+
+**Verification:** Preview is presentation-only, accessibility-hidden and
+non-interactive. Dynamic Type uses measured chip geometry; Reduce Motion keeps
+positional coupling without secondary reconciliation animation. Sheets, tab
+changes, backgrounding, content invalidation and Dynamic Type changes end
+preview deterministically. Light/dark, increased contrast, accessibility text,
+en_GB, en_US and RTL layouts were checked on iPhone 16e.
 
 ### Scope
 
@@ -284,7 +344,13 @@ spring gaps and repeated hours.
 
 ## OW-385 — Complete the coupled-scroll quality gate
 
-**Status:** Blocked by OW-384
+**Status:** Done 23 July 2026
+
+**Verification:** The complete unit and UI suites plus build, formatting,
+project generation, lint and whitespace gates pass. Simulator screenshots and
+the coupled-motion recording are retained under `artifacts/`. The final diff
+contains no persistence, reconstruction, direct-entry or Today semantic
+change.
 
 ### Acceptance criteria
 

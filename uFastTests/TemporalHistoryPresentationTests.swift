@@ -4,16 +4,80 @@ import XCTest
 // swiftlint:disable file_length function_body_length trailing_comma type_body_length
 
 final class TemporalHistoryPresentationTests: XCTestCase {
-    func testWindowShowsEveningMidnightAndFollowingEvening() throws {
+    func testWindowShowsFullSelectedDayWithOneHourContextAtEachEdge() throws {
         let calendar = try londonCalendar()
         let day = try date(2026, 7, 22, 12, calendar: calendar)
         let window = try XCTUnwrap(TemporalHistoryPresentation.ribbonWindow(containing: day, calendar: calendar))
 
-        XCTAssertEqual(calendar.component(.hour, from: window.interval.start), 18)
+        XCTAssertEqual(calendar.component(.hour, from: window.interval.start), 23)
         XCTAssertEqual(calendar.component(.day, from: window.interval.start), 21)
-        XCTAssertEqual(calendar.component(.hour, from: window.interval.end), 18)
+        XCTAssertEqual(calendar.component(.hour, from: window.interval.end), 1)
         XCTAssertEqual(calendar.component(.day, from: window.interval.end), 23)
         XCTAssertEqual(window.midnightMarkers.count, 2)
+        XCTAssertEqual(window.duration, 26 * 60 * 60)
+    }
+
+    func testContinuousTimelineResolvesAnArbitraryVisibleWindowWithoutDaySnapping() throws {
+        let calendar = try londonCalendar()
+        let firstDay = try date(2026, 7, 21, 0, calendar: calendar)
+        let days = (0 ..< 4).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: firstDay)
+        }
+        let segmentWidth = 240.0
+        let containerWidth = 260.0
+        let geometry = TemporalContinuousTimelineGeometry(
+            contentOffset: 290,
+            contentWidth: segmentWidth * Double(days.count),
+            containerWidth: containerWidth
+        )
+
+        let window = try XCTUnwrap(
+            geometry.visibleWindow(
+                days: days,
+                calendar: calendar,
+                layoutDirection: .leftToRight
+            )
+        )
+        let progress = try XCTUnwrap(
+            geometry.centerProgress(
+                days: days,
+                layoutDirection: .leftToRight
+            )
+        )
+
+        XCTAssertEqual(calendar.component(.day, from: window.interval.start), 22)
+        XCTAssertEqual(calendar.component(.hour, from: window.interval.start), 5)
+        XCTAssertEqual(calendar.component(.day, from: window.interval.end), 23)
+        XCTAssertEqual(calendar.component(.hour, from: window.interval.end), 7)
+        XCTAssertEqual(window.duration, 26 * 60 * 60)
+        XCTAssertEqual(progress.leadingDay, days[1])
+        XCTAssertEqual(progress.trailingDay, days[2])
+        XCTAssertEqual(progress.fraction, 0.25, accuracy: 0.000_001)
+    }
+
+    func testContinuousTimelineVisibleWindowUsesActualLondonDSTDayDurations() throws {
+        let calendar = try londonCalendar()
+        let firstDay = try date(2026, 3, 28, 0, calendar: calendar)
+        let days = (0 ..< 4).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: firstDay)
+        }
+        let geometry = TemporalContinuousTimelineGeometry(
+            contentOffset: 230,
+            contentWidth: 240 * Double(days.count),
+            containerWidth: 260
+        )
+
+        let window = try XCTUnwrap(
+            geometry.visibleWindow(
+                days: days,
+                calendar: calendar,
+                layoutDirection: .leftToRight
+            )
+        )
+
+        XCTAssertEqual(calendar.component(.hour, from: window.interval.start), 23)
+        XCTAssertEqual(calendar.component(.hour, from: window.interval.end), 1)
+        XCTAssertEqual(window.duration, 25 * 60 * 60)
     }
 
     func testSameDayAndOvernightIntervalsClipWithoutMutation() throws {
@@ -36,7 +100,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertEqual(result.count, 2)
         XCTAssertEqual(result.first { $0.id == overnight.id }?.originalStart, overnight.start)
         XCTAssertEqual(result.first { $0.id == overnight.id }?.originalEnd, overnight.end)
-        XCTAssertFalse(try XCTUnwrap(result.first { $0.id == overnight.id }).continuesBefore)
+        XCTAssertTrue(try XCTUnwrap(result.first { $0.id == overnight.id }).continuesBefore)
         XCTAssertFalse(try XCTUnwrap(result.first { $0.id == overnight.id }).continuesAfter)
     }
 
@@ -73,8 +137,8 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(spring.duration, 47 * 60 * 60)
-        XCTAssertEqual(autumn.duration, 49 * 60 * 60)
+        XCTAssertEqual(spring.duration, 25 * 60 * 60)
+        XCTAssertEqual(autumn.duration, 27 * 60 * 60)
     }
 
     func testWeekUsesCalendarFirstWeekday() throws {
@@ -165,15 +229,46 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     func testCarouselMovementPhasesGateAutomaticAlignmentAndTimelineActions() {
         XCTAssertFalse(TemporalCarouselMovementPhase.settled.suppressesAutomaticAlignment)
         XCTAssertTrue(TemporalCarouselMovementPhase.settled.allowsTimelineInteraction)
+        XCTAssertTrue(TemporalCarouselMovementPhase.settled.showsTimelineDetails)
 
         for phase in [
             TemporalCarouselMovementPhase.userDriven,
             .decelerating,
+            .aligning,
             .programmatic,
         ] {
             XCTAssertTrue(phase.suppressesAutomaticAlignment)
             XCTAssertFalse(phase.allowsTimelineInteraction)
+            XCTAssertFalse(phase.showsTimelineDetails)
         }
+    }
+
+    func testFlushPageGeometryUsesOneContainerWidthPerCalendarDay() throws {
+        let calendar = try londonCalendar()
+        let today = try date(2026, 7, 23, 12, calendar: calendar)
+        let days = TemporalDayBuffer(
+            centeredOn: today,
+            maximumDate: today,
+            calendar: calendar,
+            radius: 3
+        ).days
+        let containerWidth = 320.0
+        let contentWidth = containerWidth * Double(days.count)
+
+        let progress = try XCTUnwrap(
+            TemporalDaySpaceProgress.resolve(
+                contentOffset: containerWidth * 2.5,
+                contentWidth: contentWidth,
+                containerWidth: containerWidth,
+                days: days,
+                layoutDirection: .leftToRight
+            )
+        )
+
+        XCTAssertEqual(progress.lowerPageStride, containerWidth, accuracy: 0.000_001)
+        XCTAssertEqual(progress.leadingDay, days[2])
+        XCTAssertEqual(progress.trailingDay, days[3])
+        XCTAssertEqual(progress.fraction, 0.5, accuracy: 0.000_001)
     }
 
     func testCarouselSettlementResolvesSlowAndFastNativeTargetsWithoutTiming() throws {
@@ -265,6 +360,32 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         )
     }
 
+    func testDayBufferCentersTodayWithinBoundedFutureCalendarDays() throws {
+        let calendar = try londonCalendar()
+        let today = try date(2026, 3, 29, 12, calendar: calendar)
+        let maximumDisplayDay = try XCTUnwrap(
+            calendar.date(byAdding: .day, value: 400, to: today)
+        )
+        let buffer = TemporalDayBuffer(
+            centeredOn: today,
+            maximumDate: maximumDisplayDay,
+            calendar: calendar,
+            radius: 400
+        )
+        let todayDay = calendar.startOfDay(for: today)
+
+        XCTAssertEqual(buffer.days.count, 801)
+        XCTAssertEqual(buffer.days[400], todayDay)
+        XCTAssertEqual(
+            buffer.days.last,
+            calendar.startOfDay(for: maximumDisplayDay)
+        )
+        XCTAssertEqual(
+            buffer.days[401].timeIntervalSince(buffer.days[400]),
+            23 * 60 * 60
+        )
+    }
+
     func testDayBufferExpandsWithoutChangingExistingDayIdentityOrOrder() throws {
         let calendar = try londonCalendar()
         let today = try date(2027, 1, 15, 12, calendar: calendar)
@@ -336,6 +457,270 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertTrue(buffer.days.contains(calendar.startOfDay(for: distant)))
         XCTAssertEqual(buffer.days.count, 17)
         XCTAssertFalse(buffer.days.contains(calendar.startOfDay(for: today)))
+    }
+
+    func testDaySpaceProgressMapsForwardBackwardReversalAndMultipleDays() throws {
+        let calendar = try londonCalendar()
+        let today = try date(2026, 7, 23, 12, calendar: calendar)
+        let days = TemporalDayBuffer(
+            centeredOn: today,
+            maximumDate: today,
+            calendar: calendar,
+            radius: 5
+        ).days
+        let stride = 332.0
+        let contentWidth = stride * Double(days.count - 1) + 320
+
+        let samples = [
+            (2.25, 2, 0.25),
+            (1.75, 1, 0.75),
+            (2.1, 2, 0.1),
+            (4.6, 4, 0.6),
+        ]
+        for (index, leadingIndex, fraction) in samples {
+            let progress = try XCTUnwrap(
+                TemporalDaySpaceProgress.resolve(
+                    contentOffset: index * stride,
+                    contentWidth: contentWidth,
+                    containerWidth: 320,
+                    days: days,
+                    layoutDirection: .leftToRight
+                )
+            )
+            XCTAssertEqual(progress.leadingDay, days[leadingIndex])
+            XCTAssertEqual(progress.trailingDay, days[leadingIndex + 1])
+            XCTAssertEqual(progress.fraction, fraction, accuracy: 0.000_001)
+            XCTAssertEqual(progress.lowerPageStride, stride, accuracy: 0.000_001)
+        }
+    }
+
+    func testDaySpaceProgressMapsRTLGeometryToTheSameCalendarProgress() throws {
+        let calendar = try londonCalendar()
+        let today = try date(2026, 7, 23, 12, calendar: calendar)
+        let days = TemporalDayBuffer(
+            centeredOn: today,
+            maximumDate: today,
+            calendar: calendar,
+            radius: 3
+        ).days
+        let stride = 340.0
+        let container = 320.0
+        let content = stride * Double(days.count - 1) + container
+        let chronologicalProgress = 2.4
+        let ltr = try XCTUnwrap(
+            TemporalDaySpaceProgress.resolve(
+                contentOffset: chronologicalProgress * stride,
+                contentWidth: content,
+                containerWidth: container,
+                days: days,
+                layoutDirection: .leftToRight
+            )
+        )
+        let rtl = try XCTUnwrap(
+            TemporalDaySpaceProgress.resolve(
+                contentOffset: content - container - chronologicalProgress * stride,
+                contentWidth: content,
+                containerWidth: container,
+                days: days,
+                layoutDirection: .rightToLeft
+            )
+        )
+
+        XCTAssertEqual(rtl.leadingDay, ltr.leadingDay)
+        XCTAssertEqual(rtl.trailingDay, ltr.trailingDay)
+        XCTAssertEqual(rtl.fraction, ltr.fraction, accuracy: 0.000_001)
+    }
+
+    func testDaySpaceProgressUsesMeasuredLowerAndUpperStridesProportionally() throws {
+        let calendar = try londonCalendar()
+        let leading = try date(2026, 7, 21, 0, calendar: calendar)
+        let trailing = try XCTUnwrap(
+            TemporalHistoryPresentation.adjacentDay(
+                to: leading,
+                direction: 1,
+                calendar: calendar
+            )
+        )
+        let progress = TemporalDaySpaceProgress(
+            leadingDay: leading,
+            trailingDay: trailing,
+            fraction: 0.4,
+            lowerPageStride: 347
+        )
+
+        XCTAssertEqual(
+            try XCTUnwrap(progress.upperTranslation(measuredChipStride: 57)),
+            22.8,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(progress.upperTranslation(measuredChipStride: 87)),
+            34.8,
+            accuracy: 0.000_001
+        )
+        XCTAssertNil(progress.upperTranslation(measuredChipStride: 0))
+    }
+
+    func testDaySpaceProgressPreservesCalendarNeighboursAcrossBoundariesAndDST() throws {
+        let calendar = try londonCalendar()
+        let pairs = try [
+            (
+                date(2026, 12, 31, 0, calendar: calendar),
+                date(2027, 1, 1, 0, calendar: calendar)
+            ),
+            (
+                date(2028, 2, 28, 0, calendar: calendar),
+                date(2028, 2, 29, 0, calendar: calendar)
+            ),
+            (
+                date(2026, 3, 29, 0, calendar: calendar),
+                date(2026, 3, 30, 0, calendar: calendar)
+            ),
+            (
+                date(2026, 10, 25, 0, calendar: calendar),
+                date(2026, 10, 26, 0, calendar: calendar)
+            ),
+        ]
+        for (leading, trailing) in pairs {
+            let progress = TemporalDaySpaceProgress(
+                leadingDay: leading,
+                trailingDay: trailing,
+                fraction: 0.5,
+                lowerPageStride: 320
+            )
+            XCTAssertTrue(
+                progress.isValid(
+                    in: [leading, trailing],
+                    maximumDate: trailing,
+                    calendar: calendar
+                )
+            )
+        }
+        XCTAssertEqual(pairs[2].1.timeIntervalSince(pairs[2].0), 23 * 60 * 60)
+        XCTAssertEqual(pairs[3].1.timeIntervalSince(pairs[3].0), 25 * 60 * 60)
+    }
+
+    func testCoupledCoordinatorEnforcesExclusiveOwnershipAndRejectsStalePreview() throws {
+        let calendar = try londonCalendar()
+        let today = try date(2026, 7, 23, 12, calendar: calendar)
+        let buffer = TemporalDayBuffer(
+            centeredOn: today,
+            maximumDate: today,
+            calendar: calendar,
+            radius: 2
+        )
+        let progress = TemporalDaySpaceProgress(
+            leadingDay: buffer.days[1],
+            trailingDay: buffer.days[2],
+            fraction: 0.3,
+            lowerPageStride: 330
+        )
+        var coordinator = TemporalCoupledScrollCoordinator()
+        let epoch = try XCTUnwrap(coordinator.begin(.lowerUserDriven))
+
+        XCTAssertNil(coordinator.begin(.upperUserDriven))
+        XCTAssertTrue(
+            coordinator.publish(
+                progress,
+                epoch: epoch,
+                days: buffer.days,
+                maximumDate: today,
+                calendar: calendar
+            )
+        )
+        XCTAssertEqual(coordinator.preview, progress)
+        XCTAssertNotNil(coordinator.begin(.lowerDecelerating))
+        coordinator.settle()
+        XCTAssertNil(coordinator.preview)
+        XCTAssertEqual(coordinator.owner, .settled)
+        XCTAssertFalse(
+            coordinator.publish(
+                progress,
+                epoch: epoch,
+                days: buffer.days,
+                maximumDate: today,
+                calendar: calendar
+            )
+        )
+    }
+
+    func testCoupledCoordinatorRebasePreservesPreviewAndRejectsFutureOrOutOfBuffer() throws {
+        let calendar = try londonCalendar()
+        let today = try date(2026, 7, 23, 12, calendar: calendar)
+        var buffer = TemporalDayBuffer(
+            centeredOn: today,
+            maximumDate: today,
+            calendar: calendar,
+            radius: 3
+        )
+        let progress = TemporalDaySpaceProgress(
+            leadingDay: buffer.days[1],
+            trailingDay: buffer.days[2],
+            fraction: 0.65,
+            lowerPageStride: 330
+        )
+        var coordinator = TemporalCoupledScrollCoordinator()
+        let epoch = try XCTUnwrap(coordinator.begin(.lowerUserDriven))
+        XCTAssertTrue(
+            coordinator.publish(
+                progress,
+                epoch: epoch,
+                days: buffer.days,
+                maximumDate: today,
+                calendar: calendar
+            )
+        )
+        try buffer.ensureCoverage(
+            around: XCTUnwrap(buffer.days.first),
+            maximumDate: today,
+            calendar: calendar,
+            edgeThreshold: 1,
+            expansion: 4
+        )
+        XCTAssertTrue(
+            coordinator.rebase(
+                days: buffer.days,
+                maximumDate: today,
+                calendar: calendar
+            )
+        )
+        XCTAssertEqual(coordinator.preview, progress)
+
+        let future = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: today))
+        let invalid = TemporalDaySpaceProgress(
+            leadingDay: calendar.startOfDay(for: today),
+            trailingDay: calendar.startOfDay(for: future),
+            fraction: 0.2,
+            lowerPageStride: 330
+        )
+        XCTAssertFalse(
+            coordinator.publish(
+                invalid,
+                epoch: epoch,
+                days: buffer.days,
+                maximumDate: today,
+                calendar: calendar
+            )
+        )
+        XCTAssertFalse(
+            coordinator.rebase(
+                days: Array(buffer.days.suffix(2)),
+                maximumDate: today,
+                calendar: calendar
+            )
+        )
+        XCTAssertEqual(coordinator.owner, .settled)
+    }
+
+    func testCoupledCoordinatorInterruptionsEndPreviewDeterministically() {
+        var coordinator = TemporalCoupledScrollCoordinator()
+        XCTAssertNotNil(coordinator.begin(.lowerUserDriven))
+        coordinator.interrupt()
+        XCTAssertEqual(coordinator.owner, .settled)
+        XCTAssertNil(coordinator.preview)
+        XCTAssertNotNil(coordinator.begin(.upperUserDriven))
+        coordinator.interrupt()
+        XCTAssertEqual(coordinator.owner, .settled)
     }
 
     func testTapMappingUsesActualWindowAndMarkHitPriority() throws {

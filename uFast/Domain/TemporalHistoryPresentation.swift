@@ -109,6 +109,7 @@ enum TemporalCarouselMovementPhase: Equatable, Sendable {
     case settled
     case userDriven
     case decelerating
+    case aligning
     case programmatic
 
     var suppressesAutomaticAlignment: Bool {
@@ -117,6 +118,330 @@ enum TemporalCarouselMovementPhase: Equatable, Sendable {
 
     var allowsTimelineInteraction: Bool {
         self == .settled
+    }
+
+    var showsTimelineDetails: Bool {
+        self == .settled
+    }
+}
+
+enum TemporalHorizontalLayoutDirection: Equatable, Sendable {
+    case leftToRight
+    case rightToLeft
+}
+
+enum TemporalScrollMotionOwner: Equatable, Sendable {
+    case settled
+    case lowerUserDriven
+    case lowerDecelerating
+    case lowerAligning
+    case upperUserDriven
+    case deliberateProgrammatic
+
+    var publishesCoupledPreview: Bool {
+        switch self {
+        case .lowerUserDriven, .lowerDecelerating, .lowerAligning:
+            true
+        case .settled, .upperUserDriven, .deliberateProgrammatic:
+            false
+        }
+    }
+
+    var allowsSettledActions: Bool {
+        self == .settled
+    }
+}
+
+struct TemporalDaySpaceProgress: Equatable, Sendable {
+    let leadingDay: Date
+    let trailingDay: Date
+    let fraction: Double
+    let lowerPageStride: Double
+
+    static func resolve(
+        contentOffset: Double,
+        contentWidth: Double,
+        containerWidth: Double,
+        days: [Date],
+        layoutDirection: TemporalHorizontalLayoutDirection
+    ) -> Self? {
+        guard days.count > 1,
+              containerWidth > 0
+        else { return nil }
+        let stride = (contentWidth - containerWidth) / Double(days.count - 1)
+        guard stride.isFinite, stride > 0 else { return nil }
+        let maximumOffset = max(contentWidth - containerWidth, 0)
+        let chronologicalOffset = switch layoutDirection {
+        case .leftToRight:
+            contentOffset
+        case .rightToLeft:
+            maximumOffset - contentOffset
+        }
+        let progress = min(max(chronologicalOffset / stride, 0), Double(days.count - 1))
+        if progress >= Double(days.count - 1) {
+            return Self(
+                leadingDay: days[days.count - 2],
+                trailingDay: days[days.count - 1],
+                fraction: 1,
+                lowerPageStride: stride
+            )
+        }
+        let leadingIndex = Int(floor(progress))
+        return Self(
+            leadingDay: days[leadingIndex],
+            trailingDay: days[leadingIndex + 1],
+            fraction: progress - Double(leadingIndex),
+            lowerPageStride: stride
+        )
+    }
+
+    func upperTranslation(measuredChipStride: Double) -> Double? {
+        guard measuredChipStride.isFinite,
+              measuredChipStride > 0,
+              fraction.isFinite
+        else { return nil }
+        return fraction * measuredChipStride
+    }
+
+    func isValid(
+        in days: [Date],
+        maximumDate: Date,
+        calendar: Calendar
+    ) -> Bool {
+        guard fraction.isFinite,
+              (0 ... 1).contains(fraction),
+              lowerPageStride.isFinite,
+              lowerPageStride > 0,
+              let leadingIndex = days.firstIndex(of: leadingDay),
+              days.indices.contains(leadingIndex + 1),
+              days[leadingIndex + 1] == trailingDay,
+              trailingDay <= calendar.startOfDay(for: maximumDate),
+              TemporalHistoryPresentation.adjacentDay(
+                  to: leadingDay,
+                  direction: 1,
+                  calendar: calendar
+              ) == trailingDay
+        else { return false }
+        return true
+    }
+
+    func rebased(
+        in days: [Date],
+        maximumDate: Date,
+        calendar: Calendar
+    ) -> Self? {
+        isValid(in: days, maximumDate: maximumDate, calendar: calendar) ? self : nil
+    }
+}
+
+struct TemporalContinuousTimelineGeometry: Equatable, Sendable {
+    let contentOffset: Double
+    let contentWidth: Double
+    let containerWidth: Double
+
+    func visibleWindow(
+        days: [Date],
+        calendar: Calendar,
+        layoutDirection: TemporalHorizontalLayoutDirection
+    ) -> TemporalRibbonWindow? {
+        guard let segmentWidth = daySegmentWidth(days: days),
+              let start = instant(
+                  at: chronologicalOffset(
+                      layoutDirection: layoutDirection
+                  ),
+                  segmentWidth: segmentWidth,
+                  days: days,
+                  calendar: calendar
+              ),
+              let end = instant(
+                  at: chronologicalOffset(
+                      layoutDirection: layoutDirection
+                  ) + containerWidth,
+                  segmentWidth: segmentWidth,
+                  days: days,
+                  calendar: calendar
+              ),
+              start < end
+        else { return nil }
+        let selectedDay = calendar.startOfDay(
+            for: instant(
+                at: chronologicalOffset(layoutDirection: layoutDirection)
+                    + containerWidth / 2,
+                segmentWidth: segmentWidth,
+                days: days,
+                calendar: calendar
+            ) ?? start
+        )
+        guard let selectedEnd = calendar.date(byAdding: .day, value: 1, to: selectedDay) else {
+            return nil
+        }
+        let midnights = days.filter { $0 > start && $0 < end }
+        return TemporalRibbonWindow(
+            selectedDay: selectedDay,
+            selectedDayInterval: DateInterval(start: selectedDay, end: selectedEnd),
+            interval: DateInterval(start: start, end: end),
+            midnightMarkers: midnights
+        )
+    }
+
+    func centerProgress(
+        days: [Date],
+        layoutDirection: TemporalHorizontalLayoutDirection
+    ) -> TemporalDaySpaceProgress? {
+        guard let segmentWidth = daySegmentWidth(days: days), days.count > 1 else {
+            return nil
+        }
+        let center = chronologicalOffset(layoutDirection: layoutDirection)
+            + containerWidth / 2
+        let progress = min(
+            max(center / segmentWidth - 0.5, 0),
+            Double(days.count - 1)
+        )
+        if progress >= Double(days.count - 1) {
+            return TemporalDaySpaceProgress(
+                leadingDay: days[days.count - 2],
+                trailingDay: days[days.count - 1],
+                fraction: 1,
+                lowerPageStride: segmentWidth
+            )
+        }
+        let leadingIndex = Int(floor(progress))
+        return TemporalDaySpaceProgress(
+            leadingDay: days[leadingIndex],
+            trailingDay: days[leadingIndex + 1],
+            fraction: progress - Double(leadingIndex),
+            lowerPageStride: segmentWidth
+        )
+    }
+
+    private func daySegmentWidth(days: [Date]) -> Double? {
+        guard !days.isEmpty, contentWidth > 0 else { return nil }
+        let width = contentWidth / Double(days.count)
+        return width.isFinite && width > 0 ? width : nil
+    }
+
+    private func chronologicalOffset(
+        layoutDirection: TemporalHorizontalLayoutDirection
+    ) -> Double {
+        let maximumOffset = max(contentWidth - containerWidth, 0)
+        return switch layoutDirection {
+        case .leftToRight:
+            min(max(contentOffset, 0), maximumOffset)
+        case .rightToLeft:
+            min(max(maximumOffset - contentOffset, 0), maximumOffset)
+        }
+    }
+
+    private func instant(
+        at position: Double,
+        segmentWidth: Double,
+        days: [Date],
+        calendar: Calendar
+    ) -> Date? {
+        guard !days.isEmpty else { return nil }
+        let clamped = min(
+            max(position / segmentWidth, 0),
+            Double(days.count)
+        )
+        let index = min(Int(floor(clamped)), days.count - 1)
+        let fraction = min(max(clamped - Double(index), 0), 1)
+        let start = days[index]
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else {
+            return nil
+        }
+        return start.addingTimeInterval(
+            end.timeIntervalSince(start) * fraction
+        )
+    }
+}
+
+struct TemporalCoupledScrollCoordinator: Equatable, Sendable {
+    private(set) var owner = TemporalScrollMotionOwner.settled
+    private(set) var preview: TemporalDaySpaceProgress?
+    private(set) var epoch = 0
+
+    mutating func begin(_ newOwner: TemporalScrollMotionOwner) -> Int? {
+        guard canTransition(from: owner, to: newOwner) else { return nil }
+        if owner == .settled {
+            epoch += 1
+        }
+        owner = newOwner
+        if !newOwner.publishesCoupledPreview {
+            preview = nil
+        }
+        return epoch
+    }
+
+    mutating func publish(
+        _ progress: TemporalDaySpaceProgress,
+        epoch requestedEpoch: Int,
+        days: [Date],
+        maximumDate: Date,
+        calendar: Calendar
+    ) -> Bool {
+        guard requestedEpoch == epoch,
+              owner.publishesCoupledPreview,
+              progress.isValid(
+                  in: days,
+                  maximumDate: maximumDate,
+                  calendar: calendar
+              )
+        else { return false }
+        preview = progress
+        return true
+    }
+
+    mutating func rebase(
+        days: [Date],
+        maximumDate: Date,
+        calendar: Calendar
+    ) -> Bool {
+        guard let preview else { return true }
+        guard let rebased = preview.rebased(
+            in: days,
+            maximumDate: maximumDate,
+            calendar: calendar
+        ) else {
+            self.preview = nil
+            owner = .settled
+            epoch += 1
+            return false
+        }
+        self.preview = rebased
+        return true
+    }
+
+    mutating func settle() {
+        preview = nil
+        owner = .settled
+        epoch += 1
+    }
+
+    mutating func interrupt() {
+        settle()
+    }
+
+    private func canTransition(
+        from current: TemporalScrollMotionOwner,
+        to proposed: TemporalScrollMotionOwner
+    ) -> Bool {
+        switch (current, proposed) {
+        case (.settled, .lowerUserDriven),
+             (.settled, .upperUserDriven),
+             (.settled, .deliberateProgrammatic),
+             (.lowerUserDriven, .lowerDecelerating),
+             (.lowerUserDriven, .lowerAligning),
+             (.lowerUserDriven, .settled),
+             (.lowerDecelerating, .lowerUserDriven),
+             (.lowerDecelerating, .lowerAligning),
+             (.lowerDecelerating, .settled),
+             (.lowerAligning, .settled),
+             (.upperUserDriven, .settled),
+             (.deliberateProgrammatic, .settled):
+            true
+        default:
+            current == proposed
+        }
     }
 }
 
@@ -333,10 +658,8 @@ enum TemporalHistoryPresentation {
     static func ribbonWindow(containing date: Date, calendar: Calendar) -> TemporalRibbonWindow? {
         let selectedStart = calendar.startOfDay(for: date)
         guard let selectedEnd = calendar.date(byAdding: .day, value: 1, to: selectedStart),
-              let previousDay = calendar.date(byAdding: .day, value: -1, to: selectedStart),
-              let nextDay = calendar.date(byAdding: .day, value: 1, to: selectedStart),
-              let start = localTime(hour: 18, on: previousDay, calendar: calendar),
-              let end = localTime(hour: 18, on: nextDay, calendar: calendar),
+              let start = calendar.date(byAdding: .hour, value: -1, to: selectedStart),
+              let end = calendar.date(byAdding: .hour, value: 1, to: selectedEnd),
               start < end
         else { return nil }
 
@@ -346,6 +669,19 @@ enum TemporalHistoryPresentation {
             selectedDayInterval: DateInterval(start: selectedStart, end: selectedEnd),
             interval: DateInterval(start: start, end: end),
             midnightMarkers: markers
+        )
+    }
+
+    static func calendarDayWindow(containing date: Date, calendar: Calendar) -> TemporalRibbonWindow? {
+        let start = calendar.startOfDay(for: date)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else {
+            return nil
+        }
+        return TemporalRibbonWindow(
+            selectedDay: start,
+            selectedDayInterval: DateInterval(start: start, end: end),
+            interval: DateInterval(start: start, end: end),
+            midnightMarkers: [start]
         )
     }
 
@@ -481,14 +817,6 @@ enum TemporalHistoryPresentation {
         let duration = ElapsedTimeFormatter.string(from: end.timeIntervalSince(start))
         return "\(provenance.title), start \(start.formatted(style)), end "
             + "\(end.formatted(style)), duration \(duration)"
-    }
-
-    private static func localTime(hour: Int, on date: Date, calendar: Calendar) -> Date? {
-        var components = calendar.dateComponents([.era, .year, .month, .day], from: date)
-        components.hour = hour
-        components.minute = 0
-        components.second = 0
-        return calendar.date(from: components)
     }
 
     private static func hasRepeatedLocalTime(
