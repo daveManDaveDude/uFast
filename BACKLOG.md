@@ -92,12 +92,26 @@ The approval-gated continuous-scroll plan is in
 The approval-gated real-time rail-coupling plan is in
 `SLICE_3_8_COUPLED_HISTORY_SCROLL_STORIES.md`.
 
-- OW-380 P0 — Approve and prototype coupled History motion. **Proposed.**
-- OW-381 P0 — Establish deterministic coupled-scroll primitives. **Blocked by OW-380.**
-- OW-382 P0 — Couple the upper rail to lower-carousel motion. **Blocked by OW-381.**
-- OW-383 P0 — Preserve deliberate rail and date-control behavior. **Blocked by OW-382.**
-- OW-384 P0 — Complete accessibility, resilience and performance. **Blocked by OW-383.**
-- OW-385 P0 — Complete the coupled-scroll quality gate. **Blocked by OW-384.**
+- OW-380 P0 — Approve and prototype coupled History motion. **Done 23 July 2026.**
+- OW-381 P0 — Establish deterministic coupled-scroll primitives. **Done 23 July 2026.**
+- OW-382 P0 — Couple the upper rail to lower-carousel motion. **Done 23 July 2026.**
+- OW-383 P0 — Preserve deliberate rail and date-control behavior. **Done 23 July 2026.**
+- OW-384 P0 — Complete accessibility, resilience and performance. **Done 23 July 2026.**
+- OW-385 P0 — Complete the coupled-scroll quality gate. **Done 23 July 2026.**
+
+Post-delivery D-019 refinement: History opens with Today centered and both
+coupled surfaces can browse a bounded set of read-only future days; future
+entry and repair remain unavailable. **Done 23 July 2026.**
+
+Post-delivery D-020 refinement: lower History pages form a flush continuous
+carousel, show the selected local day with one hour of context on each edge,
+and hide structured timeline detail throughout live motion. **Done 24 July
+2026.**
+
+Post-delivery D-021 refinement: the continuous History timeline may settle at
+any fractional time offset, and its detail card is filtered from the exact
+settled visible interval rather than a forced day window. **Done 24 July
+2026.**
 
 ## Slice 4 — Apple Health
 
