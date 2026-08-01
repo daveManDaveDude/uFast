@@ -3,7 +3,7 @@ set -euo pipefail
 
 readonly project_root="${0:A:h:h}"
 readonly derived_data="${DERIVED_DATA_DEVICE:-$project_root/.derived-data-device}"
-readonly bundle_id="${BUNDLE_ID:-com.example.uFast}"
+readonly bundle_id="${BUNDLE_ID:-com.davidmcgrath.uFast}"
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 

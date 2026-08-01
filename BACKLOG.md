@@ -113,6 +113,32 @@ any fractional time offset, and its detail card is filtered from the exact
 settled visible interval rather than a forced day window. **Done 24 July
 2026.**
 
+Post-delivery D-022 refinement: live lower-carousel motion presents the
+viewport-centred calendar day in visual headings and the decorative follower
+rail, while semantic selection and exact-window detail remain settled-only.
+**Done 24 July 2026.**
+
+## Slice 3.9 — History interaction polish
+
+The amended contract is in `SLICE_3_9_HISTORY_INTERACTION_POLISH_STORIES.md`.
+
+- OW-390 P0 — Settle the manual date rail, enable elapsed Today entry, add
+  two-hour calendar grid rules, and bound/read-only future history. **Done 24
+  July 2026.**
+
+## Slice 3.10 — Automatic fast history
+
+The current-state review, replacement domain contract, migration boundary and
+implementation-ready stories are in
+`SLICE_3_10_AUTOMATIC_FAST_HISTORY_STORIES.md`.
+
+- OW-391 P0 — Establish the automatic-fast domain contract.
+- OW-392 P0 — Project fast history for the settled calendar view.
+- OW-393 P0 — Retire reconstruction and boundary review.
+- OW-394 P0 — Display automatic fasts and complete food details.
+- OW-395 P0 — Preserve explicit fast start and manual event entry.
+- OW-396 P0 — Migrate safely and complete the quality gate.
+
 ## Slice 4 — Apple Health
 
 - OW-401 P0 — Contextual weight authorization.
@@ -155,4 +181,7 @@ OW-365 behind an explicit interaction-contract approval gate.
 carousel contract and delivered OW-370 through OW-375 implementation.
 `SLICE_3_8_COUPLED_HISTORY_SCROLL_STORIES.md` proposes OW-380 through OW-385
 for real-time visual coupling between the delivered carousel and date rail.
+`SLICE_3_10_AUTOMATIC_FAST_HISTORY_STORIES.md` replaces reviewable
+reconstruction for new history with automatic event-gap projection and refines
+OW-391 through OW-396.
 The product pack's OW-401 example remains an input when Slice 4 is refined.

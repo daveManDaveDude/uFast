@@ -227,26 +227,40 @@ a viewport over existing absolute records, never a stored day model.
   structured timeline-detail card without collapsing its layout space. Restore
   it only for the settled selected page; passing detail is neither actionable
   nor exposed to accessibility.
-- Manual upper-rail motion remains independent. Lower-driven presentation
-  updates cannot feed selection or page alignment back into either surface.
-  Settlement reconciles the real interactive rail without a second animation,
-  overshoot or visible correction. Reduce Motion retains the direct positional
+- During lower-carousel motion, the month/year heading, **Selected day**
+  heading and decorative follower rail may present the viewport-centred local
+  day as soon as its midpoint crosses midnight. This has no semantic effect:
+  native picker, real rail selection, detail, action targets and accessibility
+  traits remain on the settled date until native idle. At the seam, present the
+  entering day; a reversal restores the preceding day immediately.
+- Manual upper-rail motion selects the chip nearest its visual centre once at
+  native idle. That settlement aligns the lower timeline once; lower-driven
+  presentation, programmatic alignment, interruption and rebasing never feed
+  selection back into the rail. Reduce Motion retains direct positional
   coupling and omits secondary travel effects.
 - The locale-derived date rail keeps stable day identity across week, month and
-  year boundaries. Its selected date uses text, fill, a visible border and the
-  word **Selected**; blank dates are neutral. Manual rail scrolling does not
-  select a date.
-- History opens with Today centered in a bounded local-calendar buffer. Both
-  the date rail and day carousel may browse future display days. Future chips
-  and the selected future page are explicitly **Read only**; timeline marks,
-  empty-space add, direct add and contextual repair are non-actionable there.
-  The native picker remains capped at Today.
+  year boundaries. Its selected date uses fill and a visible border; selection
+  is retained in accessibility traits and values. Blank dates are neutral.
+- History opens with Today centered and permits browsing through Today plus
+  one local-calendar day. Future chips and selected future pages are
+  explicitly **Read only**, with quieter semantic surfaces as well as text and
+  accessibility descriptions; a selected future chip remains visibly selected.
+  Today accepts elapsed empty points through now, while its remaining timeline
+  is shaded read-only. Future segments are fully shaded. The native picker
+  remains capped at Today.
 - The default ribbon fills one page with the complete selected local day plus
   one hour of context at each edge: 23:00 on the preceding date through 01:00
   on the following date. Geometry uses the actual elapsed interval, so a normal
   page spans 26 hours and London clock changes naturally produce 25- or
   27-elapsed-hour pages. Keep the compact grid legible with midnight, 06:00,
   12:00 and 18:00 markers rather than crowding labels into the one-hour edges.
+- Add lighter unlabelled rules at the remaining two-hour local-calendar
+  boundaries. Do not duplicate the stronger labelled rules; all rule colours
+  use semantic theme tokens and honour increased contrast.
+- Each calendar segment owns its leading midnight marker, rendered as a modestly
+  stronger rule with a compact local date and time label. Use locale-aware time,
+  monospaced digits and mirrored leading alignment in RTL; avoid decorative
+  containers or selection effects.
 - Fasts use capsule intervals. A clipped interval shows doubled chevrons when
   space permits; a very short segment uses its status symbol alone instead of
   clipping text. Both keep one record identity and one detail destination.

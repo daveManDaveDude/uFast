@@ -2,7 +2,7 @@ import XCTest
 
 final class NavigationShellUITests: XCTestCase {
     @MainActor
-    func testFourPrimaryDestinationsAreReachable() {
+    func testThreePrimaryDestinationsAreReachable() {
         let app = XCUIApplication()
         app.launchArguments.append(contentsOf: ["--ui-testing", "--reset-data"])
         app.launch()
@@ -10,7 +10,6 @@ final class NavigationShellUITests: XCTestCase {
 
         assertDestination("Today", in: app)
         assertDestination("History", in: app)
-        assertDestination("Progress", in: app)
         assertDestination("Settings", in: app)
     }
 

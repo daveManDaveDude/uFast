@@ -57,4 +57,78 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(storedFast.historicalGoal, sixteenHours)
         XCTAssertEqual(storedFast.duration, 16 * 60 * 60)
     }
+
+    func testDeleteEverythingRemovesEveryPersistedModelType() throws {
+        let container = try populatedContainer()
+        let context = container.mainContext
+
+        try AppDataDeletionService.deleteEverything(in: context)
+
+        XCTAssertTrue(try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<FastRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<FoodEntryRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).isEmpty)
+    }
+
+    func testDeleteEverythingFailureRollsBackEveryDeletion() throws {
+        let container = try populatedContainer()
+        let context = container.mainContext
+
+        XCTAssertThrowsError(
+            try AppDataDeletionService.deleteEverything(
+                in: context,
+                simulateFailure: true
+            )
+        )
+
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<UnknownPeriodRecord>()), 1)
+    }
+
+    private func populatedContainer() throws -> ModelContainer {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let startBoundaryID = UUID()
+        let endBoundaryID = UUID()
+        let boundaries = ReconstructionBoundaryPair(
+            start: .init(kind: .food, id: startBoundaryID),
+            end: .init(kind: .hydration, id: endBoundaryID)
+        )
+
+        context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        context.insert(FastRecord(startDate: now, goalAtStart: .default))
+        context.insert(
+            FoodEntryRecord(
+                id: startBoundaryID,
+                draft: .init(description: "Dinner", occurredAt: now),
+                createdAt: now
+            )
+        )
+        context.insert(
+            HydrationEntryRecord(
+                id: endBoundaryID,
+                type: .water,
+                volumeMillilitres: 500,
+                occurredAt: now,
+                isCaloric: false,
+                createdAt: now
+            )
+        )
+        context.insert(
+            UnknownPeriodRecord(
+                startDate: now,
+                endDate: now.addingTimeInterval(60),
+                boundaries: boundaries,
+                reason: .userChoice,
+                createdAt: now
+            )
+        )
+        try context.save()
+        return container
+    }
 }

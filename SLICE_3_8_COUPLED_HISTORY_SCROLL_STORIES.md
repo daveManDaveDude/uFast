@@ -50,6 +50,18 @@ date rail; the structured detail card is filtered only after settlement using
 the exact visible start and end instants. Fractional position remains transient
 presentation state and performs no persistence writes.
 
+## Post-delivery amendment — D-022
+
+During lower-carousel motion, the visible month/year heading, selected-day
+heading and decorative follower rail use the local-calendar day at the viewport
+centre. At an exact midnight seam, the entering day is presented; reversal
+restores the prior day immediately. This is presentation state only: the
+settled shared date, native picker, real rail selection, structured detail,
+editor/repair targets and VoiceOver selection remain unchanged until native
+idle commits one centered day. Coupling remains geometry- and phase-driven with
+no polling, timer, display-link or custom physics. Midnight markers use the
+Calendar-derived segment boundary, including DST days.
+
 ## Interaction contract
 
 ### One motion, two coordinated surfaces

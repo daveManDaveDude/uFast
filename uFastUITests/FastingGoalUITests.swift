@@ -118,6 +118,39 @@ final class FastingGoalUITests: XCTestCase {
     }
 
     @MainActor
+    func testDeleteAllDataRequiresTwoConfirmationsAndReturnsToOnboarding() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launch()
+        app.buttons["goal.continue"].tap()
+        app.tabBars.buttons["Settings"].tap()
+
+        let deleteAll = app.buttons["settings.data.delete-all"]
+        for _ in 0 ..< 4 where !deleteAll.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(deleteAll.isHittable)
+        deleteAll.tap()
+
+        let firstAlert = app.alerts["Delete all uFast data?"]
+        XCTAssertTrue(firstAlert.waitForExistence(timeout: 2))
+        firstAlert.buttons["Continue"].tap()
+
+        let finalAlert = app.alerts["Permanently delete everything?"]
+        XCTAssertTrue(finalAlert.waitForExistence(timeout: 2))
+        finalAlert.buttons["Cancel"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Settings"].exists)
+
+        deleteAll.tap()
+        XCTAssertTrue(firstAlert.waitForExistence(timeout: 2))
+        firstAlert.buttons["Continue"].tap()
+        XCTAssertTrue(finalAlert.waitForExistence(timeout: 2))
+        finalAlert.buttons["Delete everything"].tap()
+
+        XCTAssertTrue(app.staticTexts["goal.promise"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     private func selectGoal(_ hours: Int, in app: XCUIApplication) {
         let option = app.buttons["goal.option.\(hours)"]
         XCTAssertTrue(option.waitForExistence(timeout: 2))

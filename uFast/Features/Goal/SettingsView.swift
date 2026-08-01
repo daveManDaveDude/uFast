@@ -11,6 +11,9 @@ struct SettingsView: View {
     @State private var focusedFavouriteField: FavouriteField?
     @State private var selection = FastingGoal.default
     @State private var saveError: String?
+    @State private var deleteError: String?
+    @State private var isFirstDeleteConfirmationPresented = false
+    @State private var isFinalDeleteConfirmationPresented = false
     @State private var waterAmount = "500"
     @State private var teaAmount = "300"
     @State private var coffeeAmount = "300"
@@ -38,11 +41,15 @@ struct SettingsView: View {
                         .uFastCard(accent: UFastTheme.sage)
 
                         VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                            Label("Private by default", systemImage: "lock")
+                            Label("Private iCloud sync", systemImage: "icloud")
                                 .font(.headline)
                                 .foregroundStyle(UFastTheme.primary)
-                            Text("Your fasting goal and records stay on this device.")
-                                .foregroundStyle(UFastTheme.secondaryText)
+                            Text(
+                                "Your uFast records sync through your private iCloud account "
+                                    + "and remain available after reinstalling the app."
+                            )
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                         .uFastCard()
 
@@ -64,6 +71,32 @@ struct SettingsView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .uFastCard(accent: UFastTheme.sky)
+
+                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                            UFastSectionHeading("Your data")
+                            Text(
+                                "Delete every uFast record from this device and iCloud. "
+                                    + "This cannot be undone."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                            Button("Delete all data", role: .destructive) {
+                                deleteError = nil
+                                isFirstDeleteConfirmationPresented = true
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("settings.data.delete-all")
+
+                            if let deleteError {
+                                Label(deleteError, systemImage: "exclamationmark.circle")
+                                    .foregroundStyle(UFastTheme.error)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("settings.data.delete-error")
+                            }
+                        }
+                        .uFastCard(accent: UFastTheme.apricot)
 
                         if let saveError {
                             Label(saveError, systemImage: "exclamationmark.circle")
@@ -88,6 +121,31 @@ struct SettingsView: View {
                 if previousField != nil, previousField != currentField {
                     saveFavouritesIfValid()
                 }
+            }
+            .alert(
+                "Delete all uFast data?",
+                isPresented: $isFirstDeleteConfirmationPresented
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button("Continue", role: .destructive) {
+                    isFinalDeleteConfirmationPresented = true
+                }
+            } message: {
+                Text(
+                    "This will remove your fasts, food, drinks, settings and history "
+                        + "from this device and iCloud."
+                )
+            }
+            .alert(
+                "Permanently delete everything?",
+                isPresented: $isFinalDeleteConfirmationPresented
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete everything", role: .destructive) {
+                    deleteAllData()
+                }
+            } message: {
+                Text("This is your final confirmation. Deleted data cannot be recovered.")
             }
         }
     }
@@ -169,6 +227,20 @@ struct SettingsView: View {
         settings.setHydrationFavourites(water: values.0, tea: values.1, coffee: values.2)
         do { try modelContext.save(); saveError = nil }
         catch { settings.setHydrationFavourites(water: old.0, tea: old.1, coffee: old.2); saveError = "Your drink favourites couldn’t be saved. Please try again." }
+    }
+
+    private func deleteAllData() {
+        do {
+            try AppDataDeletionService.deleteEverything(
+                in: modelContext,
+                simulateFailure: ProcessInfo.processInfo.arguments.contains(
+                    "--simulate-delete-all-failure"
+                )
+            )
+            deleteError = nil
+        } catch {
+            deleteError = "Your data couldn’t be deleted. Please try again."
+        }
     }
 }
 

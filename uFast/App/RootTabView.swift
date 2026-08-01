@@ -34,9 +34,7 @@ struct RootTabView: View {
         case .settings:
             SettingsView()
         case .history:
-            HistoryView(clock: clock)
-        case .progress:
-            DestinationPlaceholderView(destination: destination)
+            HistoryView(clock: clock, isTabSelected: selection == .history)
         }
     }
 }

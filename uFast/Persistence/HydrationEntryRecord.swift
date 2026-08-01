@@ -17,14 +17,14 @@ enum HydrationDrinkType: String, CaseIterable {
 
 @Model
 final class HydrationEntryRecord {
-    @Attribute(.unique) var id: UUID
-    private(set) var drinkTypeRaw: String
+    var id: UUID = UUID()
+    private(set) var drinkTypeRaw: String = HydrationDrinkType.water.rawValue
     private(set) var customName: String?
-    private(set) var volumeMillilitres: Int
-    private(set) var occurredAt: Date
-    private(set) var isCaloric: Bool
-    private(set) var createdAt: Date
-    private(set) var updatedAt: Date
+    private(set) var volumeMillilitres: Int = 500
+    private(set) var occurredAt: Date = Date.now
+    private(set) var isCaloric: Bool = false
+    private(set) var createdAt: Date = Date.now
+    private(set) var updatedAt: Date = Date.now
 
     init(
         id: UUID = UUID(),

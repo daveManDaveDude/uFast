@@ -30,7 +30,7 @@ enum HydrationEntryValidator {
         guard isValid(volumeMillilitres: volumeMillilitres) else { return nil }
         if let allowedRange {
             guard allowedRange.contains(occurredAt),
-                  occurredAt < calendar.startOfDay(for: now)
+                  occurredAt <= now
             else { return nil }
         } else {
             guard occurredAt <= now,

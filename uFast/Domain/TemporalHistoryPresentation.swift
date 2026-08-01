@@ -62,6 +62,61 @@ struct TemporalFormattingContext: Sendable {
     let timeZone: TimeZone
 }
 
+/// Separates the day being drawn during carousel motion from the date exposed
+/// to controls and assistive technologies. The latter changes only when the
+/// shared History selection settles.
+struct TemporalHistoryDayPresentation: Equatable, Sendable {
+    let visualDay: Date
+    let settledDay: Date
+
+    init(settledDay: Date, liveDay: Date?, calendar: Calendar) {
+        self.settledDay = calendar.startOfDay(for: settledDay)
+        visualDay = calendar.startOfDay(for: liveDay ?? settledDay)
+    }
+}
+
+enum TemporalMidnightMarkerLayout {
+    static func labelCenterX(
+        markerX: Double,
+        labelWidth: Double,
+        availableWidth: Double,
+        layoutDirection: TemporalHorizontalLayoutDirection
+    ) -> Double {
+        let halfWidth = labelWidth / 2
+        let offset = layoutDirection == .rightToLeft ? -halfWidth : halfWidth
+        return min(
+            max(halfWidth, markerX + offset),
+            max(halfWidth, availableWidth - halfWidth)
+        )
+    }
+}
+
+struct TemporalMidnightMarkerText: Equatable, Sendable {
+    let localDate: String
+    let localTime: String
+
+    init(date: Date, context: TemporalFormattingContext) {
+        localDate = date.formatted(
+            Date.FormatStyle(
+                date: .omitted,
+                time: .omitted,
+                locale: context.locale,
+                calendar: context.calendar,
+                timeZone: context.timeZone
+            ).day().month(.abbreviated)
+        )
+        localTime = date.formatted(
+            Date.FormatStyle(
+                date: .omitted,
+                time: .shortened,
+                locale: context.locale,
+                calendar: context.calendar,
+                timeZone: context.timeZone
+            )
+        )
+    }
+}
+
 enum TemporalDaySelectionSource: Equatable, Sendable {
     case initial
     case dateChip
@@ -70,6 +125,7 @@ enum TemporalDaySelectionSource: Equatable, Sendable {
     case datePicker
     case accessibility
     case timeline
+    case dateRailSettlement
 }
 
 struct TemporalDaySelectionChange: Equatable, Sendable {
@@ -157,6 +213,12 @@ struct TemporalDaySpaceProgress: Equatable, Sendable {
     let trailingDay: Date
     let fraction: Double
     let lowerPageStride: Double
+
+    /// The local-calendar day visually under the viewport centre. A seam belongs
+    /// to the day being entered so reversal immediately restores the prior day.
+    var centeredCalendarDay: Date {
+        fraction < 0.5 ? leadingDay : trailingDay
+    }
 
     static func resolve(
         contentOffset: Double,
@@ -625,6 +687,87 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
 }
 
 enum TemporalHistoryPresentation {
+    /// Resolves a manual rail only after native scrolling is idle.  Geometry is
+    /// already expressed in the visual coordinate space, so this is identical
+    /// in LTR and RTL; the caller supplies visual chip midpoints.
+    static func settledRailDay(
+        chipMidpoints: [Date: Double],
+        viewportMidpoint: Double,
+        availableDays: [Date],
+        maximumDate: Date,
+        calendar: Calendar
+    ) -> Date? {
+        guard viewportMidpoint.isFinite else { return nil }
+        let maximumDay = calendar.startOfDay(for: maximumDate)
+        var candidate: Date?
+        var candidateDistance = Double.infinity
+        for date in availableDays {
+            guard date <= maximumDay,
+                  let midpoint = chipMidpoints[date], midpoint.isFinite
+            else { continue }
+            let distance = abs(midpoint - viewportMidpoint)
+            // At an exact visual midpoint, choose the later calendar day. This
+            // makes the seam deterministic in both layout directions.
+            if distance < candidateDistance
+                || (distance == candidateDistance && (candidate.map { date > $0 } ?? true))
+            {
+                candidate = date
+                candidateDistance = distance
+            }
+        }
+        return candidate
+    }
+
+    static func allowsHistoricalEntry(
+        at instant: Date,
+        now: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let targetDay = calendar.startOfDay(for: instant)
+        let today = calendar.startOfDay(for: now)
+        return targetDay < today || (targetDay == today && instant <= now)
+    }
+
+    /// The read-only portion of a ribbon.  The range is presentation-only and
+    /// uses absolute instants after deriving local-day boundaries with Calendar.
+    static func futureShadingInterval(
+        for window: TemporalRibbonWindow,
+        now: Date,
+        calendar: Calendar
+    ) -> DateInterval? {
+        let today = calendar.startOfDay(for: now)
+        if window.selectedDay > today {
+            return window.interval
+        }
+        guard window.selectedDay == today else { return nil }
+        let start = max(now, window.interval.start)
+        guard start < window.interval.end else { return nil }
+        return DateInterval(start: start, end: window.interval.end)
+    }
+
+    static func twoHourMarkers(
+        in window: TemporalRibbonWindow,
+        calendar: Calendar
+    ) -> [Date] {
+        var markers = Set(window.midnightMarkers)
+        // Generate each local boundary via Calendar. Missing spring-forward
+        // hours yield no boundary; Calendar's deterministic resolution avoids
+        // inventing a duplicate during autumn fallback.
+        for hour in stride(from: 0, through: 22, by: 2) {
+            var components = calendar.dateComponents([.era, .year, .month, .day], from: window.selectedDay)
+            components.hour = hour
+            components.minute = 0
+            components.second = 0
+            if let date = calendar.date(from: components),
+               date >= window.interval.start,
+               date < window.interval.end
+            {
+                markers.insert(date)
+            }
+        }
+        return markers.sorted()
+    }
+
     static func settledCarouselDay(
         centeredPage: Date?,
         currentSelection: Date,

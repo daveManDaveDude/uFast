@@ -9,10 +9,10 @@ struct FoodEntryRecordSnapshot {
 
 @Model
 final class FoodEntryRecord {
-    @Attribute(.unique) var id: UUID
-    private(set) var foodDescription: String
-    private(set) var occurredAt: Date
-    private(set) var isCaloric: Bool
+    var id: UUID = UUID()
+    private(set) var foodDescription: String = ""
+    private(set) var occurredAt: Date = Date.now
+    private(set) var isCaloric: Bool = true
     private(set) var energyKilocalories: Double?
     private(set) var proteinGrams: Double?
     private(set) var carbohydrateGrams: Double?
@@ -20,8 +20,8 @@ final class FoodEntryRecord {
     private(set) var fibreGrams: Double?
     private(set) var sugarGrams: Double?
     private(set) var saltGrams: Double?
-    private(set) var createdAt: Date
-    private(set) var updatedAt: Date
+    private(set) var createdAt: Date = Date.now
+    private(set) var updatedAt: Date = Date.now
 
     init(
         id: UUID = UUID(),

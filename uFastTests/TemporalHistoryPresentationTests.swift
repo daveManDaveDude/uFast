@@ -561,6 +561,155 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertNil(progress.upperTranslation(measuredChipStride: 0))
     }
 
+    func testCenteredCalendarDayChangesAtTheMidnightSeamAndReversesImmediately() throws {
+        let calendar = try londonCalendar()
+        let leading = try date(2026, 7, 21, 0, calendar: calendar)
+        let trailing = try XCTUnwrap(
+            TemporalHistoryPresentation.adjacentDay(
+                to: leading,
+                direction: 1,
+                calendar: calendar
+            )
+        )
+
+        for (fraction, expected) in [
+            (0.0, leading),
+            (0.4999, leading),
+            (0.5, trailing),
+            (0.5001, trailing),
+            (1.0, trailing),
+            (0.4999, leading),
+        ] {
+            XCTAssertEqual(
+                TemporalDaySpaceProgress(
+                    leadingDay: leading,
+                    trailingDay: trailing,
+                    fraction: fraction,
+                    lowerPageStride: 320
+                ).centeredCalendarDay,
+                expected
+            )
+        }
+    }
+
+    func testAccessibleHistoryDayRemainsSettledWhileLivePresentationCrossesMidnight() throws {
+        let calendar = try londonCalendar()
+        let settled = try date(2026, 12, 31, 12, calendar: calendar)
+        let live = try date(2027, 1, 1, 12, calendar: calendar)
+
+        let moving = TemporalHistoryDayPresentation(
+            settledDay: settled,
+            liveDay: live,
+            calendar: calendar
+        )
+        XCTAssertEqual(moving.visualDay, calendar.startOfDay(for: live))
+        XCTAssertEqual(moving.settledDay, calendar.startOfDay(for: settled))
+
+        let settledPresentation = TemporalHistoryDayPresentation(
+            settledDay: live,
+            liveDay: nil,
+            calendar: calendar
+        )
+        XCTAssertEqual(settledPresentation.visualDay, calendar.startOfDay(for: live))
+        XCTAssertEqual(settledPresentation.settledDay, calendar.startOfDay(for: live))
+    }
+
+    func testMidnightMarkerUsesLocaleAwareTimeAndMirrorsLabelPlacement() throws {
+        let calendar = try londonCalendar()
+        let midnight = try date(2026, 7, 22, 0, calendar: calendar)
+        let british = TemporalMidnightMarkerText(
+            date: midnight,
+            context: TemporalFormattingContext(
+                locale: Locale(identifier: "en_GB"),
+                calendar: calendar,
+                timeZone: calendar.timeZone
+            )
+        )
+        let american = TemporalMidnightMarkerText(
+            date: midnight,
+            context: TemporalFormattingContext(
+                locale: Locale(identifier: "en_US"),
+                calendar: calendar,
+                timeZone: calendar.timeZone
+            )
+        )
+
+        XCTAssertTrue(british.localTime.hasSuffix(":00"))
+        XCTAssertFalse(british.localTime.localizedCaseInsensitiveContains("AM"))
+        XCTAssertTrue(american.localTime.contains("12"))
+        XCTAssertTrue(american.localTime.localizedCaseInsensitiveContains("AM"))
+        XCTAssertEqual(
+            TemporalMidnightMarkerLayout.labelCenterX(
+                markerX: 100,
+                labelWidth: 128,
+                availableWidth: 600,
+                layoutDirection: .leftToRight
+            ),
+            164
+        )
+        XCTAssertEqual(
+            TemporalMidnightMarkerLayout.labelCenterX(
+                markerX: 100,
+                labelWidth: 128,
+                availableWidth: 600,
+                layoutDirection: .rightToLeft
+            ),
+            64
+        )
+    }
+
+    @MainActor
+    func testCoupledPresentationPublishesLiveDayOnlyAtASeamAndClearsAtSettlement() throws {
+        let calendar = try londonCalendar()
+        let leading = try date(2026, 12, 31, 0, calendar: calendar)
+        let trailing = try XCTUnwrap(
+            TemporalHistoryPresentation.adjacentDay(
+                to: leading,
+                direction: 1,
+                calendar: calendar
+            )
+        )
+        let presentation = TemporalCoupledScrollPresentation()
+
+        presentation.handle(.preview(.init(
+            leadingDay: leading,
+            trailingDay: trailing,
+            fraction: 0.4999,
+            lowerPageStride: 320
+        )))
+        XCTAssertEqual(presentation.liveCenteredDay, leading)
+        presentation.handle(.preview(.init(
+            leadingDay: leading,
+            trailingDay: trailing,
+            fraction: 0.5,
+            lowerPageStride: 320
+        )))
+        XCTAssertEqual(presentation.liveCenteredDay, trailing)
+        presentation.handle(.preview(.init(
+            leadingDay: leading,
+            trailingDay: trailing,
+            fraction: 0.4999,
+            lowerPageStride: 320
+        )))
+        XCTAssertEqual(presentation.liveCenteredDay, leading)
+
+        presentation.handle(.end)
+        XCTAssertNil(presentation.preview)
+        XCTAssertNil(presentation.liveCenteredDay)
+    }
+
+    func testCalendarDayWindowOwnsItsLeadingMidnightMarkerExactlyOnce() throws {
+        let calendar = try londonCalendar()
+        let day = try date(2026, 3, 29, 12, calendar: calendar)
+        let window = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: day, calendar: calendar)
+        )
+
+        XCTAssertEqual(window.midnightMarkers, [window.interval.start])
+        XCTAssertTrue(try window.contains(XCTUnwrap(window.midnightMarkers.first)))
+        XCTAssertFalse(window.contains(window.interval.end))
+    }
+
     func testDaySpaceProgressPreservesCalendarNeighboursAcrossBoundariesAndDST() throws {
         let calendar = try londonCalendar()
         let pairs = try [
@@ -924,6 +1073,85 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertGreaterThan(wide.contentWidth, narrow.contentWidth)
         XCTAssertGreaterThan(accessible.contentWidth, narrow.contentWidth)
         XCTAssertGreaterThan(accessible.eventLaneHeight, narrow.eventLaneHeight)
+    }
+
+    func testRailSettlementUsesNearestVisualCentreAndDeterministicTieBreak() throws {
+        let calendar = try londonCalendar()
+        let first = try date(2026, 7, 22, 0, calendar: calendar)
+        let second = try date(2026, 7, 23, 0, calendar: calendar)
+        let third = try date(2026, 7, 24, 0, calendar: calendar)
+        let days = [first, second, third]
+        XCTAssertEqual(
+            TemporalHistoryPresentation.settledRailDay(
+                chipMidpoints: [first: 20, second: 100, third: 180],
+                viewportMidpoint: 110,
+                availableDays: days,
+                maximumDate: third,
+                calendar: calendar
+            ),
+            second
+        )
+        // Visual coordinates are authoritative, so the same result applies to
+        // an RTL rail whose chronological order is mirrored.
+        XCTAssertEqual(
+            TemporalHistoryPresentation.settledRailDay(
+                chipMidpoints: [first: 180, second: 100, third: 20],
+                viewportMidpoint: 110,
+                availableDays: days,
+                maximumDate: third,
+                calendar: calendar
+            ),
+            second
+        )
+        XCTAssertEqual(
+            TemporalHistoryPresentation.settledRailDay(
+                chipMidpoints: [first: 50, second: 150],
+                viewportMidpoint: 100,
+                availableDays: [first, second],
+                maximumDate: second,
+                calendar: calendar
+            ),
+            second
+        )
+    }
+
+    func testTodayEntryEligibilityFutureShadingAndTwoHourRulesUseCalendar() throws {
+        let calendar = try londonCalendar()
+        let now = try date(2026, 3, 29, 10, 30, calendar: calendar)
+        XCTAssertTrue(
+            TemporalHistoryPresentation.allowsHistoricalEntry(at: now, now: now, calendar: calendar)
+        )
+        XCTAssertTrue(
+            TemporalHistoryPresentation.allowsHistoricalEntry(
+                at: now.addingTimeInterval(-1), now: now, calendar: calendar
+            )
+        )
+        XCTAssertFalse(
+            TemporalHistoryPresentation.allowsHistoricalEntry(
+                at: now.addingTimeInterval(1), now: now, calendar: calendar
+            )
+        )
+        let today = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: now, calendar: calendar)
+        )
+        XCTAssertEqual(
+            TemporalHistoryPresentation.futureShadingInterval(for: today, now: now, calendar: calendar)?.start,
+            now
+        )
+        let future = try date(2026, 3, 30, 12, calendar: calendar)
+        let futureWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: future, calendar: calendar)
+        )
+        XCTAssertEqual(
+            TemporalHistoryPresentation.futureShadingInterval(
+                for: futureWindow, now: now, calendar: calendar
+            ),
+            futureWindow.interval
+        )
+        let markers = TemporalHistoryPresentation.twoHourMarkers(in: today, calendar: calendar)
+        XCTAssertFalse(markers.contains { calendar.component(.hour, from: $0) == 1 })
+        XCTAssertTrue(markers.contains { calendar.component(.hour, from: $0) == 2 })
+        XCTAssertEqual(Set(markers).count, markers.count)
     }
 
     private func londonCalendar() throws -> Calendar {

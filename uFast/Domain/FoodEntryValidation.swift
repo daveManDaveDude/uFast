@@ -120,7 +120,7 @@ enum FoodEntryValidator {
             ) else {
                 return .failure(.outsideSelectedRange)
             }
-            guard occurredAt < calendar.startOfDay(for: now) else {
+            guard occurredAt <= now else {
                 return .failure(.futureTime)
             }
         } else {

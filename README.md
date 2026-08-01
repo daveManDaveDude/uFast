@@ -63,15 +63,25 @@ make deploy-iphones
 Override the configured set when needed with
 `DEVICE_IDS="<CoreDevice identifier> <CoreDevice identifier>" make deploy-iphones`.
 
+To create and upload a TestFlight build, run:
+
+```sh
+make testflight
+```
+
+This runs unit tests and lint, increments `CURRENT_PROJECT_VERSION`, archives a
+Release build, and uploads it to App Store Connect. Set
+`TESTFLIGHT_SKIP_CHECKS=1` only when the same revision has already passed those
+checks.
+
 The default test destination is `iPhone 17 Pro`. Override it when needed:
 
 ```sh
 make test SIMULATOR='platform=iOS Simulator,name=iPhone 17'
 ```
 
-Open `uFast.xcodeproj` after `make bootstrap`. For a physical iPhone, select
-your Apple Developer team and replace the example bundle identifier in
-`project.yml`; simulator builds do not require signing.
+Open `uFast.xcodeproj` after `make bootstrap`. The project is configured for
+the uFast Apple Developer identity; simulator builds do not require signing.
 
 ### Environment verified for OW-000
 

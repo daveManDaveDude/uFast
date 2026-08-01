@@ -24,10 +24,10 @@ struct FastRecordProvenanceSnapshot: Equatable, Sendable {
 
 @Model
 final class FastRecord {
-    @Attribute(.unique) var id: UUID
-    private(set) var startDate: Date
+    var id: UUID = UUID()
+    private(set) var startDate: Date = Date.now
     private(set) var endDate: Date?
-    private(set) var goalHoursAtStart: Int
+    private(set) var goalHoursAtStart: Int = FastingGoal.default.hours
     private(set) var originRaw: String = FastOrigin.recorded.rawValue
     private(set) var reviewStateRaw: String = FastReviewState.confirmed.rawValue
     private(set) var wasAdjustedByUser: Bool = false

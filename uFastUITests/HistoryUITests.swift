@@ -34,6 +34,26 @@ final class HistoryUITests: XCTestCase {
     }
 
     @MainActor
+    func testHistoryPresentsAnActiveFastThroughTheCurrentTime() {
+        let app = XCUIApplication()
+        app.launchArguments = launchArguments(now: start, resetData: true)
+        app.launch()
+        completeOnboarding(in: app)
+        app.buttons["fast.start"].tap()
+
+        app.terminate()
+        app.launchArguments = launchArguments(now: start.addingTimeInterval(3600))
+        app.launch()
+        app.tabBars.buttons["History"].tap()
+
+        let activeFast = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Started fast")
+        ).firstMatch
+        XCTAssertTrue(activeFast.waitForExistence(timeout: 2))
+        XCTAssertTrue(activeFast.label.contains("end"))
+    }
+
+    @MainActor
     func testHistorySwipeButtonsAndDateChipShareOneSelectedDay() {
         let app = launchOnboardedHistory()
         app.tabBars.buttons["History"].tap()
@@ -67,7 +87,7 @@ final class HistoryUITests: XCTestCase {
     }
 
     @MainActor
-    func testManualDateRailScrollingRemainsIndependentFromSettledTimelineSelection() {
+    func testManualDateRailSettlementSelectsNearestCenteredChipAndSynchronizesTimeline() {
         let app = launchOnboardedHistory()
         app.tabBars.buttons["History"].tap()
 
@@ -80,16 +100,61 @@ final class HistoryUITests: XCTestCase {
 
         selectedChip.swipeRight(velocity: .slow)
 
-        XCTAssertEqual(selectedDate.label, originalSelection)
+        XCTAssertNotEqual(selectedDate.label, originalSelection)
+        let settledChip = app.buttons.matching(
+            NSPredicate(format: "value CONTAINS %@", "Selected")
+        ).firstMatch
+        XCTAssertTrue(settledChip.waitForExistence(timeout: 2))
+        XCTAssertEqual(settledChip.frame.midX, app.windows.firstMatch.frame.midX, accuracy: 6)
         XCTAssertTrue(app.buttons["history.next-day"].isEnabled)
-        XCTAssertEqual(
-            app.buttons.matching(
-                NSPredicate(format: "identifier BEGINSWITH %@", "temporal.date.")
-            ).matching(
-                NSPredicate(format: "value == %@", "Selected")
-            ).count,
-            1
+    }
+
+    @MainActor
+    func testTodayAlternativeAllowsElapsedEntryWhileFutureHistoryRemainsReadOnly() {
+        let app = launchOnboardedHistory()
+        app.tabBars.buttons["History"].tap()
+
+        let add = app.buttons["history.add-at-selected-time"]
+        XCTAssertTrue(add.waitForExistence(timeout: 2))
+        add.tap()
+        XCTAssertTrue(app.navigationBars["Add to history"].waitForExistence(timeout: 2))
+        app.buttons["history.add.food"].tap()
+        let description = app.textFields["food.description"]
+        XCTAssertTrue(description.waitForExistence(timeout: 2))
+        description.tap()
+        description.typeText("Today lunch")
+        app.buttons["food.save"].tap()
+        XCTAssertTrue(app.staticTexts["Today lunch"].waitForExistence(timeout: 2))
+
+        app.buttons["history.next-day"].tap()
+        XCTAssertTrue(app.staticTexts["history.future-read-only"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["history.add-at-selected-time"].exists)
+    }
+
+    @MainActor
+    func testTomorrowIsFinalHistoryDisplayDay() throws {
+        let app = launchOnboardedHistory()
+        app.tabBars.buttons["History"].tap()
+        let today = Calendar.current.startOfDay(for: start)
+        let futureContextDay = try XCTUnwrap(
+            Calendar.current.date(
+                byAdding: .day,
+                value: 3,
+                to: today
+            )
         )
+        let futureContextChip = app.buttons[
+            "temporal.date.\(futureContextDay.timeIntervalSince1970)"
+        ]
+        XCTAssertTrue(futureContextChip.waitForExistence(timeout: 2))
+        XCTAssertFalse(futureContextChip.isEnabled)
+
+        for _ in 0 ..< 1 {
+            XCTAssertTrue(app.buttons["history.next-day"].isEnabled)
+            app.buttons["history.next-day"].tap()
+        }
+        XCTAssertFalse(app.buttons["history.next-day"].isEnabled)
+        XCTAssertTrue(app.staticTexts["history.future-read-only"].exists)
     }
 
     @MainActor
@@ -261,6 +326,44 @@ final class HistoryUITests: XCTestCase {
         dragStart.press(forDuration: 0.1, thenDragTo: dragEnd)
         XCTAssertTrue(addAlternative.isHittable)
         captureScreenshot(named: "history-dark-accessibility-en-US", in: app)
+    }
+
+    @MainActor
+    func testMidnightMarkerRemainsVisibleAtAccessibilityTextSizeInLTRAndRTL() {
+        let configurations: [(name: String, arguments: [String])] = [
+            (
+                "en-GB-ltr",
+                [
+                    "-AppleLocale", "en_GB",
+                    "-UIPreferredContentSizeCategoryName",
+                    "UICTContentSizeCategoryAccessibilityXXXL",
+                ]
+            ),
+            (
+                "ar-rtl",
+                [
+                    "-AppleLanguages", "(ar)",
+                    "-AppleLocale", "ar_SA",
+                    "-UIPreferredContentSizeCategoryName",
+                    "UICTContentSizeCategoryAccessibilityXXXL",
+                ]
+            ),
+        ]
+
+        for configuration in configurations {
+            let app = launchOnboardedHistory(
+                additionalArguments: configuration.arguments
+            )
+            app.tabBars.buttons["History"].tap()
+            XCTAssertTrue(app.staticTexts["history.selected-date"].waitForExistence(timeout: 2))
+            app.buttons["history.previous-day"].tap()
+            XCTAssertTrue(app.otherElements["history.day-carousel"].exists)
+            captureScreenshot(
+                named: "history-midnight-marker-accessibility-\(configuration.name)",
+                in: app
+            )
+            app.terminate()
+        }
     }
 
     @MainActor

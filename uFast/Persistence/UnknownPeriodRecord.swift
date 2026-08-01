@@ -20,16 +20,16 @@ enum UnknownPeriodReason: String, Equatable, Sendable {
 
 @Model
 final class UnknownPeriodRecord {
-    @Attribute(.unique) var id: UUID
-    private(set) var startDate: Date
-    private(set) var endDate: Date
-    private(set) var startBoundaryKindRaw: String
-    private(set) var startBoundaryID: UUID
-    private(set) var endBoundaryKindRaw: String
-    private(set) var endBoundaryID: UUID
-    private(set) var reasonRaw: String
-    private(set) var createdAt: Date
-    private(set) var updatedAt: Date
+    var id: UUID = UUID()
+    private(set) var startDate: Date = Date.now
+    private(set) var endDate: Date = Date.now
+    private(set) var startBoundaryKindRaw: String = CaloricBoundaryKind.food.rawValue
+    private(set) var startBoundaryID: UUID = UUID()
+    private(set) var endBoundaryKindRaw: String = CaloricBoundaryKind.food.rawValue
+    private(set) var endBoundaryID: UUID = UUID()
+    private(set) var reasonRaw: String = UnknownPeriodReason.insufficientEvidence.rawValue
+    private(set) var createdAt: Date = Date.now
+    private(set) var updatedAt: Date = Date.now
 
     init(
         id: UUID = UUID(),

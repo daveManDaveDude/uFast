@@ -4,6 +4,7 @@
 # Xcode build products and local user state
 .derived-data/
 .derived-data-device/
+.testflight-archives/
 DerivedData/
 build/
 *.xcresult
@@ -28,6 +29,10 @@ uFast.xcodeproj/
 
 # Coverage and profiling output
 *.profdata
+*.trace/
 
 # Local inspection output.
 tmp/
+
+# Generated review exports (screenshots, recordings, traces and test results).
+artifacts/review-*/

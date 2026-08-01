@@ -2,12 +2,16 @@
 
 ## Terms
 
-- **Fast:** a user-recorded or user-confirmed interval, not proof of a biological state.
+- **Fast:** a user-recorded interval or an automatic caloric-event gap, not
+  proof of a biological state.
 - **Caloric event:** an event that counts as a fasting boundary. Food events
   always qualify; hydration follows the user's explicit classification.
-- **Recorded fast:** explicitly started or entered by the user.
-- **Reconstructed fast:** proposed from confirmed boundaries and saved after user confirmation.
-- **Unknown period:** time without enough trusted information to assert a fast.
+- **Recorded fast:** explicitly started by the user.
+- **Reconstructed fast:** a legacy interval proposed from confirmed boundaries
+  and saved after user confirmation before Slice 3.10.
+- **Unknown period:** legacy state saved by the former reconstruction workflow.
+- **Automatic fast:** a read-only interval derived between consecutive caloric
+  events more than eight absolute hours apart.
 
 ## Rules
 
@@ -48,3 +52,33 @@
   deleting or reclassifying one of its supporting boundary events, marks the
   affected reconstructed fast for review in the same persistent transaction.
   The app never silently rewrites or deletes the saved fast.
+- BR-22: After Slice 3.10 delivery, consecutive saved caloric events define an
+  automatic fast only when their absolute gap is strictly greater than eight
+  hours. Exactly eight hours or less is not a fast. Both events must exist; a
+  range edge, local-calendar boundary, missing record or current time is not a
+  caloric boundary.
+- BR-23: Automatic fasts are derived for presentation and are never separately
+  persisted, confirmed, adjusted or reviewed. A committed caloric-event change
+  recalculates affected automatic history; a failed or cancelled change does
+  not.
+- BR-24: History presents automatic and user-recorded fasts only when they
+  intersect the exact settled visible interval. Derivation includes the nearest
+  caloric event beyond each visible edge. A user-recorded fast takes
+  presentation precedence over an intersecting automatic fast.
+- BR-25: Starting a fast explicitly remains the only way to create a persisted
+  fasting record. History manual entry creates food or hydration events, not a
+  manually completed fast.
+- BR-26: App-created settings, fasts, food, hydration and legacy history records
+  use a local-first SwiftData store mirrored to the user’s private iCloud
+  database. Loss of network access or iCloud availability never blocks manual
+  use of the local store.
+- BR-27: **Delete all data** requires two explicit confirmations and deletes
+  every app-created record through the synced model context so the deletions
+  propagate to iCloud. It does not delete source data owned by Apple Health.
+
+## Slice 3.10 supersession
+
+When OW-391 through OW-396 are delivered, BR-09 through BR-11 and BR-18 through
+BR-21 remain documentation of the legacy reconstruction store only. They no
+longer govern new user journeys or writes. Legacy data follows D-024 and the
+OW-396 compatibility contract.

@@ -41,9 +41,18 @@ is shown.
 ## D-006 Storage
 
 - **Status:** Accepted
-- **Decision:** Store app-owned data on the local device only for MVP.
-- **Consequence:** SwiftData uses a local store with CloudKit disabled; there is
-  no account or cloud-sync dependency.
+- **Updated:** 29 July 2026
+- **Decision:** Store app-owned data in a local-first SwiftData store mirrored
+  through the user’s private iCloud database. Cloud sync requires no app-managed
+  account and does not block offline manual use. Settings provides **Delete all
+  data**, guarded by two explicit confirmations, which removes all app-created
+  records from the device and iCloud.
+- **Consequence:** SwiftData uses CloudKit mirroring and the app declares iCloud
+  plus remote-notification capabilities. The first CloudKit-enabled build uses
+  a new store as an accepted one-off reset; existing local-only records are not
+  migrated. CloudKit-incompatible uniqueness constraints are removed, while
+  UUID identity remains part of every record. Apple Health source data is never
+  deleted by this action.
 
 ## D-007 Minimum iOS
 
@@ -489,3 +498,71 @@ is shown.
   Previous/Next, chip and picker commands center their requested day. Geometry
   uses actual local-day durations across DST and does not divide calendar
   movement by 86,400. Persistence and record semantics do not change.
+
+## D-022 Live History presentation day
+
+- **Status:** Accepted
+- **Accepted:** 24 July 2026
+- **Decision:** While the lower History timeline is tracking, decelerating or
+  aligning, its visually presented day changes when the viewport centre crosses
+  a local-calendar midnight. This transient day drives only the visible
+  month/year heading, selected-day heading and presentation-only follower rail.
+  The shared selected date, detail filter, editor and repair targets,
+  accessibility selection and announcements change once only at native
+  settlement. The real upper rail remains hidden while its follower is active.
+- **Decision:** Derive this state from native scroll geometry and phases; do not
+  add custom velocity, physics, timers or display-link sampling. Midnight is a
+  Calendar boundary, never elapsed-time division by 86,400.
+- **Consequence:** Passing days read immediately without semantic selection
+  churn, and settled detail continues to use the exact visible interval.
+
+## D-023 History interaction polish
+
+- **Status:** Accepted
+- **Accepted:** 24 July 2026
+- **Decision:** A manual date-rail scroll selects exactly once at native idle:
+  the valid buffered chip nearest the visual viewport centre. That deliberate
+  selection aligns the lower timeline once without a feedback loop.
+  Programmatic alignment, lower coupling, interruption, initial layout and
+  buffer rebasing do not settle the rail. This supersedes the relevant
+  independent-manual-rail portions of D-016/D-019/D-022.
+- **Decision:** Empty points on completed days and Today through `clock.now`
+  may add food or drink after confirmation. Later Today instants and future
+  dates remain read-only; Today picker bounds end at now and service validation
+  remains final protection. This supersedes the prior Today-ineligible rule.
+- **Decision:** Future browsing ends at Today + 1 local-calendar day. Future
+  chips and timeline regions use quiet semantic colour in addition to explicit
+  read-only text and accessibility descriptions. Today shades after now; later
+  days shade fully. Timeline rules occur every two local-calendar hours while
+  labels remain 00:00, 06:00, 12:00 and 18:00. Calendar/TimeZone arithmetic,
+  never fixed 24-hour offsets, governs all boundaries and DST.
+
+## D-024 Automatic fast history
+
+- **Status:** Accepted target for Slice 3.10
+- **Accepted:** 24 July 2026
+- **Effective:** When OW-391 through OW-396 are delivered
+- **Decision:** Apart from an explicitly user-started fast, fasting history is
+  a read-only projection of consecutive saved caloric events. A gap counts as
+  an automatic fast only when it is strictly greater than eight absolute hours.
+  Exactly eight hours or less is not a fast. Food remains caloric, non-caloric
+  hydration does not split a gap and both boundary events must exist.
+- **Decision:** Automatic fasts are not persisted, confirmed, adjusted or
+  reviewed. Event changes recalculate the projection after a successful local
+  transaction. Remove **Review suggested fasting periods** and do not create new
+  reconstructed fast, unknown-period or needs-review state.
+- **Decision:** The History calendar and **Fasts in this view** use the same
+  exact settled visible interval. Fetching includes the nearest caloric
+  neighbour beyond each edge so crossing fasts remain visible. Food calendar
+  entries retain their saved description and present optional manual nutrition
+  details without estimation.
+- **Decision:** Keep **Start fast** and explicitly recorded fast history as the
+  sole persisted fasting exception. Keep the History **Add at selected time**
+  Food/Drink journey; do not add manual completed-fast creation there. A
+  user-recorded interval takes presentation precedence over an intersecting
+  automatic gap.
+- **Consequence:** BR-09 through BR-11 and BR-18 through BR-21 become legacy
+  reconstruction rules when this slice is delivered. Legacy rows are preserved
+  through a tested compatibility path rather than silently deleted. The
+  automatic-gap projector becomes the only source for new non-recorded fasting
+  history.

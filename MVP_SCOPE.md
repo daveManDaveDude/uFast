@@ -10,11 +10,14 @@
 - Water, tea, coffee and custom hydration events.
 - Food events are caloric; hydration events have an explicit
   caloric/non-caloric state.
-- Backdated entries and guided reconstruction of missing fasting history.
-- User confirmation and visible provenance for reconstructed fasts.
-- Unknown periods remain unknown.
+- Backdated food and hydration entry from History.
+- Automatic fasting history for consecutive caloric events more than eight
+  absolute hours apart, without a separate review or save step.
+- Fast history and supporting details scoped to the settled calendar view.
 - Read-only Apple Health weight and step count.
-- Local-first, offline manual use and deletion of app-created local data.
+- Local-first, offline manual use with private iCloud sync across installs and
+  devices.
+- Double-confirmed deletion of all app-created data from the device and iCloud.
 - Core accessibility, privacy policy and non-medical disclaimer.
 
 ## Out
@@ -23,7 +26,7 @@
 - AI food interpretation or generated nutrition.
 - Coaching, chat or recommendations.
 - Biological-stage claims.
-- Accounts, cloud sync or Apple Watch.
+- App-managed accounts or Apple Watch.
 - Social features, advertising, subscription or premium gates.
 - HealthKit write access.
 
@@ -34,6 +37,6 @@
 1.5. Fasting experience: establish the visual system and make the complete
    fasting loop calm, glanceable and recognisably uFast before expanding it.
 2. Today: manual food and hydration timeline.
-3. Catch-up: backdate and reconstruct with confirmation.
+3. History: backdate events and derive qualifying fasting gaps automatically.
 4. Progress: HealthKit weight and steps.
 5. Glanceability and quality: Live Activity, accessibility, privacy and reliability.

@@ -50,14 +50,14 @@ final class AffectedHistoryTests: XCTestCase {
         }
     }
 
-    func testFoodCreateInsideAndHydrationSupportingReclassificationInvalidateAtomically() throws {
+    func testEventMutationsRetainLegacyReconstructionState() throws {
         let fixture = try fixture()
         let foodRepository = SwiftDataFoodEntryRepository(modelContext: fixture.context)
         _ = try foodRepository.create(
             FoodEntryDraft(description: "Lunch", occurredAt: date(6)),
             at: date(30)
         )
-        XCTAssertEqual(fixture.first.reviewState, .needsReview)
+        XCTAssertEqual(fixture.first.reviewState, .confirmed)
         XCTAssertEqual(fixture.second.reviewState, .confirmed)
 
         let hydrationRepository = SwiftDataHydrationEntryRepository(modelContext: fixture.context)
@@ -69,11 +69,11 @@ final class AffectedHistoryTests: XCTestCase {
             isCaloric: false
         )
         try hydrationRepository.update(fixture.shared, with: nonCaloric, at: date(31))
-        XCTAssertEqual(fixture.first.reviewState, .needsReview)
-        XCTAssertEqual(fixture.second.reviewState, .needsReview)
+        XCTAssertEqual(fixture.first.reviewState, .confirmed)
+        XCTAssertEqual(fixture.second.reviewState, .confirmed)
     }
 
-    func testSupportingFoodEditAndHydrationDeleteInvalidateAllDirectReferences() throws {
+    func testEventEditAndDeleteRetainLegacyReconstructionState() throws {
         let foodFixture = try fixture()
         let start = try XCTUnwrap(
             foodFixture.context.fetch(FetchDescriptor<FoodEntryRecord>())
@@ -84,14 +84,14 @@ final class AffectedHistoryTests: XCTestCase {
             with: .init(description: "Corrected dinner", occurredAt: date(1)),
             at: date(31)
         )
-        XCTAssertEqual(foodFixture.first.reviewState, .needsReview)
+        XCTAssertEqual(foodFixture.first.reviewState, .confirmed)
         XCTAssertEqual(foodFixture.second.reviewState, .confirmed)
 
         let hydrationFixture = try fixture()
         try SwiftDataHydrationEntryRepository(modelContext: hydrationFixture.context)
             .delete(hydrationFixture.shared)
-        XCTAssertEqual(hydrationFixture.first.reviewState, .needsReview)
-        XCTAssertEqual(hydrationFixture.second.reviewState, .needsReview)
+        XCTAssertEqual(hydrationFixture.first.reviewState, .confirmed)
+        XCTAssertEqual(hydrationFixture.second.reviewState, .confirmed)
         XCTAssertTrue(try hydrationFixture.context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
     }
 
@@ -181,7 +181,7 @@ final class AffectedHistoryTests: XCTestCase {
         XCTAssertEqual(fixture.second.reviewState, .confirmed)
     }
 
-    func testD013CombinedSuccessCommitsEventFastCompletionAndEveryInvalidation() throws {
+    func testD013CombinedSuccessCommitsEventAndFastCompletionWithoutLegacyMutation() throws {
         let fixture = try fixture()
         let active = FastRecord(startDate: date(25), goalAtStart: .default)
         fixture.context.insert(active)
@@ -202,8 +202,8 @@ final class AffectedHistoryTests: XCTestCase {
         )
         XCTAssertEqual(fixture.shared.draft, moved)
         XCTAssertEqual(active.endDate, moved.occurredAt)
-        XCTAssertEqual(fixture.first.reviewState, .needsReview)
-        XCTAssertEqual(fixture.second.reviewState, .needsReview)
+        XCTAssertEqual(fixture.first.reviewState, .confirmed)
+        XCTAssertEqual(fixture.second.reviewState, .confirmed)
     }
 
     func testUpdatedEvidenceResolverCoversAvailableConflictMissingAndAmbiguous() {

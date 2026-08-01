@@ -45,16 +45,11 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
     func create(_ draft: FoodEntryDraft, at creationDate: Date) throws -> FoodEntryRecord {
         let record = FoodEntryRecord(draft: draft, createdAt: creationDate)
         modelContext.insert(record)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-
         do {
-            invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft))
             try failIfRequested()
             try modelContext.save()
             return record
         } catch {
-            invalidator.restore(invalidated)
             modelContext.delete(record)
             throw error
         }
@@ -70,16 +65,11 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         let previousGoal = activeFast.historicalGoal
         modelContext.insert(record)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-
         do {
-            invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft))
             try failIfRequested()
             try modelContext.save()
             return record
         } catch {
-            invalidator.restore(invalidated)
             activeFast.restoreActive(goal: previousGoal)
             modelContext.delete(record)
             throw error
@@ -93,15 +83,10 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
     ) throws {
         let previousSnapshot = record.snapshot
         record.update(from: draft, at: updateDate)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-
         do {
-            invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft))
             try failIfRequested()
             try modelContext.save()
         } catch {
-            invalidator.restore(invalidated)
             record.restore(from: previousSnapshot)
             throw error
         }
@@ -118,15 +103,10 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         let previousGoal = activeFast.historicalGoal
         record.update(from: draft, at: updateDate)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-
         do {
-            invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft))
             try failIfRequested()
             try modelContext.save()
         } catch {
-            invalidator.restore(invalidated)
             record.restore(from: previousSnapshot)
             activeFast.restoreActive(goal: previousGoal)
             throw error
@@ -146,15 +126,9 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
     }
 
     func delete(_ record: FoodEntryRecord) throws {
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        let invalidated = try invalidator.invalidate(
-            for: .deletion(CaloricBoundaryReference(kind: .food, id: record.id))
-        )
-
         do {
             try failIfRequested()
         } catch {
-            invalidator.restore(invalidated)
             throw error
         }
         modelContext.delete(record)
@@ -164,14 +138,6 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
             modelContext.rollback()
             throw error
         }
-    }
-
-    private func mutation(for id: UUID, draft: FoodEntryDraft) -> CaloricEventMutation {
-        CaloricEventMutation(
-            reference: CaloricBoundaryReference(kind: .food, id: id),
-            resultingOccurredAt: draft.occurredAt,
-            resultingIsCaloric: draft.isCaloric
-        )
     }
 
     private func failIfRequested() throws {

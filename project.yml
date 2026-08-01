@@ -1,6 +1,6 @@
 name: uFast
 options:
-  bundleIdPrefix: com.example
+  bundleIdPrefix: com.davidmcgrath
   createIntermediateGroups: true
   deploymentTarget:
     iOS: "26.0"
@@ -10,7 +10,7 @@ options:
 settings:
   base:
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 1
+    CURRENT_PROJECT_VERSION: 3
     DEVELOPMENT_TEAM: QY9XGBM7T5
     ENABLE_USER_SCRIPT_SANDBOXING: true
     GENERATE_INFOPLIST_FILE: true
@@ -26,14 +26,25 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.uFast
+        PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFast
         PRODUCT_NAME: uFast
         SUPPORTS_MACCATALYST: false
         TARGETED_DEVICE_FAMILY: "1"
+    entitlements:
+      path: uFast/SupportingFiles/uFast.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.davidmcgrath.uFast
+        com.apple.developer.icloud-services:
+          - CloudKit
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.davidmcgrath.uFast
     info:
       path: uFast/SupportingFiles/Info.plist
       properties:
         CFBundleDisplayName: uFast
+        ITSAppUsesNonExemptEncryption: false
+        UIBackgroundModes:
+          - remote-notification
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -52,7 +63,7 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.uFastTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFastTests
   uFastUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -63,5 +74,5 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.uFastUITests
+        PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFastUITests
         TEST_TARGET_NAME: uFast

@@ -3,9 +3,9 @@ import SwiftData
 
 @Model
 final class AppSettingsRecord {
-    @Attribute(.unique) var id: UUID
-    var fastingGoalHours: Int
-    var hasCompletedOnboarding: Bool
+    var id: UUID = UUID()
+    var fastingGoalHours: Int = FastingGoal.default.hours
+    var hasCompletedOnboarding: Bool = false
     var waterFavouriteMillilitres: Int = 500
     var teaFavouriteMillilitres: Int = 300
     var coffeeFavouriteMillilitres: Int = 300

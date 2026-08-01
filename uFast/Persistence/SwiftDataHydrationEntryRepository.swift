@@ -34,10 +34,8 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     func create(_ draft: HydrationEntryDraft, at creationDate: Date) throws -> HydrationEntryRecord {
         let record = makeRecord(draft, creationDate)
         modelContext.insert(record)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-        do { invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft)); try save(); return record }
-        catch { invalidator.restore(invalidated); modelContext.delete(record); throw error }
+        do { try save(); return record }
+        catch { modelContext.delete(record); throw error }
     }
 
     func create(_ draft: HydrationEntryDraft, at creationDate: Date, ending activeFast: FastRecord, goal: FastingGoal) throws -> HydrationEntryRecord {
@@ -45,29 +43,23 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
         let previousGoal = activeFast.historicalGoal
         modelContext.insert(record)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-        do { invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft)); try save(); return record }
-        catch { invalidator.restore(invalidated); activeFast.restoreActive(goal: previousGoal); modelContext.delete(record); throw error }
+        do { try save(); return record }
+        catch { activeFast.restoreActive(goal: previousGoal); modelContext.delete(record); throw error }
     }
 
     func update(_ record: HydrationEntryRecord, with draft: HydrationEntryDraft, at updateDate: Date) throws {
         let old = record.draft; let oldUpdatedAt = record.updatedAt
         record.update(from: draft, at: updateDate)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-        do { invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft)); try save() }
-        catch { invalidator.restore(invalidated); record.update(from: old, at: oldUpdatedAt); throw error }
+        do { try save() }
+        catch { record.update(from: old, at: oldUpdatedAt); throw error }
     }
 
     func update(_ record: HydrationEntryRecord, with draft: HydrationEntryDraft, at updateDate: Date, ending activeFast: FastRecord, goal: FastingGoal) throws {
         let old = record.draft; let oldUpdatedAt = record.updatedAt; let previousGoal = activeFast.historicalGoal
         record.update(from: draft, at: updateDate)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        var invalidated: [InvalidatedFast] = []
-        do { invalidated = try invalidator.invalidate(for: mutation(for: record.id, draft: draft)); try save() }
-        catch { invalidator.restore(invalidated); record.update(from: old, at: oldUpdatedAt); activeFast.restoreActive(goal: previousGoal); throw error }
+        do { try save() }
+        catch { record.update(from: old, at: oldUpdatedAt); activeFast.restoreActive(goal: previousGoal); throw error }
     }
 
     func activeFast() throws -> FastRecord? {
@@ -81,10 +73,8 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     }
 
     func delete(_ record: HydrationEntryRecord) throws {
-        let invalidator = SwiftDataHistoryInvalidator(modelContext: modelContext)
-        let invalidated = try invalidator.invalidate(for: .deletion(.init(kind: .hydration, id: record.id)))
         do { try failIfRequested() }
-        catch { invalidator.restore(invalidated); throw error }
+        catch { throw error }
         modelContext.delete(record)
         do { try modelContext.save() }
         catch { modelContext.rollback(); throw error }
@@ -92,14 +82,6 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
 
     private func makeRecord(_ draft: HydrationEntryDraft, _ createdAt: Date) -> HydrationEntryRecord {
         HydrationEntryRecord(type: draft.type, customName: draft.customName, volumeMillilitres: draft.volumeMillilitres, occurredAt: draft.occurredAt, isCaloric: draft.isCaloric, createdAt: createdAt)
-    }
-
-    private func mutation(for id: UUID, draft: HydrationEntryDraft) -> CaloricEventMutation {
-        CaloricEventMutation(
-            reference: .init(kind: .hydration, id: id),
-            resultingOccurredAt: draft.occurredAt,
-            resultingIsCaloric: draft.isCaloric
-        )
     }
 
     private func save() throws {

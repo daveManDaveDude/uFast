@@ -11,12 +11,15 @@ struct UFastApp: App {
 
     init() {
         clock = AppClockConfiguration.clock()
+        let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
 
         do {
-            modelContainer = try PersistenceContainer.make()
+            modelContainer = try PersistenceContainer.make(
+                cloudSyncEnabled: !isUITesting
+            )
             try resetDataIfRequested(in: modelContainer)
         } catch {
-            fatalError("Unable to create the local persistence container: \(error)")
+            fatalError("Unable to create the persistence container: \(error)")
         }
     }
 

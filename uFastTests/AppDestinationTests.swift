@@ -2,10 +2,10 @@
 import XCTest
 
 final class AppDestinationTests: XCTestCase {
-    func testFoundationExposesFourPrimaryDestinationsInProductOrder() {
+    func testFoundationExposesThreePrimaryDestinationsInProductOrder() {
         XCTAssertEqual(
             AppDestination.allCases,
-            [.today, .history, .progress, .settings]
+            [.today, .history, .settings]
         )
     }
 
