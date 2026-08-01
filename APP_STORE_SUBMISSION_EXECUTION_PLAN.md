@@ -33,6 +33,9 @@ owner, and where work must pause for a user hand-off.
   attached to the iOS 1.0 App Store version and is marked Ready to Submit.
   The existing uFast Internal group contains build 5 and shows it as Testing;
   no external testers were added.
+- App Privacy is now published. App Store Connect shows the public policy URL
+  `https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md` and the
+  disclosure “Data Not Collected.”
 - App Store Connect inspection also found the following owner decisions still
   unset: subtitle, primary/secondary category, age rating, content-rights
   declaration and EU Digital Services Act trader status. The standard Apple
@@ -42,10 +45,9 @@ owner, and where work must pause for a user hand-off.
 
 ### Important current limitations
 
-- The checked-in privacy and support documents are not yet guaranteed to be
-  public. The app links to the GitHub main branch, so those links must be
-  verified after the release commit is merged or the documents are published
-  at another stable HTTPS host.
+- The privacy URL is published and points to the GitHub main branch. The
+  support URL and the merged main-branch availability of SUPPORT.md still need
+  a final public-link check.
 - The signed Release archive for build 5 has been inspected for bundle ID,
   version, build number, target family, and app-level capabilities. The archive
   upload succeeded and App Store Connect processing is complete.
@@ -261,10 +263,10 @@ The intended privacy answer remains “No, we do not collect data from this app�
 only if the final archive and all integrated dependencies support that answer.
 Re-check after the signed archive audit.
 
-Current App Store Connect UI state: App Privacy still shows Get Started, and
-the App Information page still has unset subtitle, category, age rating,
-content-rights declaration and EU Digital Services Act trader status. These
-are owner/legal decisions and remain intentionally untouched.
+Current App Store Connect UI state: App Privacy is published with “Data Not
+Collected.” The App Information page still has unset subtitle, category, age
+rating, content-rights declaration and EU Digital Services Act trader status.
+These are owner/legal decisions and remain intentionally untouched.
 
 ### 7. Create the final product page and screenshots
 
