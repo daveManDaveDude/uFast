@@ -4,7 +4,7 @@
 **Repository:** daveManDaveDude/uFast  
 **Release branch:** codex/release-1.0  
 **Release code commit:** 8d1a5fd (Refactor storage and privacy model for local-only release)
-**Plan commit:** 2c2a4fd (Add App Store submission execution plan)
+**Plan commit:** see `git log` for the current release-execution update
 **Target:** uFast 1.0.0, build 5 for the first production/TestFlight upload
 
 This document covers the work remaining after REL-001 to REL-008. It records
@@ -16,7 +16,9 @@ owner, and where work must pause for a user hand-off.
 ### Completed and evidenced
 
 - REL-001 to REL-008 are complete in the pushed release branch.
-- The branch is clean and tracks origin/codex/release-1.0.
+- The branch tracks origin/codex/release-1.0. The upload script has advanced
+  `CURRENT_PROJECT_VERSION` to 5; that release-number change and this execution
+  evidence are pending commit.
 - The app was built, installed and launched on dave’s iPhone (iPhone 17 Pro
   Max, paired and connected).
 - The app is local-only: no CloudKit/iCloud entitlement, account, backend,
@@ -27,8 +29,10 @@ owner, and where work must pause for a user hand-off.
 - The App Store Connect account contains a uFast app record in iOS 1.0
   “Prepare for Submission” and an internal TestFlight group named uFast
   Internal. Safari is now authenticated and the record is accessible.
-- The App Store Connect 1.0 version currently shows 0 screenshots and no build
-  attached. The first upload has not been sent.
+- App Store Connect accepted version 1.0.0 build 5 after processing. Build 5 is
+  attached to the iOS 1.0 App Store version and is marked Ready to Submit.
+  The existing uFast Internal group contains build 5 and shows it as Testing;
+  no external testers were added.
 - App Store Connect inspection also found the following owner decisions still
   unset: subtitle, primary/secondary category, age rating, content-rights
   declaration and EU Digital Services Act trader status. The standard Apple
@@ -42,9 +46,11 @@ owner, and where work must pause for a user hand-off.
   public. The app links to the GitHub main branch, so those links must be
   verified after the release commit is merged or the documents are published
   at another stable HTTPS host.
-- No signed Release archive has been inspected yet.
-- No build from this pushed commit has been uploaded and processed in
-  TestFlight yet.
+- The signed Release archive for build 5 has been inspected for bundle ID,
+  version, build number, target family, and app-level capabilities. The archive
+  upload succeeded and App Store Connect processing is complete.
+- TestFlight build 5 is available to the existing internal group, but the
+  processed TestFlight install/smoke test has not yet been performed.
 - Physical-device deployment is complete, but the full resilience and
   accessibility matrix has not been signed off.
 - App Store screenshots are not complete. The automated History evidence below
@@ -66,8 +72,8 @@ account is signed in. Work must pause and return to the account owner for:
 
 Uploading the signed app binary to Apple is also an external data transfer. It
 requires the user to explicitly authorize that specific upload immediately
-before it is attempted. A failed or rejected upload request does not mean that
-any binary was sent.
+before it is attempted. The user explicitly authorized build 5 on 1 August
+2026; the upload completed successfully and Apple processed the package.
 
 When a hand-off is required, the user should take control of Safari, complete
 the step, return control, and tell Codex exactly what was completed. Never put
@@ -139,7 +145,7 @@ agreements or change security-sensitive account configuration.
 
 **Owner:** Codex after explicit upload authorization, with user hand-off if
 Apple prompts
-**Status:** stopped before upload; explicit authorization required
+**Status:** complete for archive/upload; App Store Connect processing succeeded
 
 Before upload, run:
 
@@ -164,8 +170,10 @@ The script reads marketing version 1.0.0, increments the current build from 4
 to 5, archives a signed Release build, exports it using
 scripts/testflight-export-options.plist, and submits it to App Store Connect.
 
-The upload attempt was stopped before execution because it would transmit the
-signed release artifact to Apple. No binary was uploaded.
+The user explicitly authorized the upload in chat immediately before execution.
+The script archived, exported and uploaded version 1.0.0 build 5 successfully.
+App Store Connect later showed the upload as Complete and the processed build
+as Ready to Submit.
 
 Expected hand-offs:
 
@@ -174,7 +182,8 @@ Expected hand-offs:
   user to fix the Apple Developer account.
 - Do not bypass signing warnings or upload a differently configured build.
 - After a successful upload, commit and push the build-number change before
-  treating build 5 as the release candidate.
+  treating build 5 as the release candidate. This is the remaining local git
+  bookkeeping for this step.
 
 Archive evidence to save:
 
@@ -184,26 +193,44 @@ Archive evidence to save:
 - effective entitlements with no iCloud, CloudKit, ubiquity or remote-push
   capability;
 - privacy report, linked frameworks and required-reason API findings;
-- export/upload output and the App Store Connect processing result.
+- export/upload output and the App Store Connect processing result: archive
+  `.testflight-archives/uFast-1.0.0-5.xcarchive`; upload succeeded at 12:10
+  London time; App Store Connect status Complete; TestFlight status Ready to
+  Submit.
+
+The archive's app plist contains no iCloud, CloudKit, ubiquity, HealthKit,
+ActivityKit or remote-notification declarations. Xcode's automatically managed
+development provisioning profile still contains legacy iCloud/ubiquity profile
+keys even though the app's signed capability payload is empty/invalid and the
+app does not use those services. Apple accepted and processed this upload; keep
+this signing detail in the final release review rather than silently enabling
+any capability.
 
 ### 5. Configure TestFlight
 
 **Owner:** Codex after sign-in, with user confirmation for invitations or
 external distribution  
-**Status:** existing internal group found; new build not processed
+**Status:** build 5 processed and attached to the existing internal group;
+Test Information and smoke test remain
 
 After build 5 finishes processing:
 
 1. Inspect the processed build for warnings, missing symbols and compliance
    issues.
 2. Enter concise Test Information and What to Test notes.
-3. Add build 5 to the existing uFast Internal group.
+3. Add build 5 to the existing uFast Internal group. **Completed:** the group
+   now contains 3 builds and build 5 is marked Testing with two existing
+   internal testers.
 4. Confirm the existing internal tester can see and install build 5.
 5. Run the smoke test on the processed TestFlight build: onboarding, Today,
    start/end/edit/delete fast, food, drink, History, Settings, Privacy and
    safety, and two-step Delete all data.
 6. Record any crash, processing warning or discrepancy before moving to
    submission.
+
+The Test Information page is currently blank (Beta App Description, feedback
+email, privacy URL and review notes). Fill it only after the release owner
+approves the final tester-facing copy and URLs.
 
 External TestFlight testing is optional for this release unless the release
 owner wants it. Do not invite additional testers or publish an external group
@@ -213,7 +240,7 @@ without the user explicitly choosing that audience.
 
 **Owner:** user for final decisions; Codex can fill ordinary fields after
 sign-in  
-**Status:** not verified
+**Status:** not verified; owner decisions and App Privacy remain
 
 Complete and review:
 
@@ -232,10 +259,16 @@ The intended privacy answer remains “No, we do not collect data from this app�
 only if the final archive and all integrated dependencies support that answer.
 Re-check after the signed archive audit.
 
+Current App Store Connect UI state: App Privacy still shows Get Started, and
+the App Information page still has unset subtitle, category, age rating,
+content-rights declaration and EU Digital Services Act trader status. These
+are owner/legal decisions and remain intentionally untouched.
+
 ### 7. Create the final product page and screenshots
 
 **Owner:** Codex can prepare assets/copy; user approves final marketing claims  
-**Status:** partially evidenced
+**Status:** partially evidenced; build 5 is attached but screenshots and final
+marketing copy remain
 
 Use only the shipped local-only feature set:
 
@@ -317,7 +350,7 @@ Repository: /Users/david/uFast
 Branch: codex/release-1.0
 Remote: origin/codex/release-1.0
 Release code commit: 8d1a5fd
-Current plan commit: 576d55d
+Current plan commit: see `git log` for the current release-execution update
 Plan: /Users/david/uFast/APP_STORE_SUBMISSION_EXECUTION_PLAN.md
 Release plan: /Users/david/uFast/MVP_APP_STORE_RELEASE_PLAN.md
 
@@ -326,20 +359,21 @@ deployed to dave’s connected iPhone. No pre-release/TestFlight data needs to
 be retained and no migration is required.
 
 Continue from the execution plan. Use the computer-use skill with Safari for
-App Store Connect/TestFlight. The Safari session previously expired at
-https://appstoreconnect.apple.com/login, so first inspect the current Safari
-state. If Apple asks for a password, passkey, 2FA code, CAPTCHA, agreement,
+App Store Connect/TestFlight. The Safari session is now authenticated, so
+first inspect the current Safari state. If Apple asks for a password, passkey,
+2FA code, CAPTCHA, agreement,
 security-sensitive account change, or final submission, stop and ask me to
 take over at that exact step. Never ask me to paste credentials into chat.
 
 After I sign in, inspect the existing uFast app record and the existing
 internal TestFlight group named “uFast Internal”. Then:
 
-1. Run the release checks and ./scripts/upload_testflight.sh. The script should
-   create signed version 1.0.0 build 5, unless the current project build number
-   has already advanced; verify before uploading.
+1. Confirm the committed project build number and archive evidence for signed
+   version 1.0.0 build 5. The upload is already complete; do not upload another
+   build without asking me first.
 2. Inspect processing, configure TestFlight notes, and attach the processed
-   build to the internal group. Do not invite external testers without asking.
+   build to the internal group. Build 5 is already attached and Testing. Do not
+   invite external testers without asking.
 3. Complete only truthful App Store Connect metadata, App Privacy, age rating,
    export compliance and privacy/support URLs. Ask me for decisions that are
    legal, account-specific or marketing-sensitive.
@@ -360,7 +394,8 @@ public URLs, metadata, accessibility QA or final submission remains unverified.
 The release is ready to submit only when all of the following have evidence:
 
 - signed Release archive and final entitlements audited;
-- build 5 processed successfully in TestFlight;
+- build 5 processed successfully in TestFlight and is attached to the internal
+  group;
 - internal TestFlight smoke test passed;
 - physical-device and accessibility QA passed or accepted with no blocker;
 - privacy and support URLs work without login;
