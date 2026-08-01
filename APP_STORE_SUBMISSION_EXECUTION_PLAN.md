@@ -36,10 +36,12 @@ owner, and where work must pause for a user hand-off.
 - App Privacy is now published. App Store Connect shows the public policy URL
   `https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md` and the
   disclosure “Data Not Collected.”
-- App Store Connect inspection also found the following owner decisions still
-  unset: subtitle, primary/secondary category, age rating, content-rights
-  declaration and EU Digital Services Act trader status. The standard Apple
-  license agreement is present. These must not be guessed or silently accepted.
+- App Information now has subtitle “Fast & Hydration Tracking App,” primary
+  category Health & Fitness, secondary category Lifestyle, and completed age
+  ratings (9+ in 172 countries with regional exceptions). Content-rights
+  declaration and EU Digital Services Act trader status remain unset. The
+  standard Apple license agreement is present. These account/legal fields must
+  not be guessed or silently accepted.
 - No pre-release/TestFlight data needs to be retained. No migration is
   required; do not add a data migration to this release.
 
@@ -244,7 +246,8 @@ without the user explicitly choosing that audience.
 
 **Owner:** user for final decisions; Codex can fill ordinary fields after
 sign-in  
-**Status:** not verified; owner decisions and App Privacy remain
+**Status:** partially complete; content rights, DSA status, export answers and
+version metadata remain
 
 Complete and review:
 
@@ -264,9 +267,10 @@ only if the final archive and all integrated dependencies support that answer.
 Re-check after the signed archive audit.
 
 Current App Store Connect UI state: App Privacy is published with “Data Not
-Collected.” The App Information page still has unset subtitle, category, age
-rating, content-rights declaration and EU Digital Services Act trader status.
-These are owner/legal decisions and remain intentionally untouched.
+Collected.” App Information has the saved subtitle, Health & Fitness /
+Lifestyle categories and age-rating result. Content Rights still shows “Set Up
+Content Rights Information”; Digital Services Act still shows “Set Up.” The
+TestFlight Test Information form is open and blank for owner-approved copy.
 
 ### 7. Create the final product page and screenshots
 
