@@ -29,6 +29,10 @@ owner, and where work must pause for a user hand-off.
   Internal. Safari is now authenticated and the record is accessible.
 - The App Store Connect 1.0 version currently shows 0 screenshots and no build
   attached. The first upload has not been sent.
+- App Store Connect inspection also found the following owner decisions still
+  unset: subtitle, primary/secondary category, age rating, content-rights
+  declaration and EU Digital Services Act trader status. The standard Apple
+  license agreement is present. These must not be guessed or silently accepted.
 - No pre-release/TestFlight data needs to be retained. No migration is
   required; do not add a data migration to this release.
 
@@ -87,6 +91,12 @@ Apple credentials or 2FA codes in chat or in the repository.
 
 Do not upload a build while the in-app privacy link is broken or points to
 unpublished content.
+
+The current App Store Connect 1.0 form also has blank promotional text,
+description, keywords, support URL, marketing URL, copyright, screenshots,
+build selection and App Review notes. These are ordinary release inputs that
+can be prepared from the repository, but the user must approve the final
+public copy and legal/account answers before they are saved.
 
 ### 2. Sign in to App Store Connect
 
