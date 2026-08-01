@@ -45,7 +45,7 @@ make lint
 ```
 
 The 1.0 release baseline is iPhone-only, targets iOS 26.0, uses bundle ID
-`com.davidmcgrath.uFast`, and is versioned from `project.yml` as 1.0.0 (build 4).
+`com.davidmcgrath.uFast`, and is versioned from `project.yml` as 1.0.0 (build 5).
 It has no account, cloud sync, backup, restore, HealthKit, Live Activity,
 notification or analytics dependency. Deleting the app may remove its local
 data; uFast does not provide recovery.
