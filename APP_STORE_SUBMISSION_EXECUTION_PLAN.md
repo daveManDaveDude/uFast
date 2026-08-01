@@ -306,7 +306,8 @@ We are continuing the uFast App Store submission task.
 Repository: /Users/david/uFast
 Branch: codex/release-1.0
 Remote: origin/codex/release-1.0
-Pushed commit: 8d1a5fd
+Release code commit: 8d1a5fd
+Current plan commit: 576d55d
 Plan: /Users/david/uFast/APP_STORE_SUBMISSION_EXECUTION_PLAN.md
 Release plan: /Users/david/uFast/MVP_APP_STORE_RELEASE_PLAN.md
 
