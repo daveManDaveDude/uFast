@@ -55,6 +55,9 @@ owner, and where work must pause for a user hand-off.
   upload succeeded and App Store Connect processing is complete.
 - TestFlight build 5 is available to the existing internal group, but the
   processed TestFlight install/smoke test has not yet been performed.
+- TestFlight Test Information is now saved with the beta description, feedback
+  email, published privacy URL, reviewer contact details and no-sign-in review
+  notes. The optional marketing URL remains blank.
 - Physical-device deployment is complete, but the full resilience and
   accessibility matrix has not been signed off.
 - App Store screenshots are not complete. The automated History evidence below
@@ -217,7 +220,7 @@ any capability.
 **Owner:** Codex after sign-in, with user confirmation for invitations or
 external distribution  
 **Status:** build 5 processed and attached to the existing internal group;
-Test Information and smoke test remain
+Test Information saved; processed-build smoke test remains
 
 After build 5 finishes processing:
 
@@ -234,9 +237,8 @@ After build 5 finishes processing:
 6. Record any crash, processing warning or discrepancy before moving to
    submission.
 
-The Test Information page is currently blank (Beta App Description, feedback
-email, privacy URL and review notes). Fill it only after the release owner
-approves the final tester-facing copy and URLs.
+The Test Information page is saved. Its optional marketing URL is blank; the
+release owner can add one later if desired.
 
 External TestFlight testing is optional for this release unless the release
 owner wants it. Do not invite additional testers or publish an external group
