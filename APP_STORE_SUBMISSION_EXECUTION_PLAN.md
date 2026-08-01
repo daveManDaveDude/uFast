@@ -33,28 +33,42 @@ owner, and where work must pause for a user hand-off.
   attached to the iOS 1.0 App Store version and is marked Ready to Submit.
   The existing uFast Internal group contains build 5 and shows it as Testing;
   no external testers were added.
-- App Store Connect inspection also found the following owner decisions still
-  unset: subtitle, primary/secondary category, age rating, content-rights
-  declaration and EU Digital Services Act trader status. The standard Apple
-  license agreement is present. These must not be guessed or silently accepted.
+- App Privacy is now published. App Store Connect shows the public policy URL
+  `https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md` and the
+  disclosure “Data Not Collected.”
+- App Information now has subtitle “Fast & Hydration Tracking App,” primary
+  category Health & Fitness, secondary category Lifestyle, and completed age
+  ratings (9+ in 172 countries with regional exceptions). Content-rights
+  declaration and EU Digital Services Act trader status remain unset. The
+  standard Apple license agreement is present. These account/legal fields must
+  not be guessed or silently accepted.
+- Five release screenshots have been generated from deterministic light-mode
+  UI states and uploaded to the iPhone 6.5-inch screenshot set for version 1.0:
+  Today with local entries, active fast, History, Privacy and Safety, and
+  onboarding. App Store Connect shows 5 of 10 screenshots, each 1284 × 2778
+  pixels. The large-text accessibility capture was not used.
 - No pre-release/TestFlight data needs to be retained. No migration is
   required; do not add a data migration to this release.
 
 ### Important current limitations
 
-- The checked-in privacy and support documents are not yet guaranteed to be
-  public. The app links to the GitHub main branch, so those links must be
-  verified after the release commit is merged or the documents are published
-  at another stable HTTPS host.
+- The privacy URL is published and points to the GitHub main branch. The
+  support URL and the merged main-branch availability of SUPPORT.md still need
+  a final public-link check.
 - The signed Release archive for build 5 has been inspected for bundle ID,
   version, build number, target family, and app-level capabilities. The archive
   upload succeeded and App Store Connect processing is complete.
 - TestFlight build 5 is available to the existing internal group, but the
   processed TestFlight install/smoke test has not yet been performed.
+- TestFlight Test Information is now saved with the beta description, feedback
+  email, published privacy URL, reviewer contact details and no-sign-in review
+  notes. The optional marketing URL remains blank.
 - Physical-device deployment is complete, but the full resilience and
   accessibility matrix has not been signed off.
-- App Store screenshots are not complete. The automated History evidence below
-  is useful for QA but is not, by itself, a complete App Store screenshot set.
+- The initial iPhone screenshot set is uploaded, but screenshot ordering and
+  the remaining optional display-size/localization sets have not been reviewed
+  in Media Manager. The uploaded set is the only one needed for the current
+  iPhone product page.
 
 ## Stop and hand-off rules
 
@@ -213,7 +227,7 @@ any capability.
 **Owner:** Codex after sign-in, with user confirmation for invitations or
 external distribution  
 **Status:** build 5 processed and attached to the existing internal group;
-Test Information and smoke test remain
+Test Information saved; processed-build smoke test remains
 
 After build 5 finishes processing:
 
@@ -230,9 +244,8 @@ After build 5 finishes processing:
 6. Record any crash, processing warning or discrepancy before moving to
    submission.
 
-The Test Information page is currently blank (Beta App Description, feedback
-email, privacy URL and review notes). Fill it only after the release owner
-approves the final tester-facing copy and URLs.
+The Test Information page is saved. Its optional marketing URL is blank; the
+release owner can add one later if desired.
 
 External TestFlight testing is optional for this release unless the release
 owner wants it. Do not invite additional testers or publish an external group
@@ -242,7 +255,8 @@ without the user explicitly choosing that audience.
 
 **Owner:** user for final decisions; Codex can fill ordinary fields after
 sign-in  
-**Status:** not verified; owner decisions and App Privacy remain
+**Status:** partially complete; content rights, DSA status and export answers
+remain
 
 Complete and review:
 
@@ -261,16 +275,18 @@ The intended privacy answer remains “No, we do not collect data from this app�
 only if the final archive and all integrated dependencies support that answer.
 Re-check after the signed archive audit.
 
-Current App Store Connect UI state: App Privacy still shows Get Started, and
-the App Information page still has unset subtitle, category, age rating,
-content-rights declaration and EU Digital Services Act trader status. These
-are owner/legal decisions and remain intentionally untouched.
+Current App Store Connect UI state: App Privacy is published with “Data Not
+Collected.” App Information has the saved subtitle, Health & Fitness /
+Lifestyle categories and age-rating result. Content Rights still shows “Set Up
+Content Rights Information”; Digital Services Act still shows “Set Up.” The
+TestFlight Test Information form and version 1.0 metadata are saved, including
+the reviewer notes and the selected build 5.
 
 ### 7. Create the final product page and screenshots
 
 **Owner:** Codex can prepare assets/copy; user approves final marketing claims  
-**Status:** partially evidenced; build 5 is attached but screenshots and final
-marketing copy remain
+**Status:** screenshots and version metadata saved; final marketing review
+remains
 
 Use only the shipped local-only feature set:
 
@@ -289,10 +305,24 @@ Screenshots must use fictional deterministic data, the exact release build,
 portrait iPhone dimensions accepted by App Store Connect, and no alpha channel.
 Captions must match the binary and the privacy policy.
 
+The current local screenshot candidates are in the ignored directory
+`artifacts/review-app-store-release/app-store-screenshots-build5/`:
+
+- `01-onboarding.png`
+- `02-today-local-entries.png`
+- `03-active-fast.png`
+- `04-history.png`
+- `05-privacy-and-safety.png`
+
+Each is 1284 × 2778 pixels. App Store Connect currently shows these five files
+in the iPhone 6.5-inch set. The first three uploaded are Today with local
+entries, active fast and History, so the installation-sheet screenshots show
+the core product flow; privacy and onboarding follow them.
+
 ### 8. Prepare App Review notes and submit
 
 **Owner:** user makes the final submission decision  
-**Status:** not ready
+**Status:** reviewer notes saved; not ready for final submission
 
 Reviewer notes should explain:
 
@@ -341,6 +371,20 @@ Visual review result:
 - The simulator required elevated host access; the initial sandboxed run
   failed because CoreSimulatorService could not access its host services.
 
+On 1 August 2026, a deterministic release-marketing UI test generated five
+light-mode iPhone 17 Pro Max captures from the shipped UI states. The test
+passed with 0 failures, the captures were visually reviewed, resized to the
+accepted 1284 × 2778 portrait format, and uploaded to App Store Connect:
+
+~~~text
+Executed 1 test, with 0 failures (0 unexpected) in 34.673 seconds
+** TEST SUCCEEDED **
+~~~
+
+The source test was temporary release support and was removed after export;
+the result bundle and exported candidates remain in the ignored review
+directory. No screenshot source change is pending in git.
+
 ## Clean-context continuation prompt
 
 Paste the following into a new Codex context:
@@ -379,9 +423,10 @@ internal TestFlight group named “uFast Internal”. Then:
 3. Complete only truthful App Store Connect metadata, App Privacy, age rating,
    export compliance and privacy/support URLs. Ask me for decisions that are
    legal, account-specific or marketing-sensitive.
-4. Generate or export release screenshots where feasible. Use fictional data,
-   the exact release binary and Apple-accepted iPhone dimensions. Do not use
-   the large-text accessibility screenshot as marketing material.
+4. Verify the five uploaded release screenshots in App Store Connect. Use
+   fictional data, the exact release binary and Apple-accepted iPhone
+   dimensions. Do not use the large-text accessibility screenshot as marketing
+   material or add another build just to regenerate screenshots.
 5. Prepare reviewer notes and stop immediately before Submit for Review unless
    I explicitly tell you to submit.
 
@@ -403,6 +448,6 @@ The release is ready to submit only when all of the following have evidence:
 - privacy and support URLs work without login;
 - App Store Connect metadata, age rating, App Privacy and export answers are
   complete and truthful;
-- screenshots and product copy match the shipped binary;
+- five uploaded screenshots and product copy match the shipped binary;
 - reviewer notes are ready;
 - the user has explicitly taken the final Submit for Review action.
