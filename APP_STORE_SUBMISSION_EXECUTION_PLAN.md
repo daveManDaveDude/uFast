@@ -42,6 +42,11 @@ owner, and where work must pause for a user hand-off.
   declaration and EU Digital Services Act trader status remain unset. The
   standard Apple license agreement is present. These account/legal fields must
   not be guessed or silently accepted.
+- Five release screenshots have been generated from deterministic light-mode
+  UI states and uploaded to the iPhone 6.5-inch screenshot set for version 1.0:
+  Today with local entries, active fast, History, Privacy and Safety, and
+  onboarding. App Store Connect shows 5 of 10 screenshots, each 1284 × 2778
+  pixels. The large-text accessibility capture was not used.
 - No pre-release/TestFlight data needs to be retained. No migration is
   required; do not add a data migration to this release.
 
@@ -60,8 +65,10 @@ owner, and where work must pause for a user hand-off.
   notes. The optional marketing URL remains blank.
 - Physical-device deployment is complete, but the full resilience and
   accessibility matrix has not been signed off.
-- App Store screenshots are not complete. The automated History evidence below
-  is useful for QA but is not, by itself, a complete App Store screenshot set.
+- The initial iPhone screenshot set is uploaded, but screenshot ordering and
+  the remaining optional display-size/localization sets have not been reviewed
+  in Media Manager. The uploaded set is the only one needed for the current
+  iPhone product page.
 
 ## Stop and hand-off rules
 
@@ -248,8 +255,8 @@ without the user explicitly choosing that audience.
 
 **Owner:** user for final decisions; Codex can fill ordinary fields after
 sign-in  
-**Status:** partially complete; content rights, DSA status, export answers and
-version metadata remain
+**Status:** partially complete; content rights, DSA status and export answers
+remain
 
 Complete and review:
 
@@ -272,13 +279,14 @@ Current App Store Connect UI state: App Privacy is published with “Data Not
 Collected.” App Information has the saved subtitle, Health & Fitness /
 Lifestyle categories and age-rating result. Content Rights still shows “Set Up
 Content Rights Information”; Digital Services Act still shows “Set Up.” The
-TestFlight Test Information form is open and blank for owner-approved copy.
+TestFlight Test Information form and version 1.0 metadata are saved, including
+the reviewer notes and the selected build 5.
 
 ### 7. Create the final product page and screenshots
 
 **Owner:** Codex can prepare assets/copy; user approves final marketing claims  
-**Status:** partially evidenced; build 5 is attached but screenshots and final
-marketing copy remain
+**Status:** screenshots and version metadata saved; final marketing review
+remains
 
 Use only the shipped local-only feature set:
 
@@ -297,10 +305,24 @@ Screenshots must use fictional deterministic data, the exact release build,
 portrait iPhone dimensions accepted by App Store Connect, and no alpha channel.
 Captions must match the binary and the privacy policy.
 
+The current local screenshot candidates are in the ignored directory
+`artifacts/review-app-store-release/app-store-screenshots-build5/`:
+
+- `01-onboarding.png`
+- `02-today-local-entries.png`
+- `03-active-fast.png`
+- `04-history.png`
+- `05-privacy-and-safety.png`
+
+Each is 1284 × 2778 pixels. App Store Connect currently shows these five files
+in the iPhone 6.5-inch set. The first three uploaded are Today with local
+entries, active fast and History, so the installation-sheet screenshots show
+the core product flow; privacy and onboarding follow them.
+
 ### 8. Prepare App Review notes and submit
 
 **Owner:** user makes the final submission decision  
-**Status:** not ready
+**Status:** reviewer notes saved; not ready for final submission
 
 Reviewer notes should explain:
 
@@ -349,6 +371,20 @@ Visual review result:
 - The simulator required elevated host access; the initial sandboxed run
   failed because CoreSimulatorService could not access its host services.
 
+On 1 August 2026, a deterministic release-marketing UI test generated five
+light-mode iPhone 17 Pro Max captures from the shipped UI states. The test
+passed with 0 failures, the captures were visually reviewed, resized to the
+accepted 1284 × 2778 portrait format, and uploaded to App Store Connect:
+
+~~~text
+Executed 1 test, with 0 failures (0 unexpected) in 34.673 seconds
+** TEST SUCCEEDED **
+~~~
+
+The source test was temporary release support and was removed after export;
+the result bundle and exported candidates remain in the ignored review
+directory. No screenshot source change is pending in git.
+
 ## Clean-context continuation prompt
 
 Paste the following into a new Codex context:
@@ -387,9 +423,10 @@ internal TestFlight group named “uFast Internal”. Then:
 3. Complete only truthful App Store Connect metadata, App Privacy, age rating,
    export compliance and privacy/support URLs. Ask me for decisions that are
    legal, account-specific or marketing-sensitive.
-4. Generate or export release screenshots where feasible. Use fictional data,
-   the exact release binary and Apple-accepted iPhone dimensions. Do not use
-   the large-text accessibility screenshot as marketing material.
+4. Verify the five uploaded release screenshots in App Store Connect. Use
+   fictional data, the exact release binary and Apple-accepted iPhone
+   dimensions. Do not use the large-text accessibility screenshot as marketing
+   material or add another build just to regenerate screenshots.
 5. Prepare reviewer notes and stop immediately before Submit for Review unless
    I explicitly tell you to submit.
 
@@ -411,6 +448,6 @@ The release is ready to submit only when all of the following have evidence:
 - privacy and support URLs work without login;
 - App Store Connect metadata, age rating, App Privacy and export answers are
   complete and truthful;
-- screenshots and product copy match the shipped binary;
+- five uploaded screenshots and product copy match the shipped binary;
 - reviewer notes are ready;
 - the user has explicitly taken the final Submit for Review action.
