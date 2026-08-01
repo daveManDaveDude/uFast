@@ -36,12 +36,21 @@ owner, and where work must pause for a user hand-off.
 - App Privacy is now published. App Store Connect shows the public policy URL
   `https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md` and the
   disclosure “Data Not Collected.”
+- Content Rights is complete. App Store Connect shows “No, this app does not
+  contain, show, or access third-party content.”
+- EU Digital Services Act compliance is complete. The Business page shows the
+  Digital Services Act as Active for 27 EU countries, last updated 1 August
+  2026. The account owner made the trader-status decision in Safari; this plan
+  does not copy the account’s private contact details or legal classification.
+- Export-compliance evidence is complete for build 5. App Store Connect Build
+  Metadata shows “App Uses Non-Exempt Encryption: No,” matching the committed
+  `ITSAppUsesNonExemptEncryption = false` declaration in `project.yml` and
+  `uFast/SupportingFiles/Info.plist`. No encryption documentation was uploaded.
 - App Information now has subtitle “Fast & Hydration Tracking App,” primary
   category Health & Fitness, secondary category Lifestyle, and completed age
-  ratings (9+ in 172 countries with regional exceptions). Content-rights
-  declaration and EU Digital Services Act trader status remain unset. The
-  standard Apple license agreement is present. These account/legal fields must
-  not be guessed or silently accepted.
+  ratings (9+ in 172 countries with regional exceptions). The standard Apple
+  license agreement is present. The Paid Apps Agreement remains New; uFast is a
+  free app with no in-app purchases, and no additional agreement was accepted.
 - Five release screenshots have been generated from deterministic light-mode
   UI states and uploaded to the iPhone 6.5-inch screenshot set for version 1.0:
   Today with local entries, active fast, History, Privacy and Safety, and
@@ -53,8 +62,9 @@ owner, and where work must pause for a user hand-off.
 ### Important current limitations
 
 - The privacy URL is published and points to the GitHub main branch. The
-  support URL and the merged main-branch availability of SUPPORT.md still need
-  a final public-link check.
+  support URL `https://github.com/daveManDaveDude/uFast/issues` was opened in
+  Safari and displayed the public GitHub Issues page without requiring login.
+  The privacy page was previously verified the same way.
 - The signed Release archive for build 5 has been inspected for bundle ID,
   version, build number, target family, and app-level capabilities. The archive
   upload succeeded and App Store Connect processing is complete.
@@ -64,7 +74,11 @@ owner, and where work must pause for a user hand-off.
   email, published privacy URL, reviewer contact details and no-sign-in review
   notes. The optional marketing URL remains blank.
 - Physical-device deployment is complete, but the full resilience and
-  accessibility matrix has not been signed off.
+  accessibility matrix has not been signed off. Remaining accessibility risk:
+  the deterministic large-text capture exposed oversized/clipped layout in the
+  shipped UI; it was not used in App Store screenshots. Perform a physical
+  device Dynamic Type/VoiceOver/reduced-motion check before submission and
+  record whether the clipping is acceptable or a release blocker.
 - The initial iPhone screenshot set is uploaded, but screenshot ordering and
   the remaining optional display-size/localization sets have not been reviewed
   in Media Manager. The uploaded set is the only one needed for the current
@@ -227,7 +241,8 @@ any capability.
 **Owner:** Codex after sign-in, with user confirmation for invitations or
 external distribution  
 **Status:** build 5 processed and attached to the existing internal group;
-Test Information saved; processed-build smoke test remains
+Test Information saved; build metadata inspected; processed-build smoke test
+remains
 
 After build 5 finishes processing:
 
@@ -244,6 +259,15 @@ After build 5 finishes processing:
 6. Record any crash, processing warning or discrepancy before moving to
    submission.
 
+Evidence from the signed-in App Store Connect session on 1 August 2026:
+
+- build 5 is `Validated`, version `1.0.0`, bundle ID
+  `com.davidmcgrath.uFast`, iPhone-only, with symbols included;
+- build 5 declares “App Uses Non-Exempt Encryption: No”;
+- the TestFlight build is `Ready to Submit`, attached to `uFast Internal`, with
+  two existing internal testers and no recorded installs, sessions, crashes or
+  feedback yet.
+
 The Test Information page is saved. Its optional marketing URL is blank; the
 release owner can add one later if desired.
 
@@ -255,8 +279,8 @@ without the user explicitly choosing that audience.
 
 **Owner:** user for final decisions; Codex can fill ordinary fields after
 sign-in  
-**Status:** partially complete; content rights, DSA status and export answers
-remain
+**Status:** ordinary metadata and required compliance fields complete; final
+internal smoke test and accessibility sign-off remain
 
 Complete and review:
 
@@ -277,10 +301,11 @@ Re-check after the signed archive audit.
 
 Current App Store Connect UI state: App Privacy is published with “Data Not
 Collected.” App Information has the saved subtitle, Health & Fitness /
-Lifestyle categories and age-rating result. Content Rights still shows “Set Up
-Content Rights Information”; Digital Services Act still shows “Set Up.” The
-TestFlight Test Information form and version 1.0 metadata are saved, including
-the reviewer notes and the selected build 5.
+Lifestyle categories, age-rating result and Content Rights answer. Business
+shows Digital Services Act compliance Active for 27 EU countries. Build 5
+metadata shows “App Uses Non-Exempt Encryption: No.” The TestFlight Test
+Information form and version 1.0 metadata are saved, including the reviewer
+notes and the selected build 5.
 
 ### 7. Create the final product page and screenshots
 
