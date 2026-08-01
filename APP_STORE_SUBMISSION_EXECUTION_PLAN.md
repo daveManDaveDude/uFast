@@ -3,7 +3,8 @@
 **Prepared:** 1 August 2026  
 **Repository:** daveManDaveDude/uFast  
 **Release branch:** codex/release-1.0  
-**Pushed commit:** 8d1a5fd (Refactor storage and privacy model for local-only release)  
+**Release code commit:** 8d1a5fd (Refactor storage and privacy model for local-only release)
+**Plan commit:** 2c2a4fd (Add App Store submission execution plan)
 **Target:** uFast 1.0.0, build 5 for the first production/TestFlight upload
 
 This document covers the work remaining after REL-001 to REL-008. It records
@@ -23,10 +24,11 @@ owner, and where work must pause for a user hand-off.
   configuration.
 - Automated baseline evidence: 171 unit tests, 61 UI tests, project
   generation, lint, build and make verify-local-only passed before this plan.
-- The App Store Connect account already contains a uFast app record and an
-  internal TestFlight group named uFast Internal. The current Safari session
-  reached that account, but it expired and Apple is currently showing the
-  App Store Connect sign-in page.
+- The App Store Connect account contains a uFast app record in iOS 1.0
+  “Prepare for Submission” and an internal TestFlight group named uFast
+  Internal. Safari is now authenticated and the record is accessible.
+- The App Store Connect 1.0 version currently shows 0 screenshots and no build
+  attached. The first upload has not been sent.
 - No pre-release/TestFlight data needs to be retained. No migration is
   required; do not add a data migration to this release.
 
@@ -58,6 +60,11 @@ account is signed in. Work must pause and return to the account owner for:
    identity answers where the account owner must make the decision;
 6. the final Submit for Review or Release action.
 
+Uploading the signed app binary to Apple is also an external data transfer. It
+requires the user to explicitly authorize that specific upload immediately
+before it is attempted. A failed or rejected upload request does not mean that
+any binary was sent.
+
 When a hand-off is required, the user should take control of Safari, complete
 the step, return control, and tell Codex exactly what was completed. Never put
 Apple credentials or 2FA codes in chat or in the repository.
@@ -84,7 +91,7 @@ unpublished content.
 ### 2. Sign in to App Store Connect
 
 **Owner:** user  
-**Status:** blocked on user sign-in
+**Status:** complete; authenticated App Store Connect record reached
 
 The current Safari tab is at:
 
@@ -98,8 +105,8 @@ User action:
 4. Stop at the App Store Connect home or uFast app page and tell Codex:
    “App Store Connect is signed in; continue.”
 
-After that hand-off, Codex can inspect the existing app record, internal group,
-build list and editable metadata using Computer Use.
+The existing app record, internal group, build list and editable metadata have
+been inspected using Computer Use.
 
 ### 3. Verify Apple Developer account readiness
 
@@ -120,8 +127,9 @@ agreements or change security-sensitive account configuration.
 
 ### 4. Run the release archive and upload workflow
 
-**Owner:** Codex after sign-in, with user hand-off if Apple prompts  
-**Status:** not run for build 5
+**Owner:** Codex after explicit upload authorization, with user hand-off if
+Apple prompts
+**Status:** stopped before upload; explicit authorization required
 
 Before upload, run:
 
@@ -135,7 +143,8 @@ make verify-local-only
 make deploy-iphone
 ~~~
 
-Then run the repository upload script:
+After the user explicitly authorizes sending the binary to Apple, run the
+repository upload script:
 
 ~~~sh
 ./scripts/upload_testflight.sh
@@ -144,6 +153,9 @@ Then run the repository upload script:
 The script reads marketing version 1.0.0, increments the current build from 4
 to 5, archives a signed Release build, exports it using
 scripts/testflight-export-options.plist, and submits it to App Store Connect.
+
+The upload attempt was stopped before execution because it would transmit the
+signed release artifact to Apple. No binary was uploaded.
 
 Expected hand-offs:
 
@@ -346,4 +358,3 @@ The release is ready to submit only when all of the following have evidence:
 - screenshots and product copy match the shipped binary;
 - reviewer notes are ready;
 - the user has explicitly taken the final Submit for Review action.
-
