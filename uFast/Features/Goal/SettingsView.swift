@@ -40,18 +40,33 @@ struct SettingsView: View {
                         }
                         .uFastCard(accent: UFastTheme.sage)
 
-                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                            Label("Private iCloud sync", systemImage: "icloud")
-                                .font(.headline)
-                                .foregroundStyle(UFastTheme.primary)
+                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                            UFastSectionHeading("Data on this iPhone")
                             Text(
-                                "Your uFast records sync through your private iCloud account "
-                                    + "and remain available after reinstalling the app."
+                                "uFast stores your fasts, food, drinks, settings and history "
+                                    + "locally in this app. There is no account, cloud sync, "
+                                    + "backup or restore."
                             )
+                            .font(.subheadline)
                             .foregroundStyle(UFastTheme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
+                            Text(
+                                "Deleting uFast or losing this iPhone may permanently remove "
+                                    + "your uFast data."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                            NavigationLink {
+                                PrivacySafetyView()
+                            } label: {
+                                Label("Privacy and safety", systemImage: "lock.shield")
+                            }
+                            .buttonStyle(UFastActionRowButtonStyle())
+                            .accessibilityIdentifier("settings.privacy-safety")
                         }
-                        .uFastCard()
+                        .uFastCard(accent: UFastTheme.sky)
 
                         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
                             UFastSectionHeading("Drink favourites")
@@ -75,7 +90,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
                             UFastSectionHeading("Your data")
                             Text(
-                                "Delete every uFast record from this device and iCloud. "
+                                "Delete every uFast record stored on this iPhone. "
                                     + "This cannot be undone."
                             )
                             .font(.subheadline)
@@ -133,7 +148,7 @@ struct SettingsView: View {
             } message: {
                 Text(
                     "This will remove your fasts, food, drinks, settings and history "
-                        + "from this device and iCloud."
+                        + "from this iPhone."
                 )
             }
             .alert(

@@ -1,10 +1,10 @@
 # uFast
 
 uFast is a calm, private iPhone companion for fasting, food, hydration and
-progress. Manual features work offline and app-owned health information stays
-on the device.
+history. Manual features work offline and app-created records stay on this
+iPhone in a local SwiftData store.
 
-OW-000 establishes the SwiftUI project shell, four primary destinations,
+OW-000 establishes the SwiftUI project shell, three primary destinations,
 SwiftData persistence, deterministic fixtures, test targets and repository
 guidance. Later stories supply user-facing behaviour.
 
@@ -43,6 +43,12 @@ make build
 make test
 make lint
 ```
+
+The 1.0 release baseline is iPhone-only, targets iOS 26.0, uses bundle ID
+`com.davidmcgrath.uFast`, and is versioned from `project.yml` as 1.0.0 (build 4).
+It has no account, cloud sync, backup, restore, HealthKit, Live Activity,
+notification or analytics dependency. Deleting the app may remove its local
+data; uFast does not provide recovery.
 
 To build, install and launch the latest code on one connected, unlocked iPhone:
 
@@ -109,3 +115,5 @@ the uFast Apple Developer identity; simulator builds do not require signing.
   accessibility rules and visual Definition of Done
 - `DECISIONS.md` — accepted product and architecture choices
 - `AGENTS.md` — repository map, commands and Definition of Done
+- `PRIVACY.md` — public-facing local-data and safety policy
+- `SUPPORT.md` — public-facing support and local-data limitations

@@ -151,6 +151,48 @@ final class FastingGoalUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsExplainsLocalStorageAndOpensPrivacySafety() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launch()
+        app.buttons["goal.continue"].tap()
+        app.tabBars.buttons["Settings"].tap()
+
+        let privacyLink = app.buttons["settings.privacy-safety"]
+        if !privacyLink.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.staticTexts["Data on this iPhone"].waitForExistence(timeout: 2))
+        XCTAssertTrue(privacyLink.isHittable)
+        privacyLink.tap()
+
+        XCTAssertTrue(app.staticTexts["screen-title.privacy-safety"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["What uFast stores"].exists)
+        XCTAssertTrue(app.staticTexts["Safety"].exists)
+        XCTAssertTrue(app.buttons["privacy.public-policy"].exists)
+    }
+
+    @MainActor
+    func testDeleteAllDataFailureKeepsSettingsAvailableAndShowsRetry() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-data", "--simulate-delete-all-failure"]
+        app.launch()
+        app.buttons["goal.continue"].tap()
+        app.tabBars.buttons["Settings"].tap()
+
+        let deleteAll = app.buttons["settings.data.delete-all"]
+        for _ in 0 ..< 4 where !deleteAll.isHittable {
+            app.swipeUp()
+        }
+        deleteAll.tap()
+        app.alerts["Delete all uFast data?"].buttons["Continue"].tap()
+        app.alerts["Permanently delete everything?"].buttons["Delete everything"].tap()
+
+        XCTAssertTrue(app.tabBars.buttons["Settings"].exists)
+        XCTAssertTrue(app.staticTexts["settings.data.delete-error"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     private func selectGoal(_ hours: Int, in app: XCUIApplication) {
         let option = app.buttons["goal.option.\(hours)"]
         XCTAssertTrue(option.waitForExistence(timeout: 2))

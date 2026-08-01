@@ -87,8 +87,8 @@ Later slices own:
 
 ### Persistence and architecture
 
-- Add SwiftData models to the explicit `PersistenceContainer.schema`; keep
-  CloudKit disabled.
+- Add SwiftData models to the explicit `PersistenceContainer.schema`; keep the
+  production store local-only with no CloudKit capability.
 - Use stable identifiers and `createdAt`/`updatedAt` instants. Editing updates
   the existing record rather than delete-and-recreate.
 - Store hydration volume in one canonical unit and format it for display. Do
@@ -194,7 +194,7 @@ trust while testing the under-20-second logging outcome.
 - Product outcome: basic food logging takes under 20 seconds.
 - MVP scope: text food with optional manual nutrition; local, offline and
   editable.
-- Decisions: D-003 manual optional nutrition and D-006 local-only storage.
+- Decisions: D-003 manual optional nutrition and D-025 local-only storage.
 - Visual contract: `UX_STYLE_GUIDE.md` and the shared Slice 2 contract above.
 - Existing shell: Today's fasting state remains the dominant content.
 
@@ -228,7 +228,7 @@ trust while testing the under-20-second logging outcome.
 
 ### Product rules
 
-BR-07, BR-12 and BR-15. D-003 and D-006. S2-D1 and S2-D5.
+BR-07, BR-12 and BR-15. D-003 and D-025. S2-D1 and S2-D5.
 
 ### Acceptance criteria
 

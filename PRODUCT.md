@@ -10,7 +10,8 @@ Enable a self-directed iPhone user to understand and maintain the shape of their
 
 ## Primary user
 
-A busy, self-directed adult who wants lightweight structure for weight-management habits, already has some weight or movement data in Apple Health, and sometimes forgets to log for several days.
+A busy, self-directed adult who wants lightweight structure for fasting, food and
+hydration records, and sometimes forgets to log for several days.
 
 ## Principles
 
@@ -30,6 +31,17 @@ A busy, self-directed adult who wants lightweight structure for weight-managemen
   events must remain distinguishable.
 - No subscriptions, premium gates or hidden commercial model.
 
+## MVP data boundary
+
+- uFast stores app-created fasting, food, hydration, settings and legacy history
+  records locally in its SwiftData store on this iPhone.
+- uFast has no account, cloud sync, backup, restore, analytics, advertising or
+  tracking in the 1.0 release.
+- A successful save remains available after relaunch, force-quit, backgrounding
+  and offline use. Losing the iPhone or deleting uFast may permanently lose the
+  local data.
+- The app does not read or write Apple Health in this release.
+
 ## MVP outcome tests
 
 - A new user sets a goal and records a first fast without help.
@@ -37,7 +49,7 @@ A busy, self-directed adult who wants lightweight structure for weight-managemen
 - Basic food logging takes under 20 seconds.
 - A user can repair three missed days by adding caloric events and see
   qualifying fasting gaps update automatically.
-- A user can explain what Apple Health data is read and why.
-- Core records survive relaunch, backgrounding and time-zone tests without loss or duplication.
-- App-created records return after reinstall when the user is signed into the
-  same iCloud account.
+- Core records survive relaunch, force-quit, backgrounding, offline use and
+  time-zone tests without loss or duplication.
+- A user can explain that the records remain on this iPhone and that uFast does
+  not provide backup or recovery after app deletion.

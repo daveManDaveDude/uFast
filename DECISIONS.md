@@ -38,21 +38,38 @@ is shown.
 - **Decision:** Read weight and steps from Apple Health; do not write them.
 - **Consequence:** HealthKit remains the source of truth for those samples.
 
-## D-006 Storage
+## D-006 Storage (superseded)
+
+- **Status:** Superseded 1 August 2026 by D-025 and D-026
+- **Historical decision:** The development branch briefly accepted a local-first
+  SwiftData store mirrored through private iCloud, with two-step deletion from
+  the device and iCloud.
+- **Historical consequence:** CloudKit and remote-notification configuration was
+  added for that pre-release experiment. It is not part of the 1.0 release.
+
+## D-025 Local-only 1.0 storage
 
 - **Status:** Accepted
-- **Updated:** 29 July 2026
-- **Decision:** Store app-owned data in a local-first SwiftData store mirrored
-  through the user’s private iCloud database. Cloud sync requires no app-managed
-  account and does not block offline manual use. Settings provides **Delete all
-  data**, guarded by two explicit confirmations, which removes all app-created
-  records from the device and iCloud.
-- **Consequence:** SwiftData uses CloudKit mirroring and the app declares iCloud
-  plus remote-notification capabilities. The first CloudKit-enabled build uses
-  a new store as an accepted one-off reset; existing local-only records are not
-  migrated. CloudKit-incompatible uniqueness constraints are removed, while
-  UUID identity remains part of every record. Apple Health source data is never
-  deleted by this action.
+- **Accepted:** 1 August 2026
+- **Decision:** Store every uFast-created record in one local SwiftData store in
+  the app’s protected container. uFast has no account, CloudKit, iCloud record
+  storage, backup, restore, export, import, analytics, advertising, tracking or
+  developer backend in 1.0.
+- **Consequence:** Relaunch, force-quit, backgrounding and offline use do not
+  discard a successfully saved record. Deleting uFast or losing the iPhone may
+  permanently lose its local data. Future sync or backup requires a new product,
+  privacy and App Review decision.
+
+## D-026 Pre-release data reset
+
+- **Status:** Accepted
+- **Accepted:** 1 August 2026
+- **Decision:** No pre-release TestFlight data needs to be retained. The named
+  development CloudKit data is disposable test data and is not migrated into
+  the 1.0 local store.
+- **Consequence:** 1.0 is tested from a clean local install. No public-user
+  records are silently abandoned; any future migration requires a separate
+  decision before public distribution.
 
 ## D-007 Minimum iOS
 

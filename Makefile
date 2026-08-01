@@ -5,7 +5,7 @@ SCHEME := uFast
 DERIVED_DATA := .derived-data
 SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
 
-.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint format clean
+.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint format verify-local-only clean
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -54,6 +54,9 @@ test-ui: project
 lint:
 	swiftformat uFast uFastTests uFastUITests --lint --cache ignore
 	DEVELOPER_DIR="$(DEVELOPER_DIR)" swiftlint lint --strict --no-cache
+
+verify-local-only:
+	./scripts/verify_local_only_release.sh
 
 format:
 	swiftformat uFast uFastTests uFastUITests --cache ignore

@@ -58,11 +58,12 @@ Future backup, sync or HealthKit work requires a new product decision,
 privacy review, App Review assessment and separately accepted story. It must
 not be quietly added during this release sprint.
 
-## 3. Current repository gap analysis
+## 3. Initial repository gap analysis
 
-This assessment covers the working tree inspected on 1 August 2026. The tree
-contains substantial uncommitted Slice 3/history and CloudKit work. Preserve
-that work and create a deliberate release baseline before changing storage.
+This assessment records the working tree inspected on 1 August 2026 before the
+REL-003 through REL-008 release changes. The initial tree contained substantial
+uncommitted Slice 3/history and CloudKit work. Preserve that historical context
+while using the completion statuses below as the current release state.
 
 | Area | Current evidence | MVP action |
 | --- | --- | --- |
@@ -164,6 +165,12 @@ or unsupported feature claim in the archive or listing.
 
 ### REL-001 — Freeze the release baseline (P0)
 
+**Status — complete (1 August 2026):** Baseline frozen on branch
+`codex/release-1.0`. The included baseline retains the existing manual fasting,
+food, hydration, catch-up and History flows, including the tested automatic and
+legacy-history presentation rules. Only release blockers and regression fixes
+were accepted after the freeze.
+
 **Work**
 
 - Review the large current worktree and decide which Slice 3.9/3.10 changes
@@ -182,6 +189,11 @@ or unsupported feature claim in the archive or listing.
 - No unfinished screen, test fixture or placeholder is visible to users.
 
 ### REL-002 — Decide treatment of pre-release CloudKit data (P0)
+
+**Status — complete (1 August 2026):** No pre-release TestFlight data needs to
+be retained. Development CloudKit data is disposable test data, is not
+migrated, and 1.0 is verified against a clean local SwiftData store. This is
+recorded as D-026 in `DECISIONS.md`.
 
 Removing the entitlement does not itself migrate records from the named
 CloudKit-backed local store into a new local store, and it does not necessarily
@@ -205,6 +217,12 @@ erase private CloudKit records already created during development.
   accepted because there are no public users.
 
 ### REL-003 — Remove CloudKit and iCloud from production (P0)
+
+**Status — complete (1 August 2026):** Production persistence is explicitly
+local-only, the obsolete entitlement and remote-notification configuration are
+gone, the project is regenerated from `project.yml`, and
+`make verify-local-only` passes. The built app has no iCloud/CloudKit/ubiquity
+entitlements.
 
 **Code/configuration changes**
 
@@ -247,6 +265,11 @@ erase private CloudKit records already created during development.
 
 ### REL-004 — Replace cloud UI with honest local-data UX (P0)
 
+**Status — complete (1 August 2026):** Settings now explains local storage,
+loss on app/iPhone loss, lack of account/cloud/backup/restore, two-step local
+deletion and the Privacy and safety destination. UI coverage includes the
+privacy route and simulated deletion failure.
+
 **Settings changes**
 
 - Remove the **Private iCloud sync** card.
@@ -274,6 +297,10 @@ erase private CloudKit records already created during development.
 
 ### REL-005 — Align product documentation (P0)
 
+**Status — complete (1 August 2026):** Product, scope, domain rules, decisions,
+backlog, README and current story references now describe the local-only 1.0
+boundary and defer cloud, backup, HealthKit and Live Activity capabilities.
+
 Update together:
 
 - `PRODUCT.md` — remove reinstall/iCloud outcome; replace with local relaunch
@@ -295,6 +322,12 @@ Update together:
   that 1.0 includes sync, backup, HealthKit or Live Activities.
 
 ### REL-006 — Add privacy and safety content (P0)
+
+**Status — engineering content complete (1 August 2026):** The in-app Privacy
+and safety screen plus repository `PRIVACY.md` and `SUPPORT.md` cover stored
+data, local location, no collection, deletion, lack of recovery, safety
+limits and support. Public URL availability after merging remains part of the
+external REL-011 work.
 
 **In-app content**
 
@@ -324,6 +357,12 @@ Update together:
 
 ### REL-007 — Settle app identity and archive configuration (P0)
 
+**Status — configuration complete (1 August 2026):** The generated build is
+iPhone-only with bundle ID `com.davidmcgrath.uFast`, marketing version `1.0.0`,
+build `4`, portrait orientation, iOS 26.0 deployment and non-exempt encryption
+set to false. Effective built Info.plist values were inspected; signed archive
+submission remains REL-010.
+
 **Work**
 
 - Confirm final name and perform App Store/company/trademark checks.
@@ -344,6 +383,12 @@ Update together:
   values.
 
 ### REL-008 — Complete automated release coverage (P0)
+
+**Status — complete (1 August 2026):** `make test-unit` passed 171 tests and
+`make test-ui` passed 61 tests on iPhone 17 Pro Simulator. `make project`,
+`make lint`, `make build` and `make verify-local-only` also pass. The History
+regressions found during this run were fixed, including recorded-fast
+accessibility semantics and automatic-fast/food-event identity collisions.
 
 Required automated scenarios:
 
@@ -594,19 +639,20 @@ The release owner marks every item complete before submission.
 
 ### Product and data
 
-- [ ] Included functionality is frozen and every visible route is complete.
-- [ ] Pre-release CloudKit data treatment is explicitly recorded.
-- [ ] Production persistence is local-only SwiftData.
-- [ ] No cloud, account, backup, import, export or recovery UI/claim exists.
-- [ ] Settings accurately warns about local-only data and possible loss.
-- [ ] Delete all local data passes both-confirmation and failure tests.
-- [ ] HealthKit and Live Activity promises are deferred everywhere.
+- [x] Included functionality is frozen and every visible route is complete.
+- [x] Pre-release CloudKit data treatment is explicitly recorded.
+- [x] Production persistence is local-only SwiftData.
+- [x] No cloud, account, backup, import, export or recovery UI/claim exists.
+- [x] Settings accurately warns about local-only data and possible loss.
+- [x] Delete all local data passes both-confirmation and failure tests.
+- [x] HealthKit and Live Activity promises are deferred everywhere.
 
 ### Binary and quality
 
 - [ ] Signed archive has no iCloud/CloudKit/ubiquity/remote-push entitlement.
-- [ ] Final archive identity, icons, version and deployment target are correct.
-- [ ] `make lint`, unit tests, UI tests and build pass from a clean checkout.
+- [x] Final build identity, icons, version and deployment target are correct;
+  signed archive inspection remains REL-010.
+- [x] `make lint`, unit tests, UI tests and build pass from the frozen baseline.
 - [ ] Physical-iPhone offline, relaunch, time-zone/DST and deletion tests pass.
 - [ ] VoiceOver and accessibility-size Larger Text core flows pass.
 - [ ] Privacy manifest/report, linked dependencies and App Privacy answers agree.
