@@ -16,9 +16,9 @@ owner, and where work must pause for a user hand-off.
 ### Completed and evidenced
 
 - REL-001 to REL-008 are complete in the pushed release branch.
-- The branch tracks origin/codex/release-1.0. The upload script has advanced
-  `CURRENT_PROJECT_VERSION` to 5; that release-number change and this execution
-  evidence are pending commit.
+- The branch tracks origin/codex/release-1.0. `CURRENT_PROJECT_VERSION` is 5,
+  and the release-number change plus this execution evidence are committed in
+  the pushed release branch.
 - The app was built, installed and launched on dave’s iPhone (iPhone 17 Pro
   Max, paired and connected).
 - The app is local-only: no CloudKit/iCloud entitlement, account, backend,
@@ -109,14 +109,16 @@ public copy and legal/account answers before they are saved.
 **Owner:** user  
 **Status:** complete; authenticated App Store Connect record reached
 
-The current Safari tab is at:
+The authenticated Safari session is currently in the uFast App Store Connect
+record. If the session has expired, reopen:
 
 https://appstoreconnect.apple.com/login
 
 User action:
 
-1. Take control of Safari.
-2. Sign in to the Apple Account that owns the uFast App Store Connect record.
+1. Take control of Safari if a re-authentication prompt appears.
+2. Sign in to the Apple Account that owns the uFast App Store Connect record
+   only if the session has expired.
 3. Complete passkey, password and 2FA steps yourself.
 4. Stop at the App Store Connect home or uFast app page and tell Codex:
    “App Store Connect is signed in; continue.”
