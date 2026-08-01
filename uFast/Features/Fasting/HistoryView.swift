@@ -110,10 +110,10 @@ struct HistoryView: View {
                                     .font(.caption.weight(.semibold))
                                     .tracking(1.2)
                                     .foregroundStyle(UFastTheme.secondaryText)
-                                Text("No fasts in this view")
+                                Text("No completed fasts")
                                     .font(.headline)
                                     .foregroundStyle(UFastTheme.primary)
-                                Text("Fasts appear automatically between caloric events more than eight hours apart.")
+                                Text("Completed fasts will appear here.")
                                     .font(.body)
                                     .foregroundStyle(UFastTheme.secondaryText)
                             }
@@ -124,9 +124,9 @@ struct HistoryView: View {
                             .accessibilityIdentifier("history.empty")
                         } else {
                             UFastIllustratedInformationCard(
-                                title: "No fasts in this view",
+                                title: "No completed fasts",
                                 eyebrow: "Fasts in this view",
-                                message: "Fasts appear automatically between caloric events more than eight hours apart."
+                                message: "Completed fasts will appear here."
                             ) {
                                 FastingBotanicalArtwork()
                             }
@@ -817,7 +817,8 @@ private struct VisibleFastItem: Identifiable {
 
     var title: String {
         switch kind {
-        case .recorded, .active: "Started fast"
+        case .recorded: "Recorded fast"
+        case .active: "Started fast"
         case .automatic: "Fast"
         case .previouslySaved: "Previously saved fast"
         }
@@ -836,11 +837,29 @@ private struct VisibleFastItem: Identifiable {
     }
 
     func detail(context _: TemporalFormattingContext) -> String {
-        "\(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute())) → \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute())) · \(ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate)))"
+        var components = [
+            "start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute())) → end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
+            "duration \(ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate)))",
+        ]
+        if kind == .recorded {
+            let goal = fast?.capturedHistoricalGoal ?? .default
+            components.append("goal \(goal.hours) hours")
+        }
+        return components.joined(separator: " · ")
     }
 
     func accessibilityLabel(context _: TemporalFormattingContext) -> String {
-        "\(title), start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute())), end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute())), duration \(ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate)))"
+        var components = [
+            title,
+            "start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
+            "end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
+            "duration \(ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate)))",
+        ]
+        if kind == .recorded {
+            let goal = fast?.capturedHistoricalGoal ?? .default
+            components.append("goal \(goal.hours) hours")
+        }
+        return components.joined(separator: ", ")
     }
 }
 

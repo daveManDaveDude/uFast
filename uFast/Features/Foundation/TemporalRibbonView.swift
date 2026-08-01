@@ -1280,7 +1280,7 @@ struct TemporalRibbonView: View {
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .accessibilityIdentifier("temporal.empty")
             } else {
-                ForEach(semanticOrder(intervals: visibleIntervals, events: visibleEvents), id: \.id) { item in
+                ForEach(semanticOrder(intervals: visibleIntervals, events: visibleEvents), id: \.semanticID) { item in
                     if item.isInterval, onSelectInterval == nil {
                         semanticRow(item, showsDisclosure: false)
                             .accessibilityElement(children: .ignore)
@@ -1342,6 +1342,7 @@ struct TemporalRibbonView: View {
         let intervalValues = intervals.map {
             SemanticItem(
                 id: $0.id,
+                semanticID: "interval-\($0.id.uuidString)",
                 date: $0.start,
                 title: $0.title,
                 detail: $0.detail,
@@ -1356,6 +1357,7 @@ struct TemporalRibbonView: View {
         let eventValues = events.map {
             SemanticItem(
                 id: $0.id,
+                semanticID: "event-\($0.id.uuidString)",
                 date: $0.occurredAt,
                 title: $0.title,
                 detail: $0.detail,
@@ -1484,6 +1486,7 @@ struct TemporalRibbonView: View {
 
 private struct SemanticItem: Identifiable {
     let id: UUID
+    let semanticID: String
     let date: Date
     let title: String
     let detail: String

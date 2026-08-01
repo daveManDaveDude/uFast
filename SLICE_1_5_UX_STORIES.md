@@ -256,7 +256,7 @@ and the beginning of the complete fasting journey.
 
 ### Product rules
 
-BR-01, BR-02, BR-05 and BR-15. D-002, D-006, D-008 and D-012.
+BR-01, BR-02, BR-05 and BR-15. D-002, D-008, D-012 and D-025.
 
 ### Acceptance criteria
 

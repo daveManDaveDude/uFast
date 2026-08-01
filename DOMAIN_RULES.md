@@ -28,8 +28,10 @@
 - BR-10: Insufficient or conflicting evidence remains unknown.
 - BR-11: Changing a boundary invalidates affected reconstructed history for review.
 - BR-12: Time-zone and daylight-saving changes preserve absolute instants.
-- BR-13: Apple Health weight and steps are read-only in MVP.
-- BR-14: Health permission denial never blocks manual features.
+- BR-13: Apple Health and HealthKit are outside the 1.0 release; the app does
+  not request or read those permissions.
+- BR-14: Future health-data integration requires a separate product and privacy
+  decision and must not block the local manual tracker.
 - BR-15: Copy describes records and patterns, not diagnosis or guaranteed physiology.
 - BR-16: Correcting an active fast's start is limited to the preceding 24
   absolute hours; creating a new manually backdated fast may use an older start.
@@ -69,12 +71,12 @@
   fasting record. History manual entry creates food or hydration events, not a
   manually completed fast.
 - BR-26: App-created settings, fasts, food, hydration and legacy history records
-  use a local-first SwiftData store mirrored to the user’s private iCloud
-  database. Loss of network access or iCloud availability never blocks manual
-  use of the local store.
+  use one local SwiftData store inside the app’s protected container. The app
+  does not use CloudKit, iCloud record storage, an account or a developer
+  backend. Loss of network access never blocks manual use.
 - BR-27: **Delete all data** requires two explicit confirmations and deletes
-  every app-created record through the synced model context so the deletions
-  propagate to iCloud. It does not delete source data owned by Apple Health.
+  every app-created record in the local store, including settings and legacy
+  history. It does not delete data outside uFast.
 
 ## Slice 3.10 supersession
 

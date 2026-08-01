@@ -1,5 +1,13 @@
 # Ordered starter backlog
 
+## 1.0 release boundary
+
+The `codex/release-1.0` baseline includes the existing manual fasting, food,
+hydration, catch-up and History experience, including its tested automatic and
+legacy-history presentation rules. It is local-only and intentionally excludes
+external health data, cloud services and background delivery. The release
+reset decision for disposable pre-release CloudKit data is recorded in D-026.
+
 ## Slice 0 — Foundation
 
 - OW-000 P0 — Project shell, navigation, local persistence, tests and repository guidance. **Done 18 July 2026.**
@@ -141,6 +149,8 @@ implementation-ready stories are in
 
 ## Slice 4 — Apple Health
 
+Deferred beyond 1.0; requires a new product, privacy and App Review decision.
+
 - OW-401 P0 — Contextual weight authorization.
 - OW-402 P0 — Recent weight and neutral trend.
 - OW-403 P0 — Contextual step authorization.
@@ -149,13 +159,17 @@ implementation-ready stories are in
 
 ## Slice 5 — Quality
 
-- OW-106 P1 — Active-fast Live Activity. **Refined; two privacy and dismissal
-  decisions remain.**
+- OW-106 P1 — Active-fast Live Activity. **Deferred beyond 1.0; privacy and
+  dismissal decisions remain.**
 - OW-107 P1 — Optional fasting target reminder. **Initial discovery; MVP scope
   and notification-policy decisions required.**
 - OW-501 P0 — Accessibility checks for core journeys.
 - OW-502 P0 — Privacy, purpose strings and disclaimer.
 - OW-503 P0 — Persistence, migration and interruption safety.
+
+## Later — Storage and integrations
+
+- Cloud sync, backup, restore, import and export — **Deferred beyond 1.0.**
 
 ## Later — Feature 1
 

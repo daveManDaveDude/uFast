@@ -4,6 +4,13 @@ import XCTest
 
 @MainActor
 final class PersistenceContainerTests: XCTestCase {
+    func testProductionConfigurationIsLocalOnly() {
+        let configuration = PersistenceContainer.configuration()
+
+        XCTAssertFalse(configuration.isStoredInMemoryOnly)
+        XCTAssertNil(configuration.cloudKitContainerIdentifier)
+    }
+
     func testAppSettingsRoundTripInLocalContainer() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
