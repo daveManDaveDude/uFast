@@ -16,6 +16,7 @@ uFast has no account, cloud sync, backup, restore or password recovery. Records
 stay on the iPhone. Deleting the app or losing the iPhone may permanently lose
 them.
 
-For support, visit <https://github.com/daveManDaveDude/uFast/issues>. Please do
-not include sensitive health information unless it is necessary to explain the
-problem.
+For private support, email <ufast.app@gmail.com>. For public bug reports and
+feature requests, visit <https://github.com/daveManDaveDude/uFast/issues>.
+Please do not include sensitive health information in a public issue unless it
+is necessary to explain the problem.

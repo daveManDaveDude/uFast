@@ -49,5 +49,6 @@ fasted.
 ## Changes and contact
 
 This policy may change when the app's data practices change. The effective date
-above will be updated with a material revision. Public support is available at
+above will be updated with a material revision. Private support is available at
+<ufast.app@gmail.com>; public support is available at
 <https://github.com/daveManDaveDude/uFast/issues>.
