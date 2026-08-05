@@ -41,7 +41,8 @@ targets:
     scheme:
       testTargets:
         - uFastTests
-        - uFastUITests
+        - name: uFastUITests
+          parallelizable: true
       gatherCoverageData: true
   uFastTests:
     type: bundle.unit-test

@@ -3,11 +3,12 @@ import SwiftUI
 // swiftlint:disable opening_brace
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length type_body_length function_body_length
 
 struct TemporalRibbonIntervalItem: Identifiable {
     enum Kind: Equatable {
         case recorded
+        case active
         case automatic
         case previouslySaved
         case reconstructed
@@ -37,6 +38,38 @@ struct TemporalRibbonEventItem: Identifiable {
     let detail: String
     let accessibilityLabel: String
     let kind: Kind
+
+    var family: TemporalEventFamily {
+        kind == .food ? .food : .hydration
+    }
+
+    var isCaloric: Bool {
+        kind == .food || kind == .caloricDrink
+    }
+
+    var presentationCategory: TemporalEventPresentationCategory {
+        switch kind {
+        case .food: .food
+        case .caloricDrink: .caloricDrink
+        case .nonCaloricDrink: .nonCaloricDrink
+        }
+    }
+
+    var reference: TemporalEventReference {
+        TemporalEventReference(family: family, id: id)
+    }
+
+    var groupingInput: TemporalEventGroupingInput {
+        TemporalEventGroupingInput(
+            reference: reference,
+            occurredAt: occurredAt,
+            title: title,
+            detail: detail,
+            accessibilityLabel: accessibilityLabel,
+            isCaloric: isCaloric,
+            presentationCategory: presentationCategory
+        )
+    }
 }
 
 struct TemporalDateNavigator: View {
@@ -190,6 +223,9 @@ struct TemporalDateNavigator: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("temporal.date.\(date.timeIntervalSince1970)")
         .id(date)
+        .scrollTransition(.identity, axis: .horizontal) { content, _ in
+            content
+        }
         .background {
             dateChipGeometry(for: date, isSelected: isSelected)
         }
@@ -458,6 +494,7 @@ struct TemporalHistoryCarousel: View {
     let events: [TemporalRibbonEventItem]
     let onSelectInterval: (UUID) -> Void
     let onSelectEvent: (UUID) -> Void
+    var onSelectEventGroup: ((TemporalEventGroup) -> Void)?
     let onSelectEmpty: (Date) -> Void
     let onNavigateDay: (Int) -> Void
     let canNavigateForward: Bool
@@ -579,7 +616,6 @@ struct TemporalHistoryCarousel: View {
                 guard newPhase != .active else { return }
                 setMovementPhase(.settled)
             }
-            .accessibilityElement(children: .ignore)
             .accessibilityLabel("History day carousel")
             .accessibilityValue(
                 movementPhase == .settled ? "Settled" : "Moving"
@@ -596,13 +632,17 @@ struct TemporalHistoryCarousel: View {
                         guard allowsRecordActivation else { return }
                         onSelectEvent(id)
                     },
+                    onSelectGroup: { group in
+                        onSelectEventGroup?(group)
+                    },
                     onSelectEmpty: allowsEmptySelection ? onSelectEmpty : nil,
                     onNavigateDay: nil,
                     canNavigateForward: true,
                     accessibilityIdentifierPrefix: "history",
                     showsDayHeader: false,
-                    isInteractive: movementPhase.allowsTimelineInteraction
-                        && allowsRecordActivation,
+                    // Keep the panel's layout space stable while hiding its
+                    // content until the native calendar is idle.
+                    isInteractive: allowsRecordActivation,
                     showsSemanticItems: showsTimelineDetails
                         && movementPhase.showsTimelineDetails,
                     showsVisualRibbon: false,
@@ -610,6 +650,8 @@ struct TemporalHistoryCarousel: View {
                     emptySemanticMessage: "No recorded items in this time window.",
                     futureReadOnlyFrom: readOnlyFromDate
                 )
+                .allowsHitTesting(movementPhase == .settled && allowsRecordActivation)
+                .accessibilityHidden(movementPhase != .settled)
             }
         }
         .accessibilityAction(named: "Previous day") {
@@ -699,24 +741,39 @@ struct TemporalHistoryCarousel: View {
             && allowsRecordActivation
         let canSelectEmpty = movementPhase.allowsTimelineInteraction
             && allowsEmptySelection
+        let selectInterval: ((UUID) -> Void)? = allowsRecordActivation ? { id in
+            guard canActivateRecord else { return }
+            onSelectInterval(id)
+        } : nil
         return TemporalRibbonView(
             selectedDate: date,
             intervals: intervals,
             events: events,
-            onSelectInterval: canActivateRecord ? onSelectInterval : nil,
+            onSelectInterval: selectInterval,
             onSelectEvent: { id in
                 guard canActivateRecord else { return }
                 onSelectEvent(id)
+            },
+            onSelectGroup: { group in
+                guard canActivateRecord else { return }
+                onSelectEventGroup?(group)
             },
             onSelectEmpty: canSelectEmpty ? onSelectEmpty : nil,
             onNavigateDay: nil,
             canNavigateForward: true,
             accessibilityIdentifierPrefix: "history",
             showsDayHeader: false,
-            isInteractive: canActivateRecord || canSelectEmpty,
+            // Preserve the resting control appearance during motion. Actions
+            // remain gated by canActivateRecord/canSelectEmpty until idle.
+            isInteractive: allowsRecordActivation || allowsEmptySelection,
             showsSemanticItems: false,
             usesContinuousSurface: true,
             includesSemanticItems: false,
+            // A moving page should retain the same complete interval
+            // treatment as the settled page instead of dropping active-fast
+            // labels at the page seam. At rest, preserve the selected-page
+            // continuation rule used by the settled design.
+            isSelectedPage: isSelected || movementPhase != .settled,
             windowOverride: TemporalHistoryPresentation.calendarDayWindow(
                 containing: date,
                 calendar: calendar
@@ -732,9 +789,9 @@ struct TemporalHistoryCarousel: View {
             }
         }
         .accessibilityHidden(!isSelected)
-        .accessibilityIdentifier(
-            "history.day-page.\(date.timeIntervalSince1970)"
-        )
+        .scrollTransition(.identity, axis: .horizontal) { content, _ in
+            content
+        }
     }
 
     private func movementPhase(for scrollPhase: ScrollPhase) -> TemporalCarouselMovementPhase {
@@ -969,6 +1026,7 @@ struct TemporalRibbonView: View {
     let events: [TemporalRibbonEventItem]
     let onSelectInterval: ((UUID) -> Void)?
     let onSelectEvent: (UUID) -> Void
+    var onSelectGroup: ((TemporalEventGroup) -> Void)?
     var onSelectEmpty: ((Date) -> Void)?
     var onNavigateDay: ((Int) -> Void)?
     var canNavigateForward = true
@@ -979,6 +1037,7 @@ struct TemporalRibbonView: View {
     var usesContinuousSurface = false
     var showsVisualRibbon = true
     var includesSemanticItems = true
+    var isSelectedPage = true
     var windowOverride: TemporalRibbonWindow?
     var emptySemanticMessage = "No recorded items for this date."
     var futureReadOnlyFrom: Date?
@@ -1028,16 +1087,7 @@ struct TemporalRibbonView: View {
             }
 
             if let window {
-                if showsVisualRibbon {
-                    visualRibbon(window)
-                        .accessibilityHidden(true)
-                }
-                if includesSemanticItems {
-                    semanticItems(window)
-                        .opacity(showsSemanticItems ? 1 : 0)
-                        .allowsHitTesting(showsSemanticItems)
-                        .accessibilityHidden(!showsSemanticItems)
-                }
+                ribbonContent(window)
             }
         }
         .accessibilityAction(named: "Previous day") {
@@ -1059,7 +1109,36 @@ struct TemporalRibbonView: View {
         }
     }
 
-    private func visualRibbon(_ window: TemporalRibbonWindow) -> some View {
+    @ViewBuilder
+    private func ribbonContent(_ window: TemporalRibbonWindow) -> some View {
+        let eventItems = groupedEventPresentation(in: window)
+        if showsVisualRibbon {
+            visualRibbon(window, eventItems: eventItems)
+        }
+        if includesSemanticItems {
+            semanticItems(window, eventItems: eventItems)
+                .opacity(showsSemanticItems ? 1 : 0)
+                .allowsHitTesting(showsSemanticItems)
+                .accessibilityHidden(!showsSemanticItems)
+        }
+    }
+
+    private func groupedEventPresentation(
+        in window: TemporalRibbonWindow
+    ) -> [TemporalEventPresentationItem] {
+        var presentationCalendar = calendar
+        presentationCalendar.timeZone = timeZone
+        return TemporalEventGrouping.project(
+            events.map(\.groupingInput),
+            in: window.interval,
+            calendar: presentationCalendar
+        )
+    }
+
+    private func visualRibbon(
+        _ window: TemporalRibbonWindow,
+        eventItems: [TemporalEventPresentationItem]
+    ) -> some View {
         let markers = axisMarkers(window).map { date in
             (date, midnightMarkerText(for: date))
         }
@@ -1068,11 +1147,13 @@ struct TemporalRibbonView: View {
                 for: proxy.size.width,
                 accessibilitySize: dynamicTypeSize.isAccessibilitySize
             )
+            let surfaceHeight = ribbonHeight(policy)
             ZStack(alignment: .topLeading) {
                 ribbonBackground(
                     window: window,
                     width: policy.contentWidth,
                     markers: markers,
+                    height: surfaceHeight,
                     futureShading: futureReadOnlyFrom.flatMap {
                         TemporalHistoryPresentation.futureShadingInterval(
                             for: window,
@@ -1081,6 +1162,7 @@ struct TemporalRibbonView: View {
                         )
                     }
                 )
+                .accessibilityHidden(true)
                 .contentShape(Rectangle())
                 .gesture(
                     SpatialTapGesture()
@@ -1092,25 +1174,45 @@ struct TemporalRibbonView: View {
                             )
                         }
                 )
-                intervalMarks(window: window, policy: policy)
-                eventMarks(window: window, width: policy.contentWidth)
+                intervalMarks(
+                    window: window,
+                    policy: policy,
+                    isSelectedPage: isSelectedPage
+                )
+                .accessibilityHidden(true)
+                eventMarks(
+                    window: window,
+                    width: policy.contentWidth,
+                    eventItems: eventItems
+                )
             }
-            .frame(width: policy.contentWidth, height: ribbonHeight(policy))
+            // Neighboring days can have different intrinsic child bounds
+            // (for example, only the selected active-fast segment has a
+            // label). Pin every page to the same top-leading coordinate space
+            // so a continuous interval cannot jump vertically at midnight.
+            .frame(
+                width: policy.contentWidth,
+                height: surfaceHeight,
+                alignment: .topLeading
+            )
             .allowsHitTesting(isInteractive)
         }
-        .frame(height: dynamicTypeSize.isAccessibilitySize ? 292 : 220)
+        .frame(height: TemporalEventMarkerMetrics.make(
+            category: .food,
+            accessibilitySize: dynamicTypeSize.isAccessibilitySize
+        ).ribbonHeight)
         .modifier(
             TemporalRibbonSurfaceModifier(
                 isContinuous: usesContinuousSurface
             )
         )
-        .accessibilityIdentifier("temporal.ribbon")
     }
 
     private func ribbonBackground(
         window: TemporalRibbonWindow,
         width: Double,
         markers: [(Date, TemporalMidnightMarkerText)],
+        height: Double,
         futureShading: DateInterval?
     ) -> some View {
         ZStack(alignment: .topLeading) {
@@ -1124,7 +1226,10 @@ struct TemporalRibbonView: View {
             if let futureShading {
                 Rectangle()
                     .fill(UFastTheme.secondaryText.opacity(0.10))
-                    .frame(width: width * futureShadingFraction(futureShading, in: window), height: 220)
+                    .frame(
+                        width: width * futureShadingFraction(futureShading, in: window),
+                        height: height
+                    )
                     .offset(x: width * window.fraction(for: futureShading.start))
                     .accessibilityHidden(true)
             }
@@ -1135,8 +1240,11 @@ struct TemporalRibbonView: View {
                 Rectangle()
                     .fill(hour == 0 ? UFastTheme.action.opacity(0.7) :
                         (isLabelled ? UFastTheme.border : UFastTheme.border.opacity(0.55)))
-                    .frame(width: hour == 0 ? 1.5 : (isLabelled ? 1 : 0.75), height: 160)
-                    .offset(x: markerX, y: 32)
+                    .frame(
+                        width: hour == 0 ? 1.5 : (isLabelled ? 1 : 0.75),
+                        height: TemporalRibbonSurfaceMetrics.gridRuleHeight(surfaceHeight: height)
+                    )
+                    .offset(x: markerX, y: TemporalRibbonSurfaceMetrics.topLabelClearance)
                 if isLabelled {
                     axisMark(marker, text: text)
                         .frame(
@@ -1152,7 +1260,8 @@ struct TemporalRibbonView: View {
 
     private func intervalMarks(
         window: TemporalRibbonWindow,
-        policy: TemporalRibbonGeometry
+        policy: TemporalRibbonGeometry,
+        isSelectedPage: Bool
     ) -> some View {
         let segments = TemporalHistoryPresentation.clip(
             intervals.map { TemporalIntervalInput(id: $0.id, start: $0.start, end: $0.end) },
@@ -1162,21 +1271,31 @@ struct TemporalRibbonView: View {
             if let item = intervals.first(where: { $0.id == segment.id }) {
                 let startX = policy.contentWidth * segment.startFraction(in: window)
                 let endX = policy.contentWidth * segment.endFraction(in: window)
-                let markWidth = max(endX - startX, 28)
+                let markWidth = max(endX - startX, 1)
+                let horizontalHitPadding = max((44 - markWidth) / 2, 0)
+                let showsContent = TemporalHistoryPresentation.intervalContinuationShowsContent(
+                    isActive: item.kind == .active,
+                    continuesBefore: segment.continuesBefore,
+                    isSelectedPage: isSelectedPage
+                )
+                let showsContinuationMarkers = TemporalHistoryPresentation
+                    .intervalContinuationShowsMarkers(isActive: item.kind == .active)
                 Button {
                     onSelectInterval?(item.id)
                 } label: {
                     HStack(spacing: 4) {
-                        if segment.continuesBefore, markWidth >= 60 {
+                        if showsContinuationMarkers, segment.continuesBefore, markWidth >= 60 {
                             Image(systemName: "chevron.left.2")
                                 .accessibilityHidden(true)
                         }
-                        Image(systemName: intervalSymbol(item.kind))
-                            .accessibilityHidden(true)
-                        if markWidth >= 84 {
-                            Text(item.title).lineLimit(1)
+                        if showsContent {
+                            Image(systemName: intervalSymbol(item.kind))
+                                .accessibilityHidden(true)
+                            if markWidth >= 84 {
+                                Text(item.title).lineLimit(1)
+                            }
                         }
-                        if segment.continuesAfter, markWidth >= 60 {
+                        if showsContinuationMarkers, segment.continuesAfter, markWidth >= 60 {
                             Image(systemName: "chevron.right.2")
                                 .accessibilityHidden(true)
                         }
@@ -1186,24 +1305,41 @@ struct TemporalRibbonView: View {
                     .padding(.horizontal, 8)
                     .frame(width: markWidth, height: max(44, policy.intervalLaneHeight), alignment: .leading)
                     .background(intervalColour(item.kind))
-                    .clipShape(intervalMarkShape(for: segment))
+                    .clipShape(intervalMarkShape(for: segment, visibleWidth: markWidth))
                     .overlay {
-                        intervalMarkShape(for: segment)
+                        intervalMarkShape(for: segment, visibleWidth: markWidth)
                             .stroke(intervalStroke(item.kind), style: strokeStyle(item.kind))
                     }
+                    .overlay(alignment: .leading) {
+                        if segment.continuesBefore {
+                            continuationEdgeCover(for: item.kind)
+                        }
+                    }
+                    .overlay(alignment: .trailing) {
+                        if segment.continuesAfter {
+                            continuationEdgeCover(for: item.kind)
+                        }
+                    }
+                    .padding(.horizontal, horizontalHitPadding)
                 }
                 .buttonStyle(.plain)
                 .disabled(onSelectInterval == nil)
                 .offset(
-                    x: startX,
+                    x: startX - horizontalHitPadding,
                     y: 54 + Double(segment.lane) * (policy.intervalLaneHeight + 6)
                 )
             }
         }
     }
 
-    private func intervalMarkShape(for segment: TemporalIntervalSegment) -> UnevenRoundedRectangle {
-        let radius = UFastTheme.Radius.control
+    private func intervalMarkShape(
+        for segment: TemporalIntervalSegment,
+        visibleWidth: Double
+    ) -> UnevenRoundedRectangle {
+        let radius = TemporalRibbonGeometry.intervalCornerRadius(
+            visibleWidth: visibleWidth,
+            preferredRadius: UFastTheme.Radius.control
+        )
         return UnevenRoundedRectangle(
             cornerRadii: .init(
                 topLeading: segment.continuesBefore ? 0 : radius,
@@ -1215,42 +1351,165 @@ struct TemporalRibbonView: View {
         )
     }
 
-    private func eventMarks(window: TemporalRibbonWindow, width: Double) -> some View {
-        let orderedIDs = TemporalHistoryPresentation.chronological(
-            events
-                .filter { window.contains($0.occurredAt) }
-                .map { TemporalEventOrderingValue(id: $0.id, occurredAt: $0.occurredAt) }
-        ).map(\.id)
-        let visible = orderedIDs.compactMap { id in events.first { $0.id == id } }
-        return ForEach(Array(visible.enumerated()), id: \.element.id) { index, item in
-            let markerX = width * window.fraction(for: item.occurredAt)
-            Button {
-                onSelectEvent(item.id)
-            } label: {
-                VStack(spacing: 3) {
-                    Image(systemName: eventSymbol(item.kind))
-                        .accessibilityHidden(true)
-                        .font(.caption.weight(.bold))
-                        .frame(width: 32, height: 32)
-                        .background(eventColour(item.kind))
-                        .foregroundStyle(UFastTheme.primary)
-                        .clipShape(
-                            item.kind == .nonCaloricDrink
-                                ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 8))
-                        )
-                        .overlay {
-                            if item.kind == .nonCaloricDrink {
-                                Circle().stroke(UFastTheme.action, lineWidth: 1)
-                            }
-                        }
-                    Text(item.occurredAt, format: .dateTime.hour().minute())
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(UFastTheme.secondaryText)
-                }
-                .frame(minWidth: 44, minHeight: 44)
+    private func continuationEdgeCover(
+        for kind: TemporalRibbonIntervalItem.Kind
+    ) -> some View {
+        Rectangle()
+            .fill(intervalColour(kind))
+            .frame(width: 2)
+            .padding(.vertical, strokeStyle(kind).lineWidth)
+            .accessibilityHidden(true)
+    }
+
+    private func eventMarks(
+        window: TemporalRibbonWindow,
+        width: Double,
+        eventItems: [TemporalEventPresentationItem]
+    ) -> some View {
+        ForEach(eventItems) { item in
+            if let layout = TemporalEventGroupLayout.make(
+                bucketStartFraction: window.fraction(for: item.bucket.start),
+                bucketEndFraction: window.fraction(for: item.bucket.end),
+                ribbonWidth: width
+            ) {
+                eventMarkButton(
+                    item: item,
+                    layout: layout,
+                    width: width,
+                    metrics: TemporalEventMarkerMetrics.make(
+                        category: item.presentationCategory,
+                        accessibilitySize: dynamicTypeSize.isAccessibilitySize
+                    )
+                )
             }
-            .buttonStyle(.plain)
-            .offset(x: min(max(0, markerX - 22), max(0, width - 44)), y: 140 + Double(index % 2) * 30)
+        }
+    }
+
+    private func eventMarkButton(
+        item: TemporalEventPresentationItem,
+        layout: TemporalEventGroupLayout,
+        width: Double,
+        metrics: TemporalEventMarkerMetrics
+    ) -> some View {
+        let group = item.group
+        let member = group?.members.first ?? {
+            if case let .single(_, member) = item {
+                return member
+            }
+            return nil
+        }()
+        let buttonWidth = layout.interactiveWidth
+        let buttonOffsetX = min(
+            max(0, layout.centerFraction * width - buttonWidth / 2),
+            max(0, width - buttonWidth)
+        )
+        return Button {
+            if let group {
+                if let onSelectGroup {
+                    onSelectGroup(group)
+                } else if let first = group.members.first {
+                    onSelectEvent(first.reference.id)
+                }
+            } else if let member {
+                onSelectEvent(member.reference.id)
+            }
+        } label: {
+            eventMarkerLabel(
+                item: item,
+                layout: layout,
+                member: member,
+                metrics: metrics
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!isInteractive)
+        .frame(width: buttonWidth, height: metrics.hitHeight)
+        .contentShape(Rectangle())
+        .offset(x: buttonOffsetX, y: metrics.rowTop)
+        .zIndex(1)
+        .accessibilityHidden(group == nil && includesSemanticItems)
+        .modifier(GroupMarkerAccessibilityModifier(
+            group: group,
+            member: member,
+            prefix: accessibilityIdentifierPrefix
+        ))
+    }
+
+    private func eventMarkerLabel(
+        item: TemporalEventPresentationItem,
+        layout: TemporalEventGroupLayout,
+        member: TemporalEventGroupingInput?,
+        metrics: TemporalEventMarkerMetrics
+    ) -> some View {
+        let group = item.group
+        let tileSize = min(metrics.tileSize, layout.visibleContentWidth)
+        let cellWidth = layout.visibleContentWidth
+        return VStack(spacing: metrics.labelGap) {
+            ZStack(alignment: .topTrailing) {
+                eventMarkerTile(
+                    category: item.presentationCategory,
+                    size: tileSize
+                )
+                if let group {
+                    Text(group.visualCountText)
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(UFastTheme.onAction)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(
+                            width: min(
+                                group.visualCountText.count > 2 ? 22 : 16,
+                                tileSize
+                            ),
+                            height: 16
+                        )
+                        .background(UFastTheme.action)
+                        .clipShape(Capsule())
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(width: tileSize, height: tileSize)
+            if group == nil, let member {
+                Text(member.occurredAt, format: .dateTime.hour().minute())
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(UFastTheme.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(height: metrics.labelBandHeight)
+            } else {
+                Color.clear.frame(height: metrics.labelBandHeight)
+            }
+        }
+        .frame(width: cellWidth, height: metrics.cellHeight, alignment: .top)
+        .clipped()
+    }
+
+    @ViewBuilder
+    private func eventMarkerTile(
+        category: TemporalEventPresentationCategory,
+        size: Double
+    ) -> some View {
+        switch category {
+        case .food:
+            Image(systemName: "fork.knife")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(UFastTheme.primary)
+                .frame(width: size, height: size)
+                .background(UFastTheme.apricot)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .accessibilityHidden(true)
+        case .caloricDrink:
+            Image("HistoryCaloricDrink")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .accessibilityHidden(true)
+        case .nonCaloricDrink:
+            Image("HistoryNonCaloricDrink")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .accessibilityHidden(true)
         }
     }
 
@@ -1270,17 +1529,20 @@ struct TemporalRibbonView: View {
         onSelectEmpty?(instant)
     }
 
-    private func semanticItems(_ window: TemporalRibbonWindow) -> some View {
+    private func semanticItems(
+        _ window: TemporalRibbonWindow,
+        eventItems: [TemporalEventPresentationItem]
+    ) -> some View {
         let visibleIntervals = intervals.filter { $0.end > window.interval.start && $0.start < window.interval.end }
-        let visibleEvents = events.filter { window.contains($0.occurredAt) }
+        let orderedItems = semanticOrder(intervals: visibleIntervals, eventItems: eventItems)
         return VStack(spacing: 0) {
-            if visibleIntervals.isEmpty, visibleEvents.isEmpty {
+            if orderedItems.isEmpty {
                 Text(emptySemanticMessage)
                     .foregroundStyle(UFastTheme.secondaryText)
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .accessibilityIdentifier("temporal.empty")
             } else {
-                ForEach(semanticOrder(intervals: visibleIntervals, events: visibleEvents), id: \.semanticID) { item in
+                ForEach(orderedItems, id: \.semanticID) { item in
                     if item.isInterval, onSelectInterval == nil {
                         semanticRow(item, showsDisclosure: false)
                             .accessibilityElement(children: .ignore)
@@ -1288,22 +1550,24 @@ struct TemporalRibbonView: View {
                             .accessibilityIdentifier(item.identifier)
                     } else {
                         Button {
-                            if item.isInterval {
+                            if let group = item.eventGroup {
+                                onSelectGroup?(group)
+                            } else if item.isInterval {
                                 onSelectInterval?(item.id)
-                            } else {
-                                onSelectEvent(item.id)
+                            } else if let reference = item.eventReference {
+                                onSelectEvent(reference.id)
                             }
                         } label: {
                             semanticRow(item, showsDisclosure: true)
                         }
                         .buttonStyle(.plain)
                         .disabled(!isInteractive)
-                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel(item.accessibilityLabel)
+                        .accessibilityValue(item.eventGroup.map { String($0.count) } ?? "")
                         .accessibilityHint("Opens details and available actions.")
                         .accessibilityIdentifier(item.identifier)
                     }
-                    if item.id != semanticOrder(intervals: visibleIntervals, events: visibleEvents).last?.id {
+                    if item.semanticID != orderedItems.last?.semanticID {
                         Divider()
                     }
                 }
@@ -1311,7 +1575,7 @@ struct TemporalRibbonView: View {
         }
         .uFastCard()
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("temporal.semantic-list")
+        .accessibilityIdentifier("\(accessibilityIdentifierPrefix).event-info-panel")
     }
 
     private func semanticRow(_ item: SemanticItem, showsDisclosure: Bool) -> some View {
@@ -1337,7 +1601,7 @@ struct TemporalRibbonView: View {
 
     private func semanticOrder(
         intervals: [TemporalRibbonIntervalItem],
-        events: [TemporalRibbonEventItem]
+        eventItems: [TemporalEventPresentationItem]
     ) -> [SemanticItem] {
         let intervalValues = intervals.map {
             SemanticItem(
@@ -1351,25 +1615,68 @@ struct TemporalRibbonView: View {
                 identifier: $0.kind == .unknown
                     ? "\(accessibilityIdentifierPrefix).unknown.\($0.id.uuidString)"
                     : "\(accessibilityIdentifierPrefix).fast.\($0.id.uuidString)",
-                isInterval: true
+                isInterval: true,
+                eventReference: nil,
+                eventGroup: nil
             )
         }
-        let eventValues = events.map {
-            SemanticItem(
-                id: $0.id,
-                semanticID: "event-\($0.id.uuidString)",
-                date: $0.occurredAt,
-                title: $0.title,
-                detail: $0.detail,
-                accessibilityLabel: $0.accessibilityLabel,
-                symbol: eventSymbol($0.kind),
-                identifier: "\(accessibilityIdentifierPrefix).event.\($0.id.uuidString)",
-                isInterval: false
-            )
+        let eventValues = eventItems.map { item in
+            switch item {
+            case let .single(_, member):
+                SemanticItem(
+                    id: member.reference.id,
+                    semanticID: "event-\(member.reference.stableValue)",
+                    date: member.occurredAt,
+                    title: member.title,
+                    detail: member.detail,
+                    accessibilityLabel: member.accessibilityLabel,
+                    symbol: eventSymbol(category: member.presentationCategory),
+                    identifier: "\(accessibilityIdentifierPrefix).event.\(member.reference.id.uuidString)",
+                    isInterval: false,
+                    eventReference: member.reference,
+                    eventGroup: nil
+                )
+            case let .group(group):
+                SemanticItem(
+                    id: group.members.first?.reference.id ?? UUID(),
+                    semanticID: "group-\(group.id.stableValue)",
+                    date: group.bucket.start,
+                    title: group.summaryTitle,
+                    detail: groupDetail(group),
+                    accessibilityLabel: groupAccessibilityLabel(group),
+                    symbol: eventSymbol(category: group.presentationCategory),
+                    identifier: "\(accessibilityIdentifierPrefix).event-group.row."
+                        + "\(group.presentationCategory.rawValue).\(Int(group.bucket.start.timeIntervalSince1970))",
+                    isInterval: false,
+                    eventReference: nil,
+                    eventGroup: group
+                )
+            }
         }
         return (intervalValues + eventValues).sorted {
-            $0.date == $1.date ? $0.id.uuidString < $1.id.uuidString : $0.date < $1.date
+            $0.date == $1.date ? $0.semanticID < $1.semanticID : $0.date < $1.date
         }
+    }
+
+    private func groupDetail(_ group: TemporalEventGroup) -> String {
+        "\(timeText(group.bucket.start))–\(timeText(group.bucket.end)) · \(group.classificationSummary)"
+    }
+
+    private func groupAccessibilityLabel(_ group: TemporalEventGroup) -> String {
+        "\(group.count) \(group.family.pluralName), \(timeText(group.bucket.start)) to "
+            + "\(timeText(group.bucket.end)), \(group.classificationSummary.lowercased())"
+    }
+
+    private func timeText(_ date: Date) -> String {
+        date.formatted(
+            Date.FormatStyle(
+                date: .omitted,
+                time: .shortened,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone
+            )
+        )
     }
 
     private func axisMarkers(_ window: TemporalRibbonWindow) -> [Date] {
@@ -1431,12 +1738,17 @@ struct TemporalRibbonView: View {
     }
 
     private func ribbonHeight(_ policy: TemporalRibbonGeometry) -> Double {
-        max(190, 126 + policy.eventLaneHeight * 2)
+        _ = policy
+        return TemporalEventMarkerMetrics.make(
+            category: .nonCaloricDrink,
+            accessibilitySize: dynamicTypeSize.isAccessibilitySize
+        ).ribbonHeight
     }
 
     private func intervalSymbol(_ kind: TemporalRibbonIntervalItem.Kind) -> String {
         switch kind {
         case .recorded: "moon.stars.fill"
+        case .active: "moon.stars.fill"
         case .automatic: "moon.fill"
         case .previouslySaved: "archivebox"
         case .reconstructed: "wand.and.stars"
@@ -1447,7 +1759,7 @@ struct TemporalRibbonView: View {
 
     private func intervalColour(_ kind: TemporalRibbonIntervalItem.Kind) -> Color {
         switch kind {
-        case .recorded: UFastTheme.sage
+        case .recorded, .active: UFastTheme.sage
         case .automatic: UFastTheme.sky
         case .previouslySaved: UFastTheme.raisedSurface
         case .reconstructed: UFastTheme.sky
@@ -1471,16 +1783,12 @@ struct TemporalRibbonView: View {
         StrokeStyle(lineWidth: kind == .needsReview ? 2 : 1, dash: kind == .unknown ? [5, 4] : [])
     }
 
-    private func eventSymbol(_ kind: TemporalRibbonEventItem.Kind) -> String {
-        switch kind {
+    private func eventSymbol(category: TemporalEventPresentationCategory) -> String {
+        switch category {
         case .food: "fork.knife"
         case .caloricDrink: "cup.and.saucer.fill"
         case .nonCaloricDrink: "drop"
         }
-    }
-
-    private func eventColour(_ kind: TemporalRibbonEventItem.Kind) -> Color {
-        kind == .nonCaloricDrink ? UFastTheme.raisedSurface : UFastTheme.apricot
     }
 }
 
@@ -1494,6 +1802,8 @@ private struct SemanticItem: Identifiable {
     let symbol: String
     let identifier: String
     let isInterval: Bool
+    let eventReference: TemporalEventReference?
+    let eventGroup: TemporalEventGroup?
 }
 
 struct TemporalProposalRibbon: View {

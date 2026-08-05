@@ -23,6 +23,7 @@ struct HistoryView: View {
     @State private var foodEditor: HistoryFoodEditorPresentation?
     @State private var hydrationEditor: HistoryHydrationEditorPresentation?
     @State private var directHistoricalEntry: DirectHistoricalEntryPresentation?
+    @State private var eventGroupDisclosure: TemporalEventGroup?
     @State private var isCalendarPresented = false
     @State private var selectedDate: Date
     @State private var historyDayBuffer: TemporalDayBuffer?
@@ -61,8 +62,11 @@ struct HistoryView: View {
                         readOnlyAfterDate: clock.now,
                         automaticScrollEnabled: !temporalMovementPhase
                             .suppressesAutomaticAlignment && !isDateRailMoving,
-                        coupledPresentation: coupledScrollPresentation,
-                        presentationDay: presentedHistoryDay,
+                        // Keep the date rail on the settled presentation while
+                        // the lower timeline is moving. The rail still follows
+                        // the selected day after native scrolling settles.
+                        coupledPresentation: nil,
+                        presentationDay: selectedDate,
                         onDirectScrollPhaseChange: updateDateRailMovement,
                         onRailSettled: { day in
                             selectDay(day, source: .dateRailSettlement)
@@ -79,14 +83,18 @@ struct HistoryView: View {
                         events: ribbonEvents,
                         onSelectInterval: openInterval,
                         onSelectEvent: openEvent,
-                        onSelectEmpty: beginHistoricalEntry,
+                        onSelectEventGroup: { group in
+                            eventGroupDisclosure = group
+                        },
+                        onSelectEmpty: { instant in
+                            beginHistoricalEntry(at: instant)
+                        },
                         onNavigateDay: navigateDay,
                         canNavigateForward: canNavigateForward,
                         allowsRecordActivation: !isFutureSelection,
                         allowsEmptySelection: !isFutureSelection,
-                        showsTimelineDetails: temporalMovementPhase.showsTimelineDetails
-                            && !isDateRailMoving,
-                        presentationDay: presentedHistoryDay,
+                        showsTimelineDetails: showsSettledHistoryDetails,
+                        presentationDay: selectedDate,
                         readOnlyFromDate: clock.now,
                         onMovementPhaseChange: updateTemporalMovementPhase,
                         onCoupledPresentationChange: coupledScrollPresentation.handle,
@@ -101,53 +109,15 @@ struct HistoryView: View {
 
                     if !isFutureSelection {
                         directAddAlternative
+                            .opacity(showsSettledHistoryDetails ? 1 : 0)
+                            .allowsHitTesting(showsSettledHistoryDetails)
+                            .accessibilityHidden(!showsSettledHistoryDetails)
                     }
 
-                    if visibleFastItems.isEmpty {
-                        if dynamicTypeSize.isAccessibilitySize {
-                            VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                                Text("HISTORY")
-                                    .font(.caption.weight(.semibold))
-                                    .tracking(1.2)
-                                    .foregroundStyle(UFastTheme.secondaryText)
-                                Text("No completed fasts")
-                                    .font(.headline)
-                                    .foregroundStyle(UFastTheme.primary)
-                                Text("Completed fasts will appear here.")
-                                    .font(.body)
-                                    .foregroundStyle(UFastTheme.secondaryText)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .uFastCard()
-                            .padding(UFastTheme.Spacing.standard)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("history.empty")
-                        } else {
-                            UFastIllustratedInformationCard(
-                                title: "No completed fasts",
-                                eyebrow: "Fasts in this view",
-                                message: "Completed fasts will appear here."
-                            ) {
-                                FastingBotanicalArtwork()
-                            }
-                            .padding(UFastTheme.Spacing.standard)
-                            .accessibilityIdentifier("history.empty")
-                        }
-                    } else {
-                        UFastSectionHeading("Fasts in this view", eyebrow: "Details")
-                            .padding(.horizontal, UFastTheme.Spacing.standard)
-                        LazyVStack(spacing: 12) {
-                            ForEach(visibleFastItems) { item in
-                                Button { openVisibleFast(item) } label: {
-                                    VisibleFastHistoryRow(item: item, calendar: calendar, locale: locale, timeZone: timeZone)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("history.fast.\(item.id.uuidString)")
-                            }
-                        }
-                        .padding(.horizontal, UFastTheme.Spacing.standard)
-                        .accessibilityIdentifier("history.list")
-                    }
+                    fastHistoryDetails
+                        .opacity(showsSettledHistoryDetails ? 1 : 0)
+                        .allowsHitTesting(showsSettledHistoryDetails)
+                        .accessibilityHidden(!showsSettledHistoryDetails)
                 }
                 .padding(.vertical, UFastTheme.Spacing.standard)
             }
@@ -293,6 +263,48 @@ struct HistoryView: View {
                 onClose: { directHistoricalEntry = nil }
             )
         }
+        .sheet(item: $eventGroupDisclosure) { group in
+            HistoryEventGroupDisclosure(
+                group: group,
+                canAddEvent: allowedRange(for: group) != nil,
+                onAddEvent: {
+                    eventGroupDisclosure = nil
+                    DispatchQueue.main.async {
+                        beginHistoricalEntry(for: group)
+                    }
+                },
+                onDismiss: { eventGroupDisclosure = nil },
+                clock: clock,
+                activeFastStart: activeFasts.first?.startDate,
+                resolveFood: { id in foodEntries.first { $0.id == id } },
+                resolveHydration: { id in hydrationEntries.first { $0.id == id } },
+                saveFood: { record, draft, endingActiveFast in
+                    try FoodEntryService(repository: makeFoodRepository(), clock: clock).save(
+                        draft,
+                        replacing: record,
+                        goal: settings.first?.fastingGoal ?? .default,
+                        endingActiveFast: endingActiveFast
+                    )
+                },
+                deleteFood: { record in
+                    try makeFoodRepository().delete(record)
+                },
+                saveHydration: { record, draft, endingActiveFast in
+                    try HydrationEntryService(repository: makeHydrationRepository(), clock: clock).save(
+                        draft,
+                        replacing: record,
+                        goal: settings.first?.fastingGoal ?? .default,
+                        endingActiveFast: endingActiveFast
+                    )
+                },
+                deleteHydration: { record in
+                    try makeHydrationRepository().delete(record)
+                },
+                onMutationSucceeded: { original, mutation in
+                    refreshGroupSurface(for: original, mutation: mutation)
+                }
+            )
+        }
     }
 
     private var periodHeader: some View {
@@ -329,16 +341,10 @@ struct HistoryView: View {
         calendar.startOfDay(for: selectedDate) < historyDisplayMaximumDay
     }
 
-    /// A visual-only day during lower-carousel motion. Semantic selection stays
-    /// settled until native scrolling reaches idle.
-    private var presentedHistoryDay: Date {
-        coupledScrollPresentation.liveCenteredDay ?? selectedDate
-    }
-
     private var historyDayPresentation: TemporalHistoryDayPresentation {
         TemporalHistoryDayPresentation(
             settledDay: selectedDate,
-            liveDay: coupledScrollPresentation.liveCenteredDay,
+            liveDay: nil,
             calendar: calendar
         )
     }
@@ -402,6 +408,9 @@ struct HistoryView: View {
         if let directHistoricalEntry {
             return "add-\(directHistoricalEntry.id)"
         }
+        if let eventGroupDisclosure {
+            return "group-disclosure-\(eventGroupDisclosure.id.stableValue)"
+        }
         return "none"
     }
 
@@ -411,10 +420,10 @@ struct HistoryView: View {
                 + "\($0.endDate?.timeIntervalSinceReferenceDate ?? 0):\($0.reviewStateRaw)"
         }
         let foods = foodEntries.map {
-            "\($0.id):\($0.occurredAt.timeIntervalSinceReferenceDate)"
+            "\($0.id):\($0.occurredAt.timeIntervalSinceReferenceDate):\($0.foodDescription)"
         }
         let drinks = hydrationEntries.map {
-            "\($0.id):\($0.occurredAt.timeIntervalSinceReferenceDate):\($0.isCaloric)"
+            "\($0.id):\($0.occurredAt.timeIntervalSinceReferenceDate):\($0.isCaloric):\($0.displayName):\($0.volumeMillilitres)"
         }
         return (fasts + foods + drinks).sorted().joined(separator: "|")
     }
@@ -449,6 +458,59 @@ struct HistoryView: View {
         .padding(.horizontal, UFastTheme.Spacing.standard)
         .accessibilityHint("Opens native date and time controls before choosing food or drink.")
         .accessibilityIdentifier("history.add-at-selected-time")
+    }
+
+    @ViewBuilder
+    private var fastHistoryDetails: some View {
+        if visibleFastItems.isEmpty {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                    Text("HISTORY")
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                    Text("No completed fasts")
+                        .font(.headline)
+                        .foregroundStyle(UFastTheme.primary)
+                    Text("Completed fasts will appear here.")
+                        .font(.body)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .uFastCard()
+                .padding(UFastTheme.Spacing.standard)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("history.empty")
+            } else {
+                UFastIllustratedInformationCard(
+                    title: "No completed fasts",
+                    eyebrow: "Fasts in this view",
+                    message: "Completed fasts will appear here."
+                ) {
+                    FastingBotanicalArtwork()
+                }
+                .padding(UFastTheme.Spacing.standard)
+                .accessibilityIdentifier("history.empty")
+            }
+        } else {
+            UFastSectionHeading("Fasts in this view", eyebrow: "Details")
+                .padding(.horizontal, UFastTheme.Spacing.standard)
+            LazyVStack(spacing: 12) {
+                ForEach(visibleFastItems) { item in
+                    Button { openVisibleFast(item) } label: {
+                        VisibleFastHistoryRow(item: item, calendar: calendar, locale: locale, timeZone: timeZone)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("history.fast.\(item.id.uuidString)")
+                }
+            }
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+            .accessibilityIdentifier("history.list")
+        }
+    }
+
+    private var showsSettledHistoryDetails: Bool {
+        temporalMovementPhase.showsTimelineDetails && !isDateRailMoving
     }
 
     private var futureReadOnlyNotice: some View {
@@ -561,7 +623,10 @@ struct HistoryView: View {
         selectDay(clock.now, source: .initial)
     }
 
-    private func beginHistoricalEntry(at instant: Date) {
+    private func beginHistoricalEntry(
+        at instant: Date,
+        allowedRangeOverride: Range<Date>? = nil
+    ) {
         let targetDay = calendar.startOfDay(for: instant)
         guard TemporalHistoryPresentation.allowsHistoricalEntry(
             at: instant,
@@ -576,11 +641,88 @@ struct HistoryView: View {
         // to now remains valid without offering a future time.
         let nowExclusiveEnd = calendar.date(byAdding: .second, value: 1, to: clock.now) ?? clock.now
         let end = min(dayEnd, nowExclusiveEnd)
-        guard instant < end else { return }
-        directHistoricalEntry = DirectHistoricalEntryPresentation(
-            initialInstant: instant,
-            allowedRange: targetDay ..< end
+        let allowedRange = allowedRangeOverride ?? targetDay ..< end
+        guard allowedRange.lowerBound < allowedRange.upperBound else { return }
+        let initialInstant = min(
+            max(instant, allowedRange.lowerBound),
+            allowedRange.upperBound.addingTimeInterval(-1)
         )
+        directHistoricalEntry = DirectHistoricalEntryPresentation(
+            initialInstant: initialInstant,
+            allowedRange: allowedRange
+        )
+    }
+
+    private func beginHistoricalEntry(for group: TemporalEventGroup) {
+        guard let range = allowedRange(for: group) else { return }
+        let midpoint = group.bucket.start.addingTimeInterval(group.bucket.interval.duration / 2)
+        beginHistoricalEntry(
+            at: midpoint,
+            allowedRangeOverride: range
+        )
+    }
+
+    private func allowedRange(for group: TemporalEventGroup) -> Range<Date>? {
+        guard let dayInterval = calendar.dateInterval(of: .day, for: selectedDate) else {
+            return nil
+        }
+        let nowExclusive = calendar.date(byAdding: .second, value: 1, to: clock.now) ?? clock.now
+        let lower = max(group.bucket.start, dayInterval.start)
+        let upper = min(min(group.bucket.end, dayInterval.end), nowExclusive)
+        guard lower < upper else { return nil }
+        return lower ..< upper
+    }
+
+    private func refreshedGroup(
+        for original: TemporalEventGroup,
+        mutation: HistoryEventGroupMutation
+    ) -> TemporalEventGroup? {
+        guard let visibleInterval = settledVisibleWindow?.interval
+            ?? TemporalHistoryPresentation.calendarDayWindow(
+                containing: selectedDate,
+                calendar: calendar
+            )?.interval
+        else { return nil }
+        let queriedFoods = (try? modelContext.fetch(FetchDescriptor<FoodEntryRecord>())) ?? []
+        let queriedDrinks = (try? modelContext.fetch(FetchDescriptor<HydrationEntryRecord>())) ?? []
+        var presentationCalendar = calendar
+        presentationCalendar.timeZone = timeZone
+        let groups = TemporalEventGrouping.project(
+            makeRibbonEvents(foods: queriedFoods, drinks: queriedDrinks).map(\.groupingInput),
+            in: visibleInterval,
+            calendar: presentationCalendar
+        ).compactMap(\.group)
+        let oldReferences = Set(original.memberReferences)
+        return groups.first { refreshed in
+            guard refreshed.family == original.family,
+                  refreshed.presentationCategory == original.presentationCategory,
+                  refreshed.bucket == original.bucket
+            else {
+                return false
+            }
+            let refreshedReferences = Set(refreshed.memberReferences)
+            switch mutation {
+            case let .saved(reference):
+                return reference.family == original.family
+                    && oldReferences.contains(reference)
+                    && oldReferences.isSubset(of: refreshedReferences)
+            case let .deleted(reference):
+                guard reference.family == original.family else { return false }
+                return oldReferences.subtracting([reference]).isSubset(of: refreshedReferences)
+            }
+        }
+    }
+
+    private func refreshGroupSurface(
+        for original: TemporalEventGroup,
+        mutation: HistoryEventGroupMutation
+    ) -> TemporalEventGroup? {
+        guard let refreshed = refreshedGroup(for: original, mutation: mutation) else {
+            eventGroupDisclosure = nil
+            return nil
+        }
+        eventGroupDisclosure = refreshed
+        return refreshed
     }
 
     private var ribbonIntervals: [TemporalRibbonIntervalItem] {
@@ -594,7 +736,14 @@ struct HistoryView: View {
     }
 
     private var ribbonEvents: [TemporalRibbonEventItem] {
-        let foods = foodEntries.map { food in
+        makeRibbonEvents(foods: foodEntries, drinks: hydrationEntries)
+    }
+
+    private func makeRibbonEvents(
+        foods: [FoodEntryRecord],
+        drinks: [HydrationEntryRecord]
+    ) -> [TemporalRibbonEventItem] {
+        let foods = foods.map { food in
             TemporalRibbonEventItem(
                 id: food.id,
                 occurredAt: food.occurredAt,
@@ -609,7 +758,7 @@ struct HistoryView: View {
                 kind: .food
             )
         }
-        let drinks = hydrationEntries.map { drink in
+        let drinks = drinks.map { drink in
             TemporalRibbonEventItem(
                 id: drink.id,
                 occurredAt: drink.occurredAt,
@@ -826,7 +975,8 @@ private struct VisibleFastItem: Identifiable {
 
     var ribbonKind: TemporalRibbonIntervalItem.Kind {
         switch kind {
-        case .recorded, .active: .recorded
+        case .recorded: .recorded
+        case .active: .active
         case .automatic: .automatic
         case .previouslySaved: .previouslySaved
         }

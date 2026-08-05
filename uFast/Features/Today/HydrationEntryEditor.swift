@@ -40,7 +40,9 @@ struct HydrationEntryEditor: View {
                 Section("Drink") {
                     Picker("Type", selection: $type) {
                         ForEach(HydrationDrinkType.allCases, id: \.self) { Text($0.displayName).tag($0) }
-                    }.accessibilityIdentifier("drink.type")
+                    }
+                    .accessibilityValue(type.displayName)
+                    .accessibilityIdentifier("drink.type")
                     if type == .custom {
                         TextField("Drink name", text: $name).accessibilityIdentifier("drink.name")
                     }
@@ -55,7 +57,9 @@ struct HydrationEntryEditor: View {
                 }
                 Section("Time") {
                     DatePicker("Date", selection: $occurredAt, in: datePickerRange, displayedComponents: .date)
+                        .accessibilityIdentifier("drink.date")
                     DatePicker("Time", selection: $occurredAt, in: datePickerRange, displayedComponents: .hourAndMinute)
+                        .accessibilityIdentifier("drink.time")
                 }
                 Section {
                     Picker("Fasting classification", selection: $isCaloric) {
@@ -63,6 +67,7 @@ struct HydrationEntryEditor: View {
                         Text("Caloric").tag(true)
                     }
                     .pickerStyle(.segmented)
+                    .accessibilityValue(isCaloric ? "Caloric" : "Non-caloric")
                     .accessibilityIdentifier("drink.caloric")
                     Text("Used as a fasting boundary. If it falls during your active fast, saving it ends the fast at this time.")
                         .font(.footnote).foregroundStyle(UFastTheme.secondaryText)

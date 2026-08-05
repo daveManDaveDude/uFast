@@ -54,6 +54,47 @@ final class HistoryUITests: XCTestCase {
     }
 
     @MainActor
+    func testHistoryKeepsActiveFastLabelOnSelectedPageAcrossMidnight() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/London") ?? .current
+        let day = calendar.startOfDay(for: start)
+        let beforeMidnight = calendar.date(
+            bySettingHour: 19,
+            minute: 6,
+            second: 0,
+            of: day
+        ) ?? start
+        let nextDay = calendar.date(byAdding: .day, value: 1, to: day) ?? start
+        let afterMidnight = calendar.date(
+            bySettingHour: 13,
+            minute: 19,
+            second: 0,
+            of: nextDay
+        ) ?? start
+
+        let app = XCUIApplication()
+        app.launchArguments = launchArguments(now: beforeMidnight, resetData: true)
+            + ["-AppleInterfaceStyle", "Dark"]
+        app.launch()
+        completeOnboarding(in: app)
+        app.buttons["fast.start"].tap()
+
+        app.terminate()
+        app.launchArguments = launchArguments(now: afterMidnight)
+            + ["-AppleInterfaceStyle", "Dark"]
+        app.launch()
+        app.tabBars.buttons["History"].tap()
+
+        let activeFast = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Started fast")
+        ).firstMatch
+        XCTAssertTrue(activeFast.waitForExistence(timeout: 2))
+        XCTAssertTrue(activeFast.label.contains("19:06"))
+        XCTAssertTrue(activeFast.label.contains("13:19"))
+        captureScreenshot(named: "history-active-fast-midnight-seam", in: app)
+    }
+
+    @MainActor
     func testHistorySwipeButtonsAndDateChipShareOneSelectedDay() {
         let app = launchOnboardedHistory()
         app.tabBars.buttons["History"].tap()
@@ -73,7 +114,7 @@ final class HistoryUITests: XCTestCase {
         todayChip.tap()
         XCTAssertEqual(selectedDate.label, todayLabel)
 
-        let carousel = app.otherElements["history.day-carousel"]
+        let carousel = app.scrollViews["history.day-carousel"]
         XCTAssertTrue(carousel.waitForExistence(timeout: 2))
         carousel.swipeRight(velocity: .slow)
         XCTAssertNotEqual(selectedDate.label, todayLabel)
@@ -175,7 +216,7 @@ final class HistoryUITests: XCTestCase {
         )
         let initialAnchorX = todayChip.frame.midX
 
-        let carousel = app.otherElements["history.day-carousel"]
+        let carousel = app.scrollViews["history.day-carousel"]
         XCTAssertTrue(carousel.waitForExistence(timeout: 2))
         carousel.swipeRight(velocity: .slow)
 
@@ -206,7 +247,7 @@ final class HistoryUITests: XCTestCase {
         app.buttons["history.next-day"].tap()
         XCTAssertEqual(selectedDate.label, todayLabel)
 
-        let carousel = app.otherElements["history.day-carousel"]
+        let carousel = app.scrollViews["history.day-carousel"]
         XCTAssertTrue(carousel.waitForExistence(timeout: 2))
 
         carousel.swipeRight(velocity: .fast)
@@ -281,7 +322,7 @@ final class HistoryUITests: XCTestCase {
             "temporal.date.\(canonicalDecemberDay.timeIntervalSince1970)"
         ].waitForExistence(timeout: 2))
         XCTAssertTrue(
-            app.otherElements["history.day-carousel"].waitForExistence(timeout: 2)
+            app.scrollViews["history.day-carousel"].waitForExistence(timeout: 2)
         )
         captureScreenshot(named: "history-year-boundary-en-GB", in: app)
 
@@ -357,7 +398,7 @@ final class HistoryUITests: XCTestCase {
             app.tabBars.buttons["History"].tap()
             XCTAssertTrue(app.staticTexts["history.selected-date"].waitForExistence(timeout: 2))
             app.buttons["history.previous-day"].tap()
-            XCTAssertTrue(app.otherElements["history.day-carousel"].exists)
+            XCTAssertTrue(app.scrollViews["history.day-carousel"].exists)
             captureScreenshot(
                 named: "history-midnight-marker-accessibility-\(configuration.name)",
                 in: app
@@ -443,9 +484,10 @@ final class HistoryUITests: XCTestCase {
             caloric: true,
             in: app
         )
+        XCTAssertTrue(app.staticTexts["Sparkling water"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Orange juice"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS %@", "Caloric drink")
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Mixed fasting classifications")
         ).firstMatch.exists)
     }
 
@@ -462,19 +504,28 @@ final class HistoryUITests: XCTestCase {
         app.tabBars.buttons["History"].tap()
         app.buttons["history.previous-day"].tap()
         app.buttons["history.previous-day"].tap()
+        let carousel = app.scrollViews["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 2))
+        let settledExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "Settled"),
+            object: carousel
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [settledExpectation], timeout: 5), .completed)
 
-        let breakfast = app.buttons.matching(
+        let breakfastCandidates = app.otherElements["history.event-info-panel"].buttons.matching(
             NSPredicate(
                 format: "label CONTAINS %@ AND enabled == true",
                 "Breakfast"
             )
-        ).firstMatch
+        )
+        XCTAssertGreaterThan(breakfastCandidates.count, 0)
+        let breakfast = breakfastCandidates.element(boundBy: breakfastCandidates.count - 1)
         XCTAssertTrue(breakfast.waitForExistence(timeout: 2))
-        if !breakfast.isHittable {
+        if !breakfast.isHittable || breakfast.frame.maxY > app.frame.maxY - 120 {
             app.swipeUp()
         }
         XCTAssertTrue(breakfast.isHittable)
-        breakfast.tap()
+        breakfast.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
         XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 2))
         XCTAssertTrue((app.buttons["Date Picker"].value as? String)?.contains("17 Nov 2042") == true)
@@ -538,7 +589,10 @@ final class HistoryUITests: XCTestCase {
         app.tabBars.buttons["History"].tap()
 
         XCTAssertTrue(app.staticTexts["No completed fasts"].waitForExistence(timeout: 2))
-        XCTAssertFalse(recordedFastRow(in: app).exists)
+        let deletedRow = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Recorded fast")
+        ).firstMatch
+        XCTAssertFalse(deletedRow.exists)
     }
 
     @MainActor
@@ -696,7 +750,8 @@ final class HistoryUITests: XCTestCase {
         let row = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Recorded fast")
         ).firstMatch
-        for _ in 0 ..< 4 where !row.exists {
+        XCTAssertTrue(row.waitForExistence(timeout: 5), app.debugDescription)
+        if !row.isHittable {
             app.swipeUp()
         }
         return row

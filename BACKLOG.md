@@ -147,6 +147,24 @@ implementation-ready stories are in
 - OW-395 P0 — Preserve explicit fast start and manual event entry.
 - OW-396 P0 — Migrate safely and complete the quality gate.
 
+## Slice 3.11 — Settled History event grouping
+
+The implementation-ready stories and acceptance contract are in
+`SLICE_3_11_HISTORY_EVENT_GROUPING_STORIES.md`.
+
+- OW-397 P0 — Establish deterministic two-hour event grouping. **Done 3 August 2026.**
+- OW-398 P0 — Group settled calendar markers and the information panel. **Done 3 August 2026.**
+- OW-399 P0 — Disclose exact times and manage grouped events. **Done 3 August 2026.**
+- OW-400 P0 — Add atomic group deletion and complete the quality gate. **Done 3 August 2026.**
+
+Post-delivery refinement: OW-401 — Edit grouped History members directly.
+**Done 4 August 2026.** This refinement supersedes the grouped-event portions
+of OW-399 and OW-400: the exact-times disclosure is the only group surface;
+members open the existing food or drink editor directly; and Edit group, the
+group-manager sheet, pencil controls, manager Done, bulk Delete group and
+returning from an item editor to the manager no longer exist. Add event remains
+bucket-constrained, and individual deletion remains available in each editor.
+
 ## Slice 4 — Apple Health
 
 Deferred beyond 1.0; requires a new product, privacy and App Review decision.

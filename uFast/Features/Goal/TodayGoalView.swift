@@ -326,10 +326,10 @@ struct TodayGoalView: View {
                                     .foregroundStyle(UFastTheme.secondaryText)
                                     .accessibilityHidden(true)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .frame(minHeight: 44)
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(timelineAccessibilityLabel(entry))
                         .accessibilityValue("\(timelineDetail(entry)), " + entry.occurredAt.formatted(date: .omitted, time: .shortened))

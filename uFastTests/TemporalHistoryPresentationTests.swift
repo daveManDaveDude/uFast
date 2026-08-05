@@ -104,6 +104,84 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertFalse(try XCTUnwrap(result.first { $0.id == overnight.id }).continuesAfter)
     }
 
+    func testLiveIntervalContinuationKeepsAdjacentPageBackgroundSeamless() {
+        XCTAssertTrue(
+            TemporalHistoryPresentation.intervalContinuationShowsContent(
+                isActive: true,
+                continuesBefore: false,
+                isSelectedPage: true
+            )
+        )
+        XCTAssertTrue(
+            TemporalHistoryPresentation.intervalContinuationShowsContent(
+                isActive: true,
+                continuesBefore: true,
+                isSelectedPage: true
+            )
+        )
+        XCTAssertFalse(
+            TemporalHistoryPresentation.intervalContinuationShowsContent(
+                isActive: true,
+                continuesBefore: true,
+                isSelectedPage: false
+            )
+        )
+        XCTAssertFalse(
+            TemporalHistoryPresentation.intervalContinuationShowsContent(
+                isActive: true,
+                continuesBefore: false,
+                isSelectedPage: false
+            )
+        )
+        XCTAssertTrue(
+            TemporalHistoryPresentation.intervalContinuationShowsContent(
+                isActive: false,
+                continuesBefore: true,
+                isSelectedPage: false
+            )
+        )
+        XCTAssertFalse(TemporalHistoryPresentation.intervalContinuationShowsMarkers(isActive: true))
+        XCTAssertTrue(TemporalHistoryPresentation.intervalContinuationShowsMarkers(isActive: false))
+    }
+
+    func testOvernightIntervalLaneOrderUsesOriginalStartsAcrossMidnight() throws {
+        let calendar = try londonCalendar()
+        let longInterval = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000011")),
+            start: date(2026, 7, 21, 20, calendar: calendar),
+            end: date(2026, 7, 23, 8, calendar: calendar)
+        )
+        let shortInterval = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000012")),
+            start: date(2026, 7, 22, 22, calendar: calendar),
+            end: date(2026, 7, 23, 2, calendar: calendar)
+        )
+        let firstWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.ribbonWindow(
+                containing: date(2026, 7, 22, 12, calendar: calendar),
+                calendar: calendar
+            )
+        )
+        let nextWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.ribbonWindow(
+                containing: date(2026, 7, 23, 12, calendar: calendar),
+                calendar: calendar
+            )
+        )
+
+        let firstLongSegment = try XCTUnwrap(
+            TemporalHistoryPresentation.clip([longInterval, shortInterval], to: firstWindow)
+                .first(where: { $0.id == longInterval.id })
+        )
+        let nextLongSegment = try XCTUnwrap(
+            TemporalHistoryPresentation.clip([longInterval, shortInterval], to: nextWindow)
+                .first(where: { $0.id == longInterval.id })
+        )
+
+        XCTAssertEqual(firstLongSegment.lane, 0)
+        XCTAssertEqual(nextLongSegment.lane, firstLongSegment.lane)
+    }
+
     func testContinuationAcrossViewportAndMonthYearBoundary() throws {
         let calendar = try londonCalendar()
         let day = try date(2027, 1, 1, 12, calendar: calendar)
@@ -1073,6 +1151,23 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertGreaterThan(wide.contentWidth, narrow.contentWidth)
         XCTAssertGreaterThan(accessible.contentWidth, narrow.contentWidth)
         XCTAssertGreaterThan(accessible.eventLaneHeight, narrow.eventLaneHeight)
+    }
+
+    func testShortIntervalGeometryDoesNotOverrunItsTemporalWidth() {
+        XCTAssertEqual(
+            TemporalRibbonGeometry.intervalCornerRadius(
+                visibleWidth: 12,
+                preferredRadius: 20
+            ),
+            6
+        )
+        XCTAssertEqual(
+            TemporalRibbonGeometry.intervalCornerRadius(
+                visibleWidth: 80,
+                preferredRadius: 20
+            ),
+            20
+        )
     }
 
     func testRailSettlementUsesNearestVisualCentreAndDeterministicTieBreak() throws {

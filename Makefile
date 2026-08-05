@@ -4,6 +4,7 @@ PROJECT := uFast.xcodeproj
 SCHEME := uFast
 DERIVED_DATA := .derived-data
 SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
+UI_TEST_WORKERS ?= 4
 
 .PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint format verify-local-only clean
 
@@ -49,6 +50,9 @@ test-ui: project
 		-destination '$(SIMULATOR)' \
 		-derivedDataPath "$(DERIVED_DATA)" \
 		-only-testing:uFastUITests \
+		-parallel-testing-enabled YES \
+		-parallel-testing-worker-count "$(UI_TEST_WORKERS)" \
+		-enableCodeCoverage NO \
 		test
 
 lint:

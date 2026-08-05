@@ -56,6 +56,55 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
     }
 
     @MainActor
+    func testExistingDrinkRowOpensFromItsOpenAreaDuringAnActiveFast() {
+        let app = launch(activeFastStart: now.addingTimeInterval(-3600))
+        app.buttons["drink.add"].tap()
+        app.buttons["drink.favourite.water"].tap()
+
+        let drinkRow = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'timeline.entry.'")
+        ).firstMatch
+        XCTAssertTrue(drinkRow.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0 ..< 4 where !drinkRow.isHittable {
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(drinkRow.isHittable, app.debugDescription)
+
+        drinkRow.coordinate(withNormalizedOffset: CGVector(dx: 0.58, dy: 0.78)).tap()
+
+        XCTAssertTrue(app.navigationBars["Edit drink"].waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    @MainActor
+    func testExistingFoodRowOpensFromItsOpenAreaDuringAnActiveFast() {
+        let app = launch()
+        app.buttons["food.add"].tap()
+        app.textFields["food.description"].typeText("Lunch")
+        let saveFood = app.buttons["food.save"]
+        XCTAssertTrue(saveFood.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForEnabled(saveFood), app.debugDescription)
+        saveFood.tap()
+        XCTAssertTrue(app.navigationBars["Log food"].waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Lunch"].waitForExistence(timeout: 5), app.debugDescription)
+
+        app.buttons["fast.start"].tap()
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 5), app.debugDescription)
+
+        let foodRow = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'timeline.entry.'")
+        ).firstMatch
+        XCTAssertTrue(foodRow.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0 ..< 4 where !foodRow.isHittable {
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(foodRow.isHittable, app.debugDescription)
+
+        foodRow.coordinate(withNormalizedOffset: CGVector(dx: 0.58, dy: 0.78)).tap()
+
+        XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    @MainActor
     private func openCustomEditor(in app: XCUIApplication) {
         let add = app.buttons["drink.add"]
         if !add.isHittable {
@@ -76,6 +125,15 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["drink.add"].waitForExistence(timeout: 2))
         return app
+    }
+
+    @MainActor
+    private func waitForEnabled(_ element: XCUIElement) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isEnabled == true"),
+            object: element
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: 5) == .completed
     }
 }
 

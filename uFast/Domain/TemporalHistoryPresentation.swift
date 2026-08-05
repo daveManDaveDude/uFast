@@ -684,6 +684,13 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
             eventLaneHeight: accessibilitySize ? 56 : 48
         )
     }
+
+    static func intervalCornerRadius(
+        visibleWidth: Double,
+        preferredRadius: Double
+    ) -> Double {
+        min(max(visibleWidth / 2, 0), preferredRadius)
+    }
 }
 
 enum TemporalHistoryPresentation {
@@ -858,6 +865,9 @@ enum TemporalHistoryPresentation {
             )
         }
         .sorted {
+            if $0.originalStart != $1.originalStart {
+                return $0.originalStart < $1.originalStart
+            }
             if $0.visibleStart == $1.visibleStart {
                 if $0.visibleEnd == $1.visibleEnd {
                     return $0.id.uuidString < $1.id.uuidString
@@ -886,6 +896,18 @@ enum TemporalHistoryPresentation {
                 lane: lane
             )
         }
+    }
+
+    static func intervalContinuationShowsContent(
+        isActive: Bool,
+        continuesBefore _: Bool,
+        isSelectedPage: Bool
+    ) -> Bool {
+        !isActive || isSelectedPage
+    }
+
+    static func intervalContinuationShowsMarkers(isActive: Bool) -> Bool {
+        !isActive
     }
 
     static func chronological(_ values: [TemporalEventOrderingValue]) -> [TemporalEventOrderingValue] {
