@@ -405,12 +405,12 @@ extension TemporalEventGroupingTests {
             TemporalEventMarkerMetrics.make(category: $0, accessibilitySize: false)
         }
 
-        XCTAssertEqual(metrics.map(\.rowTop), [122, 166, 210])
+        XCTAssertEqual(metrics.map(\.rowTop), [122, 174, 226])
         XCTAssertEqual(metrics.map(\.tileSize), [26, 26, 26])
         XCTAssertTrue(metrics.allSatisfy { $0.hitHeight >= 44 && $0.cellHeight <= $0.rowHeight })
         XCTAssertLessThanOrEqual(
             (metrics.last?.rowTop ?? 0) + (metrics.last?.cellHeight ?? 0),
-            258
+            268
         )
 
         let accessibilityMetrics = categories.map {

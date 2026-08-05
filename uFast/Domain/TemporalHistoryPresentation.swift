@@ -900,10 +900,11 @@ enum TemporalHistoryPresentation {
 
     static func intervalContinuationShowsContent(
         isActive: Bool,
-        continuesBefore _: Bool,
+        continuesBefore: Bool,
+        continuesAfter: Bool = false,
         isSelectedPage: Bool
     ) -> Bool {
-        !isActive || isSelectedPage
+        !isActive || isSelectedPage || continuesBefore || continuesAfter
     }
 
     static func intervalContinuationShowsMarkers(isActive: Bool) -> Bool {

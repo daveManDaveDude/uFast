@@ -423,14 +423,14 @@ struct TemporalEventMarkerMetrics: Equatable, Sendable {
     let labelGap: Double
     let hitHeight: Double
 
-    static let normalRibbonHeight = 260.0
+    static let normalRibbonHeight = 268.0
     static let accessibilityRibbonHeight = 320.0
 
     static func make(
         category: TemporalEventPresentationCategory,
         accessibilitySize: Bool
     ) -> Self {
-        let rowHeight = accessibilitySize ? 60.0 : 44.0
+        let rowHeight = accessibilitySize ? 68.0 : 52.0
         let rowIndex = category.sortOrder
         return Self(
             ribbonHeight: accessibilitySize ? accessibilityRibbonHeight : normalRibbonHeight,

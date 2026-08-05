@@ -87,12 +87,12 @@ final class HistoryEventGroupingUITests: XCTestCase {
         let app = launchHistory(additionalArguments: ["-AppleLocale", "en_GB"])
         app.tabBars.buttons["History"].tap()
 
-        app.buttons[ungroupedDrinkRowID].firstMatch.tap()
+        tapUngroupedEvent(ungroupedDrinkRowID, in: app)
         XCTAssertTrue(app.navigationBars["Edit drink"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.buttons["drink.type"].value as? String, "Tea")
         app.navigationBars["Edit drink"].buttons["Cancel"].tap()
 
-        app.buttons[ungroupedFoodRowID].firstMatch.tap()
+        tapUngroupedEvent(ungroupedFoodRowID, in: app)
         XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.textFields["food.description"].value as? String, "Snack")
         app.navigationBars["Edit food"].buttons["Cancel"].tap()
@@ -239,8 +239,7 @@ final class HistoryEventGroupingUITests: XCTestCase {
 
         XCTAssertTrue(app.otherElements["history.event-group.disclosure"].waitForNonExistence(timeout: 3))
         XCTAssertTrue(app.buttons[groupMarkerIdentifier].waitForNonExistence(timeout: 3))
-        XCTAssertTrue(app.buttons[ungroupedDrinkRowID].firstMatch.waitForExistence(timeout: 3))
-        app.buttons[ungroupedDrinkRowID].firstMatch.tap()
+        tapUngroupedEvent(ungroupedDrinkRowID, in: app)
         XCTAssertTrue(app.navigationBars["Edit drink"].waitForExistence(timeout: 3))
     }
 
@@ -315,6 +314,30 @@ final class HistoryEventGroupingUITests: XCTestCase {
         }
         XCTAssertTrue(member.isHittable, app.debugDescription)
         member.tap()
+    }
+
+    @MainActor
+    private func tapUngroupedEvent(_ identifier: String, in app: XCUIApplication) {
+        let panel = app.otherElements["history.event-info-panel"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 5), app.debugDescription)
+        let event = panel.buttons[identifier].firstMatch
+        XCTAssertTrue(event.waitForExistence(timeout: 5), app.debugDescription)
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isHittable == true"),
+            object: event
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [expectation], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        let content = app.scrollViews["history.content"]
+        XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0 ..< 3 where event.frame.maxY > app.frame.maxY - 120 {
+            content.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(event.isHittable, app.debugDescription)
+        event.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     @MainActor

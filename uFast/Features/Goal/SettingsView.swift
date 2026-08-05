@@ -157,6 +157,7 @@ struct SettingsView: View {
             ) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete everything", role: .destructive) {
+                    isFinalDeleteConfirmationPresented = false
                     deleteAllData()
                 }
             } message: {

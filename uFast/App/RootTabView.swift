@@ -34,7 +34,11 @@ struct RootTabView: View {
         case .settings:
             SettingsView()
         case .history:
-            HistoryView(clock: clock, isTabSelected: selection == .history)
+            HistoryView(
+                clock: clock,
+                isTabSelected: selection == .history,
+                onSelectToday: { selection = .today }
+            )
         }
     }
 }

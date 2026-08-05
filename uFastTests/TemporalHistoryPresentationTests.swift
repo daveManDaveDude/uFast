@@ -119,7 +119,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
                 isSelectedPage: true
             )
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
             TemporalHistoryPresentation.intervalContinuationShowsContent(
                 isActive: true,
                 continuesBefore: true,
@@ -130,6 +130,14 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             TemporalHistoryPresentation.intervalContinuationShowsContent(
                 isActive: true,
                 continuesBefore: false,
+                isSelectedPage: false
+            )
+        )
+        XCTAssertTrue(
+            TemporalHistoryPresentation.intervalContinuationShowsContent(
+                isActive: true,
+                continuesBefore: true,
+                continuesAfter: true,
                 isSelectedPage: false
             )
         )

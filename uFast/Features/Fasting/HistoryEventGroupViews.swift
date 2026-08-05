@@ -9,11 +9,14 @@ struct GroupMarkerAccessibilityModifier: ViewModifier {
     let group: TemporalEventGroup?
     let member: TemporalEventGroupingInput?
     let prefix: String
+    let usesVisualEventIdentifier: Bool
 
     func body(content: Content) -> some View {
         guard let group else {
             guard let member else { return AnyView(content) }
-            let identifier = "\(prefix).event.\(member.reference.id.uuidString)"
+            let identifier = "\(prefix)."
+                + (usesVisualEventIdentifier ? "visual-event" : "event")
+                + ".\(member.reference.id.uuidString)"
             return AnyView(
                 content
                     .accessibilityLabel(member.accessibilityLabel)

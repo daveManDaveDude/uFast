@@ -47,10 +47,17 @@ final class HistoryUITests: XCTestCase {
         app.tabBars.buttons["History"].tap()
 
         let activeFast = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Started fast")
+            NSPredicate(format: "label BEGINSWITH %@", "Active Fast")
         ).firstMatch
         XCTAssertTrue(activeFast.waitForExistence(timeout: 2))
-        XCTAssertTrue(activeFast.label.contains("end"))
+        XCTAssertFalse(activeFast.label.contains("end"))
+        XCTAssertTrue(activeFast.label.contains("duration"))
+        XCTAssertTrue(app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "history.active-fast.")
+        ).firstMatch.exists)
+
+        activeFast.tap()
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -86,11 +93,12 @@ final class HistoryUITests: XCTestCase {
         app.tabBars.buttons["History"].tap()
 
         let activeFast = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Started fast")
+            NSPredicate(format: "label BEGINSWITH %@", "Active Fast")
         ).firstMatch
         XCTAssertTrue(activeFast.waitForExistence(timeout: 2))
         XCTAssertTrue(activeFast.label.contains("19:06"))
-        XCTAssertTrue(activeFast.label.contains("13:19"))
+        XCTAssertTrue(activeFast.label.contains("18:13:00"))
+        XCTAssertFalse(activeFast.label.contains("end"))
         captureScreenshot(named: "history-active-fast-midnight-seam", in: app)
     }
 

@@ -769,6 +769,7 @@ struct TemporalHistoryCarousel: View {
             showsSemanticItems: false,
             usesContinuousSurface: true,
             includesSemanticItems: false,
+            hidesVisualEventAccessibility: true,
             // A moving page should retain the same complete interval
             // treatment as the settled page instead of dropping active-fast
             // labels at the page seam. At rest, preserve the selected-page
@@ -1037,6 +1038,7 @@ struct TemporalRibbonView: View {
     var usesContinuousSurface = false
     var showsVisualRibbon = true
     var includesSemanticItems = true
+    var hidesVisualEventAccessibility = false
     var isSelectedPage = true
     var windowOverride: TemporalRibbonWindow?
     var emptySemanticMessage = "No recorded items for this date."
@@ -1276,6 +1278,7 @@ struct TemporalRibbonView: View {
                 let showsContent = TemporalHistoryPresentation.intervalContinuationShowsContent(
                     isActive: item.kind == .active,
                     continuesBefore: segment.continuesBefore,
+                    continuesAfter: segment.continuesAfter,
                     isSelectedPage: isSelectedPage
                 )
                 let showsContinuationMarkers = TemporalHistoryPresentation
@@ -1292,7 +1295,7 @@ struct TemporalRibbonView: View {
                             Image(systemName: intervalSymbol(item.kind))
                                 .accessibilityHidden(true)
                             if markWidth >= 84 {
-                                Text(item.title).lineLimit(1)
+                                Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
                             }
                         }
                         if showsContinuationMarkers, segment.continuesAfter, markWidth >= 60 {
@@ -1324,6 +1327,11 @@ struct TemporalRibbonView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(onSelectInterval == nil)
+                .accessibilityIdentifier(
+                    item.kind == .active
+                        ? "history.active-fast.\(item.id.uuidString)"
+                        : "history.interval.\(item.id.uuidString)"
+                )
                 .offset(
                     x: startX - horizontalHitPadding,
                     y: 54 + Double(segment.lane) * (policy.intervalLaneHeight + 6)
@@ -1427,12 +1435,13 @@ struct TemporalRibbonView: View {
         .contentShape(Rectangle())
         .offset(x: buttonOffsetX, y: metrics.rowTop)
         .zIndex(1)
-        .accessibilityHidden(group == nil && includesSemanticItems)
         .modifier(GroupMarkerAccessibilityModifier(
             group: group,
             member: member,
-            prefix: accessibilityIdentifierPrefix
+            prefix: accessibilityIdentifierPrefix,
+            usesVisualEventIdentifier: hidesVisualEventAccessibility
         ))
+        .accessibilityHidden(group == nil && (includesSemanticItems || hidesVisualEventAccessibility))
     }
 
     private func eventMarkerLabel(
@@ -1465,6 +1474,7 @@ struct TemporalRibbonView: View {
                         )
                         .background(UFastTheme.action)
                         .clipShape(Capsule())
+                        .offset(y: -10)
                         .accessibilityHidden(true)
                 }
             }
@@ -1481,7 +1491,6 @@ struct TemporalRibbonView: View {
             }
         }
         .frame(width: cellWidth, height: metrics.cellHeight, alignment: .top)
-        .clipped()
     }
 
     @ViewBuilder
@@ -1503,12 +1512,18 @@ struct TemporalRibbonView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: size, height: size)
+                .scaleEffect(4.0 / 3.0)
+                .frame(width: size, height: size)
+                .clipped()
                 .accessibilityHidden(true)
         case .nonCaloricDrink:
             Image("HistoryNonCaloricDrink")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: size, height: size)
+                .scaleEffect(4.0 / 3.0)
+                .frame(width: size, height: size)
+                .clipped()
                 .accessibilityHidden(true)
         }
     }
@@ -1789,6 +1804,18 @@ struct TemporalRibbonView: View {
         case .caloricDrink: "cup.and.saucer.fill"
         case .nonCaloricDrink: "drop"
         }
+    }
+
+    private func intervalTitle(
+        _ item: TemporalRibbonIntervalItem,
+        markWidth: Double
+    ) -> String {
+        guard item.kind == .active else { return item.title }
+        guard markWidth >= 180 else { return "Active Fast" }
+        let elapsed = ActiveElapsedTimeFormatter.string(
+            from: item.end.timeIntervalSince(item.start)
+        )
+        return "Active Fast \(elapsed)"
     }
 }
 

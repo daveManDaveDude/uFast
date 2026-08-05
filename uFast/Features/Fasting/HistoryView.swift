@@ -35,10 +35,16 @@ struct HistoryView: View {
 
     private let clock: any AppClock
     private let isTabSelected: Bool
+    private let onSelectToday: () -> Void
 
-    init(clock: any AppClock = SystemAppClock(), isTabSelected: Bool = true) {
+    init(
+        clock: any AppClock = SystemAppClock(),
+        isTabSelected: Bool = true,
+        onSelectToday: @escaping () -> Void = {}
+    ) {
         self.clock = clock
         self.isTabSelected = isTabSelected
+        self.onSelectToday = onSelectToday
         _selectedDate = State(initialValue: clock.now)
     }
 
@@ -76,32 +82,34 @@ struct HistoryView: View {
                     .allowsHitTesting(!temporalMovementPhase.suppressesAutomaticAlignment)
                     .id(historyInteractionRevision)
 
-                    TemporalHistoryCarousel(
-                        dates: historyDates,
-                        selection: selectedDateBinding(source: .carousel),
-                        intervals: ribbonIntervals,
-                        events: ribbonEvents,
-                        onSelectInterval: openInterval,
-                        onSelectEvent: openEvent,
-                        onSelectEventGroup: { group in
-                            eventGroupDisclosure = group
-                        },
-                        onSelectEmpty: { instant in
-                            beginHistoricalEntry(at: instant)
-                        },
-                        onNavigateDay: navigateDay,
-                        canNavigateForward: canNavigateForward,
-                        allowsRecordActivation: !isFutureSelection,
-                        allowsEmptySelection: !isFutureSelection,
-                        showsTimelineDetails: showsSettledHistoryDetails,
-                        presentationDay: selectedDate,
-                        readOnlyFromDate: clock.now,
-                        onMovementPhaseChange: updateTemporalMovementPhase,
-                        onCoupledPresentationChange: coupledScrollPresentation.handle,
-                        onSettledVisibleWindow: { window in settledVisibleWindow = window }
-                    )
-                    .padding(.horizontal, UFastTheme.Spacing.standard)
-                    .allowsHitTesting(!isDateRailMoving)
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        TemporalHistoryCarousel(
+                            dates: historyDates,
+                            selection: selectedDateBinding(source: .carousel),
+                            intervals: ribbonIntervals,
+                            events: ribbonEvents,
+                            onSelectInterval: openInterval,
+                            onSelectEvent: openEvent,
+                            onSelectEventGroup: { group in
+                                eventGroupDisclosure = group
+                            },
+                            onSelectEmpty: { instant in
+                                beginHistoricalEntry(at: instant)
+                            },
+                            onNavigateDay: navigateDay,
+                            canNavigateForward: canNavigateForward,
+                            allowsRecordActivation: !isFutureSelection,
+                            allowsEmptySelection: !isFutureSelection,
+                            showsTimelineDetails: showsSettledHistoryDetails,
+                            presentationDay: selectedDate,
+                            readOnlyFromDate: clock.now,
+                            onMovementPhaseChange: updateTemporalMovementPhase,
+                            onCoupledPresentationChange: coupledScrollPresentation.handle,
+                            onSettledVisibleWindow: { window in settledVisibleWindow = window }
+                        )
+                        .padding(.horizontal, UFastTheme.Spacing.standard)
+                        .allowsHitTesting(!isDateRailMoving)
+                    }
 
                     if isFutureSelection {
                         futureReadOnlyNotice
@@ -114,13 +122,16 @@ struct HistoryView: View {
                             .accessibilityHidden(!showsSettledHistoryDetails)
                     }
 
-                    fastHistoryDetails
-                        .opacity(showsSettledHistoryDetails ? 1 : 0)
-                        .allowsHitTesting(showsSettledHistoryDetails)
-                        .accessibilityHidden(!showsSettledHistoryDetails)
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        fastHistoryDetails
+                            .opacity(showsSettledHistoryDetails ? 1 : 0)
+                            .allowsHitTesting(showsSettledHistoryDetails)
+                            .accessibilityHidden(!showsSettledHistoryDetails)
+                    }
                 }
                 .padding(.vertical, UFastTheme.Spacing.standard)
             }
+            .accessibilityIdentifier("history.content")
         }
         .onAppear {
             ensureHistoryDayCoverage(around: selectedDate)
@@ -876,6 +887,10 @@ struct HistoryView: View {
     }
 
     private func openInterval(_ id: UUID) {
+        if activeFasts.contains(where: { $0.id == id }) {
+            onSelectToday()
+            return
+        }
         if let fast = completedFasts.first(where: { $0.id == id }), let end = fast.endDate {
             if fast.origin == .recorded {
                 editor = CompletedFastEditorPresentation(id: fast.id, startDate: fast.startDate, endDate: end)
@@ -884,6 +899,10 @@ struct HistoryView: View {
     }
 
     private func openVisibleFast(_ item: VisibleFastItem) {
+        if item.kind == .active {
+            onSelectToday()
+            return
+        }
         guard item.kind == .recorded,
               let fast = item.fast,
               let endDate = fast.endDate
@@ -967,7 +986,7 @@ private struct VisibleFastItem: Identifiable {
     var title: String {
         switch kind {
         case .recorded: "Recorded fast"
-        case .active: "Started fast"
+        case .active: "Active Fast"
         case .automatic: "Fast"
         case .previouslySaved: "Previously saved fast"
         }
@@ -987,10 +1006,16 @@ private struct VisibleFastItem: Identifiable {
     }
 
     func detail(context _: TemporalFormattingContext) -> String {
+        let duration = kind == .active
+            ? ActiveElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
+            : ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
         var components = [
-            "start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute())) → end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
-            "duration \(ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate)))",
+            "start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
         ]
+        if kind != .active {
+            components[0] += " → end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
+        }
+        components.append("duration \(duration)")
         if kind == .recorded {
             let goal = fast?.capturedHistoricalGoal ?? .default
             components.append("goal \(goal.hours) hours")
@@ -999,12 +1024,20 @@ private struct VisibleFastItem: Identifiable {
     }
 
     func accessibilityLabel(context _: TemporalFormattingContext) -> String {
+        let duration = kind == .active
+            ? ActiveElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
+            : ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
         var components = [
             title,
             "start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
-            "end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
-            "duration \(ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate)))",
+            "duration \(duration)",
         ]
+        if kind != .active {
+            components.insert(
+                "end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
+                at: 2
+            )
+        }
         if kind == .recorded {
             let goal = fast?.capturedHistoricalGoal ?? .default
             components.append("goal \(goal.hours) hours")
@@ -1022,17 +1055,41 @@ private struct VisibleFastHistoryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
             Text(item.title).font(.headline).foregroundStyle(UFastTheme.primary)
-            Text(ElapsedTimeFormatter.string(from: item.endDate.timeIntervalSince(item.startDate)))
+            Text(item.kind == .active
+                ? ActiveElapsedTimeFormatter.string(from: item.endDate.timeIntervalSince(item.startDate))
+                : ElapsedTimeFormatter.string(from: item.endDate.timeIntervalSince(item.startDate)))
                 .font(.uFastDisplay(.title2)).foregroundStyle(UFastTheme.primary)
             Divider()
-            HStack(alignment: .top, spacing: UFastTheme.Spacing.standard) {
+            if item.kind == .active {
                 fact("Started", item.startDate)
-                fact("Ended", item.endDate)
+            } else {
+                HStack(alignment: .top, spacing: UFastTheme.Spacing.standard) {
+                    fact("Started", item.startDate)
+                    fact("Ended", item.endDate)
+                }
             }
         }
         .uFastCard(accent: item.kind == .recorded || item.kind == .active ? UFastTheme.sage : UFastTheme.sky)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.accessibilityLabel(context: .init(locale: locale, calendar: calendar, timeZone: timeZone)))
+        .accessibilityLabel(historyAccessibilityLabel)
+    }
+
+    private var historyAccessibilityLabel: String {
+        guard item.kind == .active else {
+            return item.accessibilityLabel(
+                context: .init(locale: locale, calendar: calendar, timeZone: timeZone)
+            )
+        }
+
+        let duration = ActiveElapsedTimeFormatter.string(
+            from: item.endDate.timeIntervalSince(item.startDate)
+        )
+        return [
+            item.title,
+            "start \(item.startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
+            "duration \(duration)",
+            "currently active",
+        ].joined(separator: ", ")
     }
 
     private func fact(_ label: String, _ date: Date) -> some View {
