@@ -8,6 +8,7 @@ struct CatchUpFlowView: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
+    @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     @Environment(\.modelContext) private var modelContext
     @Environment(\.timeZone) private var timeZone
     @Query private var settings: [AppSettingsRecord]
@@ -468,6 +469,10 @@ struct CatchUpFlowView: View {
             goal: settings.first?.fastingGoal ?? .default,
             endingActiveFast: endingActiveFast
         )
+        if endingActiveFast {
+            WidgetProjectionSupport.clear()
+            Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+        }
     }
 
     private func saveHydration(
@@ -481,6 +486,10 @@ struct CatchUpFlowView: View {
             goal: settings.first?.fastingGoal ?? .default,
             endingActiveFast: endingActiveFast
         )
+        if endingActiveFast {
+            WidgetProjectionSupport.clear()
+            Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+        }
     }
 
     private func makeFoodRepository() -> SwiftDataFoodEntryRepository {

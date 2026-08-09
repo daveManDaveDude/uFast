@@ -45,7 +45,9 @@ make lint
 ```
 
 The 1.0 release baseline is iPhone-only, targets iOS 26.0, uses bundle ID
-`com.davidmcgrath.uFast`, and is versioned from `project.yml` as 1.0.0 (build 5).
+`com.davidmcgrath.uFast`, and is currently versioned from `project.yml` as
+1.0.0 (build 6). Build 5 is the App Store review candidate; build 6 is the
+current external TestFlight build.
 It has no account, cloud sync, backup, restore, HealthKit, Live Activity,
 notification or analytics dependency. Deleting the app may remove its local
 data; uFast does not provide recovery.
@@ -101,6 +103,7 @@ the uFast Apple Developer identity; simulator builds do not require signing.
 ## Repository documents
 
 - `PRODUCT.md` — promise, goal, user, principles and measures
+- `ROADMAP.md` — current release position and phased post-MVP direction
 - `MVP_SCOPE.md` — MVP boundary and build sequence
 - `DOMAIN_RULES.md` — shared terms and numbered behavioural rules
 - `BACKLOG.md` — ordered starter backlog

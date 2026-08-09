@@ -1,5 +1,8 @@
 # Ordered starter backlog
 
+This file is the delivery ledger for the original slices. The current product
+direction and working post-MVP order are maintained in `ROADMAP.md`.
+
 ## 1.0 release boundary
 
 The `codex/release-1.0` baseline includes the existing manual fasting, food,
@@ -140,12 +143,12 @@ The current-state review, replacement domain contract, migration boundary and
 implementation-ready stories are in
 `SLICE_3_10_AUTOMATIC_FAST_HISTORY_STORIES.md`.
 
-- OW-391 P0 — Establish the automatic-fast domain contract.
-- OW-392 P0 — Project fast history for the settled calendar view.
-- OW-393 P0 — Retire reconstruction and boundary review.
-- OW-394 P0 — Display automatic fasts and complete food details.
-- OW-395 P0 — Preserve explicit fast start and manual event entry.
-- OW-396 P0 — Migrate safely and complete the quality gate.
+- OW-391 P0 — Establish the automatic-fast domain contract. **Done 1 August 2026.**
+- OW-392 P0 — Project fast history for the settled calendar view. **Done 1 August 2026.**
+- OW-393 P0 — Retire reconstruction and boundary review. **Done 1 August 2026.**
+- OW-394 P0 — Display automatic fasts and complete food details. **Done 1 August 2026.**
+- OW-395 P0 — Preserve explicit fast start and manual event entry. **Done 1 August 2026.**
+- OW-396 P0 — Migrate safely and complete the quality gate. **Done 1 August 2026.**
 
 ## Slice 3.11 — Settled History event grouping
 
@@ -157,7 +160,7 @@ The implementation-ready stories and acceptance contract are in
 - OW-399 P0 — Disclose exact times and manage grouped events. **Done 3 August 2026.**
 - OW-400 P0 — Add atomic group deletion and complete the quality gate. **Done 3 August 2026.**
 
-Post-delivery refinement: OW-401 — Edit grouped History members directly.
+Post-delivery refinement: OW-400A — Edit grouped History members directly.
 **Done 4 August 2026.** This refinement supersedes the grouped-event portions
 of OW-399 and OW-400: the exact-times disclosure is the only group surface;
 members open the existing food or drink editor directly; and Edit group, the
@@ -165,40 +168,86 @@ group-manager sheet, pencil controls, manager Done, bulk Delete group and
 returning from an item editor to the manager no longer exist. Add event remains
 bucket-constrained, and individual deletion remains available in each editor.
 
-## Slice 4 — Apple Health
+## Post-MVP candidate backlog
 
-Deferred beyond 1.0; requires a new product, privacy and App Review decision.
+These are candidate story seeds ordered by `ROADMAP.md`. They are not
+implementation-ready until their milestone decision gate is complete.
 
-- OW-401 P0 — Contextual weight authorization.
-- OW-402 P0 — Recent weight and neutral trend.
-- OW-403 P0 — Contextual step authorization.
-- OW-404 P0 — Daily steps with source and recency.
-- OW-405 P0 — Denied, unavailable, no-data and revoked states.
+### Launch and stabilise
 
-## Slice 5 — Quality
+- Complete App Review follow-up for 1.0.0 (5).
+- Triage external TestFlight feedback from 1.0.0 (6).
+- Reconcile the approved release with the completed History/UI tidy-up.
 
-- OW-106 P1 — Active-fast Live Activity. **Deferred beyond 1.0; privacy and
-  dismissal decisions remain.**
-- OW-107 P1 — Optional fasting target reminder. **Initial discovery; MVP scope
-  and notification-policy decisions required.**
-- OW-501 P0 — Accessibility checks for core journeys.
-- OW-502 P0 — Privacy, purpose strings and disclaimer.
-- OW-503 P0 — Persistence, migration and interruption safety.
+### Lock Screen fasting surface
 
-## Later — Storage and integrations
+- OW-L101 — Define the Lock Screen privacy, lifecycle and stale-state contract.
+  **Done.**
+- OW-L102 — Add an accessible active-fast Lock Screen widget. **Done.**
+- OW-L103 — Decide whether an optional Live Activity is also required. **Done:
+  Option B accepted in D-029.**
+- OW-L104 — Deep-link safely to the current in-app fasting state.
+- OW-L105 — Add an explicitly requested active-fast Live Activity. **Delivered;
+  baseline contract in `docs/OW_LOCK_SCREEN_STORIES.md`.**
+- OW-L106 — Add clear consent, one-time offer and reversible automatic Live
+  Activity setting. **Sprint Ready.**
+- OW-L107 — Start one Live Activity after a committed fast when the setting is
+  on. **Sprint Ready.**
+- OW-L108 — Continue a longer active fast with a new foreground-requested Live
+  Activity after the prior eight-hour window. **Sprint Ready.**
+- OW-L109 — Complete the automatic Live Activity App Review and quality gate.
+  **Sprint Ready.**
 
-- Cloud sync, backup, restore, import and export — **Deferred beyond 1.0.**
+`READY_STORIES.md` contains the superseded historical OW-106 refinement. D-029
+and OW-L105 describe the delivered baseline; D-030 and OW-L106 through OW-L109
+in `docs/OW_LIVE_ACTIVITY_AUTOMATION_STORIES.md` govern automatic behavior.
 
-## Later — Feature 1
+### User-controlled backup and restore
 
-- OW-F101 — Capture food photo.
-- OW-F102 — Editable AI-estimated description and nutrition.
-- OW-F103 — Confidence and estimate basis.
-- OW-F104 — User-controlled reusable meals.
+- OW-B101 — Define a versioned backup archive and privacy contract.
+- OW-B102 — Export all app-created data through a user-controlled Files flow.
+- OW-B103 — Preview and restore a compatible backup non-destructively.
+- OW-B104 — Cover corrupt, duplicate, older-schema and interrupted restores.
 
-`READY_STORIES.md` contains implementation-ready versions of OW-002, OW-101,
-OW-102, OW-103, OW-104 and OW-105, a full refinement of OW-106 pending two
-product decisions, and initial discovery for OW-107.
+Cloud sync remains a separate, undecided capability.
+
+### Apple Health foundation
+
+- OW-401 — Contextual weight authorization.
+- OW-402 — Recent weight with source, recency and neutral trend.
+- OW-403 — Contextual step authorization.
+- OW-404 — Daily steps with source and recency.
+- OW-405 — Denied, unavailable, no-data and revoked states.
+
+### Calm stats and trends
+
+- OW-S101 — Define fasting metrics, time ranges and provenance.
+- OW-S102 — Add an accessible Stats destination and fasting trends.
+- OW-S103 — Add optional weight and step trends from Apple Health.
+- OW-S104 — Explain missing data and avoid causal or medical claims.
+
+### Assisted food entry
+
+- OW-F101 — Create an editable food draft from text.
+- OW-F102 — Capture or choose a food photo contextually.
+- OW-F103 — Produce an editable estimated description and nutrition draft.
+- OW-F104 — Show confidence, provenance and no-result states.
+- OW-F105 — Support Apple Intelligence-capable and older supported iPhones.
+- OW-F106 — Confirm before save and preserve the active-fast event policy.
+
+### Evergreen quality
+
+- OW-107 — Optional fasting target reminder. **Unscheduled; notification and
+  no-nag policy decisions required.**
+- OW-501 — Accessibility checks for every core and optional journey.
+- OW-502 — Privacy, purpose strings and disclaimer maintenance.
+- OW-503 — Persistence, migration and interruption safety.
+
+`READY_STORIES.md` retains the original-slice implementation stories, the
+superseded historical OW-106 refinement and initial discovery for OW-107. The
+post-MVP Lock Screen contracts OW-L101 through OW-L105 are in
+`docs/OW_LOCK_SCREEN_STORIES.md`; the accepted automatic refinement OW-L106
+through OW-L109 is in `docs/OW_LIVE_ACTIVITY_AUTOMATION_STORIES.md`.
 `SLICE_1_5_UX_STORIES.md` contains the implementation-ready visual contract and
 stories OW-150 through OW-155. `SLICE_2_TODAY_STORIES.md` supersedes the older
 OW-201 and OW-203 examples in the complete product pack and refines OW-201
@@ -213,7 +262,8 @@ OW-365 behind an explicit interaction-contract approval gate.
 carousel contract and delivered OW-370 through OW-375 implementation.
 `SLICE_3_8_COUPLED_HISTORY_SCROLL_STORIES.md` proposes OW-380 through OW-385
 for real-time visual coupling between the delivered carousel and date rail.
-`SLICE_3_10_AUTOMATIC_FAST_HISTORY_STORIES.md` replaces reviewable
-reconstruction for new history with automatic event-gap projection and refines
-OW-391 through OW-396.
-The product pack's OW-401 example remains an input when Slice 4 is refined.
+`SLICE_3_10_AUTOMATIC_FAST_HISTORY_STORIES.md` records the delivered replacement
+of reviewable reconstruction for new history with automatic event-gap
+projection in OW-391 through OW-396.
+The product pack's OW-401 example remains an input when the Apple Health
+milestone is refined.

@@ -11,6 +11,7 @@ struct HistoryView: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
+    @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.timeZone) private var timeZone
@@ -217,6 +218,10 @@ struct HistoryView: View {
                         goal: settings.first?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
+                    if endingActiveFast {
+                        WidgetProjectionSupport.clear()
+                        Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+                    }
                     foodEditor = nil
                 },
                 onDelete: {
@@ -240,6 +245,10 @@ struct HistoryView: View {
                         goal: settings.first?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
+                    if endingActiveFast {
+                        WidgetProjectionSupport.clear()
+                        Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+                    }
                     hydrationEditor = nil
                 },
                 onDelete: {
@@ -262,6 +271,10 @@ struct HistoryView: View {
                         goal: settings.first?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
+                    if endingActiveFast {
+                        WidgetProjectionSupport.clear()
+                        Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+                    }
                 },
                 onSaveHydration: { draft, endingActiveFast in
                     try HydrationEntryService(repository: makeHydrationRepository(), clock: clock).save(
@@ -270,6 +283,10 @@ struct HistoryView: View {
                         goal: settings.first?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
+                    if endingActiveFast {
+                        WidgetProjectionSupport.clear()
+                        Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+                    }
                 },
                 onClose: { directHistoricalEntry = nil }
             )
@@ -296,6 +313,10 @@ struct HistoryView: View {
                         goal: settings.first?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
+                    if endingActiveFast {
+                        WidgetProjectionSupport.clear()
+                        Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+                    }
                 },
                 deleteFood: { record in
                     try makeFoodRepository().delete(record)
@@ -307,6 +328,10 @@ struct HistoryView: View {
                         goal: settings.first?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
+                    if endingActiveFast {
+                        WidgetProjectionSupport.clear()
+                        Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+                    }
                 },
                 deleteHydration: { record in
                     try makeHydrationRepository().delete(record)

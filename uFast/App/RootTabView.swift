@@ -24,6 +24,10 @@ struct RootTabView: View {
         .tint(UFastTheme.action)
         .toolbarBackground(UFastTheme.canvas, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+        .onOpenURL { url in
+            guard ActiveFastActivityRoute.isCurrentFastURL(url) else { return }
+            selection = .today
+        }
     }
 
     @ViewBuilder

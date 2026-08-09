@@ -1,6 +1,6 @@
 # Slice 3.10 — Automatic fast history
 
-**Sprint status:** Ready for implementation  
+**Sprint status:** Delivered 1 August 2026
 **Story order:** OW-391 → OW-392 → OW-393 → OW-394 → OW-395 → OW-396
 
 ## Outcome
@@ -198,7 +198,7 @@ exception to automatic history.
 ## OW-391 — Establish the automatic-fast domain contract
 
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 1 August 2026
 
 ### User story
 
@@ -254,7 +254,7 @@ BR-06, BR-07, BR-12, BR-15, BR-22, BR-23 and BR-24.
 ## OW-392 — Project fast history for the settled calendar view
 
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 1 August 2026
 
 ### User story
 
@@ -310,7 +310,7 @@ front of me, so that the calendar and its details tell one focused story.
 ## OW-393 — Retire reconstruction and boundary review
 
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 1 August 2026
 
 ### User story
 
@@ -362,7 +362,7 @@ automatically, so that I never have to repair fasting boundaries separately.
 ## OW-394 — Display automatic fasts and complete food details
 
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 1 August 2026
 
 ### User story
 
@@ -424,7 +424,7 @@ opening a separate review flow.
 ## OW-395 — Preserve explicit fast start and manual event entry
 
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 1 August 2026
 
 ### User story
 
@@ -473,7 +473,7 @@ remove useful control.
 ## OW-396 — Migrate safely and complete the quality gate
 
 **Priority:** P0  
-**Status:** Ready
+**Status:** Done 1 August 2026
 
 ### User story
 

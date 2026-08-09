@@ -56,14 +56,14 @@ test-ui: project
 		test
 
 lint:
-	swiftformat uFast uFastTests uFastUITests --lint --cache ignore
+	swiftformat uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests --lint --cache ignore
 	DEVELOPER_DIR="$(DEVELOPER_DIR)" swiftlint lint --strict --no-cache
 
 verify-local-only:
 	./scripts/verify_local_only_release.sh
 
 format:
-	swiftformat uFast uFastTests uFastUITests --cache ignore
+	swiftformat uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests --cache ignore
 
 clean:
 	DEVELOPER_DIR="$(DEVELOPER_DIR)" xcodebuild \

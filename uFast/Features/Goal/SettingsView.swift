@@ -7,7 +7,9 @@ import UIKit
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     @Query private var settingsRecords: [AppSettingsRecord]
+    @Query(filter: #Predicate<FastRecord> { $0.endDate == nil }) private var activeFasts: [FastRecord]
     @State private var focusedFavouriteField: FavouriteField?
     @State private var selection = FastingGoal.default
     @State private var saveError: String?
@@ -67,6 +69,23 @@ struct SettingsView: View {
                             .accessibilityIdentifier("settings.privacy-safety")
                         }
                         .uFastCard(accent: UFastTheme.sky)
+
+                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                            UFastSectionHeading("Lock Screen widget")
+                            Text(
+                                "If you add the optional uFast Lock Screen widget, it can show your recorded elapsed time and goal progress while your phone is locked."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            Text(
+                                "Touch and hold the Lock Screen, choose Customize, then add the uFast widget. You can remove it at any time."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .uFastCard(accent: UFastTheme.sage)
 
                         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
                             UFastSectionHeading("Drink favourites")
@@ -189,6 +208,10 @@ struct SettingsView: View {
                 throw GoalSaveFixtureError.simulated
             }
             try modelContext.save()
+            if let activeFast = activeFasts.first {
+                WidgetProjectionSupport.publish(activeFast, goal: goal)
+                Task { await liveActivityCoordinator?.didCommitActiveFastChange() }
+            }
             saveError = nil
         } catch {
             settings.setFastingGoal(previousGoal)
@@ -253,6 +276,8 @@ struct SettingsView: View {
                     "--simulate-delete-all-failure"
                 )
             )
+            WidgetProjectionSupport.clear()
+            Task { await liveActivityCoordinator?.didCommitDeleteAllData() }
             deleteError = nil
         } catch {
             deleteError = "Your data couldn’t be deleted. Please try again."

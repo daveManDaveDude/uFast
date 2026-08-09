@@ -8,13 +8,19 @@ import SwiftUI
 struct UFastApp: App {
     private let modelContainer: ModelContainer
     private let clock: any AppClock
+    private let liveActivityCoordinator: ActiveFastLiveActivityCoordinator
 
     init() {
         clock = AppClockConfiguration.clock()
 
         do {
             modelContainer = try PersistenceContainer.make()
+            liveActivityCoordinator = Self.makeLiveActivityCoordinator(
+                container: modelContainer,
+                clock: clock
+            )
             try resetDataIfRequested(in: modelContainer)
+            synchronizeWidgetProjection(in: modelContainer)
         } catch {
             fatalError("Unable to create the persistence container: \(error)")
         }
@@ -22,7 +28,10 @@ struct UFastApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppRootView(clock: clock)
+            AppRootView(
+                clock: clock,
+                liveActivityCoordinator: liveActivityCoordinator
+            )
         }
         .modelContainer(modelContainer)
     }
@@ -38,6 +47,7 @@ struct UFastApp: App {
         try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).forEach(context.delete)
+        try UserDefaultsLiveActivityLifecycleStore().clearAll()
 
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--seed-onboarded") {
@@ -64,6 +74,68 @@ struct UFastApp: App {
             )
         }
         try context.save()
+    }
+
+    private func synchronizeWidgetProjection(in container: ModelContainer) {
+        let context = container.mainContext
+        guard let activeFast = try? context.fetch(
+            FetchDescriptor<FastRecord>(predicate: #Predicate { $0.endDate == nil })
+        ).first else {
+            WidgetProjectionSupport.clear()
+            return
+        }
+        let goal = (try? context.fetch(FetchDescriptor<AppSettingsRecord>()).first?.fastingGoal)
+            ?? .default
+        WidgetProjectionSupport.publish(activeFast, goal: goal, now: clock.now)
+    }
+
+    private static func makeLiveActivityCoordinator(
+        container: ModelContainer,
+        clock: any AppClock
+    ) -> ActiveFastLiveActivityCoordinator {
+        let arguments = ProcessInfo.processInfo.arguments
+        let client: any LiveActivityClient
+        if arguments.contains("--ui-testing") {
+            let availability: LiveActivityAvailability = if arguments.contains(
+                "--simulate-live-activity-unsupported"
+            ) {
+                .unsupported
+            } else if arguments.contains("--simulate-live-activity-disabled") {
+                .disabled
+            } else {
+                .enabled
+            }
+            let fake = DeterministicLiveActivityClient(availability: availability)
+            fake.failRequests = arguments.contains("--simulate-live-activity-request-failure")
+            fake.failEnds = arguments.contains("--simulate-live-activity-hide-failure")
+            client = fake
+        } else {
+            client = ActivityKitLiveActivityClient()
+        }
+
+        return ActiveFastLiveActivityCoordinator(
+            clock: clock,
+            client: client,
+            lifecycleStore: UserDefaultsLiveActivityLifecycleStore(),
+            resolveActiveFast: {
+                let context = container.mainContext
+                var descriptor = FetchDescriptor<FastRecord>(
+                    predicate: #Predicate { $0.endDate == nil }
+                )
+                descriptor.fetchLimit = 1
+                guard let fast = try context.fetch(descriptor).first else {
+                    return nil
+                }
+                let goal = (try? context.fetch(FetchDescriptor<AppSettingsRecord>()).first?.fastingGoal)
+                    ?? .default
+                return ActiveFastActivitySource(
+                    activeRecordIdentifier: fast.id,
+                    startDate: fast.startDate,
+                    targetDate: fast.targetDate(currentGoal: goal),
+                    goalHours: goal.hours
+                )
+            }
+        )
     }
 
     private func seedSlice3History(in context: ModelContext) throws {

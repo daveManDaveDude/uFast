@@ -77,6 +77,58 @@
 - BR-27: **Delete all data** requires two explicit confirmations and deletes
   every app-created record in the local store, including settings and legacy
   history. It does not delete data outside uFast.
+- BR-28: Optional Apple Health, Lock Screen and AI capabilities must not block
+  the local manual fasting, food, hydration or History journeys.
+- BR-29: Health-derived presentation identifies its source and recency. Missing,
+  denied, unavailable or revoked Health access remains a usable state and is
+  never interpreted as a zero value.
+- BR-30: Stats describe recorded or derived patterns without diagnosis,
+  coaching, scoring, guaranteed physiology or claims that correlation is
+  causation.
+- BR-31: AI-assisted food interpretation creates an editable proposal only.
+  The user confirms the description, caloric event and any estimated nutrition
+  before save; cancellation changes no record and never ends an active fast.
+- BR-32: A backup is an explicit user-controlled copy. Restore validates format
+  and compatibility before mutation, reports its intended effect and leaves the
+  current store unchanged on validation or commit failure.
+- BR-33: A Lock Screen surface is a read-only projection of the one active
+  user-recorded `FastRecord`. It never starts, ends, edits, infers or persists a
+  second fast, and its absence or failure never blocks a local fasting action.
+- BR-34: Lock Screen elapsed time and goal progress derive from absolute start
+  and target instants. Progress is elapsed divided by goal duration, clamped to
+  0% through 100%; target attainment is presentation, not a biological claim.
+- BR-35: The Lock Screen projection contains only its schema version, active
+  record identifier, absolute start and target instants, captured whole-hour
+  goal and generation date. Missing, unreadable, incompatible or invalid state
+  fails closed without displaying an elapsed duration.
+- BR-36: A Live Activity is a disposable projection requested only after the
+  authoritative active `FastRecord` exists. Committed correction and goal
+  changes may update one matching activity; committed fast end, active deletion
+  and Delete All Data end matching activities immediately. ActivityKit failure
+  never rolls back, blocks or changes local persistence.
+- BR-37: Automatic Live Activities are off until the person makes one clear,
+  reversible in-app choice. The app offers that choice once, contextually, only
+  after a successful eligible fast start. Declining never blocks the fast and
+  the offer does not repeat; Settings remains available at any time. This is an
+  app preference, not notification-style system permission.
+- BR-38: When the automatic preference is enabled, uFast may request exactly one
+  matching Live Activity after a successful start or backdated start, or when
+  the app genuinely becomes active with a still-active fast and no matching
+  activity running. A foreground continuation request creates a new ActivityKit
+  activity whose lifetime begins at that request while elapsed time continues
+  from the authoritative original fast start.
+- BR-39: Turning automatic Live Activities off ends any matching activity and
+  prevents later automatic requests. **Hide for this fast** ends the matching
+  activity and suppresses automatic requests until that fast ends without
+  changing the global preference or the `FastRecord`. An explicit **Show Live
+  Activity** or **Show Live Activity again** action may clear that per-fast
+  suppression.
+- BR-40: No automatic request occurs from a timer, background task, app launch
+  schedule, APNs or restart chain. After a successful request, another automatic
+  request for the same fast is ineligible until the prior eight-hour ActivityKit
+  window has elapsed and the person later foregrounds uFast. Duplicate and
+  in-flight requests are coalesced; the WidgetKit widget remains the durable
+  long-fast surface.
 
 ## Slice 3.10 supersession
 

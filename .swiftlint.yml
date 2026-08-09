@@ -1,5 +1,7 @@
 included:
   - uFast
+  - LockScreenShared
+  - LockScreenPrototype
   - uFastTests
   - uFastUITests
 excluded:

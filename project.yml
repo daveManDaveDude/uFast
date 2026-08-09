@@ -10,7 +10,7 @@ options:
 settings:
   base:
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 6
+    CURRENT_PROJECT_VERSION: 7
     DEVELOPMENT_TEAM: QY9XGBM7T5
     ENABLE_USER_SCRIPT_SANDBOXING: true
     GENERATE_INFOPLIST_FILE: true
@@ -23,9 +23,16 @@ targets:
     platform: iOS
     sources:
       - path: uFast
+      - path: LockScreenShared
+    dependencies:
+      - target: uFastLockScreenWidget
+        embed: true
+    frameworks:
+      - ActivityKit
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: uFast/SupportingFiles/UFast.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFast
         PRODUCT_NAME: uFast
         SUPPORTS_MACCATALYST: false
@@ -35,6 +42,10 @@ targets:
       properties:
         CFBundleDisplayName: uFast
         ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - ufast
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -67,3 +78,82 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFastUITests
         TEST_TARGET_NAME: uFast
+  uFastLockScreenWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LockScreenWidget/Widget
+        excludes:
+          - "*.entitlements"
+      - path: LockScreenShared
+    resources:
+      - path: LockScreenWidget/Widget/FastingBotanical.png
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: true
+        CODE_SIGN_ENTITLEMENTS: LockScreenWidget/Widget/UFastLockScreenWidget.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFast.Widget
+        PRODUCT_MODULE_NAME: UFastLockScreenWidget
+        PRODUCT_NAME: uFast Lock Screen Widget
+        SKIP_INSTALL: true
+        SUPPORTS_MACCATALYST: false
+        TARGETED_DEVICE_FAMILY: "1"
+    frameworks:
+      - ActivityKit
+    info:
+      path: LockScreenWidget/Widget/Info.plist
+      properties:
+        CFBundleDisplayName: uFast
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  uFastLockScreenPrototypeWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LockScreenPrototype/Widget
+        excludes:
+          - "*.entitlements"
+      - path: LockScreenShared
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: true
+        CODE_SIGN_ENTITLEMENTS: LockScreenPrototype/Widget/UFastLockScreenPrototypeWidget.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFast.LockScreenPrototypeHost.Widget
+        PRODUCT_MODULE_NAME: UFastLockScreenPrototypeWidget
+        PRODUCT_NAME: uFast Lock Screen Prototype
+        SKIP_INSTALL: true
+        SUPPORTS_MACCATALYST: false
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: LockScreenPrototype/Widget/Info.plist
+      properties:
+        CFBundleDisplayName: uFast Prototype
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  uFastLockScreenPrototypeHost:
+    type: application
+    platform: iOS
+    sources:
+      - path: LockScreenPrototype/Host
+        excludes:
+          - "*.entitlements"
+      - path: LockScreenShared
+    dependencies:
+      - target: uFastLockScreenPrototypeWidget
+        embed: true
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: false
+        CODE_SIGN_ENTITLEMENTS: LockScreenPrototype/Host/UFastLockScreenPrototypeHost.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFast.LockScreenPrototypeHost
+        PRODUCT_MODULE_NAME: UFastLockScreenPrototypeHost
+        PRODUCT_NAME: uFast Lock Screen Prototype
+        SUPPORTS_MACCATALYST: false
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: LockScreenPrototype/Host/Info.plist
+      properties:
+        CFBundleDisplayName: uFast Prototype
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait

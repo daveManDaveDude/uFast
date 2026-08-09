@@ -899,8 +899,16 @@ and confirmed deletions affecting only the selected completed local record.
 
 **Epic:** E5 Glanceability and quality
 **Priority:** P1
-**Status:** Refined — blocked on two privacy and dismissal decisions
-**Updated:** 19 July 2026 — lifecycle, content, recovery and test seams detailed
+**Status:** Superseded 8 August 2026 by D-029 and OW-L105
+**Updated:** 8 August 2026 — retained as historical refinement only; do not
+implement this contract
+
+> D-029 and OW-L105 settled and delivered the explicit per-fast baseline. D-030
+> later accepts a reversible automatic preference, one-time contextual offer,
+> committed-start request and foreground continuation for longer fasts. The
+> current implementation-ready refinement is OW-L106 through OW-L109 in
+> `docs/OW_LIVE_ACTIVITY_AUTOMATION_STORIES.md`. This older OW-106 remains
+> historical and must not be implemented directly.
 
 ### User story
 

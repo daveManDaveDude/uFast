@@ -11,6 +11,7 @@ struct TodayGoalView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.timeZone) private var timeZone
+    @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     @Query private var settingsRecords: [AppSettingsRecord]
     @Query(filter: #Predicate<FastRecord> { $0.endDate == nil }) private var activeFasts: [FastRecord]
     @Query(sort: [SortDescriptor(\FoodEntryRecord.occurredAt, order: .reverse)])
@@ -26,6 +27,10 @@ struct TodayGoalView: View {
     @State private var hydrationEditor: HydrationEditorPresentation?
     @State private var drinkAnnouncement: String?
     @State private var isEndConfirmationPresented = false
+    @State private var isLiveActivityDisclosurePresented = false
+    @State private var isLiveActivityActionInFlight = false
+    @State private var liveActivityControlState: LiveActivityControlState = .show
+    @State private var liveActivityStatus: String?
     @State private var startError: String?
     @State private var startTimeEditor: StartTimeEditorPresentation?
 
@@ -83,7 +88,11 @@ struct TodayGoalView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 activeTimelineID = UUID()
+                refreshLiveActivityControl()
             }
+        }
+        .task(id: activeFasts.first?.id) {
+            refreshLiveActivityControl()
         }
         .onChange(of: fastRecorded) { _, isRecorded in
             if isRecorded {
@@ -193,6 +202,17 @@ struct TodayGoalView: View {
                 onCancel: { hydrationEditor = nil }
             )
         }
+        .alert(
+            "Show Live Activity?",
+            isPresented: $isLiveActivityDisclosurePresented
+        ) {
+            Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("fast.live-activity.disclosure.cancel")
+            Button("Show Live Activity", action: showLiveActivity)
+                .accessibilityIdentifier("fast.live-activity.disclosure.show")
+        } message: {
+            Text(ActiveFastLiveActivityStatusCopy.disclosure)
+        }
     }
 
     private func activeFastView(
@@ -230,8 +250,109 @@ struct TodayGoalView: View {
                     initialEndDate: clock.now
                 )
             },
-            additionalContent: AnyView(foodSection)
+            additionalContent: AnyView(
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
+                    liveActivitySection
+                    foodSection
+                }
+            )
         )
+    }
+
+    @ViewBuilder
+    private var liveActivitySection: some View {
+        if liveActivityCoordinator != nil {
+            VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                UFastSectionHeading("Live Activity")
+                Text(
+                    "Show this active interval on the Lock Screen and Dynamic Island for up to 8 hours. Your recorded interval continues if the activity ends."
+                )
+                .font(.subheadline)
+                .foregroundStyle(UFastTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+                switch liveActivityControlState {
+                case .hide:
+                    Button("Hide Live Activity", action: hideLiveActivity)
+                        .buttonStyle(UFastSecondaryButtonStyle())
+                        .disabled(isLiveActivityActionInFlight)
+                        .accessibilityIdentifier("fast.live-activity.hide")
+                case .show, .showAgain:
+                    Button(
+                        liveActivityControlState == .show
+                            ? "Show Live Activity"
+                            : "Show Live Activity again",
+                        action: { isLiveActivityDisclosurePresented = true }
+                    )
+                    .buttonStyle(UFastSecondaryButtonStyle())
+                    .disabled(isLiveActivityActionInFlight)
+                    .accessibilityIdentifier(
+                        liveActivityControlState == .show
+                            ? "fast.live-activity.show"
+                            : "fast.live-activity.show-again"
+                    )
+                case .unavailable:
+                    EmptyView()
+                }
+
+                if let liveActivityStatus {
+                    Label(liveActivityStatus, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(UFastTheme.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("fast.live-activity.status")
+                }
+            }
+            .uFastCard(accent: UFastTheme.sky)
+        }
+    }
+
+    private func refreshLiveActivityControl() {
+        guard let liveActivityCoordinator else { return }
+        Task {
+            liveActivityControlState = await liveActivityCoordinator.controlState()
+        }
+    }
+
+    private func showLiveActivity() {
+        guard let liveActivityCoordinator else { return }
+        isLiveActivityActionInFlight = true
+        Task {
+            let result = await liveActivityCoordinator.show()
+            liveActivityStatus = liveActivityStatus(for: result)
+            isLiveActivityActionInFlight = false
+            refreshLiveActivityControl()
+        }
+    }
+
+    private func hideLiveActivity() {
+        guard let liveActivityCoordinator else { return }
+        isLiveActivityActionInFlight = true
+        Task {
+            let result = await liveActivityCoordinator.hide()
+            liveActivityStatus = liveActivityStatus(for: result)
+            isLiveActivityActionInFlight = false
+            refreshLiveActivityControl()
+        }
+    }
+
+    private func liveActivityStatus(
+        for result: ActiveFastLiveActivityResult
+    ) -> String? {
+        switch result {
+        case let .unavailable(availability):
+            switch availability {
+            case .unsupported: ActiveFastLiveActivityStatusCopy.unsupported
+            case .disabled: ActiveFastLiveActivityStatusCopy.disabled
+            case .enabled: nil
+            }
+        case .requestFailed:
+            ActiveFastLiveActivityStatusCopy.requestFailure
+        case .hideFailed:
+            ActiveFastLiveActivityStatusCopy.hideFailure
+        case .shown, .alreadyShown, .hidden, .updated, .reconciled,
+             .noActiveFast, .coalesced:
+            nil
+        }
     }
 
     private var todaysFoodEntries: [FoodEntryRecord] {
@@ -372,7 +493,8 @@ struct TodayGoalView: View {
         )
 
         do {
-            _ = try service.startFast(goal: goal)
+            let fast = try service.startFast(goal: goal)
+            WidgetProjectionSupport.publish(fast, goal: goal, now: clock.now)
             startError = nil
             fastRecorded = false
         } catch {
@@ -398,10 +520,13 @@ struct TodayGoalView: View {
 
         switch mode {
         case .create:
-            _ = try service.startFast(at: startDate, goal: goal)
+            let fast = try service.startFast(at: startDate, goal: goal)
+            WidgetProjectionSupport.publish(fast, goal: goal, now: clock.now)
             fastRecorded = false
         case .correct:
-            _ = try service.correctActiveFastStart(to: startDate)
+            let fast = try service.correctActiveFastStart(to: startDate)
+            WidgetProjectionSupport.publish(fast, goal: goal, now: clock.now)
+            Task { await liveActivityCoordinator?.didCommitActiveFastChange() }
         }
     }
 
@@ -424,6 +549,8 @@ struct TodayGoalView: View {
 
         do {
             _ = try service.endFast(goal: goal)
+            WidgetProjectionSupport.clear()
+            Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
             endError = nil
             fastRecorded = true
         } catch {
@@ -436,6 +563,8 @@ struct TodayGoalView: View {
         let goal = settingsRecords.first?.fastingGoal ?? .default
 
         _ = try service.endFast(at: endDate, goal: goal)
+        WidgetProjectionSupport.clear()
+        Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
         endError = nil
         fastRecorded = true
     }
@@ -466,6 +595,10 @@ struct TodayGoalView: View {
             goal: settingsRecords.first?.fastingGoal ?? .default,
             endingActiveFast: endingActiveFast
         )
+        if endingActiveFast {
+            WidgetProjectionSupport.clear()
+            Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+        }
     }
 
     private func deleteFood(_ record: FoodEntryRecord) throws {
@@ -493,6 +626,10 @@ struct TodayGoalView: View {
 
     private func saveHydration(_ draft: HydrationEntryDraft, record: HydrationEntryRecord?, endingActiveFast: Bool) throws {
         try HydrationEntryService(repository: makeHydrationRepository(), clock: clock).save(draft, replacing: record, goal: settingsRecords.first?.fastingGoal ?? .default, endingActiveFast: endingActiveFast)
+        if endingActiveFast {
+            WidgetProjectionSupport.clear()
+            Task { await liveActivityCoordinator?.didCommitFastEndOrDeletion() }
+        }
     }
 
     private func deleteHydration(_ record: HydrationEntryRecord) throws {
