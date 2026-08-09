@@ -12,7 +12,7 @@ enum LiveActivityTerminalReason: String, Codable, Equatable, Sendable {
 }
 
 struct LiveActivityLifecycleMetadata: Codable, Equatable, Sendable {
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     let schemaVersion: Int
     let activeRecordIdentifier: UUID
@@ -21,6 +21,9 @@ struct LiveActivityLifecycleMetadata: Codable, Equatable, Sendable {
     var lastKnownActivityIdentifier: String?
     var lastIntent: LiveActivityLifecycleIntent?
     var lastTerminalReason: LiveActivityTerminalReason?
+    var automaticSuppressed: Bool
+    var lastAutomaticAttemptDate: Date?
+    var lastAutomaticAttemptSucceeded: Bool?
 
     init(
         activeRecordIdentifier: UUID,
@@ -28,7 +31,10 @@ struct LiveActivityLifecycleMetadata: Codable, Equatable, Sendable {
         lastRequestDate: Date? = nil,
         lastKnownActivityIdentifier: String? = nil,
         lastIntent: LiveActivityLifecycleIntent? = nil,
-        lastTerminalReason: LiveActivityTerminalReason? = nil
+        lastTerminalReason: LiveActivityTerminalReason? = nil,
+        automaticSuppressed: Bool = false,
+        lastAutomaticAttemptDate: Date? = nil,
+        lastAutomaticAttemptSucceeded: Bool? = nil
     ) {
         schemaVersion = Self.currentSchemaVersion
         self.activeRecordIdentifier = activeRecordIdentifier
@@ -37,6 +43,66 @@ struct LiveActivityLifecycleMetadata: Codable, Equatable, Sendable {
         self.lastKnownActivityIdentifier = lastKnownActivityIdentifier
         self.lastIntent = lastIntent
         self.lastTerminalReason = lastTerminalReason
+        self.automaticSuppressed = automaticSuppressed
+        self.lastAutomaticAttemptDate = lastAutomaticAttemptDate
+        self.lastAutomaticAttemptSucceeded = lastAutomaticAttemptSucceeded
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case activeRecordIdentifier
+        case hasRequested
+        case lastRequestDate
+        case lastKnownActivityIdentifier
+        case lastIntent
+        case lastTerminalReason
+        case automaticSuppressed
+        case lastAutomaticAttemptDate
+        case lastAutomaticAttemptSucceeded
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        guard schemaVersion == 1 || schemaVersion == Self.currentSchemaVersion else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .schemaVersion,
+                in: container,
+                debugDescription: "Unsupported Live Activity lifecycle schema."
+            )
+        }
+
+        let lastIntent = try container.decodeIfPresent(
+            LiveActivityLifecycleIntent.self,
+            forKey: .lastIntent
+        )
+        try self.init(
+            activeRecordIdentifier: container.decode(UUID.self, forKey: .activeRecordIdentifier),
+            hasRequested: container.decode(Bool.self, forKey: .hasRequested),
+            lastRequestDate: container.decodeIfPresent(Date.self, forKey: .lastRequestDate),
+            lastKnownActivityIdentifier: container.decodeIfPresent(
+                String.self,
+                forKey: .lastKnownActivityIdentifier
+            ),
+            lastIntent: lastIntent,
+            lastTerminalReason: container.decodeIfPresent(
+                LiveActivityTerminalReason.self,
+                forKey: .lastTerminalReason
+            ),
+            // v1 represented Hide for this fast through the hidden intent.
+            automaticSuppressed: container.decodeIfPresent(
+                Bool.self,
+                forKey: .automaticSuppressed
+            ) ?? (lastIntent == .hidden),
+            lastAutomaticAttemptDate: container.decodeIfPresent(
+                Date.self,
+                forKey: .lastAutomaticAttemptDate
+            ),
+            lastAutomaticAttemptSucceeded: container.decodeIfPresent(
+                Bool.self,
+                forKey: .lastAutomaticAttemptSucceeded
+            )
+        )
     }
 }
 
@@ -63,8 +129,7 @@ final class UserDefaultsLiveActivityLifecycleStore: LiveActivityLifecycleStore {
         }
         do {
             let metadata = try JSONDecoder().decode(LiveActivityLifecycleMetadata.self, from: data)
-            guard metadata.schemaVersion == LiveActivityLifecycleMetadata.currentSchemaVersion,
-                  metadata.activeRecordIdentifier == activeRecordIdentifier
+            guard metadata.activeRecordIdentifier == activeRecordIdentifier
             else {
                 return nil
             }

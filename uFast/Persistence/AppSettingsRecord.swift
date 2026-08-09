@@ -9,6 +9,7 @@ final class AppSettingsRecord {
     var waterFavouriteMillilitres: Int = 500
     var teaFavouriteMillilitres: Int = 300
     var coffeeFavouriteMillilitres: Int = 300
+    var automaticLiveActivityPreferenceRawValue: String = "notAsked"
 
     init(
         id: UUID = UUID(),
@@ -16,7 +17,8 @@ final class AppSettingsRecord {
         hasCompletedOnboarding: Bool = false,
         waterFavouriteMillilitres: Int = 500,
         teaFavouriteMillilitres: Int = 300,
-        coffeeFavouriteMillilitres: Int = 300
+        coffeeFavouriteMillilitres: Int = 300,
+        automaticLiveActivityPreference: AutomaticLiveActivityPreference = .notAsked
     ) {
         self.id = id
         fastingGoalHours = fastingGoal.hours
@@ -24,6 +26,7 @@ final class AppSettingsRecord {
         self.waterFavouriteMillilitres = waterFavouriteMillilitres
         self.teaFavouriteMillilitres = teaFavouriteMillilitres
         self.coffeeFavouriteMillilitres = coffeeFavouriteMillilitres
+        automaticLiveActivityPreferenceRawValue = automaticLiveActivityPreference.rawValue
     }
 
     var fastingGoal: FastingGoal {
@@ -38,5 +41,15 @@ final class AppSettingsRecord {
         waterFavouriteMillilitres = water
         teaFavouriteMillilitres = tea
         coffeeFavouriteMillilitres = coffee
+    }
+
+    var automaticLiveActivityPreference: AutomaticLiveActivityPreference {
+        AutomaticLiveActivityPreference(
+            persistedRawValue: automaticLiveActivityPreferenceRawValue
+        )
+    }
+
+    func setAutomaticLiveActivityPreference(_ preference: AutomaticLiveActivityPreference) {
+        automaticLiveActivityPreferenceRawValue = preference.rawValue
     }
 }

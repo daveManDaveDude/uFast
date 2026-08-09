@@ -1,7 +1,7 @@
 import XCTest
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable line_length
+// swiftlint:disable line_length trailing_comma
 
 final class HydrationCustomAndTimelineUITests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -118,7 +118,14 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
     @MainActor
     private func launch(activeFastStart: Date? = nil) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data", "--seed-onboarded", "--fixed-now", String(now.timeIntervalSince1970)]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--seed-onboarded",
+            "--fixed-now",
+            String(now.timeIntervalSince1970),
+            "--suppress-automatic-live-activity-offer",
+        ]
         if let activeFastStart {
             app.launchArguments += ["--seed-active-fast-start", String(activeFastStart.timeIntervalSince1970)]
         }

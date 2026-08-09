@@ -1,5 +1,7 @@
 import XCTest
 
+// swiftlint:disable trailing_comma
+
 final class FastStartUITests: XCTestCase {
     private let fixedStart = Date(timeIntervalSince1970: 1_800_000_000)
 
@@ -96,7 +98,11 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testActiveFastElapsedSecondsCountUpWhileTodayIsVisible() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start"].tap()
@@ -125,7 +131,11 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testStartFastPersistsAcrossRelaunch() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launch()
         completeOnboarding(in: app)
 
@@ -149,7 +159,12 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testSaveFailureKeepsInactiveStateAndOffersRetry() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data", "--simulate-fast-save-failure"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--simulate-fast-save-failure",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launch()
         completeOnboarding(in: app)
 
@@ -163,7 +178,11 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testInactivePastStartEditorCanBeCancelledWithoutStartingFast() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launch()
         completeOnboarding(in: app)
 
@@ -183,7 +202,11 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testPastStartConfirmationPersistsAcrossRelaunch() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
@@ -202,7 +225,12 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testPastStartSaveFailureKeepsEditorSelectionAvailableForRetry() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data", "--simulate-fast-save-failure"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--simulate-fast-save-failure",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
@@ -223,7 +251,11 @@ final class FastStartUITests: XCTestCase {
     func testPastStartEditorPreventsSelectingAFutureTime() {
         let app = XCUIApplication()
         let startOfToday = Calendar.current.startOfDay(for: Date())
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launchArguments.append("--fixed-now")
         app.launchArguments.append(String(startOfToday.timeIntervalSince1970))
         app.launchArguments.append(contentsOf: ["-AppleLocale", "en_GB"])
@@ -245,7 +277,11 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testActiveFastEditorUsesSaveActionAndCancellationKeepsPresentation() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = [
+            "--ui-testing",
+            "--reset-data",
+            "--suppress-automatic-live-activity-offer",
+        ]
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start"].tap()
@@ -280,7 +316,12 @@ final class FastStartUITests: XCTestCase {
         now: Date,
         resetData: Bool = false
     ) -> [String] {
-        var arguments = ["--ui-testing", "--fixed-now", String(now.timeIntervalSince1970)]
+        var arguments = [
+            "--ui-testing",
+            "--fixed-now",
+            String(now.timeIntervalSince1970),
+            "--suppress-automatic-live-activity-offer",
+        ]
 
         if resetData {
             arguments.append("--reset-data")

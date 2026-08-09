@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable large_tuple line_length statement_position
+// swiftlint:disable large_tuple line_length opening_brace statement_position type_body_length
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var deleteError: String?
     @State private var isFirstDeleteConfirmationPresented = false
     @State private var isFinalDeleteConfirmationPresented = false
+    @State private var automaticallyShowLiveActivities = false
+    @State private var liveActivityAvailability: LiveActivityAvailability?
+    @State private var liveActivityStatus: String?
     @State private var waterAmount = "500"
     @State private var teaAmount = "300"
     @State private var coffeeAmount = "300"
@@ -71,21 +74,23 @@ struct SettingsView: View {
                         .uFastCard(accent: UFastTheme.sky)
 
                         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                            UFastSectionHeading("Lock Screen widget")
+                            UFastSectionHeading("Lock and Home Screen widgets")
                             Text(
-                                "If you add the optional uFast Lock Screen widget, it can show your recorded elapsed time and goal progress while your phone is locked."
+                                "If you add an optional uFast Lock Screen or Home Screen widget, it can show your recorded elapsed time and goal progress."
                             )
                             .font(.subheadline)
                             .foregroundStyle(UFastTheme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                             Text(
-                                "Touch and hold the Lock Screen, choose Customize, then add the uFast widget. You can remove it at any time."
+                                "Touch and hold the Lock Screen to customize it, or touch and hold the Home Screen and tap + to add uFast. You can remove either widget at any time."
                             )
                             .font(.subheadline)
                             .foregroundStyle(UFastTheme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                         }
                         .uFastCard(accent: UFastTheme.sage)
+
+                        liveActivitiesSection
 
                         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
                             UFastSectionHeading("Drink favourites")
@@ -145,10 +150,15 @@ struct SettingsView: View {
             }
             .onAppear {
                 selection = settingsRecords.first?.fastingGoal ?? .default
+                automaticallyShowLiveActivities = settingsRecords.first?
+                    .automaticLiveActivityPreference == .enabled
                 if let settings = settingsRecords.first {
                     waterAmount = String(settings.waterFavouriteMillilitres)
                     teaAmount = String(settings.teaFavouriteMillilitres)
                     coffeeAmount = String(settings.coffeeFavouriteMillilitres)
+                }
+                Task {
+                    liveActivityAvailability = liveActivityCoordinator?.availability()
                 }
             }
             .onChange(of: focusedFavouriteField) { previousField, currentField in
@@ -185,6 +195,49 @@ struct SettingsView: View {
         }
     }
 
+    private var liveActivitiesSection: some View {
+        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+            UFastSectionHeading("Live Activities")
+            Toggle(
+                "Automatically show Live Activities",
+                isOn: Binding(
+                    get: { automaticallyShowLiveActivities },
+                    set: { setAutomaticLiveActivities(enabled: $0) }
+                )
+            )
+            .accessibilityIdentifier("settings.live-activities.toggle")
+
+            Text(AutomaticLiveActivityCopy.settingsSupportingCopy)
+                .font(.subheadline)
+                .foregroundStyle(UFastTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(AutomaticLiveActivityCopy.settingsExplanation)
+                .font(.footnote)
+                .foregroundStyle(UFastTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let liveActivityStatus {
+                Label(liveActivityStatus, systemImage: "exclamationmark.circle")
+                    .foregroundStyle(UFastTheme.error)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.live-activities.status")
+            } else if let liveActivityAvailability,
+                      liveActivityAvailability != .enabled
+            {
+                let copy = liveActivityAvailability == .disabled
+                    ? ActiveFastLiveActivityStatusCopy.disabled
+                    : ActiveFastLiveActivityStatusCopy.unsupported
+                Text(copy)
+                    .font(.footnote)
+                    .foregroundStyle(UFastTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.live-activities.availability")
+            }
+        }
+        .uFastCard(accent: UFastTheme.sky)
+    }
+
     private var goalBinding: Binding<FastingGoal> {
         Binding(
             get: { selection },
@@ -217,6 +270,56 @@ struct SettingsView: View {
             settings.setFastingGoal(previousGoal)
             selection = previousGoal
             saveError = "Your goal couldn’t be saved. Please try again."
+        }
+    }
+
+    private func setAutomaticLiveActivities(enabled: Bool) {
+        guard let settings = settingsRecords.first else { return }
+        let previousPreference = settings.automaticLiveActivityPreference
+        let preference: AutomaticLiveActivityPreference = enabled ? .enabled : .disabled
+        automaticallyShowLiveActivities = enabled
+        settings.setAutomaticLiveActivityPreference(preference)
+
+        do {
+            if ProcessInfo.processInfo.arguments.contains(
+                "--simulate-live-activity-settings-save-failure"
+            ) {
+                throw AutomaticLiveActivitySettingsError.simulatedSaveFailure
+            }
+            try modelContext.save()
+            liveActivityStatus = nil
+            guard let liveActivityCoordinator else { return }
+            Task {
+                let result = await liveActivityCoordinator.didCommitAutomaticPreference(
+                    preference
+                )
+                liveActivityStatus = liveActivityStatus(for: result)
+                liveActivityAvailability = liveActivityCoordinator.availability()
+            }
+        } catch {
+            settings.setAutomaticLiveActivityPreference(previousPreference)
+            automaticallyShowLiveActivities = previousPreference == .enabled
+            liveActivityStatus = AutomaticLiveActivityCopy.settingsSaveFailure
+        }
+    }
+
+    private func liveActivityStatus(
+        for result: ActiveFastLiveActivityResult
+    ) -> String? {
+        switch result {
+        case let .unavailable(availability):
+            switch availability {
+            case .unsupported: ActiveFastLiveActivityStatusCopy.unsupported
+            case .disabled: ActiveFastLiveActivityStatusCopy.disabled
+            case .enabled: nil
+            }
+        case .requestFailed:
+            ActiveFastLiveActivityStatusCopy.requestFailure
+        case .hideFailed:
+            ActiveFastLiveActivityStatusCopy.hideFailure
+        case .shown, .alreadyShown, .hidden, .updated, .reconciled,
+             .noActiveFast, .coalesced:
+            nil
         }
     }
 

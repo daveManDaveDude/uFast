@@ -25,11 +25,14 @@ struct AppRootView: View {
         }
         .environment(\.liveActivityCoordinator, liveActivityCoordinator)
         .task {
-            _ = await liveActivityCoordinator?.reconcile()
+            _ = await liveActivityCoordinator?.didBecomeActive()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { _ = await liveActivityCoordinator?.reconcile() }
+            if phase == .active {
+                Task { _ = await liveActivityCoordinator?.didBecomeActive() }
+            } else {
+                liveActivityCoordinator?.didBecomeInactive()
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 import Foundation
 
+// swiftlint:disable type_body_length
+
 enum LiveActivityControlState: Equatable, Sendable {
     case show
     case showAgain
@@ -38,22 +40,46 @@ enum ActiveFastLiveActivityStatusCopy {
 final class ActiveFastLiveActivityCoordinator {
     typealias ActiveFastResolver = @MainActor () throws -> ActiveFastActivitySource?
 
+    private struct ActivityRequest {
+        let activeFast: ActiveFastActivitySource
+        let attributes: ActiveFastActivityAttributes
+        let contentState: ActiveFastActivityAttributes.ContentState
+        let now: Date
+        let automaticAttempt: Bool
+        let clearsSuppression: Bool
+    }
+
     private let clock: any AppClock
     private let client: any LiveActivityClient
     private let lifecycleStore: any LiveActivityLifecycleStore
     private let resolveActiveFast: ActiveFastResolver
+    private let resolveAutomaticPreference: @MainActor () -> AutomaticLiveActivityPreference
     private var mutationInFlight = false
+    private var foregroundIsActive = false
+    private var foregroundAutomaticAttempted = false
+    private var committedStartAttempts = Set<UUID>()
+    private var preferenceEnableAttempts = Set<UUID>()
 
     init(
         clock: any AppClock,
         client: any LiveActivityClient,
         lifecycleStore: any LiveActivityLifecycleStore,
-        resolveActiveFast: @escaping ActiveFastResolver
+        resolveActiveFast: @escaping ActiveFastResolver,
+        resolveAutomaticPreference: @escaping @MainActor () -> AutomaticLiveActivityPreference = { .disabled }
     ) {
         self.clock = clock
         self.client = client
         self.lifecycleStore = lifecycleStore
         self.resolveActiveFast = resolveActiveFast
+        self.resolveAutomaticPreference = resolveAutomaticPreference
+    }
+
+    func availability() -> LiveActivityAvailability {
+        client.availability
+    }
+
+    func isAvailableForAutomaticConsent() -> Bool {
+        client.availability == .enabled
     }
 
     func controlState() async -> LiveActivityControlState {
@@ -66,10 +92,12 @@ final class ActiveFastLiveActivityCoordinator {
         }) {
             return .hide
         }
-        let hasRequested = (try? lifecycleStore.metadata(
+        let metadata = try? lifecycleStore.metadata(
             for: activeFast.activeRecordIdentifier
-        ))?.hasRequested ?? false
-        return hasRequested ? .showAgain : .show
+        )
+        return metadata?.hasRequested == true || metadata?.lastTerminalReason != nil
+            ? .showAgain
+            : .show
     }
 
     func show() async -> ActiveFastLiveActivityResult {
@@ -105,30 +133,83 @@ final class ActiveFastLiveActivityCoordinator {
         }
 
         return await requestActivity(
-            for: activeFast,
-            attributes: attributes,
-            contentState: contentState,
-            now: now
+            ActivityRequest(
+                activeFast: activeFast,
+                attributes: attributes,
+                contentState: contentState,
+                now: now,
+                automaticAttempt: false,
+                clearsSuppression: true
+            )
         )
     }
 
-    private func requestActivity(
-        for activeFast: ActiveFastActivitySource,
-        attributes: ActiveFastActivityAttributes,
-        contentState: ActiveFastActivityAttributes.ContentState,
-        now: Date
+    /// Call only after a normal or backdated active fast has committed and its
+    /// WidgetKit projection has been published.
+    func didCommitActiveFastStart() async -> ActiveFastLiveActivityResult {
+        _ = await reconcile()
+        return await attemptAutomaticRequest(kind: .committedStart)
+    }
+
+    /// Call after a preference commit. Enabling may request the current active
+    /// fast; disabling ends matching derived state after the preference is off.
+    func didCommitAutomaticPreference(
+        _ preference: AutomaticLiveActivityPreference
     ) async -> ActiveFastLiveActivityResult {
+        switch preference {
+        case .enabled:
+            return await attemptAutomaticRequest(kind: .preferenceEnabled)
+        case .notAsked, .disabled:
+            preferenceEnableAttempts.removeAll()
+            return await disableAutomaticLiveActivities()
+        }
+    }
+
+    /// Reconcile once for a genuine cold launch or inactive/background-to-active
+    /// transition. Scene churn while already active is intentionally coalesced.
+    func didBecomeActive() async -> ActiveFastLiveActivityResult {
+        guard !foregroundIsActive else { return .coalesced }
+        foregroundIsActive = true
+        foregroundAutomaticAttempted = false
+
+        _ = await reconcile()
+        foregroundAutomaticAttempted = true
+        return await attemptAutomaticRequest(kind: .foreground)
+    }
+
+    func didBecomeInactive() {
+        foregroundIsActive = false
+        foregroundAutomaticAttempted = false
+    }
+
+    private func requestActivity(
+        _ request: ActivityRequest
+    ) async -> ActiveFastLiveActivityResult {
+        var attemptMetadata = lifecycleMetadata(for: request.activeFast)
+        if request.automaticAttempt {
+            attemptMetadata.lastAutomaticAttemptDate = request.now
+            attemptMetadata.lastAutomaticAttemptSucceeded = nil
+            save(attemptMetadata)
+        }
+
         do {
             let activity = try await client.request(
-                attributes: attributes,
-                contentState: contentState
+                attributes: request.attributes,
+                contentState: request.contentState
             )
-            var metadata = lifecycleMetadata(for: activeFast)
+            var metadata = lifecycleMetadata(for: request.activeFast)
             metadata.hasRequested = true
-            metadata.lastRequestDate = now
+            metadata.lastRequestDate = request.now
             metadata.lastKnownActivityIdentifier = activity.id
             metadata.lastIntent = .shown
             metadata.lastTerminalReason = nil
+            if request.clearsSuppression {
+                metadata.automaticSuppressed = false
+            }
+            if request.automaticAttempt {
+                metadata.lastAutomaticAttemptDate = request.now
+                metadata.lastAutomaticAttemptSucceeded = true
+            }
             save(metadata)
             return .shown(activityIdentifier: activity.id)
         } catch LiveActivityClientError.disabled {
@@ -136,10 +217,11 @@ final class ActiveFastLiveActivityCoordinator {
         } catch LiveActivityClientError.unavailable {
             return .unavailable(.unsupported)
         } catch {
-            var metadata = lifecycleMetadata(for: activeFast)
-            metadata.hasRequested = true
-            metadata.lastRequestDate = now
-            metadata.lastIntent = nil
+            var metadata = lifecycleMetadata(for: request.activeFast)
+            if request.automaticAttempt {
+                metadata.lastAutomaticAttemptDate = request.now
+                metadata.lastAutomaticAttemptSucceeded = false
+            }
             metadata.lastTerminalReason = .requestFailed
             save(metadata)
             return .requestFailed
@@ -171,6 +253,7 @@ final class ActiveFastLiveActivityCoordinator {
         metadata.hasRequested = true
         metadata.lastIntent = didFail ? .shown : .hidden
         metadata.lastTerminalReason = didFail ? nil : .userHidden
+        metadata.automaticSuppressed = !didFail
         save(metadata)
         return didFail ? .hideFailed : .hidden
     }
@@ -197,6 +280,8 @@ final class ActiveFastLiveActivityCoordinator {
             }
         }
         try? lifecycleStore.clearAll()
+        committedStartAttempts.removeAll()
+        preferenceEnableAttempts.removeAll()
         return didFail ? .hideFailed : .hidden
     }
 
@@ -204,6 +289,28 @@ final class ActiveFastLiveActivityCoordinator {
     /// has been cleared. This intentionally never requests a replacement.
     func didCommitDeleteAllData() async -> ActiveFastLiveActivityResult {
         await didCommitFastEndOrDeletion()
+    }
+
+    private func disableAutomaticLiveActivities() async -> ActiveFastLiveActivityResult {
+        let activities = await client.activities()
+        let matching: [LiveActivityRecord] = if let activeFast = activeFast() {
+            runningActivities(for: activeFast, in: activities)
+        } else {
+            activities.filter(\.state.isRunning)
+        }
+
+        var didFail = false
+        for activity in matching {
+            do {
+                try await client.end(
+                    activityID: activity.id,
+                    dismissalPolicy: .immediate
+                )
+            } catch {
+                didFail = true
+            }
+        }
+        return didFail ? .hideFailed : .hidden
     }
 
     /// Idempotent cleanup for cold launch and foreground activation. It only
@@ -250,13 +357,98 @@ final class ActiveFastLiveActivityCoordinator {
         } else if var metadata = try? lifecycleStore.metadata(
             for: activeFast.activeRecordIdentifier
         ) {
-            metadata.lastTerminalReason = metadata.hasRequested
-                ? .dismissedOrSystemEnded
-                : nil
+            if !metadata.automaticSuppressed {
+                metadata.lastTerminalReason = metadata.hasRequested
+                    ? .dismissedOrSystemEnded
+                    : metadata.lastTerminalReason
+            }
             try? lifecycleStore.save(metadata)
         }
 
         return .reconciled
+    }
+
+    private func attemptAutomaticRequest(
+        kind: AutomaticLiveActivityAttemptKind
+    ) async -> ActiveFastLiveActivityResult {
+        guard !mutationInFlight else { return .coalesced }
+        guard let activeFast = activeFast() else { return .noActiveFast }
+        guard markAutomaticAttempt(kind, for: activeFast.activeRecordIdentifier) else {
+            return .coalesced
+        }
+
+        mutationInFlight = true
+        defer { mutationInFlight = false }
+
+        let now = clock.now
+        let metadata = lifecycleMetadata(for: activeFast)
+        let activities = await client.activities()
+        let matching = runningActivities(for: activeFast, in: activities)
+        let reason = automaticEligibilityReason(
+            metadata: metadata,
+            matching: matching,
+            now: now
+        )
+        guard reason == .eligible else {
+            if let existing = matching.first {
+                return .alreadyShown(activityIdentifier: existing.id)
+            }
+            return .reconciled
+        }
+
+        let contentState = ActiveFastActivityAttributes.ContentState(
+            source: activeFast,
+            generatedAt: now
+        )
+        guard (try? contentState.validate(now: now)) != nil else {
+            return .noActiveFast
+        }
+
+        return await requestActivity(
+            ActivityRequest(
+                activeFast: activeFast,
+                attributes: ActiveFastActivityAttributes(
+                    activeRecordIdentifier: activeFast.activeRecordIdentifier
+                ),
+                contentState: contentState,
+                now: now,
+                automaticAttempt: true,
+                clearsSuppression: false
+            )
+        )
+    }
+
+    private func markAutomaticAttempt(
+        _ kind: AutomaticLiveActivityAttemptKind,
+        for activeRecordIdentifier: UUID
+    ) -> Bool {
+        switch kind {
+        case .committedStart:
+            committedStartAttempts.insert(activeRecordIdentifier).inserted
+        case .foreground:
+            foregroundAutomaticAttempted
+        case .preferenceEnabled:
+            preferenceEnableAttempts.insert(activeRecordIdentifier).inserted
+        }
+    }
+
+    private func automaticEligibilityReason(
+        metadata: LiveActivityLifecycleMetadata,
+        matching: [LiveActivityRecord],
+        now: Date
+    ) -> AutomaticLiveActivityEligibilityReason {
+        AutomaticLiveActivityPolicy.eligibilityReason(
+            AutomaticLiveActivityEligibilityInput(
+                preference: resolveAutomaticPreference(),
+                hasActiveFast: true,
+                availability: client.availability,
+                hasMatchingRunningActivity: !matching.isEmpty,
+                requestInFlight: false,
+                hiddenForThisFast: metadata.automaticSuppressed,
+                lastSuccessfulRequestDate: metadata.lastRequestDate,
+                now: now
+            )
+        )
     }
 
     private func activeFast() -> ActiveFastActivitySource? {

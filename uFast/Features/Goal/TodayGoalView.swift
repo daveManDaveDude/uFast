@@ -27,6 +27,7 @@ struct TodayGoalView: View {
     @State private var hydrationEditor: HydrationEditorPresentation?
     @State private var drinkAnnouncement: String?
     @State private var isEndConfirmationPresented = false
+    @State private var isAutomaticLiveActivityOfferPresented = false
     @State private var isLiveActivityDisclosurePresented = false
     @State private var isLiveActivityActionInFlight = false
     @State private var liveActivityControlState: LiveActivityControlState = .show
@@ -93,6 +94,7 @@ struct TodayGoalView: View {
         }
         .task(id: activeFasts.first?.id) {
             refreshLiveActivityControl()
+            await offerAutomaticLiveActivityIfEligible()
         }
         .onChange(of: fastRecorded) { _, isRecorded in
             if isRecorded {
@@ -203,6 +205,24 @@ struct TodayGoalView: View {
             )
         }
         .alert(
+            AutomaticLiveActivityCopy.title,
+            isPresented: $isAutomaticLiveActivityOfferPresented
+        ) {
+            Button(
+                AutomaticLiveActivityCopy.showAutomatically,
+                action: enableAutomaticLiveActivities
+            )
+            .accessibilityIdentifier("fast.automatic-offer.show")
+            Button(
+                AutomaticLiveActivityCopy.notNow,
+                role: .cancel,
+                action: disableAutomaticLiveActivities
+            )
+            .accessibilityIdentifier("fast.automatic-offer.not-now")
+        } message: {
+            Text(AutomaticLiveActivityCopy.message)
+        }
+        .alert(
             "Show Live Activity?",
             isPresented: $isLiveActivityDisclosurePresented
         ) {
@@ -273,7 +293,7 @@ struct TodayGoalView: View {
 
                 switch liveActivityControlState {
                 case .hide:
-                    Button("Hide Live Activity", action: hideLiveActivity)
+                    Button("Hide for this fast", action: hideLiveActivity)
                         .buttonStyle(UFastSecondaryButtonStyle())
                         .disabled(isLiveActivityActionInFlight)
                         .accessibilityIdentifier("fast.live-activity.hide")
@@ -310,6 +330,67 @@ struct TodayGoalView: View {
         guard let liveActivityCoordinator else { return }
         Task {
             liveActivityControlState = await liveActivityCoordinator.controlState()
+        }
+    }
+
+    private func offerAutomaticLiveActivityIfEligible() async {
+        guard !ProcessInfo.processInfo.arguments.contains(
+            "--suppress-automatic-live-activity-offer"
+        ) else { return }
+        guard activeFasts.first != nil,
+              settingsRecords.first?.automaticLiveActivityPreference == .notAsked,
+              let liveActivityCoordinator
+        else { return }
+
+        guard liveActivityCoordinator.isAvailableForAutomaticConsent() else {
+            return
+        }
+
+        // This task runs after the committed query result is rendered. Yielding
+        // once keeps consent subordinate to that visible Today state.
+        await Task.yield()
+        guard activeFasts.first != nil,
+              settingsRecords.first?.automaticLiveActivityPreference == .notAsked
+        else { return }
+        isAutomaticLiveActivityOfferPresented = true
+    }
+
+    private func enableAutomaticLiveActivities() {
+        persistAutomaticLiveActivityPreference(.enabled, requestAfterCommit: true)
+    }
+
+    private func disableAutomaticLiveActivities() {
+        persistAutomaticLiveActivityPreference(.disabled, requestAfterCommit: false)
+    }
+
+    private func persistAutomaticLiveActivityPreference(
+        _ preference: AutomaticLiveActivityPreference,
+        requestAfterCommit: Bool
+    ) {
+        guard let settings = settingsRecords.first else { return }
+        let previousPreference = settings.automaticLiveActivityPreference
+        settings.setAutomaticLiveActivityPreference(preference)
+
+        do {
+            if ProcessInfo.processInfo.arguments.contains(
+                "--simulate-live-activity-settings-save-failure"
+            ) {
+                throw AutomaticLiveActivitySettingsError.simulatedSaveFailure
+            }
+            try modelContext.save()
+            liveActivityStatus = nil
+
+            guard requestAfterCommit, let liveActivityCoordinator else { return }
+            Task {
+                let result = await liveActivityCoordinator.didCommitAutomaticPreference(
+                    preference
+                )
+                liveActivityStatus = liveActivityStatus(for: result)
+                refreshLiveActivityControl()
+            }
+        } catch {
+            settings.setAutomaticLiveActivityPreference(previousPreference)
+            liveActivityStatus = AutomaticLiveActivityCopy.settingsSaveFailure
         }
     }
 
@@ -497,6 +578,12 @@ struct TodayGoalView: View {
             WidgetProjectionSupport.publish(fast, goal: goal, now: clock.now)
             startError = nil
             fastRecorded = false
+            Task {
+                if let result = await liveActivityCoordinator?.didCommitActiveFastStart() {
+                    liveActivityStatus = liveActivityStatus(for: result)
+                }
+                refreshLiveActivityControl()
+            }
         } catch {
             startError = "Your fast couldn’t be started. Please try again."
         }
@@ -523,6 +610,12 @@ struct TodayGoalView: View {
             let fast = try service.startFast(at: startDate, goal: goal)
             WidgetProjectionSupport.publish(fast, goal: goal, now: clock.now)
             fastRecorded = false
+            Task {
+                if let result = await liveActivityCoordinator?.didCommitActiveFastStart() {
+                    liveActivityStatus = liveActivityStatus(for: result)
+                }
+                refreshLiveActivityControl()
+            }
         case .correct:
             let fast = try service.correctActiveFastStart(to: startDate)
             WidgetProjectionSupport.publish(fast, goal: goal, now: clock.now)

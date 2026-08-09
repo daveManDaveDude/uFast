@@ -134,6 +134,11 @@ struct UFastApp: App {
                     targetDate: fast.targetDate(currentGoal: goal),
                     goalHours: goal.hours
                 )
+            },
+            resolveAutomaticPreference: {
+                let context = container.mainContext
+                return (try? context.fetch(FetchDescriptor<AppSettingsRecord>()).first?
+                    .automaticLiveActivityPreference) ?? .notAsked
             }
         )
     }

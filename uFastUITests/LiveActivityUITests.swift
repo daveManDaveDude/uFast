@@ -30,6 +30,85 @@ final class LiveActivityUITests: XCTestCase {
     }
 
     @MainActor
+    func testAutomaticOfferUsesExactCopyAndNotNowDoesNotRepeat() {
+        let app = launchLiveActivityApp()
+        startFast(in: app, dismissAutomaticOffer: false)
+
+        let offer = app.alerts["See your fast at a glance?"]
+        XCTAssertTrue(offer.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(
+            offer.staticTexts.matching(
+                NSPredicate(format: "label == %@", automaticOfferMessage)
+            ).firstMatch.waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+        offer.buttons["fast.automatic-offer.not-now"].firstMatch.tap()
+        XCTAssertTrue(offer.waitForNonExistence(timeout: 5), app.debugDescription)
+
+        app.terminate()
+        app.launchArguments = [
+            "--ui-testing",
+            "--fixed-now",
+            String(fixedNow.timeIntervalSince1970),
+        ]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5))
+        XCTAssertTrue(offer.waitForNonExistence(timeout: 5), app.debugDescription)
+
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertTrue(
+            app.switches["settings.live-activities.toggle"].waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+    }
+
+    @MainActor
+    func testShowAutomaticallyStartsOneActivityAndRenamesRemovalControl() {
+        let app = launchLiveActivityApp()
+        startFast(in: app, dismissAutomaticOffer: false)
+
+        let offer = app.alerts["See your fast at a glance?"]
+        XCTAssertTrue(offer.waitForExistence(timeout: 5), app.debugDescription)
+        offer.buttons["fast.automatic-offer.show"].firstMatch.tap()
+        XCTAssertTrue(offer.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(
+            app.buttons["fast.live-activity.hide"].waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
+    }
+
+    @MainActor
+    func testSettingsToggleCanEnableBeforeAStart() {
+        let app = launchLiveActivityApp()
+        app.tabBars.buttons["Settings"].tap()
+        let toggle = app.switches["settings.live-activities.toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), app.debugDescription)
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+
+        app.terminate()
+        app.launchArguments = [
+            "--ui-testing",
+            "--fixed-now",
+            String(fixedNow.timeIntervalSince1970),
+        ]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5), app.debugDescription)
+        app.tabBars.buttons["Today"].tap()
+        app.buttons["fast.start"].tap()
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(
+            app.alerts["See your fast at a glance?"].waitForNonExistence(timeout: 5),
+            app.debugDescription
+        )
+        XCTAssertTrue(
+            app.buttons["fast.live-activity.hide"].waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+    }
+
+    @MainActor
     func testShowHideAndExplicitReshowPreserveTheActiveFast() {
         let app = launchLiveActivityApp()
         startFast(in: app)
@@ -104,11 +183,21 @@ final class LiveActivityUITests: XCTestCase {
     }
 
     @MainActor
-    private func startFast(in app: XCUIApplication) {
+    private func startFast(
+        in app: XCUIApplication,
+        dismissAutomaticOffer: Bool = true
+    ) {
         let start = app.buttons["fast.start"]
         XCTAssertTrue(start.waitForExistence(timeout: 5), app.debugDescription)
         start.tap()
         XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 5), app.debugDescription)
+        if dismissAutomaticOffer {
+            let offer = app.alerts["See your fast at a glance?"]
+            if offer.waitForExistence(timeout: 5) {
+                offer.buttons["fast.automatic-offer.not-now"].firstMatch.tap()
+                XCTAssertTrue(offer.waitForNonExistence(timeout: 5), app.debugDescription)
+            }
+        }
         XCTAssertTrue(app.buttons["fast.live-activity.show"].waitForExistence(timeout: 5), app.debugDescription)
     }
 
@@ -135,3 +224,9 @@ private enum ActiveFastLiveActivityDisclosureCopy {
         "Shows uFast, elapsed time, goal progress and target on the Lock Screen and Dynamic Island for up to 8 hours. "
             + "You can hide it at any time. Your fast continues if the activity ends."
 }
+
+private let automaticOfferMessage =
+    "uFast can automatically show elapsed time, goal progress and target on the Lock Screen and Dynamic Island "
+        + "when you start a fast. Each Live Activity stays active for up to 8 hours. If your fast continues, "
+        + "uFast can show a new one the next time you open the app. "
+        + "You can hide it or turn this off at any time in Settings."
