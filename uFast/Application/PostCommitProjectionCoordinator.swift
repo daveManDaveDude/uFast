@@ -16,7 +16,7 @@ struct PostCommitProjectionOutcome {
 @MainActor
 final class PostCommitProjectionCoordinator {
     typealias WidgetEffect = (PostCommitProjectionEvent) throws -> Void
-    typealias ActivityEffect = (PostCommitProjectionEvent) async -> ActiveFastLiveActivityResult?
+    typealias ActivityEffect = @MainActor (PostCommitProjectionEvent) async -> ActiveFastLiveActivityResult?
 
     private let widgetEffect: WidgetEffect
     private let activityEffect: ActivityEffect
