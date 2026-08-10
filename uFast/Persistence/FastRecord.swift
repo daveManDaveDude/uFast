@@ -11,6 +11,15 @@ enum FastReviewState: String, Equatable, Sendable {
     case needsReview
 }
 
+enum FastRecordIntegrityError: Error, Equatable {
+    case invalidHistoricalGoal(rawHours: Int)
+}
+
+enum FastRecordPresentationIntegrity: Equatable, Sendable {
+    case available
+    case unavailable
+}
+
 struct FastRecordProvenanceSnapshot: Equatable, Sendable {
     let originRaw: String
     let reviewStateRaw: String
@@ -77,20 +86,20 @@ final class FastRecord {
         endDate == nil
     }
 
-    var historicalGoal: FastingGoal {
-        FastingGoal(hours: goalHoursAtStart) ?? .default
+    var historicalGoal: FastingGoal? {
+        FastingGoal(hours: goalHoursAtStart)
     }
 
     var capturedHistoricalGoal: FastingGoal? {
         hasHistoricalGoal ? historicalGoal : nil
     }
 
-    var origin: FastOrigin {
-        FastOrigin(rawValue: originRaw) ?? .recorded
+    var origin: FastOrigin? {
+        FastOrigin(rawValue: originRaw)
     }
 
-    var reviewState: FastReviewState {
-        FastReviewState(rawValue: reviewStateRaw) ?? .confirmed
+    var reviewState: FastReviewState? {
+        FastReviewState(rawValue: reviewStateRaw)
     }
 
     var boundaryPair: ReconstructionBoundaryPair? {
@@ -120,17 +129,24 @@ final class FastRecord {
         )
     }
 
+    var presentationIntegrity: FastRecordPresentationIntegrity {
+        guard origin != nil, reviewState != nil else { return .unavailable }
+        guard !hasHistoricalGoal || historicalGoal != nil else { return .unavailable }
+        return .available
+    }
+
     var duration: TimeInterval? {
         endDate.map { $0.timeIntervalSince(startDate) }
     }
 
-    func presentationGoal(currentGoal: FastingGoal) -> FastingGoal {
+    func presentationGoal(currentGoal: FastingGoal) -> FastingGoal? {
         isActive ? currentGoal : historicalGoal
     }
 
-    func targetDate(currentGoal: FastingGoal) -> Date {
-        let goal = presentationGoal(currentGoal: currentGoal)
-        return startDate.addingTimeInterval(TimeInterval(goal.hours * 60 * 60))
+    func targetDate(currentGoal: FastingGoal) -> Date? {
+        presentationGoal(currentGoal: currentGoal).map {
+            startDate.addingTimeInterval(TimeInterval($0.hours * 60 * 60))
+        }
     }
 
     func correctStartDate(to startDate: Date) {
@@ -147,35 +163,6 @@ final class FastRecord {
         reviewStateRaw = FastReviewState.needsReview.rawValue
     }
 
-    func reconfirm(
-        startDate: Date,
-        endDate: Date,
-        boundaries: ReconstructionBoundaryPair,
-        adjustedByUser: Bool
-    ) {
-        self.startDate = startDate
-        self.endDate = endDate
-        originRaw = FastOrigin.reconstructed.rawValue
-        reviewStateRaw = FastReviewState.confirmed.rawValue
-        wasAdjustedByUser = adjustedByUser
-        hasHistoricalGoal = false
-        startBoundaryKindRaw = boundaries.start.kind.rawValue
-        startBoundaryID = boundaries.start.id
-        endBoundaryKindRaw = boundaries.end.kind.rawValue
-        endBoundaryID = boundaries.end.id
-    }
-
-    func convertToRecordedWithoutHistoricalGoal() {
-        originRaw = FastOrigin.recorded.rawValue
-        reviewStateRaw = FastReviewState.confirmed.rawValue
-        wasAdjustedByUser = false
-        hasHistoricalGoal = false
-        startBoundaryKindRaw = nil
-        startBoundaryID = nil
-        endBoundaryKindRaw = nil
-        endBoundaryID = nil
-    }
-
     func restoreProvenance(_ snapshot: FastRecordProvenanceSnapshot) {
         originRaw = snapshot.originRaw
         reviewStateRaw = snapshot.reviewStateRaw
@@ -185,6 +172,11 @@ final class FastRecord {
         startBoundaryID = snapshot.startBoundaryID
         endBoundaryKindRaw = snapshot.endBoundaryKindRaw
         endBoundaryID = snapshot.endBoundaryID
+    }
+
+    func restorePersistedHistoricalGoal(rawHours: Int, isCaptured: Bool) {
+        goalHoursAtStart = rawHours
+        hasHistoricalGoal = isCaptured
     }
 
     @discardableResult

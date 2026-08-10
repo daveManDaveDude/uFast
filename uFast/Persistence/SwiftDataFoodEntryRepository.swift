@@ -35,24 +35,23 @@ protocol FoodEntryRepository {
 @MainActor
 final class SwiftDataFoodEntryRepository: FoodEntryRepository {
     private let modelContext: ModelContext
-    private let simulateSaveFailure: Bool
+    private let transaction: PersistenceTransaction
 
     init(modelContext: ModelContext, simulateSaveFailure: Bool = false) {
         self.modelContext = modelContext
-        self.simulateSaveFailure = simulateSaveFailure
+        transaction = PersistenceTransaction(
+            modelContext: modelContext,
+            saveAction: simulateSaveFailure ? {
+                throw FoodEntryPersistenceError.simulatedSaveFailure
+            } : nil
+        )
     }
 
     func create(_ draft: FoodEntryDraft, at creationDate: Date) throws -> FoodEntryRecord {
         let record = FoodEntryRecord(draft: draft, createdAt: creationDate)
         modelContext.insert(record)
-        do {
-            try failIfRequested()
-            try modelContext.save()
-            return record
-        } catch {
-            modelContext.delete(record)
-            throw error
-        }
+        try transaction.save()
+        return record
     }
 
     func create(
@@ -62,18 +61,17 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         goal: FastingGoal
     ) throws -> FoodEntryRecord {
         let record = FoodEntryRecord(draft: draft, createdAt: creationDate)
-        let previousGoal = activeFast.historicalGoal
+        guard let previousGoal = activeFast.historicalGoal else {
+            throw FastRecordIntegrityError.invalidHistoricalGoal(
+                rawHours: activeFast.goalHoursAtStart
+            )
+        }
         modelContext.insert(record)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        do {
-            try failIfRequested()
-            try modelContext.save()
-            return record
-        } catch {
+        try transaction.save {
             activeFast.restoreActive(goal: previousGoal)
-            modelContext.delete(record)
-            throw error
         }
+        return record
     }
 
     func update(
@@ -83,12 +81,8 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
     ) throws {
         let previousSnapshot = record.snapshot
         record.update(from: draft, at: updateDate)
-        do {
-            try failIfRequested()
-            try modelContext.save()
-        } catch {
+        try transaction.save {
             record.restore(from: previousSnapshot)
-            throw error
         }
     }
 
@@ -100,25 +94,21 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         goal: FastingGoal
     ) throws {
         let previousSnapshot = record.snapshot
-        let previousGoal = activeFast.historicalGoal
+        guard let previousGoal = activeFast.historicalGoal else {
+            throw FastRecordIntegrityError.invalidHistoricalGoal(
+                rawHours: activeFast.goalHoursAtStart
+            )
+        }
         record.update(from: draft, at: updateDate)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        do {
-            try failIfRequested()
-            try modelContext.save()
-        } catch {
+        try transaction.save {
             record.restore(from: previousSnapshot)
             activeFast.restoreActive(goal: previousGoal)
-            throw error
         }
     }
 
     func activeFast() throws -> FastRecord? {
-        var descriptor = FetchDescriptor<FastRecord>(
-            predicate: #Predicate { $0.endDate == nil }
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
+        try ActiveFastAuthority.fetch(in: modelContext)
     }
 
     func recordedFasts() throws -> [FastRecord] {
@@ -126,23 +116,7 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
     }
 
     func delete(_ record: FoodEntryRecord) throws {
-        do {
-            try failIfRequested()
-        } catch {
-            throw error
-        }
         modelContext.delete(record)
-        do {
-            try modelContext.save()
-        } catch {
-            modelContext.rollback()
-            throw error
-        }
-    }
-
-    private func failIfRequested() throws {
-        if simulateSaveFailure {
-            throw FoodEntryPersistenceError.simulatedSaveFailure
-        }
+        try transaction.save()
     }
 }

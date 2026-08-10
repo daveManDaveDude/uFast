@@ -1,0 +1,209 @@
+import Foundation
+
+public enum CaloricBoundaryKind: String, CaseIterable, Hashable, Sendable {
+    case food
+    case hydration
+}
+
+public struct CaloricBoundaryReference: Hashable, Sendable {
+    public let kind: CaloricBoundaryKind
+    public let id: UUID
+
+    public init(kind: CaloricBoundaryKind, id: UUID) {
+        self.kind = kind
+        self.id = id
+    }
+}
+
+public struct CaloricBoundary: Equatable, Hashable, Sendable {
+    public let reference: CaloricBoundaryReference
+    public let occurredAt: Date
+    public let description: String
+
+    public init(reference: CaloricBoundaryReference, occurredAt: Date, description: String) {
+        self.reference = reference
+        self.occurredAt = occurredAt
+        self.description = description
+    }
+}
+
+public struct FoodBoundarySnapshot: Equatable, Sendable {
+    public let id: UUID
+    public let occurredAt: Date
+    public let description: String
+    public let isCaloric: Bool
+
+    public init(id: UUID, occurredAt: Date, description: String, isCaloric: Bool) {
+        self.id = id
+        self.occurredAt = occurredAt
+        self.description = description
+        self.isCaloric = isCaloric
+    }
+}
+
+public struct HydrationBoundarySnapshot: Equatable, Sendable {
+    public let id: UUID
+    public let occurredAt: Date
+    public let description: String
+    public let isCaloric: Bool
+
+    public init(id: UUID, occurredAt: Date, description: String, isCaloric: Bool) {
+        self.id = id
+        self.occurredAt = occurredAt
+        self.description = description
+        self.isCaloric = isCaloric
+    }
+}
+
+public enum CaloricBoundaryOrdering {
+    public static func sorted(_ boundaries: [CaloricBoundary]) -> [CaloricBoundary] {
+        boundaries.sorted {
+            if $0.occurredAt != $1.occurredAt {
+                return $0.occurredAt < $1.occurredAt
+            }
+            if $0.reference.kind != $1.reference.kind {
+                return $0.reference.kind.rawValue < $1.reference.kind.rawValue
+            }
+            return $0.reference.id.uuidString < $1.reference.id.uuidString
+        }
+    }
+}
+
+public enum CaloricBoundaryExtractor {
+    public static func boundaries(
+        food: [FoodBoundarySnapshot],
+        hydration: [HydrationBoundarySnapshot]
+    ) -> [CaloricBoundary] {
+        let foodBoundaries = food.filter(\.isCaloric).map {
+            CaloricBoundary(
+                reference: CaloricBoundaryReference(kind: .food, id: $0.id),
+                occurredAt: $0.occurredAt,
+                description: $0.description
+            )
+        }
+        let hydrationBoundaries = hydration.filter(\.isCaloric).map {
+            CaloricBoundary(
+                reference: CaloricBoundaryReference(kind: .hydration, id: $0.id),
+                occurredAt: $0.occurredAt,
+                description: $0.description
+            )
+        }
+        return CaloricBoundaryOrdering.sorted(foodBoundaries + hydrationBoundaries)
+    }
+}
+
+public struct CaloricBoundaryPair: Equatable, Hashable, Sendable {
+    public let start: CaloricBoundaryReference
+    public let end: CaloricBoundaryReference
+
+    public init(start: CaloricBoundaryReference, end: CaloricBoundaryReference) {
+        self.start = start
+        self.end = end
+    }
+}
+
+public struct RecordedFastInterval: Equatable, Sendable {
+    public let id: UUID
+    public let startDate: Date
+    public let endDate: Date?
+
+    public init(id: UUID, startDate: Date, endDate: Date?) {
+        self.id = id
+        self.startDate = startDate
+        self.endDate = endDate
+    }
+}
+
+public enum FastConflictChecker {
+    public static func hasConflict(
+        proposedStart: Date,
+        proposedEnd: Date?,
+        excluding excludedID: UUID? = nil,
+        among intervals: [RecordedFastInterval]
+    ) -> Bool {
+        intervals.contains { interval in
+            guard interval.id != excludedID else { return false }
+            let startsBeforeExistingEnd = interval.endDate.map { proposedStart < $0 } ?? true
+            let existingStartsBeforeEnd = proposedEnd.map { interval.startDate < $0 } ?? true
+            return startsBeforeExistingEnd && existingStartsBeforeEnd
+        }
+    }
+}
+
+public struct AutomaticFastIdentity: Hashable, Sendable {
+    public let boundaries: CaloricBoundaryPair
+
+    public init(boundaries: CaloricBoundaryPair) {
+        self.boundaries = boundaries
+    }
+}
+
+public struct AutomaticFastInterval: Equatable, Sendable {
+    public let identity: AutomaticFastIdentity
+    public let startDate: Date
+    public let endDate: Date
+    public var interval: Range<Date> {
+        startDate ..< endDate
+    }
+
+    public var duration: TimeInterval {
+        endDate.timeIntervalSince(startDate)
+    }
+
+    public init(identity: AutomaticFastIdentity, startDate: Date, endDate: Date) {
+        self.identity = identity
+        self.startDate = startDate
+        self.endDate = endDate
+    }
+}
+
+public enum AutomaticFastProjector {
+    public static let minimumDuration: TimeInterval = 8 * 60 * 60
+
+    public static func project(
+        boundaries: [CaloricBoundary],
+        visibleInterval: Range<Date>,
+        excluding recordedFasts: [RecordedFastInterval] = []
+    ) -> [AutomaticFastInterval] {
+        let ordered = CaloricBoundaryOrdering.sorted(boundaries)
+        return zip(ordered, ordered.dropFirst()).compactMap { start, end in
+            guard start.occurredAt < end.occurredAt else { return nil }
+            let interval = start.occurredAt ..< end.occurredAt
+            guard end.occurredAt.timeIntervalSince(start.occurredAt) > minimumDuration,
+                  intersects(interval, visibleInterval),
+                  !recordedFasts.contains(where: { overlaps(interval, $0) })
+            else { return nil }
+            return AutomaticFastInterval(
+                identity: AutomaticFastIdentity(
+                    boundaries: CaloricBoundaryPair(start: start.reference, end: end.reference)
+                ),
+                startDate: start.occurredAt,
+                endDate: end.occurredAt
+            )
+        }
+    }
+
+    public static func isExactProjection(
+        startDate: Date,
+        endDate: Date,
+        boundaries pair: CaloricBoundaryPair?,
+        caloricBoundaries: [CaloricBoundary]
+    ) -> Bool {
+        guard let pair else { return false }
+        return project(
+            boundaries: caloricBoundaries,
+            visibleInterval: Date.distantPast ..< Date.distantFuture
+        ).contains {
+            $0.identity.boundaries == pair && $0.startDate == startDate && $0.endDate == endDate
+        }
+    }
+
+    public static func intersects(_ lhs: Range<Date>, _ rhs: Range<Date>) -> Bool {
+        lhs.lowerBound < rhs.upperBound && rhs.lowerBound < lhs.upperBound
+    }
+
+    private static func overlaps(_ interval: Range<Date>, _ fast: RecordedFastInterval) -> Bool {
+        let endsAfterStart = fast.endDate.map { interval.lowerBound < $0 } ?? true
+        return endsAfterStart && fast.startDate < interval.upperBound
+    }
+}

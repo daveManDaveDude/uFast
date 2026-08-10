@@ -4,6 +4,48 @@ import XCTest
 
 @MainActor
 final class PersistenceContainerTests: XCTestCase {
+    func testCurrentVersionedSchemaAndMigrationPlanCoverEveryProductionModel() {
+        XCTAssertEqual(UFastSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 1)
+        XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
+        XCTAssertTrue(UFastMigrationPlan.stages.isEmpty)
+        XCTAssertEqual(PersistenceContainer.schema.entities.count, 5)
+    }
+
+    func testBootstrapReturnsReadyContainerOnSuccessfulOpen() throws {
+        let result = PersistenceBootstrapResult.open {
+            try PersistenceContainer.make(inMemory: true)
+        }
+
+        guard case let .ready(container) = result else {
+            return XCTFail("Expected persistence bootstrap to succeed")
+        }
+        XCTAssertEqual(
+            try container.mainContext.fetchCount(FetchDescriptor<AppSettingsRecord>()),
+            0
+        )
+    }
+
+    func testBootstrapFailureLeavesExistingStoreBytesUntouched() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "uFast-bootstrap-failure-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "production.store")
+        let originalBytes = Data("existing local store".utf8)
+        try originalBytes.write(to: storeURL)
+
+        let result = PersistenceBootstrapResult.open {
+            throw PersistenceBootstrapTestError.cannotOpen
+        }
+
+        guard case let .unavailable(failure) = result else {
+            return XCTFail("Expected explicit unavailable bootstrap result")
+        }
+        XCTAssertTrue(failure.diagnosticDescription.contains("cannotOpen"))
+        XCTAssertEqual(try Data(contentsOf: storeURL), originalBytes)
+    }
+
     func testProductionConfigurationIsLocalOnly() {
         let configuration = PersistenceContainer.configuration()
 
@@ -94,6 +136,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<UnknownPeriodRecord>()), 1)
+        XCTAssertFalse(context.hasChanges)
     }
 
     private func populatedContainer() throws -> ModelContainer {
@@ -138,4 +181,8 @@ final class PersistenceContainerTests: XCTestCase {
         try context.save()
         return container
     }
+}
+
+private enum PersistenceBootstrapTestError: Error {
+    case cannotOpen
 }

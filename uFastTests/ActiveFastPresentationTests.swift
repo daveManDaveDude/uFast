@@ -135,9 +135,9 @@ final class ActiveFastPresentationTests: XCTestCase {
         context.insert(fast)
         try context.save()
 
-        _ = ActiveFastPresentation(
+        _ = try ActiveFastPresentation(
             startDate: fast.startDate,
-            targetDate: fast.targetDate(currentGoal: .default),
+            targetDate: XCTUnwrap(fast.targetDate(currentGoal: .default)),
             now: startDate.addingTimeInterval(5 * 60 * 60)
         )
 

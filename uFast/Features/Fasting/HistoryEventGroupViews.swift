@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 struct GroupMarkerAccessibilityModifier: ViewModifier {
@@ -67,12 +66,12 @@ struct HistoryEventGroupDisclosure: View {
     let onDismiss: () -> Void
     let clock: any AppClock
     let activeFastStart: Date?
-    let resolveFood: (UUID) -> FoodEntryRecord?
-    let resolveHydration: (UUID) -> HydrationEntryRecord?
-    let saveFood: (FoodEntryRecord, FoodEntryDraft, Bool) throws -> Void
-    let deleteFood: (FoodEntryRecord) throws -> Void
-    let saveHydration: (HydrationEntryRecord, HydrationEntryDraft, Bool) throws -> Void
-    let deleteHydration: (HydrationEntryRecord) throws -> Void
+    let resolveFood: (UUID) -> FoodEntrySnapshot?
+    let resolveHydration: (UUID) -> HydrationEntrySnapshot?
+    let saveFood: (UUID, FoodEntryDraft, Bool) throws -> Void
+    let deleteFood: (UUID) throws -> Void
+    let saveHydration: (UUID, HydrationEntryDraft, Bool) throws -> Void
+    let deleteHydration: (UUID) throws -> Void
     let onMutationSucceeded: (TemporalEventGroup, HistoryEventGroupMutation) -> TemporalEventGroup?
 
     init(
@@ -82,12 +81,12 @@ struct HistoryEventGroupDisclosure: View {
         onDismiss: @escaping () -> Void,
         clock: any AppClock,
         activeFastStart: Date?,
-        resolveFood: @escaping (UUID) -> FoodEntryRecord?,
-        resolveHydration: @escaping (UUID) -> HydrationEntryRecord?,
-        saveFood: @escaping (FoodEntryRecord, FoodEntryDraft, Bool) throws -> Void,
-        deleteFood: @escaping (FoodEntryRecord) throws -> Void,
-        saveHydration: @escaping (HydrationEntryRecord, HydrationEntryDraft, Bool) throws -> Void,
-        deleteHydration: @escaping (HydrationEntryRecord) throws -> Void,
+        resolveFood: @escaping (UUID) -> FoodEntrySnapshot?,
+        resolveHydration: @escaping (UUID) -> HydrationEntrySnapshot?,
+        saveFood: @escaping (UUID, FoodEntryDraft, Bool) throws -> Void,
+        deleteFood: @escaping (UUID) throws -> Void,
+        saveHydration: @escaping (UUID, HydrationEntryDraft, Bool) throws -> Void,
+        deleteHydration: @escaping (UUID) throws -> Void,
         onMutationSucceeded: @escaping (TemporalEventGroup, HistoryEventGroupMutation) -> TemporalEventGroup?
     ) {
         self.group = group
@@ -160,7 +159,7 @@ struct HistoryEventGroupDisclosure: View {
         .accessibilityIdentifier("history.event-group.disclosure")
         .sheet(item: $foodEditor) { presentation in
             FoodEntryEditor(
-                record: presentation.record,
+                snapshot: presentation.record,
                 clock: clock,
                 activeFastStart: activeFastStart,
                 initialOccurredAt: presentation.record.occurredAt,
@@ -168,7 +167,7 @@ struct HistoryEventGroupDisclosure: View {
                     $0.start ..< $0.end
                 },
                 onSave: { draft, endingActiveFast in
-                    try saveFood(presentation.record, draft, endingActiveFast)
+                    try saveFood(presentation.record.id, draft, endingActiveFast)
                     foodEditor = nil
                     if let refreshed = onMutationSucceeded(
                         displayedGroup,
@@ -178,7 +177,7 @@ struct HistoryEventGroupDisclosure: View {
                     }
                 },
                 onDelete: {
-                    try deleteFood(presentation.record)
+                    try deleteFood(presentation.record.id)
                     foodEditor = nil
                     if let refreshed = onMutationSucceeded(
                         displayedGroup,
@@ -192,7 +191,7 @@ struct HistoryEventGroupDisclosure: View {
         }
         .sheet(item: $hydrationEditor) { presentation in
             HydrationEntryEditor(
-                record: presentation.record,
+                snapshot: presentation.record,
                 clock: clock,
                 activeFastStart: activeFastStart,
                 initialDraft: nil,
@@ -200,7 +199,7 @@ struct HistoryEventGroupDisclosure: View {
                     $0.start ..< $0.end
                 },
                 onSave: { draft, endingActiveFast in
-                    try saveHydration(presentation.record, draft, endingActiveFast)
+                    try saveHydration(presentation.record.id, draft, endingActiveFast)
                     hydrationEditor = nil
                     if let refreshed = onMutationSucceeded(
                         displayedGroup,
@@ -210,7 +209,7 @@ struct HistoryEventGroupDisclosure: View {
                     }
                 },
                 onDelete: {
-                    try deleteHydration(presentation.record)
+                    try deleteHydration(presentation.record.id)
                     hydrationEditor = nil
                     if let refreshed = onMutationSucceeded(
                         displayedGroup,
@@ -291,14 +290,14 @@ enum HistoryEventGroupMutation {
 }
 
 private struct GroupFoodEditorPresentation: Identifiable {
-    let record: FoodEntryRecord
+    let record: FoodEntrySnapshot
     var id: UUID {
         record.id
     }
 }
 
 private struct GroupHydrationEditorPresentation: Identifiable {
-    let record: HydrationEntryRecord
+    let record: HydrationEntrySnapshot
     var id: UUID {
         record.id
     }

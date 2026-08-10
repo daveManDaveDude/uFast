@@ -62,6 +62,7 @@ final class SwiftDataFoodEntryRepositoryTests: XCTestCase {
         )
         XCTAssertEqual(record.foodDescription, "Lunch")
         XCTAssertEqual(record.updatedAt, now)
+        XCTAssertFalse(container.mainContext.hasChanges)
     }
 
     func testDeleteFailureKeepsRecord() throws {
@@ -79,5 +80,6 @@ final class SwiftDataFoodEntryRepositoryTests: XCTestCase {
 
         XCTAssertThrowsError(try failingRepository.delete(record))
         XCTAssertEqual(try container.mainContext.fetch(FetchDescriptor<FoodEntryRecord>()).count, 1)
+        XCTAssertFalse(container.mainContext.hasChanges)
     }
 }

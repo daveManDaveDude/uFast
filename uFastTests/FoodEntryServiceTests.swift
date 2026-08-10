@@ -97,6 +97,7 @@ final class FoodEntryServiceTests: XCTestCase {
         )
         XCTAssertTrue(fast.isActive)
         XCTAssertTrue(try foodEntries(in: container).isEmpty)
+        XCTAssertFalse(container.mainContext.hasChanges)
     }
 
     func testEditingIntoActiveIntervalPreservesIdentifierAndEndsFast() throws {

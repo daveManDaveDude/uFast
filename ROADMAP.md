@@ -1,6 +1,6 @@
 # uFast product roadmap
 
-**Updated:** 9 August 2026  
+**Updated:** 10 August 2026
 **Status:** post-MVP product direction; release dates are not committed
 
 ## Where the product is now
@@ -18,7 +18,13 @@ local-first iPhone fasting tracker with:
   events, exact-time disclosure and accessible alternatives;
 - local SwiftData persistence, offline operation, privacy/safety information
   and double-confirmed deletion of all app-created data; and
-- a coherent, calm visual system completed by the post-MVP UI tidy-up.
+- a coherent, calm visual system completed by the post-MVP UI tidy-up; and
+- optional local WidgetKit and ActivityKit surfaces for an active fast,
+  including the user-controlled automatic Live Activity behavior in D-030.
+
+The source tree is currently versioned as **1.0.0 (8)**. This source version is
+separate from the last externally recorded release state below; this roadmap
+does not infer an upload or review state for build 8.
 
 Release status reported on 7 August 2026:
 
@@ -82,6 +88,11 @@ opening uFast.
 
 Both Lock Screen surfaces are optional conveniences. The in-app fasting loop
 remains complete without either one.
+
+Implementation through OW-L108 is present in the source. OW-L109 release
+evidence remains open: the full four-worker UI run and the listed physical-device
+and Apple-controlled lifecycle checks must be recorded before this milestone is
+claimed complete for release.
 
 ### 2 — User-controlled backup and restore
 

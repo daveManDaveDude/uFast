@@ -9,12 +9,14 @@ enum HydrationEntryValidator {
     static let customNameLimit = 80
 
     static func isValid(volumeMillilitres: Int) -> Bool {
-        (minimumVolumeMillilitres ... maximumVolumeMillilitres).contains(volumeMillilitres)
+        DomainValidation.contains(
+            volumeMillilitres,
+            in: minimumVolumeMillilitres ... maximumVolumeMillilitres
+        )
     }
 
     static func validatedCustomName(_ name: String) -> String? {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !trimmed.isEmpty && trimmed.count <= customNameLimit ? trimmed : nil
+        DomainValidation.nonEmptyTrimmed(name, maximumLength: customNameLimit)
     }
 
     static func validated(
@@ -63,11 +65,27 @@ struct HydrationFavourite: Equatable {
 }
 
 enum HydrationFavouriteProvider {
+    static func favourites(snapshot: AppSettingsSnapshot?) -> [HydrationFavourite] {
+        values(
+            water: snapshot?.waterFavouriteMillilitres ?? 500,
+            tea: snapshot?.teaFavouriteMillilitres ?? 300,
+            coffee: snapshot?.coffeeFavouriteMillilitres ?? 300
+        )
+    }
+
     static func favourites(settings: AppSettingsRecord?) -> [HydrationFavourite] {
+        values(
+            water: settings?.waterFavouriteMillilitres ?? 500,
+            tea: settings?.teaFavouriteMillilitres ?? 300,
+            coffee: settings?.coffeeFavouriteMillilitres ?? 300
+        )
+    }
+
+    private static func values(water: Int, tea: Int, coffee: Int) -> [HydrationFavourite] {
         [
-            HydrationFavourite(type: .water, volumeMillilitres: settings?.waterFavouriteMillilitres ?? 500),
-            HydrationFavourite(type: .tea, volumeMillilitres: settings?.teaFavouriteMillilitres ?? 300),
-            HydrationFavourite(type: .coffee, volumeMillilitres: settings?.coffeeFavouriteMillilitres ?? 300),
+            HydrationFavourite(type: .water, volumeMillilitres: water),
+            HydrationFavourite(type: .tea, volumeMillilitres: tea),
+            HydrationFavourite(type: .coffee, volumeMillilitres: coffee),
         ]
     }
 }

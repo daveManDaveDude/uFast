@@ -1,0 +1,88 @@
+name: Continuous verification
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: continuous-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-unit:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap repository tools
+        run: make bootstrap
+      - name: Record tool versions
+        run: |
+          xcodebuild -version
+          xcodegen --version
+          swiftformat --version
+          swiftlint version
+      - run: make project
+      - run: make format
+      - name: Require committed Swift formatting
+        run: git diff --exit-code -- '*.swift'
+      - run: make build
+      - run: make test-unit
+      - run: make lint
+      - run: make analyze
+      - run: make verify-ui-verifier
+      - name: Retain failed verification evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-unit-analysis-evidence
+          if-no-files-found: ignore
+          path: |
+            .derived-data/Logs/Test/*.xcresult
+            .derived-data/logs/
+
+  four-worker-ui:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: build-and-unit
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap repository tools
+        run: make bootstrap
+      - name: Run and audit one four-worker UI invocation
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p .derived-data/logs
+          make test-ui 2>&1 | tee .derived-data/logs/ui-test.log
+          test_status=$?
+          xcresult="$(find .derived-data/Logs/Test -maxdepth 1 -name '*.xcresult' -type d -print | sort | tail -1)"
+          audit_status=0
+          if [[ -n "$xcresult" ]]; then
+            ./scripts/verify_ui_xcresult.py "$xcresult" || audit_status=$?
+          else
+            echo "No UI xcresult was produced" >&2
+            audit_status=1
+          fi
+          if (( test_status != 0 || audit_status != 0 )); then
+            exit 1
+          fi
+      - name: Retain failed UI evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-worker-ui-evidence
+          if-no-files-found: ignore
+          path: |
+            .derived-data/Logs/Test/*.xcresult
+            .derived-data/logs/

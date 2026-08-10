@@ -34,9 +34,9 @@ struct RootTabView: View {
     private func destinationView(_ destination: AppDestination) -> some View {
         switch destination {
         case .today:
-            TodayGoalView(clock: clock)
+            TodayFeatureHost(clock: clock)
         case .settings:
-            SettingsView()
+            SettingsFeatureHost()
         case .history:
             HistoryView(
                 clock: clock,

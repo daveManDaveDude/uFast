@@ -136,10 +136,10 @@ private struct ActiveFastActivityDetailView: View {
             contentState: contentState,
             now: .now
         )
+        let progress = presentation.progress
+        let percentage = presentation.progressPercentage
         VStack(alignment: .leading, spacing: 5) {
-            if let progress = presentation.progress,
-               let percentage = presentation.progressPercentage
-            {
+            if let progress, let percentage {
                 ProgressView(value: progress)
                     .progressViewStyle(ActiveFastActivityProgressStyle(palette: palette))
 

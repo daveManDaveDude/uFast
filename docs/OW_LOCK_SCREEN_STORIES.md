@@ -1,8 +1,8 @@
 # uFast Lock Screen fasting surface
 
 **Stories:** OW-L101 to OW-L109  
-**Status:** OW-L101 through OW-L105 delivered; OW-L106 through OW-L109 Sprint Ready  
-**Prepared:** Updated 9 August 2026  
+**Status:** OW-L101 through OW-L108 delivered in source; OW-L109 release evidence pending
+**Prepared:** Updated 10 August 2026
 **Milestone:** Roadmap 1 — Lock Screen fasting surface
 
 ## Outcome
@@ -60,7 +60,7 @@ verified under OW-L102. OW-L103 then accepted Option B: retain that durable
 surface and add a separately requested Live Activity. OW-L104 established the
 safe current-fast route and OW-L105 delivered the explicit per-fast ActivityKit
 baseline. D-030 now amends that baseline with informed, reversible automatic
-behavior. Its implementation-ready stories are maintained in
+behavior. Its delivery contract and remaining release gates are maintained in
 `docs/OW_LIVE_ACTIVITY_AUTOMATION_STORIES.md`.
 
 Current order: **OW-L101 → OW-L102 → OW-L103 → OW-L104 → OW-L105 → OW-L106 →
@@ -420,7 +420,7 @@ contains every remaining implementation and physical-device release condition.
 
 **Epic:** Lock Screen fasting surface  
 **Priority:** P0  
-**Status:** Sprint Ready after OW-L101  
+**Status:** Done
 **Estimate:** 5 points  
 **Depends on:** OW-L101; integrates with OW-L102 and any later Live Activity
 
@@ -928,8 +928,9 @@ They do not change the WidgetKit fallback or `FastRecord` authority.
 
 ## Cross-story release gate
 
-- P1–P5 and D-030 are accepted and recorded; OW-L106 through OW-L109 must be
-  done before claiming the automatic behavior complete.
+- P1–P5 and D-030 are accepted and recorded. OW-L106 through OW-L108 are
+  implemented; OW-L109's full UI, physical-device and release evidence must be
+  complete before claiming the automatic behavior release-ready.
 - Existing data preserved; projection failures never mutate a `FastRecord`.
 - All required tests, build, format/lint and four-worker UI verification pass.
 - VoiceOver, contrast, reduced luminance, Reduce Motion, 12/24-hour locale,

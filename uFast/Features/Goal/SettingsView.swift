@@ -1,143 +1,57 @@
-import SwiftData
 import SwiftUI
 import UIKit
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable large_tuple line_length opening_brace statement_position type_body_length
+// swiftlint:disable large_tuple line_length opening_brace statement_position
 
 struct SettingsView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.applicationCommands) private var applicationCommands
     @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
-    @Query private var settingsRecords: [AppSettingsRecord]
-    @Query(filter: #Predicate<FastRecord> { $0.endDate == nil }) private var activeFasts: [FastRecord]
+    let snapshot: SettingsFeatureSnapshot
     @State private var focusedFavouriteField: FavouriteField?
-    @State private var selection = FastingGoal.default
-    @State private var saveError: String?
-    @State private var deleteError: String?
+    @State private var controller = SettingsFeatureController()
     @State private var isFirstDeleteConfirmationPresented = false
     @State private var isFinalDeleteConfirmationPresented = false
-    @State private var automaticallyShowLiveActivities = false
     @State private var liveActivityAvailability: LiveActivityAvailability?
-    @State private var liveActivityStatus: String?
-    @State private var waterAmount = "500"
-    @State private var teaAmount = "300"
-    @State private var coffeeAmount = "300"
+
+    private var authoritativeSettings: AppSettingsSnapshot? {
+        snapshot.settings.count == 1 ? snapshot.settings[0] : nil
+    }
+
+    init(snapshot: SettingsFeatureSnapshot = .init(settings: [])) {
+        self.snapshot = snapshot
+    }
 
     var body: some View {
+        @Bindable var controller = controller
         NavigationStack {
             ScreenLayout(title: "Settings", identifier: "settings") {
                 ScrollView {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
-                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                            UFastSectionHeading(
-                                "Fasting goal",
-                                eyebrow: "\(selection.hours) hours selected"
-                            )
-                            Text(
-                                "This updates the target for an active fast. "
-                                    + "Completed records keep their historical goal."
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(UFastTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                            FastingGoalPicker(selection: goalBinding)
+                        SettingsGoalSection(selection: controller.selection, goalBinding: goalBinding)
+                        SettingsPrivacySection()
+                        SettingsWidgetSection()
+                        SettingsLiveActivitiesSection(
+                            isOn: Binding(
+                                get: { controller.automaticallyShowLiveActivities },
+                                set: { setAutomaticLiveActivities(enabled: $0) }
+                            ),
+                            status: controller.liveActivityStatus,
+                            availability: liveActivityAvailability
+                        )
+                        SettingsFavouritesSection(
+                            water: $controller.waterAmount,
+                            tea: $controller.teaAmount,
+                            coffee: $controller.coffeeAmount,
+                            focusedField: $focusedFavouriteField,
+                            valuesAreValid: favouriteValues != nil
+                        )
+                        SettingsDeleteSection(error: controller.deleteError) {
+                            controller.deleteError = nil
+                            isFirstDeleteConfirmationPresented = true
                         }
-                        .uFastCard(accent: UFastTheme.sage)
 
-                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                            UFastSectionHeading("Data on this iPhone")
-                            Text(
-                                "uFast stores your fasts, food, drinks, settings and history "
-                                    + "locally in this app. There is no account, cloud sync, "
-                                    + "backup or restore."
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(UFastTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            Text(
-                                "Deleting uFast or losing this iPhone may permanently remove "
-                                    + "your uFast data."
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(UFastTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                            NavigationLink {
-                                PrivacySafetyView()
-                            } label: {
-                                Label("Privacy and safety", systemImage: "lock.shield")
-                            }
-                            .buttonStyle(UFastActionRowButtonStyle())
-                            .accessibilityIdentifier("settings.privacy-safety")
-                        }
-                        .uFastCard(accent: UFastTheme.sky)
-
-                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                            UFastSectionHeading("Lock and Home Screen widgets")
-                            Text(
-                                "If you add an optional uFast Lock Screen or Home Screen widget, it can show your recorded elapsed time and goal progress."
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(UFastTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            Text(
-                                "Touch and hold the Lock Screen to customize it, or touch and hold the Home Screen and tap + to add uFast. You can remove either widget at any time."
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(UFastTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .uFastCard(accent: UFastTheme.sage)
-
-                        liveActivitiesSection
-
-                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                            UFastSectionHeading("Drink favourites")
-                            Text("Choose the amount added by each Today shortcut.")
-                                .font(.subheadline).foregroundStyle(UFastTheme.secondaryText)
-                            favouriteField("Water", field: .water, text: $waterAmount, identifier: "settings.drink.water")
-                            favouriteField("Tea", field: .tea, text: $teaAmount, identifier: "settings.drink.tea")
-                            favouriteField("Coffee", field: .coffee, text: $coffeeAmount, identifier: "settings.drink.coffee")
-                            if favouriteValues == nil {
-                                Label("Enter each amount from 1 to 5,000 ml.", systemImage: "exclamationmark.circle")
-                                    .foregroundStyle(UFastTheme.error)
-                                    .accessibilityIdentifier("settings.drink.validation")
-                            }
-                            Text("Changes save automatically when you finish editing.")
-                                .font(.footnote)
-                                .foregroundStyle(UFastTheme.secondaryText)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .uFastCard(accent: UFastTheme.sky)
-
-                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                            UFastSectionHeading("Your data")
-                            Text(
-                                "Delete every uFast record stored on this iPhone. "
-                                    + "This cannot be undone."
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(UFastTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                            Button("Delete all data", role: .destructive) {
-                                deleteError = nil
-                                isFirstDeleteConfirmationPresented = true
-                            }
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier("settings.data.delete-all")
-
-                            if let deleteError {
-                                Label(deleteError, systemImage: "exclamationmark.circle")
-                                    .foregroundStyle(UFastTheme.error)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .accessibilityIdentifier("settings.data.delete-error")
-                            }
-                        }
-                        .uFastCard(accent: UFastTheme.apricot)
-
-                        if let saveError {
+                        if let saveError = controller.saveError {
                             Label(saveError, systemImage: "exclamationmark.circle")
                                 .foregroundStyle(UFastTheme.error)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -149,17 +63,14 @@ struct SettingsView: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .onAppear {
-                selection = settingsRecords.first?.fastingGoal ?? .default
-                automaticallyShowLiveActivities = settingsRecords.first?
-                    .automaticLiveActivityPreference == .enabled
-                if let settings = settingsRecords.first {
-                    waterAmount = String(settings.waterFavouriteMillilitres)
-                    teaAmount = String(settings.teaFavouriteMillilitres)
-                    coffeeAmount = String(settings.coffeeFavouriteMillilitres)
-                }
+                controller.connect(commands: applicationCommands)
+                controller.load(snapshot)
                 Task {
                     liveActivityAvailability = liveActivityCoordinator?.availability()
                 }
+            }
+            .onChange(of: applicationCommands != nil) { _, _ in
+                controller.connect(commands: applicationCommands)
             }
             .onChange(of: focusedFavouriteField) { previousField, currentField in
                 if previousField != nil, previousField != currentField {
@@ -195,52 +106,9 @@ struct SettingsView: View {
         }
     }
 
-    private var liveActivitiesSection: some View {
-        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-            UFastSectionHeading("Live Activities")
-            Toggle(
-                "Automatically show Live Activities",
-                isOn: Binding(
-                    get: { automaticallyShowLiveActivities },
-                    set: { setAutomaticLiveActivities(enabled: $0) }
-                )
-            )
-            .accessibilityIdentifier("settings.live-activities.toggle")
-
-            Text(AutomaticLiveActivityCopy.settingsSupportingCopy)
-                .font(.subheadline)
-                .foregroundStyle(UFastTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text(AutomaticLiveActivityCopy.settingsExplanation)
-                .font(.footnote)
-                .foregroundStyle(UFastTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let liveActivityStatus {
-                Label(liveActivityStatus, systemImage: "exclamationmark.circle")
-                    .foregroundStyle(UFastTheme.error)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("settings.live-activities.status")
-            } else if let liveActivityAvailability,
-                      liveActivityAvailability != .enabled
-            {
-                let copy = liveActivityAvailability == .disabled
-                    ? ActiveFastLiveActivityStatusCopy.disabled
-                    : ActiveFastLiveActivityStatusCopy.unsupported
-                Text(copy)
-                    .font(.footnote)
-                    .foregroundStyle(UFastTheme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("settings.live-activities.availability")
-            }
-        }
-        .uFastCard(accent: UFastTheme.sky)
-    }
-
     private var goalBinding: Binding<FastingGoal> {
         Binding(
-            get: { selection },
+            get: { controller.selection },
             set: { goal in
                 saveGoal(goal)
             }
@@ -248,83 +116,28 @@ struct SettingsView: View {
     }
 
     private func saveGoal(_ goal: FastingGoal) {
-        guard let settings = settingsRecords.first else {
+        guard let settings = authoritativeSettings else {
             return
         }
 
         let previousGoal = settings.fastingGoal
-        selection = goal
-        settings.setFastingGoal(goal)
-
-        do {
-            if ProcessInfo.processInfo.arguments.contains("--simulate-goal-save-failure") {
-                throw GoalSaveFixtureError.simulated
-            }
-            try modelContext.save()
-            if let activeFast = activeFasts.first {
-                WidgetProjectionSupport.publish(activeFast, goal: goal)
-                Task { await liveActivityCoordinator?.didCommitActiveFastChange() }
-            }
-            saveError = nil
-        } catch {
-            settings.setFastingGoal(previousGoal)
-            selection = previousGoal
-            saveError = "Your goal couldn’t be saved. Please try again."
-        }
+        controller.saveGoal(goal, previousGoal: previousGoal)
     }
 
     private func setAutomaticLiveActivities(enabled: Bool) {
-        guard let settings = settingsRecords.first else { return }
+        guard let settings = authoritativeSettings else { return }
         let previousPreference = settings.automaticLiveActivityPreference
-        let preference: AutomaticLiveActivityPreference = enabled ? .enabled : .disabled
-        automaticallyShowLiveActivities = enabled
-        settings.setAutomaticLiveActivityPreference(preference)
-
-        do {
-            if ProcessInfo.processInfo.arguments.contains(
-                "--simulate-live-activity-settings-save-failure"
-            ) {
-                throw AutomaticLiveActivitySettingsError.simulatedSaveFailure
-            }
-            try modelContext.save()
-            liveActivityStatus = nil
-            guard let liveActivityCoordinator else { return }
-            Task {
-                let result = await liveActivityCoordinator.didCommitAutomaticPreference(
-                    preference
-                )
-                liveActivityStatus = liveActivityStatus(for: result)
-                liveActivityAvailability = liveActivityCoordinator.availability()
-            }
-        } catch {
-            settings.setAutomaticLiveActivityPreference(previousPreference)
-            automaticallyShowLiveActivities = previousPreference == .enabled
-            liveActivityStatus = AutomaticLiveActivityCopy.settingsSaveFailure
-        }
-    }
-
-    private func liveActivityStatus(
-        for result: ActiveFastLiveActivityResult
-    ) -> String? {
-        switch result {
-        case let .unavailable(availability):
-            switch availability {
-            case .unsupported: ActiveFastLiveActivityStatusCopy.unsupported
-            case .disabled: ActiveFastLiveActivityStatusCopy.disabled
-            case .enabled: nil
-            }
-        case .requestFailed:
-            ActiveFastLiveActivityStatusCopy.requestFailure
-        case .hideFailed:
-            ActiveFastLiveActivityStatusCopy.hideFailure
-        case .shown, .alreadyShown, .hidden, .updated, .reconciled,
-             .noActiveFast, .coalesced:
-            nil
+        controller.setAutomaticLiveActivities(
+            enabled: enabled,
+            previousPreference: previousPreference
+        ) {
+            liveActivityAvailability = liveActivityCoordinator?.availability()
         }
     }
 
     private var favouriteValues: (Int, Int, Int)? {
-        guard let water = Int(waterAmount), let tea = Int(teaAmount), let coffee = Int(coffeeAmount),
+        guard let water = Int(controller.waterAmount), let tea = Int(controller.teaAmount),
+              let coffee = Int(controller.coffeeAmount),
               HydrationEntryValidator.isValid(volumeMillilitres: water),
               HydrationEntryValidator.isValid(volumeMillilitres: tea),
               HydrationEntryValidator.isValid(volumeMillilitres: coffee)
@@ -332,69 +145,24 @@ struct SettingsView: View {
         return (water, tea, coffee)
     }
 
-    private func favouriteField(
-        _ label: String,
-        field: FavouriteField,
-        text: Binding<String>,
-        identifier: String
-    ) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            FavouriteAmountTextField(
-                text: text,
-                label: label,
-                identifier: identifier,
-                isFocused: Binding(
-                    get: { focusedFavouriteField == field },
-                    set: { isFocused in
-                        if isFocused {
-                            focusedFavouriteField = field
-                        } else if focusedFavouriteField == field {
-                            focusedFavouriteField = nil
-                        }
-                    }
-                )
-            )
-            .frame(width: 100)
-            Text("ml")
-                .foregroundStyle(UFastTheme.secondaryText)
-                .accessibilityHidden(true)
-        }
-    }
-
     private func saveFavouritesIfValid() {
-        guard let settings = settingsRecords.first, let values = favouriteValues else { return }
-        let old = (settings.waterFavouriteMillilitres, settings.teaFavouriteMillilitres, settings.coffeeFavouriteMillilitres)
-        settings.setHydrationFavourites(water: values.0, tea: values.1, coffee: values.2)
-        do { try modelContext.save(); saveError = nil }
-        catch { settings.setHydrationFavourites(water: old.0, tea: old.1, coffee: old.2); saveError = "Your drink favourites couldn’t be saved. Please try again." }
+        guard let settings = authoritativeSettings, let values = favouriteValues else { return }
+        controller.saveFavourites(
+            values: HydrationFavouriteAmounts(water: values.0, tea: values.1, coffee: values.2),
+            previous: HydrationFavouriteAmounts(
+                water: settings.waterFavouriteMillilitres,
+                tea: settings.teaFavouriteMillilitres,
+                coffee: settings.coffeeFavouriteMillilitres
+            )
+        )
     }
 
     private func deleteAllData() {
-        do {
-            try AppDataDeletionService.deleteEverything(
-                in: modelContext,
-                simulateFailure: ProcessInfo.processInfo.arguments.contains(
-                    "--simulate-delete-all-failure"
-                )
-            )
-            WidgetProjectionSupport.clear()
-            Task { await liveActivityCoordinator?.didCommitDeleteAllData() }
-            deleteError = nil
-        } catch {
-            deleteError = "Your data couldn’t be deleted. Please try again."
-        }
+        controller.deleteAllData()
     }
 }
 
-private enum FavouriteField: Hashable {
-    case water
-    case tea
-    case coffee
-}
-
-private struct FavouriteAmountTextField: UIViewRepresentable {
+struct FavouriteAmountTextField: UIViewRepresentable {
     @Binding var text: String
     let label: String
     let identifier: String
@@ -472,17 +240,13 @@ private struct FavouriteAmountTextField: UIViewRepresentable {
     }
 }
 
-private enum GoalSaveFixtureError: Error {
-    case simulated
-}
-
 #Preview("Settings") {
-    SettingsView()
+    SettingsFeatureHost()
         .modelContainer(PreviewFixtures.modelContainer)
 }
 
 #Preview("Settings · Accessibility") {
-    SettingsView()
+    SettingsFeatureHost()
         .modelContainer(PreviewFixtures.modelContainer)
         .environment(\.dynamicTypeSize, .accessibility3)
 }

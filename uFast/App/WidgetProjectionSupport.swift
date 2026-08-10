@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import SwiftData
 import WidgetKit
 
 struct WidgetTimelineReloader: ActiveFastProjectionReloading {
@@ -43,6 +44,31 @@ enum WidgetProjectionSupport {
             goalHours: goal.hours,
             generatedAt: now
         )
+    }
+
+    @MainActor
+    static func synchronize(in container: ModelContainer, now: Date) {
+        let context = container.mainContext
+        let activeFast: FastRecord?
+        do {
+            activeFast = try ActiveFastAuthority.fetch(in: context)
+        } catch {
+            logger.error("Active fast authority is ambiguous; widget projection unchanged")
+            return
+        }
+        guard let activeFast else {
+            clear()
+            return
+        }
+        let goal: FastingGoal
+        do {
+            goal = try SwiftDataSettingsStore(modelContext: context)
+                .authoritativeRecord()?.fastingGoal ?? .default
+        } catch {
+            logger.error("Settings authority is ambiguous; widget projection unchanged")
+            return
+        }
+        publish(activeFast, goal: goal, now: now)
     }
 
     static func clear() {

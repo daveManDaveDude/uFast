@@ -44,13 +44,16 @@ make test
 make lint
 ```
 
-The 1.0 release baseline is iPhone-only, targets iOS 26.0, uses bundle ID
+The app is iPhone-only, targets iOS 26.0, uses bundle ID
 `com.davidmcgrath.uFast`, and is currently versioned from `project.yml` as
-1.0.0 (build 6). Build 5 is the App Store review candidate; build 6 is the
-current external TestFlight build.
-It has no account, cloud sync, backup, restore, HealthKit, Live Activity,
-notification or analytics dependency. Deleting the app may remove its local
-data; uFast does not provide recovery.
+1.0.0 (build 8). The last recorded external release state is historical: build
+5 was submitted for App Review and build 6 was supplied to external TestFlight
+testers on 7 August 2026.
+
+The core tracker has no account, cloud sync, backup, restore, HealthKit,
+notification, analytics or network dependency. The current source also contains
+optional, local WidgetKit and ActivityKit fasting surfaces. Deleting the app may
+remove its local data; uFast does not currently provide recovery.
 
 To build, install and launch the latest code on one connected, unlocked iPhone:
 
@@ -118,5 +121,10 @@ the uFast Apple Developer identity; simulator builds do not require signing.
   accessibility rules and visual Definition of Done
 - `DECISIONS.md` — accepted product and architecture choices
 - `AGENTS.md` — repository map, commands and Definition of Done
-- `PRIVACY.md` — public-facing local-data and safety policy
-- `SUPPORT.md` — public-facing support and local-data limitations
+- `docs/MAINTAINABILITY_HARDENING_STORIES.md` — sprint-ready, behavior-preserving
+  architecture and reliability hardening stories
+- `PRIVACY.md` — public policy for the submitted 1.0 baseline
+- `PRIVACY_AUTOMATIC_LIVE_ACTIVITIES.md` — public policy for a binary containing
+  automatic Live Activities
+- `SUPPORT.md` — support and local-data limitations for the submitted 1.0
+  baseline

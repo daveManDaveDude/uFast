@@ -25,19 +25,6 @@ enum CatchUpRangeError: Error, Equatable {
     case includesTodayOrFuture
     case moreThanSevenDays
     case unresolvedCalendarDay
-
-    var message: String {
-        switch self {
-        case .endBeforeStart:
-            "To must be the same day as or later than From."
-        case .includesTodayOrFuture:
-            "Choose completed days ending before today."
-        case .moreThanSevenDays:
-            "Choose no more than 7 completed days."
-        case .unresolvedCalendarDay:
-            "These dates couldn’t be resolved in the current time zone. Choose them again."
-        }
-    }
 }
 
 enum CatchUpRangeResolver {

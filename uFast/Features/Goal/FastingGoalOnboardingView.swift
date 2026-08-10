@@ -1,8 +1,7 @@
-import SwiftData
 import SwiftUI
 
 struct FastingGoalOnboardingView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.applicationCommands) private var applicationCommands
     @State private var selection = FastingGoal.default
     @State private var saveError: String?
 
@@ -79,21 +78,10 @@ struct FastingGoalOnboardingView: View {
     }
 
     private func saveSelection() {
-        if ProcessInfo.processInfo.arguments.contains("--simulate-goal-save-failure") {
-            saveError = "Your goal couldn’t be saved. Please try again."
-            return
-        }
-
-        let settings = AppSettingsRecord(
-            fastingGoal: selection,
-            hasCompletedOnboarding: true
-        )
-        modelContext.insert(settings)
-
         do {
-            try modelContext.save()
+            guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
+            try applicationCommands.completeOnboarding(goal: selection)
         } catch {
-            modelContext.delete(settings)
             saveError = "Your goal couldn’t be saved. Please try again."
         }
     }

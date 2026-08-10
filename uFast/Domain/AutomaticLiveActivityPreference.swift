@@ -76,10 +76,6 @@ enum AutomaticLiveActivityPolicy {
     }
 }
 
-enum AutomaticLiveActivitySettingsError: Error {
-    case simulatedSaveFailure
-}
-
 enum AutomaticLiveActivityCopy {
     static let title = "See your fast at a glance?"
     static let showAutomatically = "Show Automatically"

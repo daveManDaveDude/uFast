@@ -25,9 +25,8 @@ struct UFastLockScreenProvider: TimelineProvider {
     func getTimeline(in _: Context, completion: @escaping (Timeline<UFastLockScreenEntry>) -> Void) {
         logger.notice("Widget timeline requested")
         let entry = makeEntry()
-        // The system timer drives elapsed text and progress after this entry is
-        // rendered. A target-date refresh lets the clamped progress percentage
-        // converge without persisting ticks or requesting per-second entries.
+        // A target-date refresh lets the clamped progress percentage converge
+        // without persisting ticks or requesting per-second entries.
         let nextRefresh: Date? = if case let .success(projection?) = entry.projectionResult {
             projection.targetDate > entry.date ? projection.targetDate : nil
         } else {
@@ -84,17 +83,16 @@ struct UFastLockScreenWidgetView: View {
     @Environment(\.colorSchemeContrast) private var contrast
     let entry: UFastLockScreenEntry
 
-    private var presentation: LockScreenFastPresentation {
+    private var content: LockScreenWidgetContent {
         .make(
             projectionResult: entry.projectionResult,
-            now: .now,
-            privacyState: .protected
+            now: entry.date
         )
     }
 
     var body: some View {
         Group {
-            switch presentation {
+            switch content {
             case let .active(active): activeView(active)
             case .unavailable: unavailableView
             }
@@ -103,11 +101,11 @@ struct UFastLockScreenWidgetView: View {
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
-    private func activeView(_ active: LockScreenActivePresentation) -> some View {
+    private func activeView(_ active: LockScreenWidgetActiveContent) -> some View {
         // Accessory rectangular is only about 67 points tall on the Lock
-        // Screen. Keep the label and dynamic timer on one row so the progress
-        // track remains inside the family bounds at the largest practical
-        // system text size.
+        // Screen. Keep the label and protected elapsed value on one row so the
+        // progress track remains inside the family bounds at the largest
+        // practical system text size.
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text("uFast")
@@ -119,10 +117,7 @@ struct UFastLockScreenWidgetView: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("Elapsed")
                     .font(.caption2)
-                // Use WidgetKit's documented dynamic-date style. Unlike a
-                // manually bounded format interval, this remains system-driven
-                // while the widget extension is suspended or terminated.
-                Text(active.startDate, style: .timer)
+                Text(active.elapsedText)
                     .font(.headline.monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -130,9 +125,8 @@ struct UFastLockScreenWidgetView: View {
                     .accessibilityHidden(true)
             }
             // Date-relative ProgressView supplies its own current-value text,
-            // which consumes a second hidden row in this compact family. The
-            // live timer above remains system-driven; the bar only needs the
-            // already-derived, clamped fraction for this render.
+            // which consumes a second hidden row in this compact family. The bar
+            // only needs the already-derived, clamped fraction for this render.
             ProgressView(value: active.progress)
                 .progressViewStyle(.linear)
                 .tint(.primary)
@@ -140,9 +134,7 @@ struct UFastLockScreenWidgetView: View {
                 .clipShape(Capsule())
                 .accessibilityHidden(true)
         }
-        // Dynamic date text carries private resolvable attributes. Combining
-        // those child nodes makes WidgetKit archive the attributes and crashes
-        // the extension on iOS 26. Expose one stable summary instead.
+        // Expose one stable summary so seconds cannot reappear in accessibility.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             Text(verbatim: active.accessibilitySummary)

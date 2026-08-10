@@ -67,5 +67,6 @@ final class HydrationEntryTests: XCTestCase {
             )
         )
         XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
+        XCTAssertFalse(container.mainContext.hasChanges)
     }
 }

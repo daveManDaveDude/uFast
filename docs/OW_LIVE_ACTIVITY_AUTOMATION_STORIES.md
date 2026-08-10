@@ -1,8 +1,8 @@
 # uFast user-controlled automatic Live Activities
 
 **Stories:** OW-L106 to OW-L109  
-**Status:** Sprint Ready  
-**Prepared:** 9 August 2026  
+**Status:** OW-L106 through OW-L108 delivered in source; OW-L109 release evidence pending
+**Prepared:** Updated 10 August 2026
 **Milestone:** Roadmap 1 — Lock Screen fasting surface  
 **Decision:** D-030; BR-33 through BR-40  
 **Baseline:** Delivered OW-L101 through OW-L105
@@ -195,7 +195,7 @@ the goal; its own maximum active lifetime still begins when requested.
 ## OW-L106 — Add informed consent and reversible Settings control
 
 **Priority:** P0  
-**Status:** Sprint Ready  
+**Status:** Delivered in source 9 August 2026
 **Estimate:** 5 points  
 **Depends on:** Delivered OW-L105; D-030; BR-37 and BR-39
 
@@ -286,7 +286,7 @@ through every preference or ActivityKit failure.
 ## OW-L107 — Automatically start after a committed fast
 
 **Priority:** P0  
-**Status:** Sprint Ready  
+**Status:** Delivered in source 9 August 2026
 **Estimate:** 5 points  
 **Depends on:** OW-L106; BR-36 through BR-40
 
@@ -358,7 +358,7 @@ request is possible.
 ## OW-L108 — Continue a longer fast on foreground activation
 
 **Priority:** P0  
-**Status:** Sprint Ready  
+**Status:** Delivered in source 9 August 2026
 **Estimate:** 8 points  
 **Depends on:** OW-L106 and OW-L107
 
@@ -449,7 +449,7 @@ user control.
 ## OW-L109 — Complete the App Review and quality gate
 
 **Priority:** P0  
-**Status:** Sprint Ready  
+**Status:** Implementation and review materials prepared; release evidence pending
 **Estimate:** 5 points  
 **Depends on:** OW-L106 through OW-L108
 

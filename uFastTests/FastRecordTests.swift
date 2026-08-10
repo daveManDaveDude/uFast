@@ -51,4 +51,34 @@ final class FastRecordTests: XCTestCase {
         XCTAssertEqual(fast.endDate, endDate)
         XCTAssertEqual(fast.historicalGoal, completionGoal)
     }
+
+    func testUnknownProvenanceAndInvalidHistoricalGoalRemainUnavailableAndRaw() {
+        let fast = FastRecord(
+            startDate: startDate,
+            endDate: startDate.addingTimeInterval(3600),
+            goalAtStart: .default
+        )
+        fast.restoreProvenance(
+            FastRecordProvenanceSnapshot(
+                originRaw: "future-origin",
+                reviewStateRaw: "future-review",
+                wasAdjustedByUser: false,
+                hasHistoricalGoal: true,
+                startBoundaryKindRaw: nil,
+                startBoundaryID: nil,
+                endBoundaryKindRaw: nil,
+                endBoundaryID: nil
+            )
+        )
+        fast.restorePersistedHistoricalGoal(rawHours: 99, isCaptured: true)
+
+        XCTAssertNil(fast.origin)
+        XCTAssertNil(fast.reviewState)
+        XCTAssertNil(fast.historicalGoal)
+        XCTAssertNil(fast.capturedHistoricalGoal)
+        XCTAssertEqual(fast.presentationIntegrity, .unavailable)
+        XCTAssertEqual(fast.provenanceSnapshot.originRaw, "future-origin")
+        XCTAssertEqual(fast.provenanceSnapshot.reviewStateRaw, "future-review")
+        XCTAssertEqual(fast.goalHoursAtStart, 99)
+    }
 }

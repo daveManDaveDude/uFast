@@ -15,7 +15,7 @@ struct HydrationEntryEditor: View {
     @State private var showsFastEndConfirmation = false
     @State private var pendingDraft: HydrationEntryDraft?
 
-    let record: HydrationEntryRecord?
+    let record: HydrationEntrySnapshot?
     let clock: any AppClock
     let activeFastStart: Date?
     let allowedRange: Range<Date>?
@@ -24,6 +24,14 @@ struct HydrationEntryEditor: View {
     let onCancel: () -> Void
 
     init(record: HydrationEntryRecord?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: (() throws -> Void)?, onCancel: @escaping () -> Void) {
+        self.init(
+            snapshot: record.map(HydrationEntrySnapshot.init), clock: clock,
+            activeFastStart: activeFastStart, initialDraft: initialDraft,
+            allowedRange: allowedRange, onSave: onSave, onDelete: onDelete, onCancel: onCancel
+        )
+    }
+
+    init(snapshot record: HydrationEntrySnapshot?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: (() throws -> Void)?, onCancel: @escaping () -> Void) {
         self.record = record; self.clock = clock; self.activeFastStart = activeFastStart
         self.allowedRange = allowedRange
         self.onSave = onSave; self.onDelete = onDelete; self.onCancel = onCancel

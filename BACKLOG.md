@@ -11,6 +11,14 @@ legacy-history presentation rules. It is local-only and intentionally excludes
 external health data, cloud services and background delivery. The release
 reset decision for disposable pre-release CloudKit data is recorded in D-026.
 
+## Maintainability hardening
+
+The sprint-ready, behavior-preserving reliability and architecture work from
+the 10 August 2026 app-wide review is maintained in
+`docs/MAINTAINABILITY_HARDENING_STORIES.md`. MH-001 through MH-011 must retain
+valid user behavior and pass the full four-worker UI suite before being marked
+done.
+
 ## Slice 0 — Foundation
 
 - OW-000 P0 — Project shell, navigation, local persistence, tests and repository guidance. **Done 18 July 2026.**
@@ -186,17 +194,19 @@ implementation-ready until their milestone decision gate is complete.
 - OW-L102 — Add an accessible active-fast Lock Screen widget. **Done.**
 - OW-L103 — Decide whether an optional Live Activity is also required. **Done:
   Option B accepted in D-029.**
-- OW-L104 — Deep-link safely to the current in-app fasting state.
+- OW-L104 — Deep-link safely to the current in-app fasting state. **Done.**
 - OW-L105 — Add an explicitly requested active-fast Live Activity. **Delivered;
   baseline contract in `docs/OW_LOCK_SCREEN_STORIES.md`.**
 - OW-L106 — Add clear consent, one-time offer and reversible automatic Live
-  Activity setting. **Sprint Ready.**
+  Activity setting. **Delivered in source 9 August 2026.**
 - OW-L107 — Start one Live Activity after a committed fast when the setting is
-  on. **Sprint Ready.**
+  on. **Delivered in source 9 August 2026.**
 - OW-L108 — Continue a longer active fast with a new foreground-requested Live
-  Activity after the prior eight-hour window. **Sprint Ready.**
+  Activity after the prior eight-hour window. **Delivered in source 9 August
+  2026.**
 - OW-L109 — Complete the automatic Live Activity App Review and quality gate.
-  **Sprint Ready.**
+  **Implementation and review materials prepared; full UI and physical release
+  evidence remains pending.**
 
 `READY_STORIES.md` contains the superseded historical OW-106 refinement. D-029
 and OW-L105 describe the delivered baseline; D-030 and OW-L106 through OW-L109

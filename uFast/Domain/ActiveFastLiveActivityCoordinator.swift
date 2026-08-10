@@ -22,20 +22,6 @@ enum ActiveFastLiveActivityResult: Equatable, Sendable {
     case coalesced
 }
 
-enum ActiveFastLiveActivityStatusCopy {
-    static let unsupported = "Live Activities aren’t available on this iPhone."
-    static let disabled = "Live Activities are turned off for uFast in iPhone Settings."
-    static let requestFailure = "The Live Activity couldn’t be started. Please try again."
-    static let hideFailure =
-        "The Live Activity couldn’t be hidden. You can remove it from the Lock Screen."
-    static let endedWhileFastContinues =
-        "The Live Activity has ended. Your fast is still active, and the Lock Screen widget "
-            + "can keep showing it."
-    static let disclosure =
-        "Shows uFast, elapsed time, goal progress and target on the Lock Screen and Dynamic Island "
-            + "for up to 8 hours. You can hide it at any time. Your fast continues if the activity ends."
-}
-
 @MainActor
 final class ActiveFastLiveActivityCoordinator {
     typealias ActiveFastResolver = @MainActor () throws -> ActiveFastActivitySource?

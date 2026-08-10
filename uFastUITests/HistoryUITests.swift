@@ -529,13 +529,9 @@ final class HistoryUITests: XCTestCase {
         XCTAssertGreaterThan(breakfastCandidates.count, 0)
         let breakfast = breakfastCandidates.element(boundBy: breakfastCandidates.count - 1)
         XCTAssertTrue(breakfast.waitForExistence(timeout: 2))
-        if !breakfast.isHittable || breakfast.frame.maxY > app.frame.maxY - 120 {
-            app.swipeUp()
-        }
-        XCTAssertTrue(breakfast.isHittable)
-        breakfast.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapFullyVisible(breakfast, in: app.scrollViews["history.content"], app: app)
 
-        XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 5))
         XCTAssertTrue((app.buttons["Date Picker"].value as? String)?.contains("17 Nov 2042") == true)
         XCTAssertEqual(app.buttons["Time Picker"].value as? String, "08:53")
     }
@@ -763,6 +759,39 @@ final class HistoryUITests: XCTestCase {
             app.swipeUp()
         }
         return row
+    }
+
+    @MainActor
+    private func tapFullyVisible(
+        _ element: XCUIElement,
+        in scrollView: XCUIElement,
+        app: XCUIApplication
+    ) {
+        XCTAssertTrue(scrollView.waitForExistence(timeout: 2), app.debugDescription)
+        if !element.isHittable || element.frame.maxY > app.frame.maxY - 120 {
+            scrollView.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+                .press(
+                    forDuration: 0.05,
+                    thenDragTo: scrollView.coordinate(
+                        withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+                    )
+                )
+        }
+        let fullyVisible = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                guard let candidate = object as? XCUIElement else { return false }
+                return candidate.isHittable
+                    && candidate.frame.minY >= scrollView.frame.minY + 8
+                    && candidate.frame.maxY <= app.frame.maxY - 120
+            },
+            object: element
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [fullyVisible], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        element.tap()
     }
 
     private func launchArguments(

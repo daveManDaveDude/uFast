@@ -25,6 +25,26 @@ final class LockScreenFastPresentationTests: XCTestCase {
         XCTAssertNil(active.hasReachedGoal)
     }
 
+    func testProductionWidgetContentSelectsProtectedHoursAndMinutes() {
+        let content = LockScreenWidgetContent.make(
+            projectionResult: .success(
+                projection(elapsed: 12 * 60 * 60 + 34 * 60 + 56)
+            ),
+            now: now
+        )
+
+        guard case let .active(active) = content else {
+            return XCTFail("Expected active production widget content")
+        }
+        XCTAssertEqual(active.elapsedText, "12 h 34 min")
+        XCTAssertEqual(
+            active.accessibilitySummary,
+            "uFast, elapsed 12 hours 34 minutes, 78 percent of 16-hour goal. Opens uFast."
+        )
+        XCTAssertFalse(active.elapsedText.contains(":"))
+        XCTAssertFalse(active.accessibilitySummary.contains("second"))
+    }
+
     func testAuthenticatedPresentationAddsSecondsTargetAndGoalState() throws {
         let active = try activePresentation(
             projection: projection(elapsed: 12 * 60 * 60 + 34 * 60 + 56),

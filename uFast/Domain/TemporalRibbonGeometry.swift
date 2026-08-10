@@ -1,0 +1,353 @@
+import Foundation
+
+// swiftlint:disable opening_brace
+
+struct TemporalRibbonGeometry: Equatable, Sendable {
+    let contentWidth: Double
+    let intervalLaneHeight: Double
+    let eventLaneHeight: Double
+
+    static func policy(for viewportWidth: Double, accessibilitySize: Bool) -> Self {
+        let safeWidth = max(viewportWidth, 280)
+        return Self(
+            contentWidth: max(accessibilitySize ? 1120 : 900, safeWidth * 2.45),
+            intervalLaneHeight: accessibilitySize ? 42 : 34,
+            eventLaneHeight: accessibilitySize ? 52 : 44
+        )
+    }
+
+    static func pagePolicy(for viewportWidth: Double, accessibilitySize: Bool) -> Self {
+        Self(
+            contentWidth: max(viewportWidth, 280),
+            intervalLaneHeight: accessibilitySize ? 46 : 40,
+            eventLaneHeight: accessibilitySize ? 56 : 48
+        )
+    }
+
+    static func intervalCornerRadius(
+        visibleWidth: Double,
+        preferredRadius: Double
+    ) -> Double {
+        min(max(visibleWidth / 2, 0), preferredRadius)
+    }
+}
+
+enum TemporalHistoryPresentation {
+    /// Resolves a manual rail only after native scrolling is idle.  Geometry is
+    /// already expressed in the visual coordinate space, so this is identical
+    /// in LTR and RTL; the caller supplies visual chip midpoints.
+    static func settledRailDay(
+        chipMidpoints: [Date: Double],
+        viewportMidpoint: Double,
+        availableDays: [Date],
+        maximumDate: Date,
+        calendar: Calendar
+    ) -> Date? {
+        guard viewportMidpoint.isFinite else { return nil }
+        let maximumDay = calendar.startOfDay(for: maximumDate)
+        var candidate: Date?
+        var candidateDistance = Double.infinity
+        for date in availableDays {
+            guard date <= maximumDay,
+                  let midpoint = chipMidpoints[date], midpoint.isFinite
+            else { continue }
+            let distance = abs(midpoint - viewportMidpoint)
+            // At an exact visual midpoint, choose the later calendar day. This
+            // makes the seam deterministic in both layout directions.
+            if distance < candidateDistance
+                || (distance == candidateDistance && (candidate.map { date > $0 } ?? true))
+            {
+                candidate = date
+                candidateDistance = distance
+            }
+        }
+        return candidate
+    }
+
+    static func allowsHistoricalEntry(
+        at instant: Date,
+        now: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let targetDay = calendar.startOfDay(for: instant)
+        let today = calendar.startOfDay(for: now)
+        return targetDay < today || (targetDay == today && instant <= now)
+    }
+
+    /// The read-only portion of a ribbon.  The range is presentation-only and
+    /// uses absolute instants after deriving local-day boundaries with Calendar.
+    static func futureShadingInterval(
+        for window: TemporalRibbonWindow,
+        now: Date,
+        calendar: Calendar
+    ) -> DateInterval? {
+        let today = calendar.startOfDay(for: now)
+        if window.selectedDay > today {
+            return window.interval
+        }
+        guard window.selectedDay == today else { return nil }
+        let start = max(now, window.interval.start)
+        guard start < window.interval.end else { return nil }
+        return DateInterval(start: start, end: window.interval.end)
+    }
+
+    static func twoHourMarkers(
+        in window: TemporalRibbonWindow,
+        calendar: Calendar
+    ) -> [Date] {
+        var markers = Set(window.midnightMarkers)
+        // Generate each local boundary via Calendar. Missing spring-forward
+        // hours yield no boundary; Calendar's deterministic resolution avoids
+        // inventing a duplicate during autumn fallback.
+        for hour in stride(from: 0, through: 22, by: 2) {
+            var components = calendar.dateComponents([.era, .year, .month, .day], from: window.selectedDay)
+            components.hour = hour
+            components.minute = 0
+            components.second = 0
+            if let date = calendar.date(from: components),
+               date >= window.interval.start,
+               date < window.interval.end
+            {
+                markers.insert(date)
+            }
+        }
+        return markers.sorted()
+    }
+
+    static func settledCarouselDay(
+        centeredPage: Date?,
+        currentSelection: Date,
+        availableDays: [Date],
+        maximumDate: Date,
+        calendar: Calendar
+    ) -> Date {
+        let currentDay = calendar.startOfDay(for: currentSelection)
+        guard let centeredPage else { return currentDay }
+        let proposedDay = calendar.startOfDay(for: centeredPage)
+        let maximumDay = calendar.startOfDay(for: maximumDate)
+        guard proposedDay <= maximumDay,
+              availableDays.contains(proposedDay)
+        else { return currentDay }
+        return proposedDay
+    }
+
+    static func adjacentDay(
+        to date: Date,
+        direction: Int,
+        calendar: Calendar
+    ) -> Date? {
+        let day = calendar.startOfDay(for: date)
+        guard direction != 0 else {
+            return day
+        }
+        return calendar.date(byAdding: .day, value: direction > 0 ? 1 : -1, to: day)
+            .map { calendar.startOfDay(for: $0) }
+    }
+
+    static func ribbonWindow(containing date: Date, calendar: Calendar) -> TemporalRibbonWindow? {
+        let selectedStart = calendar.startOfDay(for: date)
+        guard let selectedEnd = calendar.date(byAdding: .day, value: 1, to: selectedStart),
+              let start = calendar.date(byAdding: .hour, value: -1, to: selectedStart),
+              let end = calendar.date(byAdding: .hour, value: 1, to: selectedEnd),
+              start < end
+        else { return nil }
+
+        let markers = [selectedStart, selectedEnd].filter { $0 > start && $0 < end }
+        return TemporalRibbonWindow(
+            selectedDay: selectedStart,
+            selectedDayInterval: DateInterval(start: selectedStart, end: selectedEnd),
+            interval: DateInterval(start: start, end: end),
+            midnightMarkers: markers
+        )
+    }
+
+    static func calendarDayWindow(containing date: Date, calendar: Calendar) -> TemporalRibbonWindow? {
+        let start = calendar.startOfDay(for: date)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else {
+            return nil
+        }
+        return TemporalRibbonWindow(
+            selectedDay: start,
+            selectedDayInterval: DateInterval(start: start, end: end),
+            interval: DateInterval(start: start, end: end),
+            midnightMarkers: [start]
+        )
+    }
+
+    static func week(containing date: Date, calendar: Calendar) -> [Date] {
+        guard let week = calendar.dateInterval(of: .weekOfYear, for: date) else {
+            return [calendar.startOfDay(for: date)]
+        }
+        return (0 ..< 7).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: week.start)
+        }
+    }
+
+    static func clip(
+        _ intervals: [TemporalIntervalInput],
+        to window: TemporalRibbonWindow
+    ) -> [TemporalIntervalSegment] {
+        let visible = intervals.compactMap { input -> TemporalIntervalSegment? in
+            guard input.start < input.end,
+                  input.end > window.interval.start,
+                  input.start < window.interval.end
+            else { return nil }
+            return TemporalIntervalSegment(
+                id: input.id,
+                originalStart: input.start,
+                originalEnd: input.end,
+                visibleStart: max(input.start, window.interval.start),
+                visibleEnd: min(input.end, window.interval.end),
+                continuesBefore: input.start < window.interval.start,
+                continuesAfter: input.end > window.interval.end,
+                lane: 0
+            )
+        }
+        .sorted {
+            if $0.originalStart != $1.originalStart {
+                return $0.originalStart < $1.originalStart
+            }
+            if $0.visibleStart == $1.visibleStart {
+                if $0.visibleEnd == $1.visibleEnd {
+                    return $0.id.uuidString < $1.id.uuidString
+                }
+                return $0.visibleEnd < $1.visibleEnd
+            }
+            return $0.visibleStart < $1.visibleStart
+        }
+
+        var laneEnds: [Date] = []
+        return visible.map { segment in
+            let lane = laneEnds.firstIndex { $0 <= segment.visibleStart } ?? laneEnds.count
+            if lane == laneEnds.count {
+                laneEnds.append(segment.visibleEnd)
+            } else {
+                laneEnds[lane] = segment.visibleEnd
+            }
+            return TemporalIntervalSegment(
+                id: segment.id,
+                originalStart: segment.originalStart,
+                originalEnd: segment.originalEnd,
+                visibleStart: segment.visibleStart,
+                visibleEnd: segment.visibleEnd,
+                continuesBefore: segment.continuesBefore,
+                continuesAfter: segment.continuesAfter,
+                lane: lane
+            )
+        }
+    }
+
+    static func intervalContinuationShowsContent(
+        isActive: Bool,
+        continuesBefore: Bool,
+        continuesAfter: Bool = false,
+        isSelectedPage: Bool
+    ) -> Bool {
+        !isActive || isSelectedPage || continuesBefore || continuesAfter
+    }
+
+    static func intervalContinuationShowsMarkers(isActive: Bool) -> Bool {
+        !isActive
+    }
+
+    static func chronological(_ values: [TemporalEventOrderingValue]) -> [TemporalEventOrderingValue] {
+        values.sorted {
+            if $0.occurredAt == $1.occurredAt {
+                return $0.id.uuidString < $1.id.uuidString
+            }
+            return $0.occurredAt < $1.occurredAt
+        }
+    }
+
+    static func ribbonHitTarget(
+        at position: Double,
+        width: Double,
+        window: TemporalRibbonWindow,
+        hitRegions: [TemporalRibbonHitRegion]
+    ) -> TemporalRibbonHitTarget? {
+        guard width > 0, position >= 0, position <= width else {
+            return nil
+        }
+        let fraction = position / width
+        let matchingHits = hitRegions
+            .filter { $0.range.contains(fraction) }
+            .sorted(by: {
+                if $0.kind.rawValue == $1.kind.rawValue {
+                    return $0.id.uuidString < $1.id.uuidString
+                }
+                return $0.kind.rawValue > $1.kind.rawValue
+            })
+        if let hit = matchingHits.first {
+            return .mark(id: hit.id, kind: hit.kind)
+        }
+        return .empty(instant: window.instant(at: fraction))
+    }
+
+    static func selectedInstantSummary(
+        _ instant: Date,
+        in window: TemporalRibbonWindow,
+        context: TemporalFormattingContext
+    ) -> String {
+        let style = Date.FormatStyle(
+            date: .complete,
+            time: .shortened,
+            locale: context.locale,
+            calendar: context.calendar,
+            timeZone: context.timeZone
+        )
+        let formatted = instant.formatted(style)
+        guard hasRepeatedLocalTime(
+            instant,
+            in: window,
+            calendar: context.calendar
+        ) else {
+            return formatted
+        }
+        return "\(formatted) (\(timeZoneAbbreviation(for: instant, context: context)))"
+    }
+
+    static func intervalSummary(
+        provenance: TemporalProvenancePresentation,
+        start: Date,
+        end: Date,
+        context: TemporalFormattingContext
+    ) -> String {
+        let style = Date.FormatStyle(
+            date: .abbreviated,
+            time: .shortened,
+            locale: context.locale,
+            calendar: context.calendar,
+            timeZone: context.timeZone
+        )
+        let duration = ElapsedTimeFormatter.string(from: end.timeIntervalSince(start))
+        return "\(provenance.title), start \(start.formatted(style)), end "
+            + "\(end.formatted(style)), duration \(duration)"
+    }
+
+    private static func hasRepeatedLocalTime(
+        _ instant: Date,
+        in window: TemporalRibbonWindow,
+        calendar: Calendar
+    ) -> Bool {
+        let components: Set<Calendar.Component> = [.era, .year, .month, .day, .hour, .minute]
+        let local = calendar.dateComponents(components, from: instant)
+        return [-3600.0, 3600.0]
+            .map { instant.addingTimeInterval($0) }
+            .contains {
+                window.interval.contains($0)
+                    && calendar.dateComponents(components, from: $0) == local
+            }
+    }
+
+    private static func timeZoneAbbreviation(
+        for instant: Date,
+        context: TemporalFormattingContext
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = context.calendar
+        formatter.locale = context.locale
+        formatter.timeZone = context.timeZone
+        formatter.dateFormat = "z"
+        return formatter.string(from: instant)
+    }
+}

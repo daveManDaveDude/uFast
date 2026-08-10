@@ -15,6 +15,34 @@ struct TodayTimelineEntry: Identifiable, Equatable {
 }
 
 enum TodayTimeline {
+    static func entries(
+        food: [FoodEntrySnapshot],
+        drinks: [HydrationEntrySnapshot],
+        now: Date,
+        calendar: Calendar
+    ) -> [TodayTimelineEntry] {
+        let foodEntries = food.filter { calendar.isDate($0.occurredAt, inSameDayAs: now) }.map {
+            TodayTimelineEntry(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                kind: .food(id: $0.id, name: $0.foodDescription, isCaloric: $0.isCaloric)
+            )
+        }
+        let drinkEntries = drinks.filter { calendar.isDate($0.occurredAt, inSameDayAs: now) }.map {
+            TodayTimelineEntry(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                kind: .drink(
+                    id: $0.id,
+                    name: $0.displayName,
+                    volumeMillilitres: $0.volumeMillilitres,
+                    isCaloric: $0.isCaloric
+                )
+            )
+        }
+        return sorted(foodEntries + drinkEntries)
+    }
+
     static func entries(food: [FoodEntryRecord], drinks: [HydrationEntryRecord], now: Date, calendar: Calendar) -> [TodayTimelineEntry] {
         let foodEntries = food.filter { calendar.isDate($0.occurredAt, inSameDayAs: now) }.map {
             TodayTimelineEntry(id: $0.id, occurredAt: $0.occurredAt, kind: .food(id: $0.id, name: $0.foodDescription, isCaloric: $0.isCaloric))
@@ -22,7 +50,11 @@ enum TodayTimeline {
         let drinkEntries = drinks.filter { calendar.isDate($0.occurredAt, inSameDayAs: now) }.map {
             TodayTimelineEntry(id: $0.id, occurredAt: $0.occurredAt, kind: .drink(id: $0.id, name: $0.displayName, volumeMillilitres: $0.volumeMillilitres, isCaloric: $0.isCaloric))
         }
-        return (foodEntries + drinkEntries).sorted {
+        return sorted(foodEntries + drinkEntries)
+    }
+
+    private static func sorted(_ entries: [TodayTimelineEntry]) -> [TodayTimelineEntry] {
+        entries.sorted {
             if $0.occurredAt == $1.occurredAt {
                 return $0.id.uuidString < $1.id.uuidString
             }
@@ -36,46 +68,6 @@ enum TodayTimeline {
                 return total + volume
             }
             return total
-        }
-    }
-}
-
-enum HistoricalTimeline {
-    static func entries(
-        food: [FoodEntryRecord],
-        drinks: [HydrationEntryRecord],
-        day: Date,
-        calendar: Calendar
-    ) -> [TodayTimelineEntry] {
-        let foodEntries = food.filter {
-            calendar.isDate($0.occurredAt, inSameDayAs: day)
-        }.map {
-            TodayTimelineEntry(
-                id: $0.id,
-                occurredAt: $0.occurredAt,
-                kind: .food(id: $0.id, name: $0.foodDescription, isCaloric: $0.isCaloric)
-            )
-        }
-        let drinkEntries = drinks.filter {
-            calendar.isDate($0.occurredAt, inSameDayAs: day)
-        }.map {
-            TodayTimelineEntry(
-                id: $0.id,
-                occurredAt: $0.occurredAt,
-                kind: .drink(
-                    id: $0.id,
-                    name: $0.displayName,
-                    volumeMillilitres: $0.volumeMillilitres,
-                    isCaloric: $0.isCaloric
-                )
-            )
-        }
-
-        return (foodEntries + drinkEntries).sorted {
-            if $0.occurredAt == $1.occurredAt {
-                return $0.id.uuidString < $1.id.uuidString
-            }
-            return $0.occurredAt < $1.occurredAt
         }
     }
 }
