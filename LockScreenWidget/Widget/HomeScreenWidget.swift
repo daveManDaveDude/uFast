@@ -82,8 +82,7 @@ struct UFastHomeScreenWidgetView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Spacer(minLength: 0)
-                ProgressView(value: active.progress)
-                    .progressViewStyle(UFastHomeScreenProgressStyle(palette: palette))
+                systemDrivenProgress(active)
                 compactDetail(active)
             }
             .padding(12)
@@ -119,8 +118,7 @@ struct UFastHomeScreenWidgetView: View {
                 }
 
                 Spacer(minLength: 0)
-                ProgressView(value: active.progress)
-                    .progressViewStyle(UFastHomeScreenProgressStyle(palette: palette))
+                systemDrivenProgress(active)
                 compactDetail(active)
             }
             .padding(16)
@@ -152,8 +150,7 @@ struct UFastHomeScreenWidgetView: View {
                     .minimumScaleFactor(0.65)
 
                 Spacer(minLength: 0)
-                ProgressView(value: active.progress)
-                    .progressViewStyle(UFastHomeScreenProgressStyle(palette: palette))
+                systemDrivenProgress(active)
                 HStack(alignment: .firstTextBaseline) {
                     Text(active.progressAccessibilityValue)
                     Spacer(minLength: 8)
@@ -189,6 +186,22 @@ struct UFastHomeScreenWidgetView: View {
         .monospacedDigit()
         .foregroundStyle(palette.primary)
         .privacySensitive()
+    }
+
+    private func systemDrivenProgress(
+        _ active: LockScreenActivePresentation
+    ) -> some View {
+        // WidgetKit can keep a date-relative ProgressView current without
+        // granting the extension execution time or persisting timer ticks.
+        ProgressView(
+            timerInterval: active.startDate ... active.targetDate,
+            countsDown: false,
+            label: { EmptyView() },
+            currentValueLabel: { EmptyView() }
+        )
+        .progressViewStyle(.linear)
+        .tint(palette.action)
+        .scaleEffect(y: 1.5)
     }
 
     private func compactDetail(_ active: LockScreenActivePresentation) -> some View {
@@ -300,27 +313,5 @@ private struct UFastHomeScreenBotanicalArtwork: View {
         }
         .clipped()
         .accessibilityHidden(true)
-    }
-}
-
-private struct UFastHomeScreenProgressStyle: ProgressViewStyle {
-    let palette: UFastHomeScreenPalette
-
-    func makeBody(configuration: Configuration) -> some View {
-        GeometryReader { proxy in
-            let progress = min(max(configuration.fractionCompleted ?? 0, 0), 1)
-            let fillWidth = progress > 0 ? max(2, proxy.size.width * progress) : 0
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(palette.track.opacity(0.9))
-                if fillWidth > 0 {
-                    Capsule()
-                        .fill(palette.action)
-                        .frame(width: fillWidth)
-                }
-            }
-        }
-        .frame(height: 12)
     }
 }

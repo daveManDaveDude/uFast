@@ -124,15 +124,21 @@ struct UFastLockScreenWidgetView: View {
                     .layoutPriority(1)
                     .accessibilityHidden(true)
             }
-            // Date-relative ProgressView supplies its own current-value text,
-            // which consumes a second hidden row in this compact family. The bar
-            // only needs the already-derived, clamped fraction for this render.
-            ProgressView(value: active.progress)
-                .progressViewStyle(.linear)
-                .tint(.primary)
-                .frame(height: contrast == .increased ? 7 : 5)
-                .clipShape(Capsule())
-                .accessibilityHidden(true)
+            // WidgetKit resolves this date interval while the extension is
+            // suspended, so the bar does not freeze at the entry's fraction.
+            ProgressView(
+                timerInterval: active.startDate ... active.targetDate,
+                countsDown: false,
+                label: { EmptyView() },
+                currentValueLabel: { EmptyView() }
+            )
+            .progressViewStyle(.linear)
+            .labelsHidden()
+            .tint(.primary)
+            .scaleEffect(y: 1.5)
+            .frame(height: contrast == .increased ? 9 : 7)
+            .clipShape(Capsule())
+            .accessibilityHidden(true)
         }
         // Expose one stable summary so seconds cannot reappear in accessibility.
         .accessibilityElement(children: .ignore)

@@ -103,20 +103,22 @@ private struct ActiveFastActivityCircularProgressView: View {
             now: .now
         )
 
-        let progress = presentation.progress ?? 0
         let palette = ActiveFastActivityPalette(colorScheme: colorScheme)
 
-        ZStack {
-            Circle()
-                .strokeBorder(palette.track.opacity(0.9), lineWidth: 2.5)
-            Circle()
-                .inset(by: 1.25)
-                .trim(from: 0, to: progress)
-                .stroke(
-                    palette.action,
-                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+        Group {
+            if presentation.progress != nil {
+                ProgressView(
+                    timerInterval: contentState.startDate ... contentState.targetDate,
+                    countsDown: false,
+                    label: { EmptyView() },
+                    currentValueLabel: { EmptyView() }
                 )
-                .rotationEffect(.degrees(-90))
+                .progressViewStyle(.circular)
+                .tint(palette.action)
+            } else {
+                Circle()
+                    .strokeBorder(palette.track.opacity(0.9), lineWidth: 2.5)
+            }
         }
         .frame(width: 22, height: 22)
         .privacySensitive()
@@ -136,12 +138,20 @@ private struct ActiveFastActivityDetailView: View {
             contentState: contentState,
             now: .now
         )
-        let progress = presentation.progress
         let percentage = presentation.progressPercentage
         VStack(alignment: .leading, spacing: 5) {
-            if let progress, let percentage {
-                ProgressView(value: progress)
-                    .progressViewStyle(ActiveFastActivityProgressStyle(palette: palette))
+            if presentation.progress != nil, let percentage {
+                // A date-relative progress view is resolved by the system and
+                // keeps advancing while uFast and this extension are suspended.
+                ProgressView(
+                    timerInterval: contentState.startDate ... contentState.targetDate,
+                    countsDown: false,
+                    label: { EmptyView() },
+                    currentValueLabel: { EmptyView() }
+                )
+                .progressViewStyle(.linear)
+                .tint(palette.action)
+                .scaleEffect(y: 1.5)
 
                 if let target = presentation.targetText {
                     ViewThatFits(in: .horizontal) {
@@ -303,28 +313,6 @@ private struct ActiveFastActivityBotanicalArtwork: View {
         }
         .clipped()
         .accessibilityHidden(true)
-    }
-}
-
-private struct ActiveFastActivityProgressStyle: ProgressViewStyle {
-    let palette: ActiveFastActivityPalette
-
-    func makeBody(configuration: Configuration) -> some View {
-        GeometryReader { proxy in
-            let progress = min(max(configuration.fractionCompleted ?? 0, 0), 1)
-            let fillWidth = progress > 0
-                ? max(2, proxy.size.width * progress)
-                : 0
-
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(palette.track.opacity(0.74))
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(palette.action)
-                    .frame(width: fillWidth)
-            }
-        }
-        .frame(height: 12)
     }
 }
 

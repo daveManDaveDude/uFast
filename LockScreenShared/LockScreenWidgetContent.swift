@@ -1,6 +1,8 @@
 import Foundation
 
 struct LockScreenWidgetActiveContent: Equatable, Sendable {
+    let startDate: Date
+    let targetDate: Date
     let elapsedText: String
     let progress: Double
     let progressPercentage: Int
@@ -23,6 +25,8 @@ enum LockScreenWidgetContent: Equatable, Sendable {
         case let .active(presentation):
             .active(
                 LockScreenWidgetActiveContent(
+                    startDate: presentation.startDate,
+                    targetDate: presentation.targetDate,
                     elapsedText: presentation.elapsedText,
                     progress: presentation.progress,
                     progressPercentage: presentation.progressPercentage,
