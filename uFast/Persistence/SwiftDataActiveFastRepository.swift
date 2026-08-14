@@ -9,22 +9,23 @@ enum ActiveFastPersistenceError: Error {
 @MainActor
 final class SwiftDataActiveFastRepository: ActiveFastRepository {
     private let modelContext: ModelContext
-    private let simulateSaveFailure: Bool
+    private let transaction: PersistenceTransaction
 
     init(
         modelContext: ModelContext,
         simulateSaveFailure: Bool = false
     ) {
         self.modelContext = modelContext
-        self.simulateSaveFailure = simulateSaveFailure
+        transaction = PersistenceTransaction(
+            modelContext: modelContext,
+            saveAction: simulateSaveFailure ? {
+                throw ActiveFastPersistenceError.simulatedSaveFailure
+            } : nil
+        )
     }
 
     func activeFast() throws -> FastRecord? {
-        var descriptor = FetchDescriptor<FastRecord>(
-            predicate: #Predicate { $0.endDate == nil }
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
+        try ActiveFastAuthority.fetch(in: modelContext)
     }
 
     func recordedFasts() throws -> [FastRecord] {
@@ -33,26 +34,14 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository {
 
     func saveNewActiveFast(_ fast: FastRecord) throws {
         modelContext.insert(fast)
-
-        do {
-            try failIfRequested()
-            try modelContext.save()
-        } catch {
-            modelContext.delete(fast)
-            throw error
-        }
+        try transaction.save()
     }
 
     func updateStartDate(of fast: FastRecord, to startDate: Date) throws {
         let originalStartDate = fast.startDate
         fast.correctStartDate(to: startDate)
-
-        do {
-            try failIfRequested()
-            try modelContext.save()
-        } catch {
+        try transaction.save {
             fast.correctStartDate(to: originalStartDate)
-            throw error
         }
     }
 
@@ -61,21 +50,12 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository {
             return
         }
 
-        let originalGoal = fast.historicalGoal
-        fast.complete(at: endDate, goal: goal)
-
-        do {
-            try failIfRequested()
-            try modelContext.save()
-        } catch {
-            fast.restoreActive(goal: originalGoal)
-            throw error
+        guard let originalGoal = fast.historicalGoal else {
+            throw FastRecordIntegrityError.invalidHistoricalGoal(rawHours: fast.goalHoursAtStart)
         }
-    }
-
-    private func failIfRequested() throws {
-        if simulateSaveFailure {
-            throw ActiveFastPersistenceError.simulatedSaveFailure
+        fast.complete(at: endDate, goal: goal)
+        try transaction.save {
+            fast.restoreActive(goal: originalGoal)
         }
     }
 }
@@ -95,18 +75,10 @@ extension SwiftDataActiveFastRepository: CompletedFastRepository {
             throw ActiveFastPersistenceError.completedFastNotFound
         }
         fast.correctBoundaries(startDate: startDate, endDate: endDate)
-
-        do {
-            try failIfRequested()
-            try modelContext.save()
-            return fast
-        } catch {
-            fast.correctBoundaries(
-                startDate: originalStartDate,
-                endDate: originalEndDate
-            )
-            throw error
+        try transaction.save {
+            fast.correctBoundaries(startDate: originalStartDate, endDate: originalEndDate)
         }
+        return fast
     }
 
     func deleteCompletedFast(id: UUID) throws {
@@ -114,14 +86,7 @@ extension SwiftDataActiveFastRepository: CompletedFastRepository {
             throw ActiveFastPersistenceError.completedFastNotFound
         }
 
-        try failIfRequested()
         modelContext.delete(fast)
-
-        do {
-            try modelContext.save()
-        } catch {
-            modelContext.rollback()
-            throw error
-        }
+        try transaction.save()
     }
 }

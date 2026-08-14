@@ -24,17 +24,25 @@ struct RootTabView: View {
         .tint(UFastTheme.action)
         .toolbarBackground(UFastTheme.canvas, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+        .onOpenURL { url in
+            guard ActiveFastActivityRoute.isCurrentFastURL(url) else { return }
+            selection = .today
+        }
     }
 
     @ViewBuilder
     private func destinationView(_ destination: AppDestination) -> some View {
         switch destination {
         case .today:
-            TodayGoalView(clock: clock)
+            TodayFeatureHost(clock: clock)
         case .settings:
-            SettingsView()
+            SettingsFeatureHost()
         case .history:
-            HistoryView(clock: clock, isTabSelected: selection == .history)
+            HistoryView(
+                clock: clock,
+                isTabSelected: selection == .history,
+                onSelectToday: { selection = .today }
+            )
         }
     }
 }

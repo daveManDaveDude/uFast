@@ -49,6 +49,7 @@ final class HydrationEntryServiceTests: XCTestCase {
         XCTAssertThrowsError(try failed.service.save(draft, replacing: nil, goal: .default, endingActiveFast: true))
         XCTAssertTrue(failed.fast.isActive)
         XCTAssertTrue(try failed.container.mainContext.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
+        XCTAssertFalse(failed.container.mainContext.hasChanges)
     }
 
     func testExactStartIsRejected() throws {

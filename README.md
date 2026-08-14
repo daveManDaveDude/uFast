@@ -44,11 +44,16 @@ make test
 make lint
 ```
 
-The 1.0 release baseline is iPhone-only, targets iOS 26.0, uses bundle ID
-`com.davidmcgrath.uFast`, and is versioned from `project.yml` as 1.0.0 (build 5).
-It has no account, cloud sync, backup, restore, HealthKit, Live Activity,
-notification or analytics dependency. Deleting the app may remove its local
-data; uFast does not provide recovery.
+The app is iPhone-only, targets iOS 26.0, uses bundle ID
+`com.davidmcgrath.uFast`, and is currently versioned from `project.yml` as
+1.0.0 (build 8). The last recorded external release state is historical: build
+5 was submitted for App Review and build 6 was supplied to external TestFlight
+testers on 7 August 2026.
+
+The core tracker has no account, cloud sync, backup, restore, HealthKit,
+notification, analytics or network dependency. The current source also contains
+optional, local WidgetKit and ActivityKit fasting surfaces. Deleting the app may
+remove its local data; uFast does not currently provide recovery.
 
 To build, install and launch the latest code on one connected, unlocked iPhone:
 
@@ -101,6 +106,7 @@ the uFast Apple Developer identity; simulator builds do not require signing.
 ## Repository documents
 
 - `PRODUCT.md` — promise, goal, user, principles and measures
+- `ROADMAP.md` — current release position and phased post-MVP direction
 - `MVP_SCOPE.md` — MVP boundary and build sequence
 - `DOMAIN_RULES.md` — shared terms and numbered behavioural rules
 - `BACKLOG.md` — ordered starter backlog
@@ -115,5 +121,10 @@ the uFast Apple Developer identity; simulator builds do not require signing.
   accessibility rules and visual Definition of Done
 - `DECISIONS.md` — accepted product and architecture choices
 - `AGENTS.md` — repository map, commands and Definition of Done
-- `PRIVACY.md` — public-facing local-data and safety policy
-- `SUPPORT.md` — public-facing support and local-data limitations
+- `docs/MAINTAINABILITY_HARDENING_STORIES.md` — sprint-ready, behavior-preserving
+  architecture and reliability hardening stories
+- `PRIVACY.md` — public policy for the submitted 1.0 baseline
+- `PRIVACY_AUTOMATIC_LIVE_ACTIVITIES.md` — public policy for a binary containing
+  automatic Live Activities
+- `SUPPORT.md` — support and local-data limitations for the submitted 1.0
+  baseline

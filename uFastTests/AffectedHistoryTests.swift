@@ -50,6 +50,22 @@ final class AffectedHistoryTests: XCTestCase {
         }
     }
 
+    func testExplicitLegacyInvalidationCanBeRestoredWithoutRewritingBoundaries() throws {
+        let fixture = try fixture()
+        let invalidator = LegacyHistoryInvalidator(modelContext: fixture.context)
+        let invalidated = try invalidator.invalidate(for: .deletion(
+            .init(kind: .hydration, id: fixture.shared.id)
+        ))
+
+        XCTAssertEqual(Set(invalidated.map(\.fast.id)), [fixture.first.id, fixture.second.id])
+        XCTAssertEqual(fixture.first.reviewState, .needsReview)
+        XCTAssertEqual(fixture.second.reviewState, .needsReview)
+
+        invalidator.restore(invalidated)
+        XCTAssertEqual(fixture.first.reviewState, .confirmed)
+        XCTAssertEqual(fixture.second.reviewState, .confirmed)
+    }
+
     func testEventMutationsRetainLegacyReconstructionState() throws {
         let fixture = try fixture()
         let foodRepository = SwiftDataFoodEntryRepository(modelContext: fixture.context)
@@ -59,6 +75,7 @@ final class AffectedHistoryTests: XCTestCase {
         )
         XCTAssertEqual(fixture.first.reviewState, .confirmed)
         XCTAssertEqual(fixture.second.reviewState, .confirmed)
+        XCTAssertFalse(fixture.context.hasChanges)
 
         let hydrationRepository = SwiftDataHydrationEntryRepository(modelContext: fixture.context)
         let nonCaloric = HydrationEntryDraft(
@@ -71,6 +88,7 @@ final class AffectedHistoryTests: XCTestCase {
         try hydrationRepository.update(fixture.shared, with: nonCaloric, at: date(31))
         XCTAssertEqual(fixture.first.reviewState, .confirmed)
         XCTAssertEqual(fixture.second.reviewState, .confirmed)
+        XCTAssertFalse(fixture.context.hasChanges)
     }
 
     func testEventEditAndDeleteRetainLegacyReconstructionState() throws {
@@ -206,103 +224,6 @@ final class AffectedHistoryTests: XCTestCase {
         XCTAssertEqual(fixture.second.reviewState, .confirmed)
     }
 
-    func testUpdatedEvidenceResolverCoversAvailableConflictMissingAndAmbiguous() {
-        let a = boundary(.food, 1, 0)
-        let b = boundary(.food, 2, 12)
-        let pair = ReconstructionBoundaryPair(start: a.reference, end: b.reference)
-        let saved = date(0) ..< date(12)
-        XCTAssertEqual(
-            UpdatedReconstructionEvidenceResolver.resolve(
-                savedInterval: saved,
-                originalPair: pair,
-                boundaries: [a, b],
-                otherFasts: []
-            ),
-            .available(.init(pair: pair, startBoundary: a, endBoundary: b))
-        )
-        XCTAssertEqual(
-            UpdatedReconstructionEvidenceResolver.resolve(
-                savedInterval: saved,
-                originalPair: pair,
-                boundaries: [a, b],
-                otherFasts: [.init(id: uuid(90), startDate: date(1), endDate: date(2))]
-            ),
-            .unavailable(.conflictingHistory)
-        )
-        XCTAssertEqual(
-            UpdatedReconstructionEvidenceResolver.resolve(
-                savedInterval: saved,
-                originalPair: pair,
-                boundaries: [],
-                otherFasts: []
-            ),
-            .unavailable(.missingSupportingEntry)
-        )
-        XCTAssertEqual(
-            UpdatedReconstructionEvidenceResolver.resolve(
-                savedInterval: date(0) ..< date(24),
-                originalPair: .init(start: a.reference, end: boundary(.food, 3, 24).reference),
-                boundaries: [a, b, boundary(.food, 3, 24)],
-                otherFasts: []
-            ),
-            .unavailable(.ambiguousEvidence)
-        )
-    }
-
-    func testNeedsReviewResolutionUpdateKeepAndRemoveAreExplicitAndSingleUse() throws {
-        let updateFixture = try fixture()
-        updateFixture.first.markNeedsReview()
-        try updateFixture.context.save()
-        let reconstruction = SwiftDataReconstructionRepository(
-            modelContext: updateFixture.context,
-            clock: FixedAppClock(now: date(40))
-        )
-        try reconstruction.updateAndReconfirm(id: updateFixture.first.id)
-        XCTAssertEqual(updateFixture.first.reviewState, .confirmed)
-        XCTAssertEqual(updateFixture.first.origin, .reconstructed)
-        XCTAssertNil(updateFixture.first.capturedHistoricalGoal)
-        XCTAssertThrowsError(try reconstruction.updateAndReconfirm(id: updateFixture.first.id))
-
-        updateFixture.second.markNeedsReview()
-        try updateFixture.context.save()
-        try reconstruction.keepAsRecordedFast(id: updateFixture.second.id)
-        XCTAssertEqual(updateFixture.second.origin, .recorded)
-        XCTAssertNil(updateFixture.second.boundaryPair)
-        XCTAssertNil(updateFixture.second.capturedHistoricalGoal)
-
-        let removeFixture = try fixture()
-        removeFixture.first.markNeedsReview()
-        try removeFixture.context.save()
-        let removeRepository = SwiftDataReconstructionRepository(
-            modelContext: removeFixture.context,
-            clock: FixedAppClock(now: date(40))
-        )
-        try removeRepository.removeAndLeaveUnknown(id: removeFixture.first.id)
-        XCTAssertEqual(try removeFixture.context.fetch(FetchDescriptor<UnknownPeriodRecord>()).count, 1)
-        XCTAssertThrowsError(try removeRepository.removeAndLeaveUnknown(id: removeFixture.first.id))
-        XCTAssertEqual(try removeFixture.context.fetch(FetchDescriptor<UnknownPeriodRecord>()).count, 1)
-    }
-
-    func testEveryFailedResolutionLeavesOneNeedsReviewFastAndNoUnknown() throws {
-        let fixture = try fixture()
-        fixture.first.markNeedsReview()
-        try fixture.context.save()
-        let repository = SwiftDataReconstructionRepository(
-            modelContext: fixture.context,
-            clock: FixedAppClock(now: date(40)),
-            simulateSaveFailure: true
-        )
-
-        XCTAssertThrowsError(try repository.updateAndReconfirm(id: fixture.first.id))
-        XCTAssertThrowsError(try repository.keepAsRecordedFast(id: fixture.first.id))
-        XCTAssertThrowsError(try repository.removeAndLeaveUnknown(id: fixture.first.id))
-        let matching = try fixture.context.fetch(FetchDescriptor<FastRecord>())
-            .filter { $0.id == fixture.first.id }
-        XCTAssertEqual(matching.count, 1)
-        XCTAssertEqual(matching.first?.reviewState, .needsReview)
-        XCTAssertTrue(try fixture.context.fetch(FetchDescriptor<UnknownPeriodRecord>()).isEmpty)
-    }
-
     private func fixture() throws -> (
         container: ModelContainer,
         context: ModelContext,
@@ -352,10 +273,6 @@ final class AffectedHistoryTests: XCTestCase {
             interval: date(startHour) ..< date(endHour),
             boundaries: .init(start: start, end: end)
         )
-    }
-
-    private func boundary(_ kind: CaloricBoundaryKind, _ id: Int, _ hour: Int) -> CaloricBoundary {
-        .init(reference: reference(kind, id), occurredAt: date(hour), description: "Entry \(id)")
     }
 
     private func reference(_ kind: CaloricBoundaryKind, _ id: Int) -> CaloricBoundaryReference {

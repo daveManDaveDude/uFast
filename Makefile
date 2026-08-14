@@ -4,8 +4,9 @@ PROJECT := uFast.xcodeproj
 SCHEME := uFast
 DERIVED_DATA := .derived-data
 SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
+UI_TEST_WORKERS ?= 4
 
-.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint format verify-local-only clean
+.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint analyze format verify-local-only verify-release-versions verify-ui-result verify-ui-verifier clean
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -41,6 +42,13 @@ test-unit: project
 		-derivedDataPath "$(DERIVED_DATA)" \
 		-only-testing:uFastTests \
 		test
+	DEVELOPER_DIR="$(DEVELOPER_DIR)" xcodebuild \
+		-project "$(PROJECT)" \
+		-scheme "UFastCore" \
+		-destination '$(SIMULATOR)' \
+		-derivedDataPath "$(DERIVED_DATA)" \
+		-only-testing:UFastCoreTests \
+		test
 
 test-ui: project
 	DEVELOPER_DIR="$(DEVELOPER_DIR)" xcodebuild \
@@ -49,17 +57,36 @@ test-ui: project
 		-destination '$(SIMULATOR)' \
 		-derivedDataPath "$(DERIVED_DATA)" \
 		-only-testing:uFastUITests \
+		-parallel-testing-enabled YES \
+		-parallel-testing-worker-count "$(UI_TEST_WORKERS)" \
+		-enableCodeCoverage NO \
 		test
 
 lint:
-	swiftformat uFast uFastTests uFastUITests --lint --cache ignore
+	./scripts/count_swift_sources.sh "SwiftFormat" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests
+	swiftformat UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests --lint --cache ignore
+	./scripts/count_swift_sources.sh "SwiftLint" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests
 	DEVELOPER_DIR="$(DEVELOPER_DIR)" swiftlint lint --strict --no-cache
+
+analyze:
+	DEVELOPER_DIR="$(DEVELOPER_DIR)" ./scripts/analyze_swift.sh
 
 verify-local-only:
 	./scripts/verify_local_only_release.sh
 
+verify-release-versions: project
+	./scripts/verify_release_versions.sh
+
+verify-ui-result:
+	@test -n "$(UI_XCRESULT)" || (echo "UI_XCRESULT must name an .xcresult bundle" >&2; exit 2)
+	./scripts/verify_ui_xcresult.py "$(UI_XCRESULT)"
+
+verify-ui-verifier:
+	./scripts/verify_ui_xcresult.py --self-test
+
 format:
-	swiftformat uFast uFastTests uFastUITests --cache ignore
+	./scripts/count_swift_sources.sh "SwiftFormat" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests
+	swiftformat UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests --cache ignore
 
 clean:
 	DEVELOPER_DIR="$(DEVELOPER_DIR)" xcodebuild \

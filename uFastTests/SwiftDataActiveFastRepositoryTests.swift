@@ -4,6 +4,32 @@ import XCTest
 
 @MainActor
 final class SwiftDataActiveFastRepositoryTests: XCTestCase {
+    func testMultipleActiveFastsReturnIntegrityFailureWithoutSelectingOrMutating() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let first = FastRecord(
+            startDate: Date(timeIntervalSince1970: 1_800_000_000),
+            goalAtStart: .default
+        )
+        let second = FastRecord(
+            startDate: Date(timeIntervalSince1970: 1_800_003_600),
+            goalAtStart: .default
+        )
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+        let repository = SwiftDataActiveFastRepository(modelContext: context)
+
+        XCTAssertThrowsError(try repository.activeFast()) { error in
+            XCTAssertEqual(
+                error as? ActiveFastIntegrityError,
+                .multipleActiveFasts(count: 2)
+            )
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 2)
+        XCTAssertFalse(context.hasChanges)
+    }
+
     func testSaveFailureRemovesUnsavedFastFromContext() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let repository = SwiftDataActiveFastRepository(
@@ -20,6 +46,7 @@ final class SwiftDataActiveFastRepositoryTests: XCTestCase {
         let storedFasts = try container.mainContext.fetch(FetchDescriptor<FastRecord>())
         XCTAssertTrue(storedFasts.isEmpty)
         XCTAssertNil(try repository.activeFast())
+        XCTAssertFalse(container.mainContext.hasChanges)
     }
 
     func testStartCorrectionUpdatesRecordInPlace() throws {
@@ -64,6 +91,7 @@ final class SwiftDataActiveFastRepositoryTests: XCTestCase {
         XCTAssertEqual(storedFasts.count, 1)
         XCTAssertEqual(storedFasts.first?.id, fast.id)
         XCTAssertEqual(storedFasts.first?.startDate, originalStart)
+        XCTAssertFalse(context.hasChanges)
     }
 
     func testCompletionUpdatesExistingRecordInPlaceAndCapturesGoal() throws {
@@ -117,6 +145,7 @@ final class SwiftDataActiveFastRepositoryTests: XCTestCase {
         XCTAssertNil(storedFasts.first?.endDate)
         XCTAssertEqual(storedFasts.first?.historicalGoal, originalGoal)
         XCTAssertEqual(try repository.activeFast()?.id, fast.id)
+        XCTAssertFalse(context.hasChanges)
     }
 
     func testRepeatedCompletionDoesNotRewriteCompletedRecord() throws {
@@ -201,6 +230,7 @@ final class SwiftDataActiveFastRepositoryTests: XCTestCase {
 
         XCTAssertEqual(fast.startDate, originalStart)
         XCTAssertEqual(fast.endDate, originalEnd)
+        XCTAssertFalse(context.hasChanges)
     }
 
     func testCompletedDeleteRoundTripLeavesOtherRecords() throws {
@@ -246,5 +276,6 @@ final class SwiftDataActiveFastRepositoryTests: XCTestCase {
         XCTAssertThrowsError(try repository.deleteCompletedFast(id: fast.id))
 
         XCTAssertEqual(try repository.recordedFasts().map(\.id), [fast.id])
+        XCTAssertFalse(context.hasChanges)
     }
 }

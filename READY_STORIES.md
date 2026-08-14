@@ -12,6 +12,29 @@ The refined Slice 2 contract and stories OW-201 through OW-205 are maintained
 in `SLICE_2_TODAY_STORIES.md`. They remain Draft until its six decisions are
 accepted in `DECISIONS.md`.
 
+The sprint-ready WidgetKit and ActivityKit review-hardening stories WS-101
+through WS-103 are maintained in
+`docs/WIDGET_SYSTEM_SURFACE_REVIEW_STORIES.md`. They implement the current
+surface contract in D-031 without adding or redesigning a widget family or
+Dynamic Island region.
+
+The sprint-ready code-review follow-up PI-101 and PI-102 is maintained in
+`docs/CODE_REVIEW_PERSISTENCE_INTEGRITY_SPRINT.md`. It preserves the exact
+release-baseline SwiftData schema and applies the existing active-fast authority
+rule to background History motion loads.
+
+The sprint-ready release-integrity follow-up CR-201 is maintained in
+`docs/CODE_REVIEW_RELEASE_INTEGRITY_STORY.md`. It aligns the embedded widget's
+short version, injects one temporal authority into History motion snapshots,
+and clears disposable Live Activity state when active-fast authority is
+ambiguous.
+
+The sprint-ready App Store packaging follow-up CR-202 is maintained in
+`docs/CODE_REVIEW_APP_STORE_PACKAGING_STORY.md`. It declares the app's existing
+app-private UserDefaults access with the approved required reason and makes the
+embedded widget derive its build number from the containing app's release
+setting, with built-product verification for both contracts.
+
 ## OW-002 Set a fasting goal
 
 **Epic:** E0 Product foundation  
@@ -899,8 +922,16 @@ and confirmed deletions affecting only the selected completed local record.
 
 **Epic:** E5 Glanceability and quality
 **Priority:** P1
-**Status:** Refined — blocked on two privacy and dismissal decisions
-**Updated:** 19 July 2026 — lifecycle, content, recovery and test seams detailed
+**Status:** Superseded 8 August 2026 by D-029 and OW-L105
+**Updated:** 8 August 2026 — retained as historical refinement only; do not
+implement this contract
+
+> D-029 and OW-L105 settled and delivered the explicit per-fast baseline. D-030
+> later accepts a reversible automatic preference, one-time contextual offer,
+> committed-start request and foreground continuation for longer fasts. The
+> current implementation-ready refinement is OW-L106 through OW-L109 in
+> `docs/OW_LIVE_ACTIVITY_AUTOMATION_STORIES.md`. This older OW-106 remains
+> historical and must not be implemented directly.
 
 ### User story
 

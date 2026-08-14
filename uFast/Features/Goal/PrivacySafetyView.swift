@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct PrivacySafetyView: View {
-    private let privacyPolicyURL = URL(string: "https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md")
+    private let privacyPolicyURL = URL(
+        string: "https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY_AUTOMATIC_LIVE_ACTIVITIES.md"
+    )
     private let supportURL = URL(string: "https://github.com/daveManDaveDude/uFast/issues")
 
     var body: some View {
@@ -27,6 +29,17 @@ struct PrivacySafetyView: View {
                         text: "In this release uFast sends fasting, food, drink or settings "
                             + "records to neither the developer nor a third party. uFast "
                             + "has no analytics, advertising or tracking."
+                    )
+
+                    privacySection(
+                        title: "Live Activities",
+                        text: "Live Activities are optional. If you enable automatic "
+                            + "Live Activities, the preference and minimal presentation "
+                            + "lifecycle metadata stay on this iPhone. The elapsed time, "
+                            + "goal progress and target you choose to show may be visible "
+                            + "on the Lock Screen and Dynamic Island. No Live Activity "
+                            + "content is sent to uFast, a server or a third party. Turn "
+                            + "the setting off or choose Hide for this fast at any time."
                     )
 
                     privacySection(

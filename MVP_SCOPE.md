@@ -1,5 +1,8 @@
 # MVP scope
 
+**Status:** delivered 1.0 release boundary. This document is retained as the
+historical scope contract for 1.0; post-MVP priorities are in `ROADMAP.md`.
+
 ## In
 
 - Fasting goal from 8 to 24 whole hours; default 12.
@@ -21,6 +24,10 @@
 
 ## Out
 
+The items below are out of **1.0**, not permanently rejected. Lock Screen,
+backup/restore, Apple Health, stats and assisted food entry now have a phased
+post-MVP direction in `ROADMAP.md`.
+
 - Photo food capture.
 - AI food interpretation or generated nutrition.
 - Coaching, chat or recommendations.
@@ -41,4 +48,6 @@
 3. History: backdate events and derive qualifying fasting gaps automatically.
 4. Deferred health and glanceability work: HealthKit, Live Activities,
    notifications and related permissions require a later product decision.
+   The post-MVP Live Activity decision is now recorded in D-029 and D-030 and
+   does not change this historical 1.0 boundary.
 5. Quality: accessibility, privacy and reliability for the local-only release.

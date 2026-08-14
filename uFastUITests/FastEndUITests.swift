@@ -1,5 +1,7 @@
 import XCTest
 
+// swiftlint:disable trailing_comma
+
 final class FastEndUITests: XCTestCase {
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 
@@ -176,7 +178,12 @@ final class FastEndUITests: XCTestCase {
         resetData: Bool = false,
         simulateSaveFailure: Bool = false
     ) -> [String] {
-        var arguments = ["--ui-testing", "--fixed-now", String(now.timeIntervalSince1970)]
+        var arguments = [
+            "--ui-testing",
+            "--fixed-now",
+            String(now.timeIntervalSince1970),
+            "--suppress-automatic-live-activity-offer",
+        ]
 
         if resetData {
             arguments.append("--reset-data")

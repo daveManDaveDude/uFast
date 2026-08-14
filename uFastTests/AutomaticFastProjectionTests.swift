@@ -1,4 +1,4 @@
-@testable import uFast
+@testable import UFastCore
 import XCTest
 
 // swiftlint:disable line_length

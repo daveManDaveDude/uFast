@@ -20,8 +20,10 @@ if ! rg -n 'cloudKitDatabase: \.none' uFast/Persistence/PersistenceContainer.swi
     exit 1
 fi
 
-if [[ -e uFast/SupportingFiles/uFast.entitlements ]]; then
-    print -u2 "The local-only release must not include an entitlement file."
+if [[ -e uFast/SupportingFiles/uFast.entitlements ]] \
+    && ! rg -n 'com.apple.security.application-groups' uFast/SupportingFiles/uFast.entitlements >/dev/null
+then
+    print -u2 "The local-only release entitlement must be limited to the local App Group."
     exit 1
 fi
 

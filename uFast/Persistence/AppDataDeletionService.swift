@@ -10,20 +10,19 @@ enum AppDataDeletionService {
         in context: ModelContext,
         simulateFailure: Bool = false
     ) throws {
-        do {
-            try context.fetch(FetchDescriptor<AppSettingsRecord>()).forEach(context.delete)
-            try context.fetch(FetchDescriptor<FastRecord>()).forEach(context.delete)
-            try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
-            try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
-            try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).forEach(context.delete)
-
-            if simulateFailure {
-                throw AppDataDeletionError.simulated
-            }
-            try context.save()
-        } catch {
-            context.rollback()
-            throw error
-        }
+        let saveAction: PersistenceTransaction.Save? = simulateFailure ? {
+            throw AppDataDeletionError.simulated
+        } : nil
+        let transaction = PersistenceTransaction(
+            modelContext: context,
+            saveAction: saveAction
+        )
+        try context.fetch(FetchDescriptor<AppSettingsRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<FastRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
+        try LegacyHistoryDeletion.deleteSchemaOnlyRecords(in: context)
+        try transaction.save()
     }
 }

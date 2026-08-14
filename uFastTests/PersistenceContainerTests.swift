@@ -2,13 +2,123 @@ import SwiftData
 @testable import uFast
 import XCTest
 
+// swiftlint:disable trailing_comma
+
 @MainActor
 final class PersistenceContainerTests: XCTestCase {
+    func testCurrentVersionedSchemaAndMigrationPlanCoverEveryProductionModel() {
+        XCTAssertEqual(UFastSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
+        XCTAssertEqual(UFastSchemaV2.versionIdentifier, Schema.Version(2, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 2)
+        XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
+        XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
+        XCTAssertEqual(UFastMigrationPlan.stages.count, 1)
+        XCTAssertEqual(PersistenceContainer.schema.entities.count, 6)
+
+        let releaseSchema = Schema(versionedSchema: UFastSchemaV1.self)
+        XCTAssertEqual(
+            Set(releaseSchema.entities.map(\.name)),
+            [
+                "AppSettingsRecord",
+                "FastRecord",
+                "FoodEntryRecord",
+                "HydrationEntryRecord",
+                "UnknownPeriodRecord",
+            ]
+        )
+        XCTAssertEqual(
+            releaseSchema.entitiesByName["AppSettingsRecord"]?.storedProperties.map(\.name),
+            [
+                "id",
+                "fastingGoalHours",
+                "hasCompletedOnboarding",
+                "waterFavouriteMillilitres",
+                "teaFavouriteMillilitres",
+                "coffeeFavouriteMillilitres",
+            ]
+        )
+        XCTAssertNil(
+            releaseSchema.entitiesByName["AppSettingsRecord"]?.storedPropertiesByName[
+                "automaticLiveActivityPreferenceRawValue"
+            ]
+        )
+        XCTAssertNil(releaseSchema.entitiesByName["HydrationFavouriteRecord"])
+
+        XCTAssertEqual(
+            Set(PersistenceContainer.schema.entities.map(\.name)),
+            [
+                "AppSettingsRecord",
+                "FastRecord",
+                "FoodEntryRecord",
+                "HydrationEntryRecord",
+                "HydrationFavouriteRecord",
+                "UnknownPeriodRecord",
+            ]
+        )
+    }
+
+    func testBootstrapReturnsReadyContainerOnSuccessfulOpen() throws {
+        let result = PersistenceBootstrapResult.open {
+            try PersistenceContainer.make(inMemory: true)
+        }
+
+        guard case let .ready(container) = result else {
+            return XCTFail("Expected persistence bootstrap to succeed")
+        }
+        XCTAssertEqual(
+            try container.mainContext.fetchCount(FetchDescriptor<AppSettingsRecord>()),
+            0
+        )
+    }
+
+    func testBootstrapFailureLeavesExistingStoreBytesUntouched() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "uFast-bootstrap-failure-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "production.store")
+        let originalBytes = Data("existing local store".utf8)
+        try originalBytes.write(to: storeURL)
+
+        let result = PersistenceBootstrapResult.open {
+            try PersistenceContainer.make(storeURL: storeURL)
+        }
+
+        guard case let .unavailable(failure) = result else {
+            return XCTFail("Expected explicit unavailable bootstrap result")
+        }
+        XCTAssertFalse(failure.diagnosticDescription.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: storeURL), originalBytes)
+    }
+
     func testProductionConfigurationIsLocalOnly() {
         let configuration = PersistenceContainer.configuration()
 
         XCTAssertFalse(configuration.isStoredInMemoryOnly)
         XCTAssertNil(configuration.cloudKitContainerIdentifier)
+    }
+
+    func testFreshV2HydrationFavouriteRoundTripStaysLocalOnly() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let createdAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let favourite = HydrationFavouriteRecord(
+            name: "Sparkling water",
+            volumeMillilitres: 330,
+            isCaloric: false,
+            createdAt: createdAt
+        )
+        context.insert(favourite)
+        try context.save()
+
+        let stored = try context.fetch(FetchDescriptor<HydrationFavouriteRecord>())
+        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.first?.id, favourite.id)
+        XCTAssertEqual(stored.first?.name, "Sparkling water")
+        XCTAssertEqual(stored.first?.volumeMillilitres, 330)
+        XCTAssertEqual(stored.first?.isCaloric, false)
+        XCTAssertEqual(stored.first?.createdAt, createdAt)
+        XCTAssertNil(PersistenceContainer.configuration(inMemory: true).cloudKitContainerIdentifier)
     }
 
     func testAppSettingsRoundTripInLocalContainer() throws {
@@ -75,6 +185,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<FastRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<FoodEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).isEmpty)
     }
 
@@ -94,6 +205,8 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<UnknownPeriodRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationFavouriteRecord>()), 1)
+        XCTAssertFalse(context.hasChanges)
     }
 
     private func populatedContainer() throws -> ModelContainer {
@@ -132,6 +245,14 @@ final class PersistenceContainerTests: XCTestCase {
                 endDate: now.addingTimeInterval(60),
                 boundaries: boundaries,
                 reason: .userChoice,
+                createdAt: now
+            )
+        )
+        context.insert(
+            HydrationFavouriteRecord(
+                name: "Sparkling water",
+                volumeMillilitres: 330,
+                isCaloric: false,
                 createdAt: now
             )
         )

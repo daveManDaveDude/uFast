@@ -189,7 +189,10 @@ final class FastingGoalUITests: XCTestCase {
         app.alerts["Permanently delete everything?"].buttons["Delete everything"].tap()
 
         XCTAssertTrue(app.tabBars.buttons["Settings"].exists)
-        XCTAssertTrue(app.staticTexts["settings.data.delete-error"].waitForExistence(timeout: 2))
+        let finalAlert = app.alerts["Permanently delete everything?"]
+        XCTAssertTrue(finalAlert.waitForNonExistence(timeout: 5), app.debugDescription)
+        app.scrollViews.firstMatch.swipeUp()
+        XCTAssertTrue(app.staticTexts["settings.data.delete-error"].waitForExistence(timeout: 5))
     }
 
     @MainActor

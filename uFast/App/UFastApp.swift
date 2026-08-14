@@ -4,132 +4,145 @@ import SwiftUI
 // swiftlint:disable blanket_disable_command superfluous_disable_command
 // swiftlint:disable opening_brace trailing_comma
 
+private enum SimulatedPersistenceBootstrapError: Error {
+    case requested
+}
+
 @main
 struct UFastApp: App {
-    private let modelContainer: ModelContainer
+    private let persistence: PersistenceBootstrapResult
     private let clock: any AppClock
+    private let liveActivityCoordinator: ActiveFastLiveActivityCoordinator?
+    private let applicationCommands: ApplicationCommands?
+    private let suppressAutomaticLiveActivityOffer: Bool
 
     init() {
-        clock = AppClockConfiguration.clock()
+        let launchConfiguration = AppLaunchConfiguration.current()
+        let configuredClock = AppClockConfiguration.clock(fixedNow: launchConfiguration.fixedNow)
+        clock = configuredClock
+        suppressAutomaticLiveActivityOffer = launchConfiguration.suppressAutomaticLiveActivityOffer
+        let bootstrap = PersistenceBootstrapResult.open {
+            if launchConfiguration.simulatePersistenceBootstrapFailure {
+                throw SimulatedPersistenceBootstrapError.requested
+            }
+            return try PersistenceContainer.make()
+        }
 
-        do {
-            modelContainer = try PersistenceContainer.make()
-            try resetDataIfRequested(in: modelContainer)
-        } catch {
-            fatalError("Unable to create the persistence container: \(error)")
+        switch bootstrap {
+        case let .ready(container):
+            do {
+                try SwiftDataSettingsStore(modelContext: container.mainContext).prepareForUse()
+                try Self.resetDataIfRequested(
+                    in: container,
+                    clock: configuredClock,
+                    configuration: launchConfiguration.fixtures
+                )
+                WidgetProjectionSupport.synchronize(in: container, now: configuredClock.now)
+                persistence = .ready(container)
+                let coordinator = Self.makeLiveActivityCoordinator(
+                    container: container,
+                    clock: configuredClock,
+                    configuration: launchConfiguration.liveActivityAdapter,
+                    buildIdentity: launchConfiguration.liveActivityBuildIdentity
+                )
+                liveActivityCoordinator = coordinator
+                applicationCommands = ApplicationCommands(
+                    modelContext: container.mainContext,
+                    clock: configuredClock,
+                    projectionCoordinator: PostCommitProjectionCoordinator(
+                        liveActivityCoordinator: coordinator
+                    ),
+                    configuration: launchConfiguration.commands
+                )
+            } catch {
+                persistence = .unavailable(
+                    PersistenceBootstrapFailure(
+                        diagnosticDescription: String(describing: error)
+                    )
+                )
+                liveActivityCoordinator = nil
+                applicationCommands = nil
+            }
+        case let .unavailable(failure):
+            persistence = .unavailable(failure)
+            liveActivityCoordinator = nil
+            applicationCommands = nil
         }
     }
 
     var body: some Scene {
         WindowGroup {
-            AppRootView(clock: clock)
-        }
-        .modelContainer(modelContainer)
-    }
-
-    private func resetDataIfRequested(in container: ModelContainer) throws {
-        guard ProcessInfo.processInfo.arguments.contains("--reset-data") else {
-            return
-        }
-
-        let context = container.mainContext
-        try context.fetch(FetchDescriptor<AppSettingsRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<FastRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).forEach(context.delete)
-
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("--seed-onboarded") {
-            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
-        }
-        if arguments.contains("--seed-slice3-history") {
-            try seedSlice3History(in: context)
-        }
-        if arguments.contains("--seed-slice36-proposal") {
-            seedSlice36Proposal(in: context)
-        }
-        if let index = arguments.firstIndex(of: "--seed-active-fast-start"),
-           arguments.indices.contains(index + 1),
-           let interval = TimeInterval(arguments[index + 1])
-        {
-            context.insert(
-                FastRecord(
-                    startDate: Date(timeIntervalSince1970: interval),
-                    goalAtStart: .default
+            switch persistence {
+            case let .ready(container):
+                AppRootView(
+                    clock: clock,
+                    liveActivityCoordinator: liveActivityCoordinator,
+                    applicationCommands: applicationCommands,
+                    suppressAutomaticLiveActivityOffer: suppressAutomaticLiveActivityOffer
                 )
-            )
+                .modelContainer(container)
+            case .unavailable:
+                PersistenceUnavailableView()
+            }
         }
-        try context.save()
     }
 
-    private func seedSlice3History(in context: ModelContext) throws {
-        if try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty {
-            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
-        }
-        let now = clock.now
-        let dates = [-60, -48, -36, -24].map {
-            now.addingTimeInterval(TimeInterval($0 * 60 * 60))
-        }
-        let entries = [
-            FoodEntryRecord(draft: .init(description: "Late dinner", occurredAt: dates[0]), createdAt: dates[0]),
-            FoodEntryRecord(draft: .init(description: "Breakfast", occurredAt: dates[1]), createdAt: dates[1]),
-            FoodEntryRecord(draft: .init(description: "Supper", occurredAt: dates[2]), createdAt: dates[2]),
-            FoodEntryRecord(draft: .init(description: "Morning meal", occurredAt: dates[3]), createdAt: dates[3]),
-        ]
-        entries.forEach(context.insert)
-        let confirmed = FastRecord(
-            reconstructedStart: dates[0],
-            endDate: dates[1],
-            boundaries: .init(
-                start: .init(kind: .food, id: entries[0].id),
-                end: .init(kind: .food, id: entries[1].id)
-            ),
-            adjustedByUser: false
-        )
-        let needsReview = FastRecord(
-            reconstructedStart: dates[2],
-            endDate: dates[3],
-            boundaries: .init(
-                start: .init(kind: .food, id: entries[2].id),
-                end: .init(kind: .food, id: entries[3].id)
-            ),
-            adjustedByUser: true
-        )
-        needsReview.markNeedsReview()
-        context.insert(confirmed)
-        context.insert(needsReview)
-        context.insert(
-            UnknownPeriodRecord(
-                startDate: now.addingTimeInterval(-18 * 60 * 60),
-                endDate: now.addingTimeInterval(-10 * 60 * 60),
-                boundaries: .init(
-                    start: .init(kind: .food, id: UUID()),
-                    end: .init(kind: .hydration, id: UUID())
-                ),
-                reason: .userChoice,
-                createdAt: now
-            )
+    private static func resetDataIfRequested(
+        in container: ModelContainer,
+        clock: any AppClock,
+        configuration: DevelopmentFixtureConfiguration
+    ) throws {
+        try UITestDataReset.runIfRequested(
+            in: container,
+            configuration: configuration,
+            now: clock.now,
+            clock: clock
         )
     }
 
-    private func seedSlice36Proposal(in context: ModelContext) {
-        context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
-        let start = clock.now.addingTimeInterval(-24 * 60 * 60)
-        let end = clock.now.addingTimeInterval(-12 * 60 * 60)
-        context.insert(
-            FoodEntryRecord(
-                id: UUID(uuidString: "36000000-0000-0000-0000-000000000001") ?? UUID(),
-                draft: .init(description: "Evening meal", occurredAt: start),
-                createdAt: start
-            )
-        )
-        context.insert(
-            FoodEntryRecord(
-                id: UUID(uuidString: "36000000-0000-0000-0000-000000000002") ?? UUID(),
-                draft: .init(description: "Morning meal", occurredAt: end),
-                createdAt: end
-            )
+    private static func makeLiveActivityCoordinator(
+        container: ModelContainer,
+        clock: any AppClock,
+        configuration: LiveActivityAdapterConfiguration,
+        buildIdentity: LiveActivityBuildIdentity?
+    ) -> ActiveFastLiveActivityCoordinator {
+        let client: any LiveActivityClient
+        switch configuration {
+        case .activityKit:
+            client = ActivityKitLiveActivityClient()
+        case let .deterministic(availability, failRequests, failEnds):
+            let fake = DeterministicLiveActivityClient(availability: availability)
+            fake.failRequests = failRequests
+            fake.failEnds = failEnds
+            client = fake
+        }
+
+        return ActiveFastLiveActivityCoordinator(
+            clock: clock,
+            client: client,
+            lifecycleStore: UserDefaultsLiveActivityLifecycleStore(),
+            resolveActiveFast: {
+                let context = container.mainContext
+                guard let fast = try ActiveFastAuthority.fetch(in: context) else {
+                    return nil
+                }
+                let goal = try SwiftDataSettingsStore(modelContext: context)
+                    .authoritativeRecord()?.fastingGoal ?? .default
+                return ActiveFastActivitySource(
+                    activeRecordIdentifier: fast.id,
+                    startDate: fast.startDate,
+                    targetDate: fast.startDate.addingTimeInterval(
+                        TimeInterval(goal.hours * 60 * 60)
+                    ),
+                    goalHours: goal.hours
+                )
+            },
+            resolveAutomaticPreference: {
+                let context = container.mainContext
+                return (try? SwiftDataSettingsStore(modelContext: context)
+                    .authoritativeRecord()?.automaticLiveActivityPreference) ?? .disabled
+            },
+            installedBuildIdentity: buildIdentity
         )
     }
 }

@@ -5,17 +5,6 @@ enum UnknownPeriodReason: String, Equatable, Sendable {
     case userChoice
     case insufficientEvidence
     case savedHistoryConflict
-
-    var explanation: String {
-        switch self {
-        case .userChoice:
-            "You chose to leave this period unknown."
-        case .insufficientEvidence:
-            "Not enough confirmed information."
-        case .savedHistoryConflict:
-            "A saved fast overlaps this period."
-        }
-    }
 }
 
 @Model

@@ -109,7 +109,7 @@ enum FoodEntryValidator {
             return .failure(.descriptionTooLong)
         }
         guard nutrition.values.allSatisfy({
-            $0.isFinite && $0 >= 0 && $0 <= maximumNutritionValue
+            DomainValidation.isFinite($0, in: 0 ... maximumNutritionValue)
         }) else {
             return .failure(.invalidNutrition)
         }

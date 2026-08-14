@@ -17,6 +17,7 @@ struct DirectHistoricalEntryView: View {
     let clock: any AppClock
     let activeFastStart: Date?
     let favourites: [HydrationFavourite]
+    let resolveFavouriteDraft: (HydrationFavourite, Date) throws -> HydrationEntryDraft
     let onSaveFood: (FoodEntryDraft, Bool) throws -> Void
     let onSaveHydration: (HydrationEntryDraft, Bool) throws -> Void
     let onClose: () -> Void
@@ -26,6 +27,7 @@ struct DirectHistoricalEntryView: View {
         clock: any AppClock,
         activeFastStart: Date?,
         favourites: [HydrationFavourite],
+        resolveFavouriteDraft: @escaping (HydrationFavourite, Date) throws -> HydrationEntryDraft,
         onSaveFood: @escaping (FoodEntryDraft, Bool) throws -> Void,
         onSaveHydration: @escaping (HydrationEntryDraft, Bool) throws -> Void,
         onClose: @escaping () -> Void
@@ -34,6 +36,7 @@ struct DirectHistoricalEntryView: View {
         self.clock = clock
         self.activeFastStart = activeFastStart
         self.favourites = favourites
+        self.resolveFavouriteDraft = resolveFavouriteDraft
         self.onSaveFood = onSaveFood
         self.onSaveHydration = onSaveHydration
         self.onClose = onClose
@@ -62,15 +65,7 @@ struct DirectHistoricalEntryView: View {
             AddDrinkSheet(
                 favourites: favourites,
                 onAdd: { favourite in
-                    stage = .hydration(
-                        HydrationEntryDraft(
-                            type: favourite.type,
-                            customName: nil,
-                            volumeMillilitres: favourite.volumeMillilitres,
-                            occurredAt: selectedInstant,
-                            isCaloric: false
-                        )
-                    )
+                    stage = try .hydration(resolveFavouriteDraft(favourite, selectedInstant))
                 },
                 onChooseAnother: {
                     stage = .hydration(

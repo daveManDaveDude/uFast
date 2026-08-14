@@ -1,5 +1,4 @@
-import Foundation
-@testable import uFast
+@testable import UFastCore
 import XCTest
 
 final class FastConflictCheckerTests: XCTestCase {

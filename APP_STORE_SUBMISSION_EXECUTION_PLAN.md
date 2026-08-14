@@ -5,7 +5,15 @@
 **Release branch:** codex/release-1.0  
 **Release code commit:** 8d1a5fd (Refactor storage and privacy model for local-only release)
 **Plan commit:** see `git log` for the current release-execution update
-**Target:** uFast 1.0.0, build 5 for the first production/TestFlight upload
+**Target:** uFast 1.0.0, build 5 for App Store review; build 6 for current
+external TestFlight testing
+
+**Status update, 7 August 2026:** The release owner reports that build 5 has
+been submitted and is awaiting App Store Connect review. Build 6 has been
+published to TestFlight and external testers have been invited. The detailed
+execution record below describes the earlier build-5 preparation state and is
+retained as evidence; where it conflicts with this update, this update is
+current.
 
 This document covers the work remaining after REL-001 to REL-008. It records
 what is already evidenced, what Codex can do, what needs the Apple account
@@ -14,6 +22,9 @@ owner, and where work must pause for a user hand-off.
 ## Current state
 
 ### Completed and evidenced
+
+- Current owner-reported state: **1.0.0 (5)** is awaiting App Store review;
+  **1.0.0 (6)** is published to TestFlight with external testers invited.
 
 - REL-001 to REL-008 are complete in the pushed release branch.
 - The branch tracks origin/codex/release-1.0. `CURRENT_PROJECT_VERSION` is 5,
@@ -32,7 +43,7 @@ owner, and where work must pause for a user hand-off.
 - App Store Connect accepted version 1.0.0 build 5 after processing. Build 5 is
   attached to the iOS 1.0 App Store version and is marked Ready to Submit.
   The existing uFast Internal group contains build 5 and shows it as Testing;
-  no external testers were added.
+  no external testers had been added at that earlier evidence point.
 - App Privacy is now published. App Store Connect shows the public policy URL
   `https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md` and the
   disclosure “Data Not Collected.”

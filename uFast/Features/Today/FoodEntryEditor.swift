@@ -13,7 +13,7 @@ struct FoodEntryEditor: View {
     @State private var showsFastEndConfirmation = false
     @State private var pendingFastEndDraft: FoodEntryDraft?
 
-    let record: FoodEntryRecord?
+    let record: FoodEntrySnapshot?
     let clock: any AppClock
     let activeFastStart: Date?
     let allowedRange: Range<Date>?
@@ -22,7 +22,7 @@ struct FoodEntryEditor: View {
     let onCancel: () -> Void
 
     init(
-        record: FoodEntryRecord?,
+        snapshot record: FoodEntrySnapshot?,
         clock: any AppClock,
         activeFastStart: Date?,
         initialOccurredAt: Date? = nil,

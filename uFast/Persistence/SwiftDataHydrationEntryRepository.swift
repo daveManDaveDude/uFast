@@ -20,11 +20,16 @@ protocol HydrationEntryRepository {
 @MainActor
 final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     private let modelContext: ModelContext
-    private let simulateSaveFailure: Bool
+    private let transaction: PersistenceTransaction
 
     init(modelContext: ModelContext, simulateSaveFailure: Bool = false) {
         self.modelContext = modelContext
-        self.simulateSaveFailure = simulateSaveFailure
+        transaction = PersistenceTransaction(
+            modelContext: modelContext,
+            saveAction: simulateSaveFailure ? {
+                throw HydrationEntryPersistenceError.simulatedSaveFailure
+            } : nil
+        )
     }
 
     func createFavourite(_ favourite: HydrationFavourite, occurredAt: Date) throws -> HydrationEntryRecord {
@@ -34,38 +39,52 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     func create(_ draft: HydrationEntryDraft, at creationDate: Date) throws -> HydrationEntryRecord {
         let record = makeRecord(draft, creationDate)
         modelContext.insert(record)
-        do { try save(); return record }
-        catch { modelContext.delete(record); throw error }
+        try transaction.save()
+        return record
     }
 
     func create(_ draft: HydrationEntryDraft, at creationDate: Date, ending activeFast: FastRecord, goal: FastingGoal) throws -> HydrationEntryRecord {
         let record = makeRecord(draft, creationDate)
-        let previousGoal = activeFast.historicalGoal
+        guard let previousGoal = activeFast.historicalGoal else {
+            throw FastRecordIntegrityError.invalidHistoricalGoal(
+                rawHours: activeFast.goalHoursAtStart
+            )
+        }
         modelContext.insert(record)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        do { try save(); return record }
-        catch { activeFast.restoreActive(goal: previousGoal); modelContext.delete(record); throw error }
+        try transaction.save {
+            activeFast.restoreActive(goal: previousGoal)
+        }
+        return record
     }
 
     func update(_ record: HydrationEntryRecord, with draft: HydrationEntryDraft, at updateDate: Date) throws {
-        let old = record.draft; let oldUpdatedAt = record.updatedAt
+        let old = record.draft
+        let oldUpdatedAt = record.updatedAt
         record.update(from: draft, at: updateDate)
-        do { try save() }
-        catch { record.update(from: old, at: oldUpdatedAt); throw error }
+        try transaction.save {
+            record.update(from: old, at: oldUpdatedAt)
+        }
     }
 
     func update(_ record: HydrationEntryRecord, with draft: HydrationEntryDraft, at updateDate: Date, ending activeFast: FastRecord, goal: FastingGoal) throws {
-        let old = record.draft; let oldUpdatedAt = record.updatedAt; let previousGoal = activeFast.historicalGoal
+        let old = record.draft
+        let oldUpdatedAt = record.updatedAt
+        guard let previousGoal = activeFast.historicalGoal else {
+            throw FastRecordIntegrityError.invalidHistoricalGoal(
+                rawHours: activeFast.goalHoursAtStart
+            )
+        }
         record.update(from: draft, at: updateDate)
         activeFast.complete(at: draft.occurredAt, goal: goal)
-        do { try save() }
-        catch { record.update(from: old, at: oldUpdatedAt); activeFast.restoreActive(goal: previousGoal); throw error }
+        try transaction.save {
+            record.update(from: old, at: oldUpdatedAt)
+            activeFast.restoreActive(goal: previousGoal)
+        }
     }
 
     func activeFast() throws -> FastRecord? {
-        var descriptor = FetchDescriptor<FastRecord>(predicate: #Predicate { $0.endDate == nil })
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
+        try ActiveFastAuthority.fetch(in: modelContext)
     }
 
     func recordedFasts() throws -> [FastRecord] {
@@ -73,24 +92,11 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     }
 
     func delete(_ record: HydrationEntryRecord) throws {
-        do { try failIfRequested() }
-        catch { throw error }
         modelContext.delete(record)
-        do { try modelContext.save() }
-        catch { modelContext.rollback(); throw error }
+        try transaction.save()
     }
 
     private func makeRecord(_ draft: HydrationEntryDraft, _ createdAt: Date) -> HydrationEntryRecord {
         HydrationEntryRecord(type: draft.type, customName: draft.customName, volumeMillilitres: draft.volumeMillilitres, occurredAt: draft.occurredAt, isCaloric: draft.isCaloric, createdAt: createdAt)
-    }
-
-    private func save() throws {
-        try failIfRequested(); try modelContext.save()
-    }
-
-    private func failIfRequested() throws {
-        if simulateSaveFailure {
-            throw HydrationEntryPersistenceError.simulatedSaveFailure
-        }
     }
 }

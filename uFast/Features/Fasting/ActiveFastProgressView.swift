@@ -153,6 +153,7 @@ struct ActiveFastProgressView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(UFastTheme.Spacing.standard)
         }
+        .accessibilityIdentifier("today.content")
     }
 
     @ViewBuilder

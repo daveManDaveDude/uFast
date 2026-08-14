@@ -1,4 +1,4 @@
-@testable import uFast
+@testable import UFastCore
 import XCTest
 
 final class FastingGoalTests: XCTestCase {

@@ -8,6 +8,14 @@ A calm, private companion for fasting, food, hydration and progress that remains
 
 Enable a self-directed iPhone user to understand and maintain the shape of their eating, drinking and fasting week in less than a minute a day, without punishment for gaps.
 
+## Product position
+
+uFast is a fully featured free fasting tracker. “Free without a catch” means no
+advertising, subscription, premium feature gate, paid AI credits or nagging
+upgrade path. New capabilities may reduce effort or add context, but the core
+manual tracker remains complete without an account, Apple Health, AI or a
+network connection.
+
 ## Primary user
 
 A busy, self-directed adult who wants lightweight structure for fasting, food and
@@ -31,7 +39,33 @@ hydration records, and sometimes forgets to log for several days.
   events must remain distinguishable.
 - No subscriptions, premium gates or hidden commercial model.
 
-## MVP data boundary
+## Post-MVP direction
+
+The delivered 1.0 foundation expands in this order: a Lock Screen fasting
+surface, user-controlled backup and restore, optional read-only Apple Health
+integration, calm fasting/health trends, and assisted food entry from text and
+photos. `ROADMAP.md` records the outcomes and decision gates.
+
+- Health data adds optional context; it never blocks manual tracking.
+- Stats describe recorded patterns and data completeness without scores,
+  coaching, diagnosis or claims of causation.
+- AI food results are editable estimates that require confirmation before save.
+- Assisted food entry must support Apple Intelligence-capable and older
+  supported iPhones, while retaining manual entry everywhere.
+- Backup and restore must remain user-controlled, validated and non-destructive
+  on failure.
+- Lock Screen surfaces remain optional conveniences. A Live Activity may start
+  automatically only after a clear, reversible in-app choice, must be easy to
+  hide, and must never become a background restart loop or a dependency of the
+  local fasting journey.
+- The shipped widget extension includes the Lock Screen accessory-rectangular
+  widget and all three required Home Screen sizes: small, medium and large.
+  They are read-only views of the same disposable active-fast projection.
+- Dynamic Island support is an optional Live Activity treatment, not a
+  persistent banner promise. uFast supplies compact, minimal and expanded
+  regions while an activity is active, and the system decides when they appear.
+
+## 1.0 data boundary
 
 - uFast stores app-created fasting, food, hydration, settings and legacy history
   records locally in its SwiftData store on this iPhone.

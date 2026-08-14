@@ -3,6 +3,179 @@
 Decisions were accepted on 18 July 2026 unless a later accepted or updated date
 is shown.
 
+## D-027 Post-MVP product direction
+
+- **Status:** Accepted
+- **Accepted:** 7 August 2026
+- **Decision:** Keep uFast a fully featured free fasting tracker with no
+  advertising, subscription, premium gates, paid AI credits or nagging upgrade
+  path. After launch stabilisation, pursue a Lock Screen fasting surface,
+  user-controlled backup/restore, optional read-only Apple Health integration,
+  calm fasting and health-data trends, then AI-assisted food entry from text
+  and photos. Assisted entry must cover Apple Intelligence-capable and older
+  supported iPhones while manual entry remains available everywhere.
+- **Consequence:** `ROADMAP.md` becomes the current product roadmap and
+  `BACKLOG.md` remains the delivery ledger for the original slices. Each new
+  milestone requires its own implementation-ready stories plus product,
+  privacy, accessibility, persistence and App Review decisions. Health and AI
+  remain optional enhancements and cannot become dependencies of the local
+  manual tracker. Any remote AI fallback needs an explicit consent, retention,
+  availability and sustainable-cost decision before implementation.
+
+## D-028 Lock Screen privacy and projection contract
+
+- **Status:** Accepted
+- **Accepted:** 8 August 2026
+- **Decision:** Treat WidgetKit privacy redaction as the supported protected
+  presentation signal. While privacy-redacted, show only **uFast**, **Elapsed**,
+  completed hours/minutes, the clamped progress track and its percentage. Hide
+  target time and goal-reached state. When redaction is absent, the same
+  absolute interval may show system-driven counting seconds plus target or the
+  neutral **Goal time reached** state. If physical-device evidence cannot prove
+  a reliable distinction, show hours/minutes on the Lock Screen at all times
+  and retain seconds in the unlocked app; never infer lock state or schedule
+  per-second timeline entries.
+- **Decision:** When no valid active projection is available, show **No active
+  fast** and **Open uFast**, without a prior duration, next goal or celebration.
+- **Decision:** OW-L102 may use the rebuildable App Group projection at
+  `group.com.davidmcgrath.uFast.widgets`, stored as
+  `active-fast-widget-projection.json` with complete-until-first-user-
+  authentication protection. The authoritative SwiftData store remains in the
+  app container. The projection is written or cleared atomically only after the
+  related SwiftData commit succeeds, then WidgetKit is asked to reload. A
+  failed commit leaves the prior projection unchanged; a projection or reload
+  failure never rolls back the committed fasting operation.
+- **Consequence:** Projection generation age alone is not stale. Unsupported
+  schema, corrupt or missing required fields, a goal outside 8–24 whole hours,
+  a target that is not the captured goal duration after start, or any start in
+  the future is unavailable and displays no duration. Before first unlock after
+  restart, protected data may be unreadable and must use the same neutral state.
+  Because OW-L101 did not complete a direct Lock Screen redaction observation,
+  its accepted fallback is selected for OW-L102: the production widget shows
+  hours/minutes in every Lock Screen state and seconds remain in the app unless
+  a later accepted decision records complete physical-device evidence.
+  The OW-L101 targets are an isolated prototype and do not add a widget or App
+  Group entitlement to the production `uFast` target.
+
+## D-029 Optional per-fast Live Activity
+
+- **Status:** Accepted baseline; start and continuation policy amended by D-030
+- **Accepted:** 8 August 2026
+- **Decision:** Ship the existing user-added WidgetKit Lock Screen widget plus
+  an optional ActivityKit Live Activity. The Live Activity is default off and
+  begins only after a separate explicit request for the current active fast; a
+  normal start or backdated start never creates one. Dynamic Island layouts are
+  in scope where supported. Successful fast end, active deletion and Delete All
+  Data end matching activities with immediate dismissal. A dismissed,
+  unavailable, failed or system-ended activity never changes the local fast and
+  is never automatically restarted. A person may explicitly request another
+  activity for the same still-active fast after seeing the visibility and
+  eight-hour disclosure again.
+- **Decision:** ActivityKit's maximum eight-hour active lifetime is an accepted
+  limit, not a reason to split, chain or restart activities automatically. At
+  that boundary the Dynamic Island presentation ends and the system may retain
+  ended content on the Lock Screen for its documented period. The active
+  `FastRecord`, Today and the separately installed widget continue unchanged.
+  A backdated active fast older than eight hours remains eligible for a new
+  explicit request; the activity lifetime begins with the request while elapsed
+  time derives from the authoritative older start instant.
+- **Decision:** Live Activity elapsed time and progress use the system's
+  date-relative timer and progress primitives. Because no physical-device
+  evidence proves that a public numeric percentage label remains current while
+  uFast and its extension are suspended, visible and spoken ActivityKit copy
+  uses stable context such as **16-hour goal** instead of a sampled percentage.
+  The pure percentage projection remains available for validation, and the
+  separate WidgetKit percentage contract is unchanged.
+- **Consequence:** OW-L105 is the production implementation contract and
+  supersedes the older OW-106 refinement. It uses one local, read-only activity
+  projection; post-commit update/end ordering; deterministic reconciliation;
+  minimal presentation-only lifecycle metadata; the OW-L104 current-fast deep
+  link; and no notifications, APNs, background extension, account, analytics,
+  network or mutation controls. The widget remains the durable 8–24-hour Lock
+  Screen surface and ActivityKit failure remains non-blocking.
+
+## D-030 User-controlled automatic Live Activities
+
+- **Status:** Accepted
+- **Accepted:** 9 August 2026
+- **Decision:** Add a local three-state automatic Live Activity preference:
+  **not asked**, **on** and **off**. New and existing users begin at **not
+  asked**, which behaves as off. After the first successfully persisted eligible
+  fast start, and only when ActivityKit is supported and enabled, offer once to
+  **Show Automatically** or choose **Not Now**. Present the active fast before
+  the offer, describe Lock Screen and Dynamic Island visibility, the eight-hour
+  limit, foreground continuation for longer fasts and the ability to hide or
+  turn the feature off. Do not call this notification permission, present a
+  system-permission imitation or repeat the offer after either choice.
+- **Decision:** Settings exposes **Automatically show Live Activities** with
+  plain supporting copy. Enabling it while a fast is active may request one
+  activity immediately after the preference commits. Disabling it ends any
+  matching activity and prevents automatic requests. Today retains manual
+  **Show Live Activity**, **Show Live Activity again** and **Hide for this
+  fast** controls. Hiding suppresses automatic requests for the current fast
+  only; it does not silently change the global setting or fasting record.
+- **Decision:** With the preference on, a successful normal or backdated fast
+  start may request one activity after the `FastRecord` commit and widget
+  publication. On a later genuine foreground activation, reconciliation first
+  updates or deduplicates any running match. If no match runs, the fast remains
+  active, no per-fast suppression applies and either no activity has yet been
+  requested or the previous successful request's eight-hour window has elapsed,
+  uFast may request one new activity. Its ActivityKit lifetime begins at the new
+  request; its elapsed display derives from the original fast start and may
+  truthfully show a duration already beyond the goal.
+- **Decision:** Automatic continuation is foreground-only and event-driven. It
+  never schedules a launch, polls, chains at the eight-hour boundary, uses APNs
+  or starts repeatedly during one foreground session. A failed request never
+  affects the fast and never loops immediately. ActivityKit and the person's
+  iPhone setting remain authoritative for framework availability.
+- **Consequence:** D-030 supersedes D-029, BR-36 and OW-L105 only where they ban
+  a persistent preference, automatic start or foreground continuation. The
+  delivered privacy-sensitive content, one-activity deduplication, local-only
+  architecture, immediate successful-end dismissal, failure isolation and
+  widget fallback remain unchanged. OW-L106 through OW-L109 in
+  `docs/OW_LIVE_ACTIVITY_AUTOMATION_STORIES.md` are the implementation contract.
+
+## D-031 Current widget-family and Dynamic Island contract
+
+- **Status:** Accepted current-state clarification
+- **Accepted:** 11 August 2026
+- **Decision:** Keep the working WidgetKit families already present in the
+  production extension: accessory rectangular for the Lock Screen plus the
+  three required Home Screen families (small, medium and large). They share the
+  minimal App Group projection and remain optional, read-only conveniences.
+- **Decision:** Do not promise or require a persistent Dynamic Island banner.
+  The optional Live Activity supplies compact, minimal and expanded Dynamic
+  Island regions while it exists; iOS controls which region is visible, and
+  devices without Dynamic Island use the system-provided fallback.
+- **Consequence:** The earlier OW-L102 statement that Home Screen families were
+  out of scope is historical and is superseded for the current product. D-029
+  continues to require the implemented Dynamic Island regions, but neither
+  product copy nor release criteria may describe an always-visible banner.
+  BR-41 and BR-42 record the enduring boundary.
+
+## D-032 Live Activity recovery after app update
+
+- **Status:** Accepted
+- **Accepted:** 13 August 2026
+- **Decision:** Treat an installed release/build change as one bounded
+  foreground-only recovery opportunity when automatic Live Activities are
+  enabled and an authoritative fast remains active. After reconciling
+  ActivityKit state, a newly installed build may request one replacement before
+  the prior successful request's eight-hour window ends only when no matching
+  activity survives and **Hide for this fast** is not set. The replacement
+  continues elapsed time from the original fast start and begins its own
+  ActivityKit lifetime at the new request.
+- **Decision:** Identify the transition with the app's release version and build
+  number, persist the identity used by a successful request as local lifecycle
+  metadata and make the production Info.plist derive those fields from the
+  project version settings. Older metadata without the identity may recover
+  once on the first fixed build when every other condition passes.
+- **Consequence:** This is a narrow exception to D-030 and BR-40's normal
+  eight-hour continuation gate. It does not enable background restart,
+  same-build relaunch recovery, duplicate requests, notification behavior or a
+  deployment-only code path. Explicit per-fast suppression and global off
+  remain authoritative. OW-L110 is the implementation contract.
+
 ## D-001 Fast start
 
 - **Status:** Accepted
