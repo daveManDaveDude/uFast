@@ -415,6 +415,33 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
+    func testCaloricFavouriteFailureStaysVisibleAndCanBeRetriedDuringActiveFast() {
+        let app = launch(additionalArguments: [
+            "--seed-caloric-favourite-active-fast",
+            "--simulate-drink-save-failure",
+        ])
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 3))
+
+        tapDrinkAdd(in: app)
+        tapWhenReady(app.buttons["Juice"], in: drinkPickerScrollView(in: app), app: app)
+        let confirmation = app.alerts["This entry is during your recorded fast."]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        tapWhenReady(confirmation.buttons["Save and end fast"], app: app)
+
+        let error = app.staticTexts["drink.caloric-favourite.save-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(error.label.contains("drink and fast couldn’t be saved"))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
+        XCTAssertEqual(app.staticTexts["drink.total"].label, "0 ml")
+
+        let retry = app.buttons["drink.caloric-favourite.retry"]
+        tapWhenReady(retry, in: app.scrollViews["today.content"], app: app)
+        XCTAssertTrue(error.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(retry.exists)
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
+    }
+
+    @MainActor
     private func launch() -> XCUIApplication {
         launch(additionalArguments: [], resetData: true)
     }

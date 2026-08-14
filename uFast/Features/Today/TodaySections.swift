@@ -1,6 +1,20 @@
 import SwiftUI
 
 extension TodayGoalView {
+    func savePendingCaloricFavourite(endingActiveFast: Bool) {
+        guard let favourite = caloricFavouritePending else { return }
+        do {
+            try controller.addFavouriteDrink(favourite, endingActiveFast: endingActiveFast)
+            caloricFavouriteSaveError = nil
+            drinkAnnouncement = "\(favourite.displayName), \(favourite.volumeMillilitres) millilitres, added."
+            caloricFavouritePending = nil
+            isCaloricFavouriteConfirmationPresented = false
+        } catch {
+            isCaloricFavouriteConfirmationPresented = false
+            caloricFavouriteSaveError = "Your drink and fast couldn’t be saved. Please try again."
+        }
+    }
+
     func activeFastView(
         _ activeFast: ActiveFastSnapshot,
         goal: FastingGoal,
@@ -109,7 +123,11 @@ extension TodayGoalView {
             .buttonStyle(UFastSecondaryButtonStyle())
             .accessibilityIdentifier("food.add")
 
-            Button { isDrinkSheetPresented = true } label: {
+            Button {
+                caloricFavouriteSaveError = nil
+                caloricFavouritePending = nil
+                isDrinkSheetPresented = true
+            } label: {
                 HStack {
                     Label("Add drink", systemImage: "drop")
                     Spacer()
@@ -120,6 +138,22 @@ extension TodayGoalView {
             }
             .buttonStyle(UFastSecondaryButtonStyle())
             .accessibilityIdentifier("drink.add")
+
+            if let caloricFavouriteSaveError {
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                    Label(caloricFavouriteSaveError, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(UFastTheme.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("drink.caloric-favourite.save-error")
+
+                    Button("Try adding drink again") {
+                        savePendingCaloricFavourite(endingActiveFast: true)
+                    }
+                    .buttonStyle(UFastSecondaryButtonStyle())
+                    .accessibilityIdentifier("drink.caloric-favourite.retry")
+                }
+                .uFastCard(accent: UFastTheme.apricot)
+            }
 
             HStack {
                 Text("Fluids today")

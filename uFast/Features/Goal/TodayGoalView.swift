@@ -22,6 +22,7 @@ struct TodayGoalView: View {
     @State var isCaloricFavouriteConfirmationPresented = false
     @State var hydrationEditor: HydrationEditorPresentation?
     @State var drinkAnnouncement: String?
+    @State var caloricFavouriteSaveError: String?
     @State var isEndConfirmationPresented = false
     @State var isAutomaticLiveActivityOfferPresented = false
     @State var isLiveActivityDisclosurePresented = false
@@ -109,6 +110,12 @@ struct TodayGoalView: View {
         .task(id: authoritativeActiveFast?.id) {
             refreshLiveActivityControl()
             await offerAutomaticLiveActivityIfEligible()
+        }
+        .onChange(of: authoritativeActiveFast?.id) { oldID, newID in
+            if oldID != newID {
+                caloricFavouritePending = nil
+                caloricFavouriteSaveError = nil
+            }
         }
         .onAppear { controller.connect(commands: applicationCommands) }
         .onChange(of: applicationCommands != nil) { _, _ in
@@ -201,11 +208,13 @@ struct TodayGoalView: View {
                 ),
                 onAdd: { favourite in
                     try addFavouriteDrink(favourite)
+                    caloricFavouriteSaveError = nil
                     drinkAnnouncement = "\(favourite.displayName), "
                         + "\(favourite.volumeMillilitres) millilitres, added."
                     isDrinkSheetPresented = false
                 },
                 onConfirmationRequired: { favourite in
+                    caloricFavouriteSaveError = nil
                     caloricFavouritePending = favourite
                     isDrinkSheetPresented = false
                     isCaloricFavouriteConfirmationPresented = true
@@ -434,20 +443,6 @@ extension TodayGoalView {
 
     private func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
         try controller.addFavouriteDrink(favourite)
-    }
-
-    private func savePendingCaloricFavourite(endingActiveFast: Bool) {
-        guard let favourite = caloricFavouritePending else { return }
-        do {
-            try controller.addFavouriteDrink(favourite, endingActiveFast: endingActiveFast)
-            drinkAnnouncement = "\(favourite.displayName), \(favourite.volumeMillilitres) millilitres, added."
-            caloricFavouritePending = nil
-            isCaloricFavouriteConfirmationPresented = false
-        } catch {
-            isCaloricFavouriteConfirmationPresented = false
-            caloricFavouritePending = nil
-            controller.startError = "Your drink couldn’t be added. Please try again."
-        }
     }
 
     private func saveHydration(_ draft: HydrationEntryDraft, record: HydrationEntrySnapshot?, endingActiveFast: Bool) throws {
