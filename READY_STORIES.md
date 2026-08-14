@@ -29,6 +29,12 @@ short version, injects one temporal authority into History motion snapshots,
 and clears disposable Live Activity state when active-fast authority is
 ambiguous.
 
+The sprint-ready App Store packaging follow-up CR-202 is maintained in
+`docs/CODE_REVIEW_APP_STORE_PACKAGING_STORY.md`. It declares the app's existing
+app-private UserDefaults access with the approved required reason and makes the
+embedded widget derive its build number from the containing app's release
+setting, with built-product verification for both contracts.
+
 ## OW-002 Set a fasting goal
 
 **Epic:** E0 Product foundation  

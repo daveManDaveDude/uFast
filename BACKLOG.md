@@ -32,6 +32,13 @@ matches the widget's short version to the app, makes History motion use the
 injected reference instant, and ends derived Live Activity state when
 active-fast authority is ambiguous. It is **Ready**.
 
+The sprint-ready App Store packaging follow-up from the 14 August 2026 code
+review is maintained in `docs/CODE_REVIEW_APP_STORE_PACKAGING_STORY.md`.
+CR-202 adds the truthful required-reason declaration for app-private
+UserDefaults access, derives the widget build number from
+`CURRENT_PROJECT_VERSION`, and extends built-product release verification for
+both. It is **Ready**.
+
 ## Slice 0 — Foundation
 
 - OW-000 P0 — Project shell, navigation, local persistence, tests and repository guidance. **Done 18 July 2026.**
