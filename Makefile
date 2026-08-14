@@ -6,7 +6,7 @@ DERIVED_DATA := .derived-data
 SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
 UI_TEST_WORKERS ?= 4
 
-.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint analyze format verify-local-only verify-ui-result verify-ui-verifier clean
+.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint analyze format verify-local-only verify-release-versions verify-ui-result verify-ui-verifier clean
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -73,6 +73,9 @@ analyze:
 
 verify-local-only:
 	./scripts/verify_local_only_release.sh
+
+verify-release-versions: project
+	./scripts/verify_release_versions.sh
 
 verify-ui-result:
 	@test -n "$(UI_XCRESULT)" || (echo "UI_XCRESULT must name an .xcresult bundle" >&2; exit 2)

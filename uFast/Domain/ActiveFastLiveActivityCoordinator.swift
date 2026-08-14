@@ -335,6 +335,9 @@ final class ActiveFastLiveActivityCoordinator {
         do {
             resolvedActiveFast = try resolveActiveFast()
         } catch {
+            let activities = await client.activities()
+            await endAll(activities)
+            try? lifecycleStore.clearAll()
             return .reconciled
         }
         let activities = await client.activities()

@@ -3,6 +3,7 @@ final class DeterministicLiveActivityClient: LiveActivityClient {
     private(set) var requestedAttributes: [ActiveFastActivityAttributes] = []
     private(set) var requestedContents: [ActiveFastActivityAttributes.ContentState] = []
     private(set) var updatedContents: [(String, ActiveFastActivityAttributes.ContentState)] = []
+    private(set) var endAttemptedActivityIDs: [String] = []
     private(set) var endedActivityIDs: [String] = []
 
     var availability: LiveActivityAvailability
@@ -80,6 +81,7 @@ final class DeterministicLiveActivityClient: LiveActivityClient {
         activityID: String,
         dismissalPolicy _: LiveActivityDismissalPolicy
     ) async throws {
+        endAttemptedActivityIDs.append(activityID)
         guard !failEnds else {
             throw LiveActivityClientError.operationFailed
         }

@@ -92,7 +92,11 @@ final class HistoryMotionAuthorityTests: XCTestCase {
 
         do {
             _ = try await SwiftDataHistoryMotionRangeLoader(container: container)
-                .load(coverage: coverage, calendar: utcCalendar)
+                .load(
+                    coverage: coverage,
+                    calendar: utcCalendar,
+                    referenceNow: start.addingTimeInterval(24 * 60 * 60)
+                )
             XCTFail("Expected the motion loader to reject ambiguous active-fast authority")
         } catch let error as ActiveFastIntegrityError {
             XCTAssertEqual(error, .multipleActiveFasts(count: 2))
@@ -101,6 +105,82 @@ final class HistoryMotionAuthorityTests: XCTestCase {
         }
 
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 2)
+    }
+
+    func testSettledAndMotionHistoryUseTheExplicitReferenceInstant() async throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let referenceNow = Date(timeIntervalSince1970: 1_500_000_000)
+        let futureStart = referenceNow.addingTimeInterval(60 * 60)
+        let active = FastRecord(startDate: futureStart, goalAtStart: .default)
+        context.insert(active)
+        try context.save()
+
+        let window = DateInterval(
+            start: referenceNow.addingTimeInterval(-2 * 60 * 60),
+            end: futureStart.addingTimeInterval(2 * 60 * 60)
+        )
+        let data = try SwiftDataHistoryDataProvider(modelContext: context).fetch(window: window)
+        let settled = HistoryPresentationBuilder.build(
+            data: data,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: utcCalendar.timeZone,
+            referenceNow: referenceNow
+        )
+        let coverage = HistoryMotionCoverage(
+            firstDay: referenceNow,
+            lastDay: referenceNow,
+            calendar: utcCalendar
+        )
+        let motion = try await SwiftDataHistoryMotionRangeLoader(container: container).load(
+            coverage: coverage,
+            calendar: utcCalendar,
+            referenceNow: referenceNow
+        )
+
+        XCTAssertTrue(settled.fastItems.isEmpty)
+        XCTAssertTrue(motion.presentation.intervals.isEmpty)
+        XCTAssertFalse(
+            settled.fastItems.contains { $0.kind == .active },
+            "A future fast relative to the injected instant must remain hidden."
+        )
+    }
+
+    func testMotionChunksUseOneReferenceInstantWhenLoadedAcrossChunks() async throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let referenceNow = Date(timeIntervalSince1970: 1_500_000_000)
+        let calendar = utcCalendar
+        let referenceDay = calendar.startOfDay(for: referenceNow)
+        let day = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: referenceDay))
+        let activeStart = day.addingTimeInterval(23 * 60 * 60)
+        context.insert(FastRecord(startDate: activeStart, goalAtStart: .default))
+        try context.save()
+
+        let loader = SwiftDataHistoryMotionRangeLoader(container: container)
+        let firstCoverage = HistoryMotionCoverage(firstDay: day, lastDay: day, calendar: calendar)
+        let secondDay = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: day))
+        let secondCoverage = HistoryMotionCoverage(
+            firstDay: secondDay,
+            lastDay: secondDay,
+            calendar: calendar
+        )
+        let first = try await loader.load(
+            coverage: firstCoverage,
+            calendar: calendar,
+            referenceNow: referenceNow
+        )
+        let second = try await loader.load(
+            coverage: secondCoverage,
+            calendar: calendar,
+            referenceNow: referenceNow
+        )
+
+        let firstActive = try XCTUnwrap(first.presentation.intervals.first { $0.isActive })
+        let secondActive = try XCTUnwrap(second.presentation.intervals.first { $0.isActive })
+        XCTAssertEqual(firstActive.end, referenceNow)
+        XCTAssertEqual(secondActive.end, referenceNow)
     }
 
     private var utcCalendar: Calendar {

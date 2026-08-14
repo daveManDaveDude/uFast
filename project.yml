@@ -132,6 +132,7 @@ targets:
       path: LockScreenWidget/Widget/Info.plist
       properties:
         CFBundleDisplayName: uFast
+        CFBundleShortVersionString: $(MARKETING_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
   uFastLockScreenPrototypeWidget:

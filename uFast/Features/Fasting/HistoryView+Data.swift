@@ -104,11 +104,16 @@ extension HistoryView {
         motionGeneration += 1
         let generation = motionGeneration
         let expectedCalendar = calendar
+        let referenceNow = clock.now
         let container = modelContext.container
         Task {
             do {
                 let loader = SwiftDataHistoryMotionRangeLoader(container: container)
-                let chunk = try await loader.load(coverage: coverage, calendar: expectedCalendar)
+                let chunk = try await loader.load(
+                    coverage: coverage,
+                    calendar: expectedCalendar,
+                    referenceNow: referenceNow
+                )
                 await MainActor.run {
                     guard motionGeneration == generation,
                           calendar.identifier == expectedCalendar.identifier,
@@ -229,12 +234,17 @@ extension HistoryView {
         }
         let container = modelContext.container
         let expectedCalendar = calendar
+        let referenceNow = clock.now
         let expectedCoverage = current.coverage
         let existingChunks = motionChunks
         Task {
             do {
                 let loader = SwiftDataHistoryMotionRangeLoader(container: container)
-                let chunk = try await loader.load(coverage: chunkCoverage, calendar: expectedCalendar)
+                let chunk = try await loader.load(
+                    coverage: chunkCoverage,
+                    calendar: expectedCalendar,
+                    referenceNow: referenceNow
+                )
                 guard let mergedWindow = coverage.visualWindow(calendar: expectedCalendar),
                       let merged = await loader.merge(existingChunks + [chunk], window: mergedWindow)
                 else { throw HistoryMotionChunkError.invalidCoverage }
@@ -333,6 +343,7 @@ extension HistoryView {
         let oldCoverage = current.coverage
         let wasInitial = current.isInitial
         let expectedCalendar = calendar
+        let referenceNow = clock.now
         let container = modelContext.container
         Task {
             do {
@@ -342,7 +353,8 @@ extension HistoryView {
                 for oldChunk in oldChunks {
                     try await refreshed.append(loader.load(
                         coverage: oldChunk.coverage,
-                        calendar: expectedCalendar
+                        calendar: expectedCalendar,
+                        referenceNow: referenceNow
                     ))
                 }
                 guard let window = oldCoverage.visualWindow(calendar: expectedCalendar),

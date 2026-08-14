@@ -23,6 +23,12 @@ The sprint-ready code-review follow-up PI-101 and PI-102 is maintained in
 release-baseline SwiftData schema and applies the existing active-fast authority
 rule to background History motion loads.
 
+The sprint-ready release-integrity follow-up CR-201 is maintained in
+`docs/CODE_REVIEW_RELEASE_INTEGRITY_STORY.md`. It aligns the embedded widget's
+short version, injects one temporal authority into History motion snapshots,
+and clears disposable Live Activity state when active-fast authority is
+ambiguous.
+
 ## OW-002 Set a fasting goal
 
 **Epic:** E0 Product foundation  

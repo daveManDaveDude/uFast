@@ -161,7 +161,7 @@ final class HistoryMotionStreamingTests: XCTestCase {
         let coverage = HistoryMotionCoverage(firstDay: day, lastDay: day, calendar: calendar)
         let loader = SwiftDataHistoryMotionRangeLoader(container: container)
 
-        let chunk = try await loader.load(coverage: coverage, calendar: calendar)
+        let chunk = try await loader.load(coverage: coverage, calendar: calendar, referenceNow: day)
 
         XCTAssertEqual(chunk.coverage, coverage)
         XCTAssertTrue(chunk.presentation.events.isEmpty)
