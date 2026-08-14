@@ -18,6 +18,11 @@ through WS-103 are maintained in
 surface contract in D-031 without adding or redesigning a widget family or
 Dynamic Island region.
 
+The sprint-ready code-review follow-up PI-101 and PI-102 is maintained in
+`docs/CODE_REVIEW_PERSISTENCE_INTEGRITY_SPRINT.md`. It preserves the exact
+release-baseline SwiftData schema and applies the existing active-fast authority
+rule to background History motion loads.
+
 ## OW-002 Set a fasting goal
 
 **Epic:** E0 Product foundation  

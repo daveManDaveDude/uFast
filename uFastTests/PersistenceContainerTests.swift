@@ -2,6 +2,8 @@ import SwiftData
 @testable import uFast
 import XCTest
 
+// swiftlint:disable trailing_comma
+
 @MainActor
 final class PersistenceContainerTests: XCTestCase {
     func testCurrentVersionedSchemaAndMigrationPlanCoverEveryProductionModel() {
@@ -12,6 +14,47 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
         XCTAssertEqual(UFastMigrationPlan.stages.count, 1)
         XCTAssertEqual(PersistenceContainer.schema.entities.count, 6)
+
+        let releaseSchema = Schema(versionedSchema: UFastSchemaV1.self)
+        XCTAssertEqual(
+            Set(releaseSchema.entities.map(\.name)),
+            [
+                "AppSettingsRecord",
+                "FastRecord",
+                "FoodEntryRecord",
+                "HydrationEntryRecord",
+                "UnknownPeriodRecord",
+            ]
+        )
+        XCTAssertEqual(
+            releaseSchema.entitiesByName["AppSettingsRecord"]?.storedProperties.map(\.name),
+            [
+                "id",
+                "fastingGoalHours",
+                "hasCompletedOnboarding",
+                "waterFavouriteMillilitres",
+                "teaFavouriteMillilitres",
+                "coffeeFavouriteMillilitres",
+            ]
+        )
+        XCTAssertNil(
+            releaseSchema.entitiesByName["AppSettingsRecord"]?.storedPropertiesByName[
+                "automaticLiveActivityPreferenceRawValue"
+            ]
+        )
+        XCTAssertNil(releaseSchema.entitiesByName["HydrationFavouriteRecord"])
+
+        XCTAssertEqual(
+            Set(PersistenceContainer.schema.entities.map(\.name)),
+            [
+                "AppSettingsRecord",
+                "FastRecord",
+                "FoodEntryRecord",
+                "HydrationEntryRecord",
+                "HydrationFavouriteRecord",
+                "UnknownPeriodRecord",
+            ]
+        )
     }
 
     func testBootstrapReturnsReadyContainerOnSuccessfulOpen() throws {
@@ -38,13 +81,13 @@ final class PersistenceContainerTests: XCTestCase {
         try originalBytes.write(to: storeURL)
 
         let result = PersistenceBootstrapResult.open {
-            throw PersistenceBootstrapTestError.cannotOpen
+            try PersistenceContainer.make(storeURL: storeURL)
         }
 
         guard case let .unavailable(failure) = result else {
             return XCTFail("Expected explicit unavailable bootstrap result")
         }
-        XCTAssertTrue(failure.diagnosticDescription.contains("cannotOpen"))
+        XCTAssertFalse(failure.diagnosticDescription.isEmpty)
         XCTAssertEqual(try Data(contentsOf: storeURL), originalBytes)
     }
 
@@ -53,6 +96,29 @@ final class PersistenceContainerTests: XCTestCase {
 
         XCTAssertFalse(configuration.isStoredInMemoryOnly)
         XCTAssertNil(configuration.cloudKitContainerIdentifier)
+    }
+
+    func testFreshV2HydrationFavouriteRoundTripStaysLocalOnly() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let createdAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let favourite = HydrationFavouriteRecord(
+            name: "Sparkling water",
+            volumeMillilitres: 330,
+            isCaloric: false,
+            createdAt: createdAt
+        )
+        context.insert(favourite)
+        try context.save()
+
+        let stored = try context.fetch(FetchDescriptor<HydrationFavouriteRecord>())
+        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.first?.id, favourite.id)
+        XCTAssertEqual(stored.first?.name, "Sparkling water")
+        XCTAssertEqual(stored.first?.volumeMillilitres, 330)
+        XCTAssertEqual(stored.first?.isCaloric, false)
+        XCTAssertEqual(stored.first?.createdAt, createdAt)
+        XCTAssertNil(PersistenceContainer.configuration(inMemory: true).cloudKitContainerIdentifier)
     }
 
     func testAppSettingsRoundTripInLocalContainer() throws {
@@ -193,8 +259,4 @@ final class PersistenceContainerTests: XCTestCase {
         try context.save()
         return container
     }
-}
-
-private enum PersistenceBootstrapTestError: Error {
-    case cannotOpen
 }

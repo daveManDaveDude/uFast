@@ -14,6 +14,89 @@ enum UFastSchemaV1: VersionedSchema {
         HydrationEntryRecord.self,
         UnknownPeriodRecord.self,
     ]
+
+    /// These declarations are intentionally separate from the current model
+    /// types below.  V1 is the persisted contract shipped before preferences
+    /// and hydration favourites were added; changing it would make old stores
+    /// look like a different schema to SwiftData.
+    @Model
+    final class AppSettingsRecord {
+        var id: UUID = UUID()
+        var fastingGoalHours: Int = FastingGoal.default.hours
+        var hasCompletedOnboarding: Bool = false
+        var waterFavouriteMillilitres: Int = 500
+        var teaFavouriteMillilitres: Int = 300
+        var coffeeFavouriteMillilitres: Int = 300
+
+        init() {}
+    }
+
+    @Model
+    final class FastRecord {
+        var id: UUID = UUID()
+        private(set) var startDate: Date = Date.now
+        private(set) var endDate: Date?
+        private(set) var goalHoursAtStart: Int = FastingGoal.default.hours
+        private(set) var originRaw: String = FastOrigin.recorded.rawValue
+        private(set) var reviewStateRaw: String = FastReviewState.confirmed.rawValue
+        private(set) var wasAdjustedByUser: Bool = false
+        private(set) var hasHistoricalGoal: Bool = true
+        private(set) var startBoundaryKindRaw: String?
+        private(set) var startBoundaryID: UUID?
+        private(set) var endBoundaryKindRaw: String?
+        private(set) var endBoundaryID: UUID?
+
+        init() {}
+    }
+
+    @Model
+    final class FoodEntryRecord {
+        var id: UUID = UUID()
+        private(set) var foodDescription: String = ""
+        private(set) var occurredAt: Date = Date.now
+        private(set) var isCaloric: Bool = true
+        private(set) var energyKilocalories: Double?
+        private(set) var proteinGrams: Double?
+        private(set) var carbohydrateGrams: Double?
+        private(set) var fatGrams: Double?
+        private(set) var fibreGrams: Double?
+        private(set) var sugarGrams: Double?
+        private(set) var saltGrams: Double?
+        private(set) var createdAt: Date = Date.now
+        private(set) var updatedAt: Date = Date.now
+
+        init() {}
+    }
+
+    @Model
+    final class HydrationEntryRecord {
+        var id: UUID = UUID()
+        private(set) var drinkTypeRaw: String = HydrationDrinkType.water.rawValue
+        private(set) var customName: String?
+        private(set) var volumeMillilitres: Int = 500
+        private(set) var occurredAt: Date = Date.now
+        private(set) var isCaloric: Bool = false
+        private(set) var createdAt: Date = Date.now
+        private(set) var updatedAt: Date = Date.now
+
+        init() {}
+    }
+
+    @Model
+    final class UnknownPeriodRecord {
+        var id: UUID = UUID()
+        private(set) var startDate: Date = Date.now
+        private(set) var endDate: Date = Date.now
+        private(set) var startBoundaryKindRaw: String = CaloricBoundaryKind.food.rawValue
+        private(set) var startBoundaryID: UUID = UUID()
+        private(set) var endBoundaryKindRaw: String = CaloricBoundaryKind.food.rawValue
+        private(set) var endBoundaryID: UUID = UUID()
+        private(set) var reasonRaw: String = UnknownPeriodReason.insufficientEvidence.rawValue
+        private(set) var createdAt: Date = Date.now
+        private(set) var updatedAt: Date = Date.now
+
+        init() {}
+    }
 }
 
 enum UFastSchemaV2: VersionedSchema {

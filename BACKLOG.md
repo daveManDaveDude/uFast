@@ -19,6 +19,13 @@ the 10 August 2026 app-wide review is maintained in
 valid user behavior and pass the full four-worker UI suite before being marked
 done.
 
+The sprint-ready persistence-integrity follow-up from the 14 August 2026 code
+review is maintained in
+`docs/CODE_REVIEW_PERSISTENCE_INTEGRITY_SPRINT.md`. PI-101 freezes and proves
+the release-baseline migration contract; PI-102 makes background History motion
+reject ambiguous active-fast authority. Both are **Ready** and form one sprint
+goal.
+
 ## Slice 0 — Foundation
 
 - OW-000 P0 — Project shell, navigation, local persistence, tests and repository guidance. **Done 18 July 2026.**

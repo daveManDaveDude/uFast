@@ -207,9 +207,9 @@ final class SwiftDataHistoryDataProvider {
     }
 }
 
-/// Motion-only provider. It intentionally avoids the settled authorities
-/// (`ActiveFastAuthority` and `SwiftDataSettingsStore`), which are main-actor
-/// editor boundaries. The independent context returns value snapshots only.
+/// Motion-only provider. It avoids the settled fetch boundary, but shares the
+/// pure `ActiveFastAuthority` resolver so the independent context applies the
+/// same zero/one/many rule. It returns value snapshots only.
 final class SwiftDataHistoryMotionDataProvider {
     private let modelContext: ModelContext
 
@@ -229,9 +229,11 @@ final class SwiftDataHistoryMotionDataProvider {
             },
             sortBy: [SortDescriptor(\.startDate)]
         )).map(HistoryFastSnapshot.init)
-        let active = try modelContext.fetch(FetchDescriptor<FastRecord>(
+        let activeCandidates = try modelContext.fetch(FetchDescriptor<FastRecord>(
             predicate: #Predicate { $0.endDate == nil }
-        )).first.map(HistoryFastSnapshot.init)
+        ))
+        let active = try ActiveFastAuthority.resolve(activeCandidates)
+            .map(HistoryFastSnapshot.init)
         let foods = try modelContext.fetch(FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
             sortBy: [SortDescriptor(\.occurredAt)]
