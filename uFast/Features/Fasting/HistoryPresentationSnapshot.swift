@@ -100,6 +100,7 @@ struct HistoryPresentationKey: Equatable {
     let localeIdentifier: String
     let calendarIdentifier: Calendar.Identifier
     let timeZoneIdentifier: String
+    let activeFastIntersectsWindow: Bool
 }
 
 @MainActor
@@ -119,7 +120,11 @@ final class HistoryPresentationCache {
             data: data,
             localeIdentifier: locale.identifier,
             calendarIdentifier: calendar.identifier,
-            timeZoneIdentifier: timeZone.identifier
+            timeZoneIdentifier: timeZone.identifier,
+            activeFastIntersectsWindow: activeFastIntersectsWindow(
+                in: data,
+                at: referenceNow
+            )
         )
         if key == newKey, let snapshot {
             return snapshot
@@ -135,6 +140,16 @@ final class HistoryPresentationCache {
         snapshot = built
         rebuildCount += 1
         return built
+    }
+
+    private func activeFastIntersectsWindow(in data: HistoryDataSlice, at referenceNow: Date) -> Bool {
+        guard let activeFast = data.activeFast,
+              activeFast.startDate < referenceNow
+        else { return false }
+        return AutomaticFastProjector.intersects(
+            activeFast.startDate ..< referenceNow,
+            data.window.start ..< data.window.end
+        )
     }
 
     func invalidate() {

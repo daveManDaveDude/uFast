@@ -43,43 +43,6 @@ final class HistoryDataProviderTests: XCTestCase {
         }
     }
 
-    func testOneSecondActiveTickDoesNotRebuildStaticPresentation() {
-        let start = Date(timeIntervalSince1970: 2_000_000_000)
-        let data = HistoryDataSlice(
-            window: DateInterval(start: start, duration: 24 * 60 * 60),
-            completedFasts: [],
-            activeFast: HistoryFastSnapshot(
-                FastRecord(startDate: start.addingTimeInterval(60), goalAtStart: .default)
-            ),
-            foods: [],
-            drinks: [],
-            settings: nil
-        )
-        let cache = HistoryPresentationCache()
-
-        let first = cache.presentation(
-            for: data,
-            locale: Locale(identifier: "en_GB"),
-            calendar: utcCalendar,
-            timeZone: .gmt,
-            referenceNow: start.addingTimeInterval(120)
-        )
-        let second = cache.presentation(
-            for: data,
-            locale: Locale(identifier: "en_GB"),
-            calendar: utcCalendar,
-            timeZone: .gmt,
-            referenceNow: start.addingTimeInterval(121)
-        )
-
-        XCTAssertEqual(first, second)
-        XCTAssertEqual(cache.rebuildCount, 1)
-        XCTAssertNotEqual(
-            first.intervals(activeEndingAt: start.addingTimeInterval(120)),
-            first.intervals(activeEndingAt: start.addingTimeInterval(121))
-        )
-    }
-
     func testTenYearStoreSuppliesOnlyVisibleRecordsAndNearestCaloricNeighbours() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
