@@ -56,16 +56,18 @@ public struct HydrationBoundarySnapshot: Equatable, Sendable {
 }
 
 public enum CaloricBoundaryOrdering {
-    public static func sorted(_ boundaries: [CaloricBoundary]) -> [CaloricBoundary] {
-        boundaries.sorted {
-            if $0.occurredAt != $1.occurredAt {
-                return $0.occurredAt < $1.occurredAt
-            }
-            if $0.reference.kind != $1.reference.kind {
-                return $0.reference.kind.rawValue < $1.reference.kind.rawValue
-            }
-            return $0.reference.id.uuidString < $1.reference.id.uuidString
+    public static func precedes(_ lhs: CaloricBoundary, _ rhs: CaloricBoundary) -> Bool {
+        if lhs.occurredAt != rhs.occurredAt {
+            return lhs.occurredAt < rhs.occurredAt
         }
+        if lhs.reference.kind != rhs.reference.kind {
+            return lhs.reference.kind.rawValue < rhs.reference.kind.rawValue
+        }
+        return lhs.reference.id.uuidString < rhs.reference.id.uuidString
+    }
+
+    public static func sorted(_ boundaries: [CaloricBoundary]) -> [CaloricBoundary] {
+        boundaries.sorted(by: precedes)
     }
 }
 
