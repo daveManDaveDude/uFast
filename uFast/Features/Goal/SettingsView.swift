@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var isFirstDeleteConfirmationPresented = false
     @State private var isFinalDeleteConfirmationPresented = false
     @State private var liveActivityAvailability: LiveActivityAvailability?
+    @State private var favouriteEditor: HydrationFavouriteEditorPresentation?
 
     private var authoritativeSettings: AppSettingsSnapshot? {
         snapshot.settings.count == 1 ? snapshot.settings[0] : nil
@@ -44,7 +45,14 @@ struct SettingsView: View {
                             tea: $controller.teaAmount,
                             coffee: $controller.coffeeAmount,
                             focusedField: $focusedFavouriteField,
-                            valuesAreValid: favouriteValues != nil
+                            valuesAreValid: favouriteValues != nil,
+                            userCreatedFavourites: snapshot.hydrationFavourites,
+                            onAddFavourite: {
+                                favouriteEditor = HydrationFavouriteEditorPresentation(favourite: nil)
+                            },
+                            onEditFavourite: { favourite in
+                                favouriteEditor = HydrationFavouriteEditorPresentation(favourite: favourite)
+                            }
                         )
                         SettingsDeleteSection(error: controller.deleteError) {
                             controller.deleteError = nil
@@ -60,6 +68,7 @@ struct SettingsView: View {
                     }
                     .padding(UFastTheme.Spacing.standard)
                 }
+                .accessibilityIdentifier("settings.content")
                 .scrollDismissesKeyboard(.interactively)
             }
             .onAppear {
@@ -103,6 +112,32 @@ struct SettingsView: View {
             } message: {
                 Text("This is your final confirmation. Deleted data cannot be recovered.")
             }
+        }
+        .sheet(item: $favouriteEditor) { presentation in
+            HydrationFavouriteEditor(
+                presentation: presentation,
+                existingFavourites: snapshot.hydrationFavourites,
+                onSave: { name, amount, isCaloric in
+                    if let favourite = presentation.favourite {
+                        try controller.updateFavourite(
+                            id: favourite.id,
+                            name: name,
+                            amount: amount,
+                            isCaloric: isCaloric
+                        )
+                    } else {
+                        try controller.createFavourite(name, amount: amount, isCaloric: isCaloric)
+                    }
+                    favouriteEditor = nil
+                },
+                onRemove: presentation.favourite.map { favourite in
+                    {
+                        try controller.deleteFavourite(id: favourite.id)
+                        favouriteEditor = nil
+                    }
+                },
+                onCancel: { favouriteEditor = nil }
+            )
         }
     }
 

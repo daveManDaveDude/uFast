@@ -1,6 +1,6 @@
 # uFast product roadmap
 
-**Updated:** 10 August 2026
+**Updated:** 11 August 2026
 **Status:** post-MVP product direction; release dates are not committed
 
 ## Where the product is now
@@ -20,7 +20,10 @@ local-first iPhone fasting tracker with:
   and double-confirmed deletion of all app-created data; and
 - a coherent, calm visual system completed by the post-MVP UI tidy-up; and
 - optional local WidgetKit and ActivityKit surfaces for an active fast,
-  including the user-controlled automatic Live Activity behavior in D-030.
+  including the Lock Screen accessory widget, the working small/medium/large
+  Home Screen widgets and the user-controlled automatic Live Activity behavior
+  in D-030. Dynamic Island has no persistent banner promise; iOS chooses among
+  the supplied compact, minimal and expanded regions while an activity exists.
 
 The source tree is currently versioned as **1.0.0 (8)**. This source version is
 separate from the last externally recorded release state below; this roadmap
@@ -79,6 +82,9 @@ opening uFast.
 - Deep-link to the relevant in-app fast action.
 - Keep the surface useful when refresh opportunities are limited and never
   imply second-by-second biological precision.
+- Retain all three required and currently working Home Screen widget sizes:
+  small, medium and large. They share the Lock Screen widget's fail-closed,
+  read-only projection contract.
 - Retain the user-added WidgetKit surface as the durable path and the optional
   Live Activity accepted in D-029. Under D-030, offer one contextual, reversible
   choice to start Live Activities automatically. When enabled, start after a
@@ -89,7 +95,12 @@ opening uFast.
 Both Lock Screen surfaces are optional conveniences. The in-app fasting loop
 remains complete without either one.
 
-Implementation through OW-L108 is present in the source. OW-L109 release
+Dynamic Island is likewise optional system presentation. uFast does not require
+or promise an always-visible banner; it supplies compact, minimal and expanded
+regions and accepts the system-selected presentation and device fallback.
+
+Implementation through OW-L108 and the three Home Screen families is present in
+the source. OW-L109 release
 evidence remains open: the full four-worker UI run and the listed physical-device
 and Apple-controlled lifecycle checks must be recorded before this milestone is
 claimed complete for release.

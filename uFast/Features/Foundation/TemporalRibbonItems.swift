@@ -1,7 +1,7 @@
 import Foundation
 
-struct TemporalRibbonIntervalItem: Identifiable, Equatable {
-    enum Kind: Equatable {
+struct TemporalRibbonIntervalItem: Identifiable, Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
         case recorded
         case active
         case automatic
@@ -20,8 +20,8 @@ struct TemporalRibbonIntervalItem: Identifiable, Equatable {
     let kind: Kind
 }
 
-struct TemporalRibbonEventItem: Identifiable, Equatable {
-    enum Kind: Equatable {
+struct TemporalRibbonEventItem: Identifiable, Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
         case food
         case caloricDrink
         case nonCaloricDrink

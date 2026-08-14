@@ -42,7 +42,8 @@ struct UFastApp: App {
                 let coordinator = Self.makeLiveActivityCoordinator(
                     container: container,
                     clock: configuredClock,
-                    configuration: launchConfiguration.liveActivityAdapter
+                    configuration: launchConfiguration.liveActivityAdapter,
+                    buildIdentity: launchConfiguration.liveActivityBuildIdentity
                 )
                 liveActivityCoordinator = coordinator
                 applicationCommands = ApplicationCommands(
@@ -102,7 +103,8 @@ struct UFastApp: App {
     private static func makeLiveActivityCoordinator(
         container: ModelContainer,
         clock: any AppClock,
-        configuration: LiveActivityAdapterConfiguration
+        configuration: LiveActivityAdapterConfiguration,
+        buildIdentity: LiveActivityBuildIdentity?
     ) -> ActiveFastLiveActivityCoordinator {
         let client: any LiveActivityClient
         switch configuration {
@@ -139,7 +141,8 @@ struct UFastApp: App {
                 let context = container.mainContext
                 return (try? SwiftDataSettingsStore(modelContext: context)
                     .authoritativeRecord()?.automaticLiveActivityPreference) ?? .disabled
-            }
+            },
+            installedBuildIdentity: buildIdentity
         )
     }
 }

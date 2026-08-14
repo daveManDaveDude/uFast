@@ -156,6 +156,7 @@ final class ActiveFastLiveActivityCoordinatorTests: XCTestCase {
         XCTAssertEqual(client.endedActivityIDs, ["z-duplicate", "orphan"])
         XCTAssertEqual(client.updatedContents.map(\.0), ["a-winner"])
         XCTAssertEqual(store.storedMetadata?.lastKnownActivityIdentifier, "a-winner")
+        XCTAssertEqual(store.storedMetadata?.lastRequestDate, now)
         let reconciledActivities = await client.activities()
         XCTAssertEqual(
             reconciledActivities.first(where: { $0.id == "a-winner" })?.state,

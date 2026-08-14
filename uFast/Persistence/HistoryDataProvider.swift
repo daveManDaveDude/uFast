@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-struct HistoryFastSnapshot: Equatable, Sendable {
+struct HistoryFastSnapshot: Equatable {
     let id: UUID
     let startDate: Date
     let endDate: Date?
@@ -40,27 +40,14 @@ struct HistoryDataSlice: Equatable {
     }
 }
 
-enum HistoryMotionWindow {
-    static let dayRadius = 7
-
-    static func interval(
-        centeredOn date: Date,
-        maximumDate: Date,
-        calendar: Calendar
-    ) -> DateInterval? {
-        let selectedDay = calendar.startOfDay(for: date)
-        let maximumDay = calendar.startOfDay(for: maximumDate)
-        guard let start = calendar.date(byAdding: .day, value: -dayRadius, to: selectedDay),
-              let proposedLastDay = calendar.date(byAdding: .day, value: dayRadius, to: selectedDay),
-              let end = calendar.date(
-                  byAdding: .day,
-                  value: 1,
-                  to: min(proposedLastDay, maximumDay)
-              ),
-              start < end
-        else { return nil }
-        return DateInterval(start: start, end: end)
-    }
+/// Compact value returned for one visual runway chunk.  The SwiftData models
+/// are converted to value snapshots before leaving the provider boundary.
+/// `data` is intentionally the same projection input used by settled History;
+/// the coordinator owns the compact, immutable presentation assembled from
+/// these values and never retains model objects.
+struct HistoryMotionChunk: Equatable, Sendable {
+    let coverage: HistoryMotionCoverage
+    let presentation: HistoryMotionPresentation
 }
 
 @MainActor
@@ -86,6 +73,33 @@ final class SwiftDataHistoryDataProvider {
             foods: appendUnique(visibleFoods, neighbours.foods).map(FoodEntrySnapshot.init),
             drinks: appendUnique(visibleDrinks, neighbours.drinks).map(HydrationEntrySnapshot.init),
             settings: settings
+        )
+    }
+
+    /// Merge adjacent chunks by stable identity.  This is used before building
+    /// a presentation so an event or fast crossing a seam is projected once,
+    /// with recorded-fast precedence unchanged from the settled builder.
+    nonisolated static func mergeMotionChunks(
+        _ chunks: [HistoryMotionChunk],
+        window: DateInterval
+    ) -> HistoryMotionPresentation? {
+        guard !chunks.isEmpty else { return nil }
+        var intervals: [HistoryMotionIntervalPrimitive] = []
+        var events: [HistoryMotionEventPrimitive] = []
+        var intervalIDs = Set<UUID>()
+        var eventIDs = Set<UUID>()
+        for chunk in chunks {
+            for interval in chunk.presentation.intervals where intervalIDs.insert(interval.id).inserted {
+                intervals.append(interval)
+            }
+            for event in chunk.presentation.events where eventIDs.insert(event.id).inserted {
+                events.append(event)
+            }
+        }
+        return HistoryMotionPresentation(
+            window: window,
+            intervals: intervals.sorted { $0.start < $1.start },
+            events: events.sorted { $0.occurredAt < $1.occurredAt }
         )
     }
 
@@ -190,5 +204,162 @@ final class SwiftDataHistoryDataProvider {
     ) -> [Record] where Record.ID: Hashable {
         var identifiers = Set(visible.map(\.id))
         return visible + neighbours.filter { identifiers.insert($0.id).inserted }
+    }
+}
+
+/// Motion-only provider. It intentionally avoids the settled authorities
+/// (`ActiveFastAuthority` and `SwiftDataSettingsStore`), which are main-actor
+/// editor boundaries. The independent context returns value snapshots only.
+final class SwiftDataHistoryMotionDataProvider {
+    private let modelContext: ModelContext
+
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+    }
+
+    func fetch(window: DateInterval, calendar _: Calendar) throws -> HistoryDataSlice {
+        let lower = window.start
+        let upper = window.end
+        let distantPast = Date.distantPast
+        let completed = try modelContext.fetch(FetchDescriptor<FastRecord>(
+            predicate: #Predicate {
+                $0.endDate != nil
+                    && $0.startDate < upper
+                    && ($0.endDate ?? distantPast) > lower
+            },
+            sortBy: [SortDescriptor(\.startDate)]
+        )).map(HistoryFastSnapshot.init)
+        let active = try modelContext.fetch(FetchDescriptor<FastRecord>(
+            predicate: #Predicate { $0.endDate == nil }
+        )).first.map(HistoryFastSnapshot.init)
+        let foods = try modelContext.fetch(FetchDescriptor<FoodEntryRecord>(
+            predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
+            sortBy: [SortDescriptor(\.occurredAt)]
+        ))
+        let drinks = try modelContext.fetch(FetchDescriptor<HydrationEntryRecord>(
+            predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
+            sortBy: [SortDescriptor(\.occurredAt)]
+        ))
+        let neighbours = try nearestCaloricNeighbours(outside: window)
+        return HistoryDataSlice(
+            window: window,
+            completedFasts: completed,
+            activeFast: active,
+            foods: appendUnique(foods, neighbours.foods).map(FoodEntrySnapshot.init),
+            drinks: appendUnique(drinks, neighbours.drinks).map(HydrationEntrySnapshot.init),
+            settings: nil
+        )
+    }
+
+    private func nearestCaloricNeighbours(
+        outside window: DateInterval
+    ) throws -> (foods: [FoodEntryRecord], drinks: [HydrationEntryRecord]) {
+        let beforeFoods = try caloricFoods(before: window.start, order: .reverse)
+        let beforeDrinks = try caloricDrinks(before: window.start, order: .reverse)
+        let afterFoods = try caloricFoods(after: window.end, order: .forward)
+        let afterDrinks = try caloricDrinks(after: window.end, order: .forward)
+        let before = nearestFoodOrDrink(foods: beforeFoods, drinks: beforeDrinks, latest: true)
+        let after = nearestFoodOrDrink(foods: afterFoods, drinks: afterDrinks, latest: false)
+        return (
+            [before.food, after.food].compactMap(\.self),
+            [before.drink, after.drink].compactMap(\.self)
+        )
+    }
+
+    private func caloricFoods(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
+        var descriptor = FetchDescriptor<FoodEntryRecord>(
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func caloricFoods(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
+        var descriptor = FetchDescriptor<FoodEntryRecord>(
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func caloricDrinks(before date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
+        var descriptor = FetchDescriptor<HydrationEntryRecord>(
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func caloricDrinks(after date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
+        var descriptor = FetchDescriptor<HydrationEntryRecord>(
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func nearestFoodOrDrink(
+        foods: [FoodEntryRecord],
+        drinks: [HydrationEntryRecord],
+        latest: Bool
+    ) -> (food: FoodEntryRecord?, drink: HydrationEntryRecord?) {
+        guard let food = foods.first else { return (nil, drinks.first) }
+        guard let drink = drinks.first else { return (food, nil) }
+        let foodWins = latest ? food.occurredAt >= drink.occurredAt : food.occurredAt <= drink.occurredAt
+        return foodWins ? (food, nil) : (nil, drink)
+    }
+
+    private func appendUnique<Record: Identifiable>(
+        _ visible: [Record],
+        _ neighbours: [Record]
+    ) -> [Record] where Record.ID: Hashable {
+        var identifiers = Set(visible.map(\.id))
+        return visible + neighbours.filter { identifiers.insert($0.id).inserted }
+    }
+}
+
+enum HistoryMotionChunkError: Error, Equatable, Sendable {
+    case invalidCoverage
+}
+
+/// Background-safe range loader. The actor creates its own ModelContext from
+/// the container and returns only Sendable value snapshots; SwiftData model
+/// objects never cross into the History view.
+actor SwiftDataHistoryMotionRangeLoader {
+    private let container: ModelContainer
+
+    init(container: ModelContainer) {
+        self.container = container
+    }
+
+    func merge(
+        _ chunks: [HistoryMotionChunk],
+        window: DateInterval
+    ) -> HistoryMotionPresentation? {
+        SwiftDataHistoryDataProvider.mergeMotionChunks(chunks, window: window)
+    }
+
+    func load(
+        coverage: HistoryMotionCoverage,
+        calendar: Calendar
+    ) async throws -> HistoryMotionChunk {
+        let context = ModelContext(container)
+        guard let window = coverage.visualWindow(calendar: calendar) else {
+            throw HistoryMotionChunkError.invalidCoverage
+        }
+        let data = try SwiftDataHistoryMotionDataProvider(modelContext: context)
+            .fetch(window: window, calendar: calendar)
+        let exact = HistoryPresentationBuilder.build(
+            data: data,
+            locale: calendar.locale ?? Locale(identifier: "en_GB"),
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            referenceNow: Date.now
+        )
+        return HistoryMotionChunk(coverage: coverage, presentation: HistoryMotionPresentation(exact))
     }
 }

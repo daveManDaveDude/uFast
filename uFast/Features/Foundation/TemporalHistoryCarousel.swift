@@ -27,6 +27,10 @@ struct TemporalHistoryCarousel: View {
     let onMovementPhaseChange: (TemporalCarouselMovementPhase) -> Void
     let onCoupledPresentationChange: (TemporalCoupledPresentationUpdate) -> Void
     var onSettledVisibleWindow: (TemporalRibbonWindow) -> Void = { _ in }
+    /// Coarse edge intent only.  The callback is gated below so geometry
+    /// frames never perform persistence work or rebuild the page arrays.
+    var onPrefetchIntent: (HistoryMotionEdge) -> Void = { _ in }
+    var onPrefetchIntentAt: (HistoryMotionEdge, Date) -> Void = { _, _ in }
 
     @State var centeredDay: Date?
     @State var movementPhase = TemporalCarouselMovementPhase.settled
@@ -34,6 +38,19 @@ struct TemporalHistoryCarousel: View {
     @State var lowerMotionInFlight = false
     @State var settledVisibleWindow: TemporalRibbonWindow?
     @State var geometrySnapshot = TemporalCarouselGeometrySnapshot()
+    @State var prefetchedEdges: Set<HistoryMotionEdge> = []
+
+    enum PresentationSource: Equatable, Sendable {
+        case settled
+        case motion
+    }
+
+    static func presentationSource(
+        isSelectedPage: Bool,
+        movementPhase: TemporalCarouselMovementPhase
+    ) -> PresentationSource {
+        isSelectedPage && movementPhase == .settled ? .settled : .motion
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
@@ -92,10 +109,17 @@ struct TemporalHistoryCarousel: View {
                            layoutDirection: direction
                        )
                     {
+                        emitPrefetchIntent(for: preview)
                         onCoupledPresentationChange(.preview(preview))
                     } else if movementPhase == .settled,
                               geometrySnapshot.hasActiveMotion
                     {
+                        if let preview = geometry.centerProgress(
+                            days: dates,
+                            layoutDirection: direction
+                        ) {
+                            emitPrefetchIntent(for: preview)
+                        }
                         settleVisibleGeometry(geometry)
                     }
                 }
@@ -128,6 +152,7 @@ struct TemporalHistoryCarousel: View {
             }
             .onChange(of: dates) { _, newDates in
                 guard newDates.contains(canonicalSelection) else { return }
+                prefetchedEdges.removeAll()
                 alignToExternalSelection()
             }
             .onDisappear {
@@ -260,6 +285,12 @@ extension TemporalHistoryCarousel {
 
     func daySegment(_ date: Date) -> some View {
         let isSelected = calendar.isDate(date, inSameDayAs: selection)
+        let source = Self.presentationSource(
+            isSelectedPage: isSelected,
+            movementPhase: movementPhase
+        )
+        let pageIntervals = source == .settled ? intervals : motionIntervals
+        let pageEvents = source == .settled ? events : motionEvents
         let canActivateRecord = movementPhase.allowsTimelineInteraction
             && allowsRecordActivation
         let canSelectEmpty = movementPhase.allowsTimelineInteraction
@@ -270,8 +301,8 @@ extension TemporalHistoryCarousel {
         } : nil
         return TemporalRibbonView(
             selectedDate: date,
-            intervals: motionIntervals,
-            events: motionEvents,
+            intervals: pageIntervals,
+            events: pageEvents,
             onSelectInterval: selectInterval,
             onSelectEvent: { id in
                 guard canActivateRecord else { return }
@@ -393,5 +424,30 @@ extension TemporalHistoryCarousel {
             calendar: calendar
         )
         centeredDay = canonicalSelection
+    }
+
+    /// Emits at most one intent per edge for the current date generation.  It
+    /// intentionally uses only the already-published progress and calendar
+    /// arithmetic; no query, projection, sorting, or array rebuild occurs on a
+    /// geometry callback.
+    func emitPrefetchIntent(for progress: TemporalDaySpaceProgress) {
+        guard let first = dates.first, let last = dates.last else { return }
+        let threshold = HistoryMotionConfiguration.product.prefetchThreshold
+        let leadingDistance = calendar.dateComponents(
+            [.day], from: first, to: progress.leadingDay
+        ).day ?? Int.max
+        let trailingDistance = calendar.dateComponents(
+            [.day], from: progress.trailingDay, to: last
+        ).day ?? Int.max
+        if leadingDistance <= threshold, !prefetchedEdges.contains(.preceding) {
+            prefetchedEdges.insert(.preceding)
+            onPrefetchIntent(.preceding)
+            onPrefetchIntentAt(.preceding, progress.centeredCalendarDay)
+        }
+        if trailingDistance <= threshold, !prefetchedEdges.contains(.following) {
+            prefetchedEdges.insert(.following)
+            onPrefetchIntent(.following)
+            onPrefetchIntentAt(.following, progress.centeredCalendarDay)
+        }
     }
 }

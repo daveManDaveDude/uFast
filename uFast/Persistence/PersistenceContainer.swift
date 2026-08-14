@@ -16,13 +16,28 @@ enum UFastSchemaV1: VersionedSchema {
     ]
 }
 
+enum UFastSchemaV2: VersionedSchema {
+    static let versionIdentifier = Schema.Version(2, 0, 0)
+
+    static let models: [any PersistentModel.Type] = [
+        AppSettingsRecord.self,
+        FastRecord.self,
+        FoodEntryRecord.self,
+        HydrationEntryRecord.self,
+        HydrationFavouriteRecord.self,
+        UnknownPeriodRecord.self,
+    ]
+}
+
 enum UFastMigrationPlan: SchemaMigrationPlan {
-    static let schemas: [any VersionedSchema.Type] = [UFastSchemaV1.self]
-    static let stages: [MigrationStage] = []
+    static let schemas: [any VersionedSchema.Type] = [UFastSchemaV1.self, UFastSchemaV2.self]
+    static let stages: [MigrationStage] = [
+        .lightweight(fromVersion: UFastSchemaV1.self, toVersion: UFastSchemaV2.self),
+    ]
 }
 
 enum PersistenceContainer {
-    static let schema = Schema(versionedSchema: UFastSchemaV1.self)
+    static let schema = Schema(versionedSchema: UFastSchemaV2.self)
 
     static func make(inMemory: Bool = false) throws -> ModelContainer {
         let configuration = configuration(inMemory: inMemory)

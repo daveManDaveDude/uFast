@@ -1,6 +1,6 @@
 import Foundation
 
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length function_body_length type_body_length
 
 enum LiveActivityControlState: Equatable, Sendable {
     case show
@@ -38,6 +38,7 @@ final class ActiveFastLiveActivityCoordinator {
     private let clock: any AppClock
     private let client: any LiveActivityClient
     private let lifecycleStore: any LiveActivityLifecycleStore
+    private let installedBuildIdentity: LiveActivityBuildIdentity?
     private let resolveActiveFast: ActiveFastResolver
     private let resolveAutomaticPreference: @MainActor () -> AutomaticLiveActivityPreference
     private var mutationInFlight = false
@@ -45,17 +46,20 @@ final class ActiveFastLiveActivityCoordinator {
     private var foregroundAutomaticAttempted = false
     private var committedStartAttempts = Set<UUID>()
     private var preferenceEnableAttempts = Set<UUID>()
+    private var lifecycleGeneration = 0
 
     init(
         clock: any AppClock,
         client: any LiveActivityClient,
         lifecycleStore: any LiveActivityLifecycleStore,
         resolveActiveFast: @escaping ActiveFastResolver,
-        resolveAutomaticPreference: @escaping @MainActor () -> AutomaticLiveActivityPreference = { .disabled }
+        resolveAutomaticPreference: @escaping @MainActor () -> AutomaticLiveActivityPreference = { .disabled },
+        installedBuildIdentity: LiveActivityBuildIdentity? = LiveActivityBuildIdentity.production()
     ) {
         self.clock = clock
         self.client = client
         self.lifecycleStore = lifecycleStore
+        self.installedBuildIdentity = installedBuildIdentity
         self.resolveActiveFast = resolveActiveFast
         self.resolveAutomaticPreference = resolveAutomaticPreference
     }
@@ -171,6 +175,7 @@ final class ActiveFastLiveActivityCoordinator {
     private func requestActivity(
         _ request: ActivityRequest
     ) async -> ActiveFastLiveActivityResult {
+        let requestGeneration = lifecycleGeneration
         var attemptMetadata = lifecycleMetadata(for: request.activeFast)
         if request.automaticAttempt {
             attemptMetadata.lastAutomaticAttemptDate = request.now
@@ -183,10 +188,27 @@ final class ActiveFastLiveActivityCoordinator {
                 attributes: request.attributes,
                 contentState: request.contentState
             )
+
+            // A committed end or Delete All Data may race an ActivityKit
+            // request. Never let a response from the old authority recreate a
+            // projection or lifecycle metadata after that authoritative
+            // transaction has completed.
+            let stillAuthoritative = lifecycleGeneration == requestGeneration
+                && activeFast()?.activeRecordIdentifier == request.activeFast.activeRecordIdentifier
+            guard stillAuthoritative else {
+                try? await client.end(
+                    activityID: activity.id,
+                    dismissalPolicy: .immediate
+                )
+                try? lifecycleStore.clear(for: request.activeFast.activeRecordIdentifier)
+                return .reconciled
+            }
+
             var metadata = lifecycleMetadata(for: request.activeFast)
             metadata.hasRequested = true
             metadata.lastRequestDate = request.now
             metadata.lastKnownActivityIdentifier = activity.id
+            metadata.lastRequestBuildIdentity = installedBuildIdentity
             metadata.lastIntent = .shown
             metadata.lastTerminalReason = nil
             if request.clearsSuppression {
@@ -203,6 +225,12 @@ final class ActiveFastLiveActivityCoordinator {
         } catch LiveActivityClientError.unavailable {
             return .unavailable(.unsupported)
         } catch {
+            let stillAuthoritative = lifecycleGeneration == requestGeneration
+                && activeFast()?.activeRecordIdentifier == request.activeFast.activeRecordIdentifier
+            guard stillAuthoritative else {
+                try? lifecycleStore.clear(for: request.activeFast.activeRecordIdentifier)
+                return .reconciled
+            }
             var metadata = lifecycleMetadata(for: request.activeFast)
             if request.automaticAttempt {
                 metadata.lastAutomaticAttemptDate = request.now
@@ -253,6 +281,7 @@ final class ActiveFastLiveActivityCoordinator {
     /// Call only after a successful fast end or active deletion and after the
     /// existing widget projection has been cleared.
     func didCommitFastEndOrDeletion() async -> ActiveFastLiveActivityResult {
+        lifecycleGeneration &+= 1
         let activities = await client.activities()
         var didFail = false
         for activity in activities {
@@ -334,9 +363,28 @@ final class ActiveFastLiveActivityCoordinator {
                     contentState: expectedContent
                 )
             }
-            var metadata = lifecycleMetadata(for: activeFast)
+            // Do not repair unreadable bytes as an incidental side effect of
+            // reconciliation. Automatic recovery must remain fail-closed;
+            // explicit Show or authoritative cleanup is the repair path.
+            let persistedMetadata = try? lifecycleStore.metadata(
+                for: activeFast.activeRecordIdentifier
+            )
+            guard !lifecycleStore.hasUnreadableMetadata() else {
+                return .reconciled
+            }
+            var metadata = persistedMetadata ?? LiveActivityLifecycleMetadata(
+                activeRecordIdentifier: activeFast.activeRecordIdentifier
+            )
             metadata.hasRequested = true
+            // A surviving ActivityKit record is itself evidence of a prior
+            // request. If lifecycle metadata was absent, use this
+            // reconciliation instant as the conservative request-window
+            // anchor rather than persisting an incoherent success state.
+            metadata.lastRequestDate = metadata.lastRequestDate ?? now
             metadata.lastKnownActivityIdentifier = winner.id
+            if installedBuildIdentity != nil {
+                metadata.lastRequestBuildIdentity = installedBuildIdentity
+            }
             metadata.lastIntent = .shown
             metadata.lastTerminalReason = nil
             save(metadata)
@@ -368,12 +416,17 @@ final class ActiveFastLiveActivityCoordinator {
 
         let now = clock.now
         let metadata = lifecycleMetadata(for: activeFast)
+        guard !lifecycleStore.hasUnreadableMetadata() else {
+            return .reconciled
+        }
+
         let activities = await client.activities()
         let matching = runningActivities(for: activeFast, in: activities)
         let reason = automaticEligibilityReason(
             metadata: metadata,
             matching: matching,
-            now: now
+            now: now,
+            allowsUpdateRecovery: kind == .foreground
         )
         guard reason == .eligible else {
             if let existing = matching.first {
@@ -421,7 +474,8 @@ final class ActiveFastLiveActivityCoordinator {
     private func automaticEligibilityReason(
         metadata: LiveActivityLifecycleMetadata,
         matching: [LiveActivityRecord],
-        now: Date
+        now: Date,
+        allowsUpdateRecovery: Bool
     ) -> AutomaticLiveActivityEligibilityReason {
         AutomaticLiveActivityPolicy.eligibilityReason(
             AutomaticLiveActivityEligibilityInput(
@@ -432,7 +486,11 @@ final class ActiveFastLiveActivityCoordinator {
                 requestInFlight: false,
                 hiddenForThisFast: metadata.automaticSuppressed,
                 lastSuccessfulRequestDate: metadata.lastRequestDate,
-                now: now
+                now: now,
+                installedBuildIdentity: installedBuildIdentity,
+                lastRequestBuildIdentity: metadata.lastRequestBuildIdentity,
+                allowsUpdateRecovery: allowsUpdateRecovery,
+                hasSuccessfulRequest: metadata.hasRequested
             )
         )
     }

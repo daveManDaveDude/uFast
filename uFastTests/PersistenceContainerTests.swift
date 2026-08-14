@@ -6,10 +6,12 @@ import XCTest
 final class PersistenceContainerTests: XCTestCase {
     func testCurrentVersionedSchemaAndMigrationPlanCoverEveryProductionModel() {
         XCTAssertEqual(UFastSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
-        XCTAssertEqual(UFastMigrationPlan.schemas.count, 1)
+        XCTAssertEqual(UFastSchemaV2.versionIdentifier, Schema.Version(2, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 2)
         XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
-        XCTAssertTrue(UFastMigrationPlan.stages.isEmpty)
-        XCTAssertEqual(PersistenceContainer.schema.entities.count, 5)
+        XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
+        XCTAssertEqual(UFastMigrationPlan.stages.count, 1)
+        XCTAssertEqual(PersistenceContainer.schema.entities.count, 6)
     }
 
     func testBootstrapReturnsReadyContainerOnSuccessfulOpen() throws {
@@ -117,6 +119,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<FastRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<FoodEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).isEmpty)
     }
 
@@ -136,6 +139,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<UnknownPeriodRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationFavouriteRecord>()), 1)
         XCTAssertFalse(context.hasChanges)
     }
 
@@ -175,6 +179,14 @@ final class PersistenceContainerTests: XCTestCase {
                 endDate: now.addingTimeInterval(60),
                 boundaries: boundaries,
                 reason: .userChoice,
+                createdAt: now
+            )
+        )
+        context.insert(
+            HydrationFavouriteRecord(
+                name: "Sparkling water",
+                volumeMillilitres: 330,
+                isCaloric: false,
                 createdAt: now
             )
         )

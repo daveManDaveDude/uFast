@@ -34,7 +34,7 @@ struct UFastHomeScreenWidgetView: View {
     private var presentation: LockScreenFastPresentation {
         .make(
             projectionResult: entry.projectionResult,
-            now: .now,
+            now: entry.date,
             privacyState: privacyState
         )
     }

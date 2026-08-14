@@ -36,9 +36,14 @@ enum WidgetProjectionSupport {
         )
     }
 
-    static func publish(_ fast: FastRecord, goal: FastingGoal, now: Date = .now) {
+    static func publish(
+        _ fast: FastRecord,
+        goal: FastingGoal,
+        now: Date = .now,
+        projectionCoordinator: ActiveFastProjectionCoordinator? = nil
+    ) {
         logger.notice("Publishing active fast projection")
-        coordinator()?.publish(
+        (projectionCoordinator ?? coordinator())?.publish(
             activeRecordIdentifier: fast.id,
             startDate: fast.startDate,
             goalHours: goal.hours,
@@ -47,17 +52,22 @@ enum WidgetProjectionSupport {
     }
 
     @MainActor
-    static func synchronize(in container: ModelContainer, now: Date) {
+    static func synchronize(
+        in container: ModelContainer,
+        now: Date,
+        projectionCoordinator: ActiveFastProjectionCoordinator? = nil
+    ) {
         let context = container.mainContext
         let activeFast: FastRecord?
         do {
             activeFast = try ActiveFastAuthority.fetch(in: context)
         } catch {
-            logger.error("Active fast authority is ambiguous; widget projection unchanged")
+            logger.error("Active fast authority is ambiguous; clearing widget projection")
+            clear(projectionCoordinator: projectionCoordinator)
             return
         }
         guard let activeFast else {
-            clear()
+            clear(projectionCoordinator: projectionCoordinator)
             return
         }
         let goal: FastingGoal
@@ -68,11 +78,18 @@ enum WidgetProjectionSupport {
             logger.error("Settings authority is ambiguous; widget projection unchanged")
             return
         }
-        publish(activeFast, goal: goal, now: now)
+        publish(
+            activeFast,
+            goal: goal,
+            now: now,
+            projectionCoordinator: projectionCoordinator
+        )
     }
 
-    static func clear() {
+    static func clear(
+        projectionCoordinator: ActiveFastProjectionCoordinator? = nil
+    ) {
         logger.debug("Clearing active fast projection")
-        coordinator()?.clear()
+        (projectionCoordinator ?? coordinator())?.clear()
     }
 }

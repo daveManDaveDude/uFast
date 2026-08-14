@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Sprint"
+  short_description: "Orchestrate reviewed story-by-story sprints (Sol-led, Luna-implemented, independently reviewed)"
+  default_prompt: "Use $implement-sprint to run a sprint document through Sol planning, Luna implementation, and independent acceptance review."

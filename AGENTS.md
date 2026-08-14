@@ -72,6 +72,54 @@ expect one worker to take longer than the others. Do not treat that uneven
 completion time as a failed or non-parallel run while the remaining workers
 are still active.
 
+### Test execution ownership
+
+- The implementation Luna runs focused unit tests and the UI tests added or
+  changed by its story before handoff. It should not run the full UI suite
+  unless Sol specifically requests it to diagnose a failure.
+- After reviewing the implementation and changed tests, Sol should delegate
+  noisy integration commands to a fresh, read-only Luna verification worker
+  when one is available. That worker may generate build logs and result bundles
+  but must not edit product or test source.
+- The verification worker returns only command status, test counts, concise
+  failure summaries, and paths to logs and `.xcresult` bundles. Do not paste
+  routine `xcodebuild` output into the main thread.
+- Sol independently inspects the changed tests and actual result artifacts,
+  runs `make verify-ui-result UI_XCRESULT=<path>` for the final UI result, and
+  remains the sole acceptance authority. A verifier handoff is evidence, not
+  acceptance.
+- Sol reruns an expensive command itself only when both conditions hold: the
+  evidence is missing, inconsistent, or shows a failure; and a Luna verification
+  worker is unavailable. Do not duplicate a passing verification run merely to
+  establish independence.
+
+### Test preflight
+
+Run this preflight once before the first Xcode test command, and repeat it only
+when the simulator or execution environment materially changes:
+
+1. Check for an existing `xcodebuild` or Xcode test process. If one is active,
+   wait; never overlap UI suites or kill another user's run.
+2. Confirm XcodeGen and `/Applications/Xcode.app/Contents/Developer` are
+   available, generate the project, and use `xcodebuild -showdestinations` or
+   `xcrun simctl list devices available` to confirm that the configured
+   `SIMULATOR` resolves exactly once.
+3. Confirm CoreSimulator access using the same execution security model that
+   will run the tests. In a sandboxed agent environment, if this probe fails
+   with a simulator-service, permission, or sandbox error, immediately request
+   the required escalation and rerun the same probe. Once approved, run the
+   Xcode test commands with that same model; do not first launch a full suite
+   under a security model the preflight has shown cannot work.
+4. Run the story's smallest representative focused test first. For UI work,
+   require the changed story-specific UI tests to pass before starting the full
+   four-worker suite. Treat launch, fixture-reset, or persistence-bootstrap
+   failures as environment/fixture failures until diagnosed.
+5. Never erase all simulators, reset shared DerivedData, or uninstall unrelated
+   apps. If stale app-owned simulator data is proven to be the cause, target
+   only the uFast app on the resolved test simulator and record that action.
+6. Record the exact command, security model, simulator destination, and result
+   bundle path so later workers reuse the known-good setup.
+
 - Run only one `make test-ui` invocation at a time. One invocation already owns
   four simulator clones; overlapping invocations multiply simulator load, share
   `.derived-data`, materially slow both suites, and can create misleading
@@ -127,3 +175,10 @@ are still active.
 - Product docs and decisions are updated when behaviour changes.
 - When an iPhone is connected, the verified app is deployed with
   `make deploy-iphone`.
+
+## Codex sprint orchestration
+
+- Sol is the sprint orchestration and acceptance agent.
+- Delegate bounded implementation work to the configured Luna `story_worker`.
+- Luna completion is evidence, not story acceptance; Sol must review the actual code and tests.
+- Follow the existing repository architecture and conventions during every delegated story.

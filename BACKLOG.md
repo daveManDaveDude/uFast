@@ -176,6 +176,13 @@ group-manager sheet, pencil controls, manager Done, bulk Delete group and
 returning from an item editor to the manager no longer exist. Add event remains
 bucket-constrained, and individual deletion remains available in each editor.
 
+## Sprint-ready product refinements
+
+### Manual hydration convenience
+
+- OW-D101 P1 — Add and remove favourite drinks in Settings. **Ready; contract
+  in `docs/FAVOURITE_DRINK_MANAGEMENT_STORY.md`.**
+
 ## Post-MVP candidate backlog
 
 These are candidate story seeds ordered by `ROADMAP.md`. They are not
@@ -207,6 +214,20 @@ implementation-ready until their milestone decision gate is complete.
 - OW-L109 — Complete the automatic Live Activity App Review and quality gate.
   **Implementation and review materials prepared; full UI and physical release
   evidence remains pending.**
+- OW-L110 P0 — Restore an enabled Live Activity after an app update or redeploy
+  interrupts it. **Ready; contract in
+  `docs/LIVE_ACTIVITY_UPDATE_RECOVERY_STORY.md`.**
+- WS-101 P1 — Keep fixed Lock Screen widget elapsed copy, percentage and
+  accessibility summary advancing during an active fast. **Ready.**
+- WS-102 P1 — Fail closed for VoiceOver when Live Activity privacy redaction is
+  active. **Ready.**
+- WS-103 P2 — Clear or invalidate the widget projection when active-fast
+  authority is ambiguous. **Ready.**
+
+The sprint-ready review-hardening contract for WS-101 through WS-103 is in
+`docs/WIDGET_SYSTEM_SURFACE_REVIEW_STORIES.md`. D-031 records the current
+surface inventory: no persistent Dynamic Island banner promise, and the small,
+medium and large Home Screen widgets are required and working in source.
 
 `READY_STORIES.md` contains the superseded historical OW-106 refinement. D-029
 and OW-L105 describe the delivered baseline; D-030 and OW-L106 through OW-L109

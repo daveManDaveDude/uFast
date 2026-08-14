@@ -79,6 +79,13 @@ is shown.
   A backdated active fast older than eight hours remains eligible for a new
   explicit request; the activity lifetime begins with the request while elapsed
   time derives from the authoritative older start instant.
+- **Decision:** Live Activity elapsed time and progress use the system's
+  date-relative timer and progress primitives. Because no physical-device
+  evidence proves that a public numeric percentage label remains current while
+  uFast and its extension are suspended, visible and spoken ActivityKit copy
+  uses stable context such as **16-hour goal** instead of a sampled percentage.
+  The pure percentage projection remains available for validation, and the
+  separate WidgetKit percentage contract is unchanged.
 - **Consequence:** OW-L105 is the production implementation contract and
   supersedes the older OW-106 refinement. It uses one local, read-only activity
   projection; post-commit update/end ordering; deterministic reconciliation;
@@ -127,6 +134,47 @@ is shown.
   architecture, immediate successful-end dismissal, failure isolation and
   widget fallback remain unchanged. OW-L106 through OW-L109 in
   `docs/OW_LIVE_ACTIVITY_AUTOMATION_STORIES.md` are the implementation contract.
+
+## D-031 Current widget-family and Dynamic Island contract
+
+- **Status:** Accepted current-state clarification
+- **Accepted:** 11 August 2026
+- **Decision:** Keep the working WidgetKit families already present in the
+  production extension: accessory rectangular for the Lock Screen plus the
+  three required Home Screen families (small, medium and large). They share the
+  minimal App Group projection and remain optional, read-only conveniences.
+- **Decision:** Do not promise or require a persistent Dynamic Island banner.
+  The optional Live Activity supplies compact, minimal and expanded Dynamic
+  Island regions while it exists; iOS controls which region is visible, and
+  devices without Dynamic Island use the system-provided fallback.
+- **Consequence:** The earlier OW-L102 statement that Home Screen families were
+  out of scope is historical and is superseded for the current product. D-029
+  continues to require the implemented Dynamic Island regions, but neither
+  product copy nor release criteria may describe an always-visible banner.
+  BR-41 and BR-42 record the enduring boundary.
+
+## D-032 Live Activity recovery after app update
+
+- **Status:** Accepted
+- **Accepted:** 13 August 2026
+- **Decision:** Treat an installed release/build change as one bounded
+  foreground-only recovery opportunity when automatic Live Activities are
+  enabled and an authoritative fast remains active. After reconciling
+  ActivityKit state, a newly installed build may request one replacement before
+  the prior successful request's eight-hour window ends only when no matching
+  activity survives and **Hide for this fast** is not set. The replacement
+  continues elapsed time from the original fast start and begins its own
+  ActivityKit lifetime at the new request.
+- **Decision:** Identify the transition with the app's release version and build
+  number, persist the identity used by a successful request as local lifecycle
+  metadata and make the production Info.plist derive those fields from the
+  project version settings. Older metadata without the identity may recover
+  once on the first fixed build when every other condition passes.
+- **Consequence:** This is a narrow exception to D-030 and BR-40's normal
+  eight-hour continuation gate. It does not enable background restart,
+  same-build relaunch recovery, duplicate requests, notification behavior or a
+  deployment-only code path. Explicit per-fast suppression and global off
+  remain authoritative. OW-L110 is the implementation contract.
 
 ## D-001 Fast start
 

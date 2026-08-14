@@ -31,20 +31,26 @@ struct UFastActiveFastActivityWidget: Widget {
 
 private struct ActiveFastActivityLockScreenView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.redactionReasons) private var redactionReasons
     let context: ActivityViewContext<ActiveFastActivityAttributes>
+
+    private var privacyState: ActiveFastActivityPrivacyState {
+        .make(isPrivacyRedacted: redactionReasons.contains(.privacy))
+    }
 
     private var presentation: ActiveFastActivityPresentation {
         ActiveFastActivityPresentation.make(
             attributes: context.attributes,
             contentState: context.state,
-            now: .now
+            now: .now,
+            privacyState: privacyState
         )
     }
 
-    var body: some View {
+    private var visualContent: some View {
         let palette = ActiveFastActivityPalette(colorScheme: colorScheme)
 
-        ZStack {
+        return ZStack {
             palette.card
             ActiveFastActivityBotanicalArtwork()
 
@@ -64,9 +70,43 @@ private struct ActiveFastActivityLockScreenView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+    }
+
+    private var visibleAccessibilityValue: Text? {
+        guard privacyState == .visible,
+              let goal = presentation.stableGoalText,
+              let target = presentation.targetText
+        else {
+            return nil
+        }
+
+        let reached = presentation.hasReachedGoal ? ", Goal time reached" : ""
+        // Text(date, style: .timer) is resolved by the system and remains
+        // current while the app and extension are suspended. Keep ordinary
+        // sampled projection fields out of this accessibility representation.
+        return Text(
+            "Elapsed \(Text(context.state.startDate, style: .timer)), "
+                + "\(goal), target \(target)\(reached). Opens uFast."
+        )
+    }
+
+    var body: some View {
+        Group {
+            if let visibleAccessibilityValue {
+                visualContent
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("uFast"))
+                    .accessibilityValue(visibleAccessibilityValue)
+            } else {
+                // Invalid or privacy-redacted content fails closed to the
+                // identity-only summary and does not expose child semantics.
+                visualContent
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("uFast. Opens uFast."))
+            }
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(presentation.accessibilitySummary))
+        .privacySensitive()
     }
 }
 
@@ -82,13 +122,6 @@ private struct ActiveFastActivityTimerView: View {
             .foregroundStyle(ActiveFastActivityPalette(colorScheme: colorScheme).primary)
             .privacySensitive()
             .accessibilityLabel("Elapsed")
-            .accessibilityValue(
-                Text(
-                    ActiveFastActivityElapsedFormatter.accessibilityString(
-                        from: Date.now.timeIntervalSince(contentState.startDate)
-                    )
-                )
-            )
     }
 }
 
@@ -122,7 +155,14 @@ private struct ActiveFastActivityCircularProgressView: View {
         }
         .frame(width: 22, height: 22)
         .privacySensitive()
-        .accessibilityLabel(Text(presentation.accessibilitySummary))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("uFast"))
+        .accessibilityValue(
+            ActiveFastActivityAccessibility.value(
+                startDate: contentState.startDate,
+                goal: presentation.stableGoalText
+            )
+        )
     }
 }
 
@@ -138,9 +178,8 @@ private struct ActiveFastActivityDetailView: View {
             contentState: contentState,
             now: .now
         )
-        let percentage = presentation.progressPercentage
         VStack(alignment: .leading, spacing: 5) {
-            if presentation.progress != nil, let percentage {
+            if presentation.progress != nil {
                 // A date-relative progress view is resolved by the system and
                 // keeps advancing while uFast and this extension are suspended.
                 ProgressView(
@@ -156,7 +195,7 @@ private struct ActiveFastActivityDetailView: View {
                 if let target = presentation.targetText {
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(presentation.progressAccessibilityValue ?? "")
+                            Text(presentation.stableGoalText ?? "")
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(1)
@@ -170,7 +209,7 @@ private struct ActiveFastActivityDetailView: View {
                         }
 
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(verbatim: "\(percentage)%")
+                            Text(presentation.stableGoalText ?? "")
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(1)
@@ -183,7 +222,7 @@ private struct ActiveFastActivityDetailView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(presentation.progressAccessibilityValue ?? "")
+                            Text(presentation.stableGoalText ?? "")
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(2)
@@ -197,7 +236,7 @@ private struct ActiveFastActivityDetailView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(verbatim: "\(percentage)%")
+                    Text(presentation.stableGoalText ?? "")
                         .font(.caption2)
                         .foregroundStyle(palette.secondaryText)
                 }
@@ -212,7 +251,33 @@ private struct ActiveFastActivityDetailView: View {
         }
         .privacySensitive()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(presentation.accessibilitySummary))
+        .accessibilityLabel(Text("uFast"))
+        .accessibilityValue(
+            ActiveFastActivityAccessibility.value(
+                startDate: contentState.startDate,
+                goal: presentation.stableGoalText,
+                target: presentation.targetText,
+                hasReachedGoal: presentation.hasReachedGoal
+            )
+        )
+    }
+}
+
+private enum ActiveFastActivityAccessibility {
+    static func value(
+        startDate: Date,
+        goal: String?,
+        target: String? = nil,
+        hasReachedGoal: Bool = false
+    ) -> Text {
+        guard let goal else { return Text("Opens uFast.") }
+
+        let targetCopy = target.map { ", target \($0)" } ?? ""
+        let reachedCopy = hasReachedGoal ? ", Goal time reached" : ""
+        return Text(
+            "Elapsed \(Text(startDate, style: .timer)), "
+                + "\(goal)\(targetCopy)\(reachedCopy). Opens uFast."
+        )
     }
 }
 

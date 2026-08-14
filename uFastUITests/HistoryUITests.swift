@@ -291,6 +291,26 @@ final class HistoryUITests: XCTestCase {
     }
 
     @MainActor
+    func testHistoryRunwayStaysPopulatedAfterRepeatedFastFlicksBeyondSevenDays() {
+        let app = launchOnboardedHistory(additionalArguments: ["-AppleLocale", "en_GB"])
+        app.tabBars.buttons["History"].tap()
+        let carousel = app.scrollViews["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+
+        for _ in 0 ..< 8 {
+            carousel.swipeRight(velocity: .fast)
+            XCTAssertTrue(
+                carousel.waitForExistence(timeout: 5),
+                "carousel disappeared during runway extension: \(app.debugDescription)"
+            )
+        }
+
+        XCTAssertFalse(app.otherElements["history.motion-unavailable"].exists)
+        XCTAssertTrue(app.staticTexts["history.selected-date"].exists)
+        XCTAssertTrue(app.buttons["history.previous-day"].exists)
+    }
+
+    @MainActor
     func testCarouselRailAndHeadingStaySynchronizedAcrossYearBoundary() throws {
         let calendar = Calendar.current
         let now = try XCTUnwrap(

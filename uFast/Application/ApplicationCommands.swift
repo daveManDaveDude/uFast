@@ -6,6 +6,7 @@ struct ApplicationCommandConfiguration: Equatable {
     var simulateFastHistoryFailure = false
     var simulateFoodSaveFailure = false
     var simulateDrinkSaveFailure = false
+    var simulateFavouriteSaveFailure = false
     var simulateGoalSaveFailure = false
     var simulateLiveActivitySettingsSaveFailure = false
     var simulateDeleteAllFailure = false
@@ -149,8 +150,79 @@ final class ApplicationCommands {
         }
     }
 
-    func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
-        _ = try hydrationRepository().createFavourite(favourite, occurredAt: clock.now)
+    func addFavouriteDrink(
+        _ favourite: HydrationFavourite,
+        endingActiveFast: Bool = false
+    ) throws {
+        let draft = try hydrationDraft(for: favourite, occurredAt: clock.now)
+        let goal = try authoritativeSettingsRecord()?.fastingGoal ?? .default
+        try HydrationEntryService(repository: hydrationRepository(), clock: clock).save(
+            draft,
+            replacing: nil,
+            goal: goal,
+            endingActiveFast: endingActiveFast
+        )
+        if endingActiveFast {
+            projectionCoordinator.enqueue(.fastEndedOrDeleted)
+        }
+    }
+
+    func hydrationDraft(
+        for favourite: HydrationFavourite,
+        occurredAt: Date
+    ) throws -> HydrationEntryDraft {
+        try requireUnambiguousSettingsAuthority()
+        let resolved = try resolveFavourite(favourite)
+        guard HydrationEntryValidator.isValid(volumeMillilitres: resolved.volumeMillilitres) else {
+            throw HydrationFavouriteStoreError.invalidAmount
+        }
+        if resolved.type == .custom {
+            _ = try HydrationFavouriteValidator.validated(
+                name: resolved.displayName,
+                amount: resolved.volumeMillilitres,
+                isCaloric: resolved.isCaloric,
+                existing: []
+            )
+        }
+        return HydrationFavouriteProjection.hydrationDraft(
+            from: resolved,
+            occurredAt: occurredAt
+        )
+    }
+
+    func createFavourite(
+        name: String,
+        volumeMillilitres: Int,
+        isCaloric: Bool
+    ) throws -> HydrationFavouriteSnapshot {
+        try requireUnambiguousSettingsAuthority()
+        return try favouriteStore().create(
+            name: name,
+            volumeMillilitres: volumeMillilitres,
+            isCaloric: isCaloric,
+            at: clock.now
+        )
+    }
+
+    func updateFavourite(
+        id: UUID,
+        name: String,
+        volumeMillilitres: Int,
+        isCaloric: Bool
+    ) throws -> HydrationFavouriteSnapshot {
+        try requireUnambiguousSettingsAuthority()
+        return try favouriteStore().update(
+            id: id,
+            name: name,
+            volumeMillilitres: volumeMillilitres,
+            isCaloric: isCaloric,
+            at: clock.now
+        )
+    }
+
+    func deleteFavourite(id: UUID) throws {
+        try requireUnambiguousSettingsAuthority()
+        try favouriteStore().delete(id: id)
     }
 
     func deleteHydration(id: UUID) throws {
@@ -254,6 +326,44 @@ final class ApplicationCommands {
             throw ApplicationCommandError.recordNotFound
         }
         return record
+    }
+}
+
+private extension ApplicationCommands {
+    func favouriteStore() -> SwiftDataHydrationFavouriteStore {
+        SwiftDataHydrationFavouriteStore(
+            modelContext: modelContext,
+            simulateSaveFailure: configuration.simulateFavouriteSaveFailure
+        )
+    }
+
+    func resolveFavourite(_ favourite: HydrationFavourite) throws -> HydrationFavourite {
+        if let id = favourite.userCreatedID {
+            return try favouriteStore().resolve(id: id).hydrationFavourite
+        }
+        guard favourite.type != .custom else {
+            throw HydrationFavouriteStoreError.recordNotFound
+        }
+        let settings = try authoritativeSettingsRecord()
+        return HydrationFavouriteProvider.favourites(settings: settings)
+            .first { $0.type == favourite.type } ?? favourite
+    }
+
+    func requireUnambiguousSettingsAuthority() throws {
+        _ = try authoritativeSettingsRecord()
+    }
+
+    func authoritativeSettingsRecord() throws -> AppSettingsRecord? {
+        do {
+            return try settingsStore().authoritativeRecord()
+        } catch let error as SettingsStoreError {
+            switch error {
+            case .conflictingAuthorities:
+                throw HydrationFavouriteStoreError.conflictingAuthorities
+            default:
+                throw error
+            }
+        }
     }
 }
 

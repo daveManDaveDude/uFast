@@ -25,20 +25,19 @@ struct UFastLockScreenProvider: TimelineProvider {
     func getTimeline(in _: Context, completion: @escaping (Timeline<UFastLockScreenEntry>) -> Void) {
         logger.notice("Widget timeline requested")
         let entry = makeEntry()
-        // A target-date refresh lets the clamped progress percentage converge
-        // without persisting ticks or requesting per-second entries.
-        let nextRefresh: Date? = if case let .success(projection?) = entry.projectionResult {
-            projection.targetDate > entry.date ? projection.targetDate : nil
-        } else {
-            nil
+        let schedule = LockScreenWidgetTimelineSchedule.make(
+            projectionResult: entry.projectionResult,
+            now: entry.date
+        )
+        let entries = schedule.dates.map { date in
+            UFastLockScreenEntry(date: date, projectionResult: entry.projectionResult)
         }
-        // A no-active/error entry must not become permanent if an app-triggered
-        // reload is coalesced while the widget is installed on the Lock Screen.
-        // Five minutes is the platform's practical lower bound for timeline
-        // refreshes and remains far from per-second polling.
-        let policy: TimelineReloadPolicy = nextRefresh.map { .after($0) }
-            ?? .after(entry.date.addingTimeInterval(5 * 60))
-        completion(Timeline(entries: [entry], policy: policy))
+        completion(
+            Timeline(
+                entries: entries,
+                policy: .after(schedule.reloadDate)
+            )
+        )
     }
 
     private func makeEntry() -> UFastLockScreenEntry {

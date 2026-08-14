@@ -91,6 +91,7 @@ struct InactiveFastView: View {
             }
             .padding(UFastTheme.Spacing.standard)
         }
+        .accessibilityIdentifier("today.content")
     }
 }
 

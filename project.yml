@@ -55,6 +55,8 @@ targets:
       path: uFast/SupportingFiles/Info.plist
       properties:
         CFBundleDisplayName: uFast
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         CFBundleURLTypes:

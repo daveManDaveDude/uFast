@@ -12,6 +12,12 @@ The refined Slice 2 contract and stories OW-201 through OW-205 are maintained
 in `SLICE_2_TODAY_STORIES.md`. They remain Draft until its six decisions are
 accepted in `DECISIONS.md`.
 
+The sprint-ready WidgetKit and ActivityKit review-hardening stories WS-101
+through WS-103 are maintained in
+`docs/WIDGET_SYSTEM_SURFACE_REVIEW_STORIES.md`. They implement the current
+surface contract in D-031 without adding or redesigning a widget family or
+Dynamic Island region.
+
 ## OW-002 Set a fasting goal
 
 **Epic:** E0 Product foundation  

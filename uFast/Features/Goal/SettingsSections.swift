@@ -115,6 +115,9 @@ struct SettingsFavouritesSection: View {
     @Binding var coffee: String
     @Binding var focusedField: FavouriteField?
     let valuesAreValid: Bool
+    let userCreatedFavourites: [HydrationFavouriteSnapshot]
+    let onAddFavourite: () -> Void
+    let onEditFavourite: (HydrationFavouriteSnapshot) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
@@ -124,6 +127,30 @@ struct SettingsFavouritesSection: View {
             field("Water", field: .water, text: $water, identifier: "settings.drink.water")
             field("Tea", field: .tea, text: $tea, identifier: "settings.drink.tea")
             field("Coffee", field: .coffee, text: $coffee, identifier: "settings.drink.coffee")
+            ForEach(userCreatedFavourites) { favourite in
+                Button { onEditFavourite(favourite) } label: {
+                    HStack(spacing: UFastTheme.Spacing.standard) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(favourite.name).font(.headline).foregroundStyle(UFastTheme.primary)
+                            Text("\(favourite.volumeMillilitres) ml · \(favourite.classification)")
+                                .font(.subheadline)
+                                .foregroundStyle(UFastTheme.secondaryText)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(UFastActionRowButtonStyle())
+                .accessibilityLabel(favourite.name)
+                .accessibilityValue("\(favourite.volumeMillilitres) millilitres, \(favourite.classification)")
+                .accessibilityIdentifier("settings.favourite.\(favourite.id.uuidString)")
+            }
+            Button("Add favourite", action: onAddFavourite)
+                .buttonStyle(UFastSecondaryButtonStyle())
+                .accessibilityIdentifier("settings.favourite.add")
             if !valuesAreValid {
                 Label("Enter each amount from 1 to 5,000 ml.", systemImage: "exclamationmark.circle")
                     .foregroundStyle(UFastTheme.error)

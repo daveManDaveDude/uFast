@@ -51,6 +51,38 @@ struct AutomaticLiveActivityEligibilityInput: Equatable, Sendable {
     let hiddenForThisFast: Bool
     let lastSuccessfulRequestDate: Date?
     let now: Date
+    let installedBuildIdentity: LiveActivityBuildIdentity?
+    let lastRequestBuildIdentity: LiveActivityBuildIdentity?
+    let allowsUpdateRecovery: Bool
+    let hasSuccessfulRequest: Bool
+
+    init(
+        preference: AutomaticLiveActivityPreference,
+        hasActiveFast: Bool,
+        availability: LiveActivityAvailability,
+        hasMatchingRunningActivity: Bool,
+        requestInFlight: Bool,
+        hiddenForThisFast: Bool,
+        lastSuccessfulRequestDate: Date?,
+        now: Date,
+        installedBuildIdentity: LiveActivityBuildIdentity? = nil,
+        lastRequestBuildIdentity: LiveActivityBuildIdentity? = nil,
+        allowsUpdateRecovery: Bool = false,
+        hasSuccessfulRequest: Bool = true
+    ) {
+        self.preference = preference
+        self.hasActiveFast = hasActiveFast
+        self.availability = availability
+        self.hasMatchingRunningActivity = hasMatchingRunningActivity
+        self.requestInFlight = requestInFlight
+        self.hiddenForThisFast = hiddenForThisFast
+        self.lastSuccessfulRequestDate = lastSuccessfulRequestDate
+        self.now = now
+        self.installedBuildIdentity = installedBuildIdentity
+        self.lastRequestBuildIdentity = lastRequestBuildIdentity
+        self.allowsUpdateRecovery = allowsUpdateRecovery
+        self.hasSuccessfulRequest = hasSuccessfulRequest
+    }
 }
 
 enum AutomaticLiveActivityPolicy {
@@ -69,6 +101,13 @@ enum AutomaticLiveActivityPolicy {
         if let lastSuccessfulRequestDate = input.lastSuccessfulRequestDate,
            input.now.timeIntervalSince(lastSuccessfulRequestDate) < activityWindow
         {
+            if input.allowsUpdateRecovery,
+               input.hasSuccessfulRequest,
+               input.installedBuildIdentity != nil,
+               input.lastRequestBuildIdentity != input.installedBuildIdentity
+            {
+                return .eligible
+            }
             return .activityWindowStillOpen
         }
 

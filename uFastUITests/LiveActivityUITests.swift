@@ -160,6 +160,45 @@ final class LiveActivityUITests: XCTestCase {
     }
 
     @MainActor
+    func testUpdateRecoveryUsesDeterministicBuildIdentityAndDoesNotRepeatOnSameBuild() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing",
+            "--fixed-now",
+            String(fixedNow.timeIntervalSince1970),
+            "--reset-data",
+            "--seed-active-fast-start",
+            String(fixedNow.addingTimeInterval(-60 * 60).timeIntervalSince1970),
+            "--seed-live-activity-recovery",
+            "--live-activity-build",
+            "B",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(
+            app.buttons["fast.live-activity.hide"].waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+        app.terminate()
+
+        app.launchArguments = [
+            "--ui-testing",
+            "--fixed-now",
+            String(fixedNow.timeIntervalSince1970),
+            "--live-activity-build",
+            "B",
+        ]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(
+            app.buttons["fast.live-activity.show-again"].waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+        XCTAssertFalse(app.buttons["fast.live-activity.hide"].exists)
+    }
+
+    @MainActor
     private func launchLiveActivityApp(additionalArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [

@@ -129,6 +129,21 @@
   window has elapsed and the person later foregrounds uFast. Duplicate and
   in-flight requests are coalesced; the WidgetKit widget remains the durable
   long-fast surface.
+- BR-41: The widget extension supports four read-only families from the same
+  disposable active-fast projection: accessory rectangular on the Lock Screen
+  and small, medium and large on the Home Screen. All four fail closed together;
+  none may become fasting authority or mutate a record.
+- BR-42: Dynamic Island has no separate or persistent banner requirement. While
+  an optional Live Activity is active, uFast supplies compact, minimal and
+  expanded Dynamic Island regions and accepts system-controlled presentation,
+  dismissal and device fallback.
+- BR-43: When automatic Live Activities are enabled, installing a newer app
+  release/build while a fast remains active is one foreground-only recovery
+  opportunity. If the newly installed build becomes active with no matching
+  activity, it may request exactly one replacement before the previous
+  eight-hour window ends. The exception never overrides **Hide for this fast**,
+  global off, ActivityKit availability, request coalescing or duplicate
+  prevention, and it does not apply to an ordinary same-build relaunch.
 
 ## Slice 3.10 supersession
 

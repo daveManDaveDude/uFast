@@ -97,14 +97,24 @@ enum ActiveFastActivityContentError: Error, Equatable, Sendable {
 enum ActiveFastActivityPrivacyState: Equatable, Sendable {
     case visible
     case redacted
+
+    static func make(isPrivacyRedacted: Bool) -> Self {
+        isPrivacyRedacted ? .redacted : .visible
+    }
 }
 
 struct ActiveFastActivityPresentation: Equatable, Sendable {
     let elapsedText: String?
     let elapsedAccessibilityValue: String?
     let progress: Double?
+    /// The sampled percentage remains available to pure projection tests and
+    /// validation. Live Activity views must not render this value because a
+    /// request-time `now` cannot keep ordinary text current while suspended.
     let progressPercentage: Int?
+    /// The sampled percentage wording is retained for projection parity only;
+    /// the Live Activity uses `stableGoalText` for visible and spoken copy.
     let progressAccessibilityValue: String?
+    let stableGoalText: String?
     let targetText: String?
     let hasReachedGoal: Bool
     let accessibilitySummary: String
@@ -129,6 +139,7 @@ struct ActiveFastActivityPresentation: Equatable, Sendable {
             from: elapsed
         )
         let progressAccessibility = "\(percentage) percent of \(contentState.goalHours)-hour goal"
+        let stableGoalText = ActiveFastActivityGoalFormatter.string(hours: contentState.goalHours)
         let target = ActiveFastActivityTargetFormatter.string(
             from: contentState.targetDate,
             locale: locale,
@@ -137,7 +148,7 @@ struct ActiveFastActivityPresentation: Equatable, Sendable {
         let reached = now >= contentState.targetDate
             && contentState.hasLegitimateGoalReachedObservation
 
-        var summary = "uFast, elapsed \(elapsedAccessibility), \(progressAccessibility), target \(target)"
+        var summary = "uFast, elapsed \(elapsedAccessibility), \(stableGoalText), target \(target)"
         if reached {
             summary += ", Goal time reached"
         }
@@ -149,6 +160,7 @@ struct ActiveFastActivityPresentation: Equatable, Sendable {
             progress: progress,
             progressPercentage: percentage,
             progressAccessibilityValue: progressAccessibility,
+            stableGoalText: stableGoalText,
             targetText: target,
             hasReachedGoal: reached,
             accessibilitySummary: summary
@@ -162,10 +174,17 @@ struct ActiveFastActivityPresentation: Equatable, Sendable {
             progress: nil,
             progressPercentage: nil,
             progressAccessibilityValue: nil,
+            stableGoalText: nil,
             targetText: nil,
             hasReachedGoal: false,
             accessibilitySummary: "uFast. Opens uFast."
         )
+    }
+}
+
+enum ActiveFastActivityGoalFormatter {
+    static func string(hours: Int) -> String {
+        "\(hours)-hour goal"
     }
 }
 

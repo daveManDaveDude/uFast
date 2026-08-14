@@ -1,5 +1,6 @@
 @MainActor
 final class DeterministicLiveActivityClient: LiveActivityClient {
+    private(set) var requestedAttributes: [ActiveFastActivityAttributes] = []
     private(set) var requestedContents: [ActiveFastActivityAttributes.ContentState] = []
     private(set) var updatedContents: [(String, ActiveFastActivityAttributes.ContentState)] = []
     private(set) var endedActivityIDs: [String] = []
@@ -46,6 +47,7 @@ final class DeterministicLiveActivityClient: LiveActivityClient {
         )
         nextIdentifier += 1
         storedActivities.append(record)
+        requestedAttributes.append(attributes)
         requestedContents.append(contentState)
         return record
     }

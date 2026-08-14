@@ -11,6 +11,8 @@ final class AppLaunchConfigurationTests: XCTestCase {
             "--seed-multiple-active-fasts",
             "--seed-unknown-provenance", "--fixed-now", "1234.5",
             "--seed-active-fast-start", "1200",
+            "--seed-live-activity-recovery", "--live-activity-release", "1.2.3",
+            "--live-activity-build", "B",
             "--simulate-persistence-bootstrap-failure",
             "--simulate-fast-save-failure", "--simulate-fast-history-failure",
             "--simulate-food-save-failure", "--simulate-drink-save-failure",
@@ -30,9 +32,14 @@ final class AppLaunchConfigurationTests: XCTestCase {
             seedSlice3History: true,
             seedHistoryEventGrouping: true,
             seedActiveFastStart: Date(timeIntervalSince1970: 1200),
+            seedLiveActivityRecovery: true,
             seedMultipleActiveFasts: true,
             seedUnknownProvenance: true
         ))
+        XCTAssertEqual(
+            configuration.liveActivityBuildIdentity,
+            LiveActivityBuildIdentity(releaseVersion: "1.2.3", buildNumber: "B")
+        )
         XCTAssertEqual(configuration.commands, ApplicationCommandConfiguration(
             simulateFastSaveFailure: true,
             simulateFastHistoryFailure: true,
@@ -97,5 +104,9 @@ final class AppLaunchConfigurationTests: XCTestCase {
             failRequests: false,
             failEnds: false
         ))
+        XCTAssertEqual(
+            configuration.liveActivityBuildIdentity,
+            .deterministic()
+        )
     }
 }

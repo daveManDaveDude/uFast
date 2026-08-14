@@ -58,6 +58,12 @@ photos. `ROADMAP.md` records the outcomes and decision gates.
   automatically only after a clear, reversible in-app choice, must be easy to
   hide, and must never become a background restart loop or a dependency of the
   local fasting journey.
+- The shipped widget extension includes the Lock Screen accessory-rectangular
+  widget and all three required Home Screen sizes: small, medium and large.
+  They are read-only views of the same disposable active-fast projection.
+- Dynamic Island support is an optional Live Activity treatment, not a
+  persistent banner promise. uFast supplies compact, minimal and expanded
+  regions while an activity is active, and the system decides when they appear.
 
 ## 1.0 data boundary
 

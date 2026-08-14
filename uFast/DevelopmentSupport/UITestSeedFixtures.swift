@@ -4,6 +4,52 @@ import SwiftData
 // SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
 // swiftlint:disable trailing_comma
 enum UITestSeedFixtures {
+    static func seedFavouritePopulated(in context: ModelContext, clock: any AppClock) {
+        let createdAt = clock.now.addingTimeInterval(-120)
+        guard let id = UUID(uuidString: "10100000-0000-0000-0000-000000000001") else { return }
+        context.insert(HydrationFavouriteRecord(
+            id: id,
+            name: "Sparkling water",
+            volumeMillilitres: 330,
+            isCaloric: false,
+            createdAt: createdAt
+        ))
+    }
+
+    static func seedFavouriteDuplicateName(in context: ModelContext, clock: any AppClock) {
+        context.insert(HydrationFavouriteRecord(
+            name: "Water",
+            volumeMillilitres: 250,
+            isCaloric: false,
+            createdAt: clock.now
+        ))
+    }
+
+    static func seedFavouriteValidation(in context: ModelContext, clock: any AppClock) {
+        context.insert(HydrationFavouriteRecord(
+            name: "",
+            volumeMillilitres: 0,
+            isCaloric: false,
+            createdAt: clock.now
+        ))
+    }
+
+    static func seedCaloricFavouriteActiveFast(in context: ModelContext, clock: any AppClock) {
+        let createdAt = clock.now.addingTimeInterval(-120)
+        guard let id = UUID(uuidString: "10100000-0000-0000-0000-000000000002") else { return }
+        context.insert(HydrationFavouriteRecord(
+            id: id,
+            name: "Juice",
+            volumeMillilitres: 250,
+            isCaloric: true,
+            createdAt: createdAt
+        ))
+        context.insert(FastRecord(
+            startDate: clock.now.addingTimeInterval(-3600),
+            goalAtStart: .default
+        ))
+    }
+
     static func seedSlice3History(in context: ModelContext, clock: any AppClock) throws {
         if try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty {
             context.insert(AppSettingsRecord(hasCompletedOnboarding: true))

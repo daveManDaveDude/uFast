@@ -18,6 +18,83 @@ struct HistoryPresentationSnapshot: Equatable {
     }
 }
 
+/// The moving ribbon's deliberately lossy value projection.  It contains no
+/// food descriptions, nutrition, editor payloads, settings or SwiftData
+/// models.  Settled History continues to use `HistoryPresentationSnapshot` as
+/// its exact authority.
+struct HistoryMotionIntervalPrimitive: Equatable, Sendable {
+    let id: UUID
+    let start: Date
+    let end: Date
+    let kind: TemporalRibbonIntervalItem.Kind
+    let isActive: Bool
+}
+
+struct HistoryMotionEventPrimitive: Equatable, Sendable {
+    let id: UUID
+    let occurredAt: Date
+    let kind: TemporalRibbonEventItem.Kind
+}
+
+struct HistoryMotionPresentation: Equatable, Sendable {
+    let window: DateInterval
+    let intervals: [HistoryMotionIntervalPrimitive]
+    let events: [HistoryMotionEventPrimitive]
+
+    init(_ snapshot: HistoryPresentationSnapshot) {
+        window = snapshot.window
+        intervals = snapshot.fastItems.map {
+            HistoryMotionIntervalPrimitive(
+                id: $0.id,
+                start: $0.startDate,
+                end: $0.endDate,
+                kind: $0.ribbonKind,
+                isActive: $0.kind == .active
+            )
+        }
+        events = snapshot.events.map {
+            HistoryMotionEventPrimitive(id: $0.id, occurredAt: $0.occurredAt, kind: $0.kind)
+        }
+    }
+
+    init(
+        window: DateInterval,
+        intervals: [HistoryMotionIntervalPrimitive],
+        events: [HistoryMotionEventPrimitive]
+    ) {
+        self.window = window
+        self.intervals = intervals
+        self.events = events
+    }
+
+    func ribbonIntervals(activeEndingAt now: Date) -> [TemporalRibbonIntervalItem] {
+        intervals.map { primitive in
+            TemporalRibbonIntervalItem(
+                id: primitive.id,
+                start: primitive.start,
+                end: primitive.isActive ? now : primitive.end,
+                title: primitive.kind == .active ? "Active fast" : "Fast",
+                detail: "",
+                accessibilityLabel: primitive.kind == .active ? "Active fast" : "Fast",
+                kind: primitive.kind
+            )
+        }
+    }
+
+    var ribbonEvents: [TemporalRibbonEventItem] {
+        events.map { primitive in
+            TemporalRibbonEventItem(
+                id: primitive.id,
+                occurredAt: primitive.occurredAt,
+                title: primitive.kind == .food ? "Food" : "Drink",
+                detail: "",
+                accessibilityLabel: primitive.kind == .food ? "Food event" : "Drink event",
+                kind: primitive.kind
+            )
+        }
+    }
+}
+
 struct HistoryPresentationKey: Equatable {
     let data: HistoryDataSlice
     let localeIdentifier: String
@@ -217,8 +294,8 @@ enum HistoryPresentationBuilder {
     }
 }
 
-struct HistoryVisibleFastItem: Identifiable, Equatable {
-    enum Kind: Equatable { case recorded, active, automatic, previouslySaved, unavailable }
+struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
+    enum Kind: Equatable, Sendable { case recorded, active, automatic, previouslySaved, unavailable }
 
     let id: UUID
     let startDate: Date

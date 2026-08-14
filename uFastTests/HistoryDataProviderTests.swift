@@ -6,6 +6,32 @@ import XCTest
 
 @MainActor
 final class HistoryDataProviderTests: XCTestCase {
+    func testCarouselUsesExactSourceOnlyForSelectedSettledPage() {
+        XCTAssertEqual(
+            TemporalHistoryCarousel.presentationSource(
+                isSelectedPage: true,
+                movementPhase: .settled
+            ),
+            .settled
+        )
+        for phase: TemporalCarouselMovementPhase in [.userDriven, .decelerating, .aligning, .programmatic] {
+            XCTAssertEqual(
+                TemporalHistoryCarousel.presentationSource(
+                    isSelectedPage: true,
+                    movementPhase: phase
+                ),
+                .motion
+            )
+        }
+        XCTAssertEqual(
+            TemporalHistoryCarousel.presentationSource(
+                isSelectedPage: false,
+                movementPhase: .settled
+            ),
+            .motion
+        )
+    }
+
     @MainActor
     private struct LegacyFixture {
         let container: ModelContainer
@@ -157,30 +183,26 @@ final class HistoryDataProviderTests: XCTestCase {
         )
     }
 
-    func testMotionWindowIsCalendarBoundedAcrossDaylightSavingAndMaximumDate() throws {
+    func testMotionCoverageIsCalendarBoundedAcrossDaylightSavingAndMaximumDate() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/London"))
         let selectedDay = try XCTUnwrap(
             calendar.date(from: DateComponents(year: 2027, month: 3, day: 28))
         )
         let maximumDay = try XCTUnwrap(calendar.date(byAdding: .day, value: 3, to: selectedDay))
-        let interval = try XCTUnwrap(HistoryMotionWindow.interval(
+        let coverage = HistoryMotionCoverage.initial(
             centeredOn: selectedDay,
             maximumDate: maximumDay,
             calendar: calendar
-        ))
-
-        XCTAssertEqual(
-            calendar.dateComponents([.day], from: interval.start, to: interval.end).day,
-            HistoryMotionWindow.dayRadius + 4
         )
-        XCTAssertEqual(
-            interval.end,
-            calendar.date(byAdding: .day, value: 1, to: maximumDay)
-        )
+        XCTAssertEqual(coverage.lastDay, maximumDay)
+        XCTAssertEqual(coverage.days(calendar: calendar).count, 124)
+        let visualWindow = try XCTUnwrap(coverage.visualWindow(calendar: calendar))
+        let visualDuration: TimeInterval = visualWindow.duration
+        let elapsedDayDuration: TimeInterval = 124 * 24 * 60 * 60 + 2 * 60 * 60
         XCTAssertNotEqual(
-            interval.duration,
-            TimeInterval(HistoryMotionWindow.dayRadius + 4) * 24 * 60 * 60,
+            visualDuration,
+            elapsedDayDuration,
             "Calendar-day preloading must remain correct across the spring DST transition."
         )
     }

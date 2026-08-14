@@ -87,8 +87,32 @@ struct TodayFeatureSnapshot: Equatable {
     let activeFasts: [ActiveFastSnapshot]
     let foodEntries: [FoodEntrySnapshot]
     let hydrationEntries: [HydrationEntrySnapshot]
+    let hydrationFavourites: [HydrationFavouriteSnapshot]
+
+    init(
+        settings: [AppSettingsSnapshot],
+        activeFasts: [ActiveFastSnapshot],
+        foodEntries: [FoodEntrySnapshot],
+        hydrationEntries: [HydrationEntrySnapshot],
+        hydrationFavourites: [HydrationFavouriteSnapshot] = []
+    ) {
+        self.settings = settings
+        self.activeFasts = activeFasts
+        self.foodEntries = foodEntries
+        self.hydrationEntries = hydrationEntries
+        self.hydrationFavourites = hydrationFavourites
+    }
 }
 
 struct SettingsFeatureSnapshot: Equatable {
     let settings: [AppSettingsSnapshot]
+    let hydrationFavourites: [HydrationFavouriteSnapshot]
+
+    init(
+        settings: [AppSettingsSnapshot],
+        hydrationFavourites: [HydrationFavouriteSnapshot] = []
+    ) {
+        self.settings = settings
+        self.hydrationFavourites = hydrationFavourites
+    }
 }

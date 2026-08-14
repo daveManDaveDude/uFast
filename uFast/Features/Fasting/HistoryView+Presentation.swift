@@ -1,6 +1,49 @@
 import SwiftUI
 
+// swiftlint:disable opening_brace
+
 extension HistoryView {
+    @ViewBuilder
+    var motionUnavailableNotice: some View {
+        if motionSnapshot == nil {
+            VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                Text("History temporarily unavailable")
+                    .font(.headline)
+                    .foregroundStyle(UFastTheme.primary)
+                Text("Your saved records are still safe on this iPhone. Try loading this runway again.")
+                    .font(.subheadline)
+                    .foregroundStyle(UFastTheme.secondaryText)
+                Button("Try again") {
+                    _ = ensureMotionRunway(around: selectedDate)
+                }
+                .buttonStyle(UFastSecondaryButtonStyle())
+                .accessibilityIdentifier("history.motion-retry")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .uFastCard()
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+            .accessibilityIdentifier("history.motion-unavailable")
+        } else if !motionFailedEdges.isEmpty {
+            HStack(spacing: UFastTheme.Spacing.compact) {
+                Text("More history is still available to load.")
+                    .font(.subheadline)
+                    .foregroundStyle(UFastTheme.secondaryText)
+                Spacer()
+                Button("Retry") {
+                    let failed = motionFailedEdges
+                    motionFailedEdges.removeAll()
+                    for edge in failed {
+                        requestMotionExtension(edge)
+                    }
+                }
+                .buttonStyle(UFastSecondaryButtonStyle())
+                .accessibilityIdentifier("history.motion-extension-retry")
+            }
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+            .accessibilityIdentifier("history.motion-extension-unavailable")
+        }
+    }
+
     var periodHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -56,7 +99,10 @@ extension HistoryView {
     }
 
     var historyDates: [Date] {
-        historyDayBuffer?.days ?? [calendar.startOfDay(for: selectedDate)]
+        // Only dates with a complete compact projection are exposed to the
+        // native carousel.  Before the initial runway is ready, an empty date
+        // list is preferable to mislabelling an unloaded page as empty.
+        motionSnapshot?.dates ?? []
     }
 
     var dateNavigatorDates: [Date] {
@@ -239,6 +285,16 @@ extension HistoryView {
         guard let change = coordinator.select(date, source: source, calendar: calendar),
               change.day <= historyDisplayMaximumDay
         else { return }
+        // Deliberate date-picker/rail jumps must not expose the target day
+        // until its complete target runway has been fetched.  A failed jump
+        // leaves the previous selection, exact presentation and motion cache
+        // untouched.  Carousel settlement stays on the already loaded runway.
+        if source != .carousel,
+           !(motionSnapshot?.coverage.contains(change.day, calendar: calendar) ?? false),
+           !ensureMotionRunway(around: change.day)
+        {
+            return
+        }
         selectedDate = change.day
         if let window = TemporalHistoryPresentation.ribbonWindow(
             containing: change.day,
@@ -289,17 +345,9 @@ extension HistoryView {
     }
 
     func ensureHistoryDayCoverage(around date: Date) {
-        var buffer = historyDayBuffer ?? TemporalDayBuffer(
-            centeredOn: date,
-            maximumDate: historyDisplayMaximumDay,
-            calendar: calendar
-        )
-        buffer.ensureCoverage(
-            around: date,
-            maximumDate: historyDisplayMaximumDay,
-            calendar: calendar
-        )
-        historyDayBuffer = buffer
+        // Retained name for the existing motion coordination call sites.  The
+        // HS-101 coordinator owns both the loaded dates and projection.
+        ensureMotionRunway(around: date)
     }
 
     func resetToCurrentDayIfSelected() {
@@ -367,7 +415,7 @@ extension HistoryView {
                 calendar: calendar
             )?.interval
         else { return nil }
-        reloadHistory(in: visibleInterval)
+        reloadHistoryAfterMutation(in: visibleInterval)
         var presentationCalendar = calendar
         presentationCalendar.timeZone = timeZone
         let groups = TemporalEventGrouping.project(

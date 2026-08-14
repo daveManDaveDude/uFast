@@ -23,6 +23,10 @@ protocol TodayFeatureCommanding: AnyObject {
     ) throws
     func deleteFood(id: UUID) throws
     func todayAddFavouriteDrink(_ favourite: HydrationFavourite) throws
+    func todayAddFavouriteDrink(
+        _ favourite: HydrationFavourite,
+        endingActiveFast: Bool
+    ) throws
     func saveHydration(
         _ draft: HydrationEntryDraft,
         replacing recordID: UUID?,
@@ -63,7 +67,14 @@ extension ApplicationCommands: TodayFeatureCommanding {
     }
 
     func todayAddFavouriteDrink(_ favourite: HydrationFavourite) throws {
-        try addFavouriteDrink(favourite)
+        try addFavouriteDrink(favourite, endingActiveFast: false)
+    }
+
+    func todayAddFavouriteDrink(
+        _ favourite: HydrationFavourite,
+        endingActiveFast: Bool
+    ) throws {
+        try addFavouriteDrink(favourite, endingActiveFast: endingActiveFast)
     }
 
     func todayUpdateAutomaticLiveActivityPreference(
@@ -168,6 +179,14 @@ final class TodayFeatureController {
     func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
         guard let commands else { throw ApplicationCommandError.recordNotFound }
         try commands.todayAddFavouriteDrink(favourite)
+    }
+
+    func addFavouriteDrink(
+        _ favourite: HydrationFavourite,
+        endingActiveFast: Bool
+    ) throws {
+        guard let commands else { throw ApplicationCommandError.recordNotFound }
+        try commands.todayAddFavouriteDrink(favourite, endingActiveFast: endingActiveFast)
     }
 
     func saveHydration(

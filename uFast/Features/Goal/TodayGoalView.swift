@@ -18,6 +18,8 @@ struct TodayGoalView: View {
     @State var endTimeEditor: EndTimeEditorPresentation?
     @State var foodEditor: FoodEditorPresentation?
     @State var isDrinkSheetPresented = false
+    @State var caloricFavouritePending: HydrationFavourite?
+    @State var isCaloricFavouriteConfirmationPresented = false
     @State var hydrationEditor: HydrationEditorPresentation?
     @State var drinkAnnouncement: String?
     @State var isEndConfirmationPresented = false
@@ -193,18 +195,42 @@ struct TodayGoalView: View {
         }
         .sheet(isPresented: $isDrinkSheetPresented) {
             AddDrinkSheet(
-                favourites: HydrationFavouriteProvider.favourites(snapshot: authoritativeSettings),
+                favourites: HydrationFavouriteProvider.combined(
+                    settings: authoritativeSettings,
+                    userCreated: snapshot.hydrationFavourites
+                ),
                 onAdd: { favourite in
                     try addFavouriteDrink(favourite)
-                    drinkAnnouncement = "\(favourite.type.displayName), "
+                    drinkAnnouncement = "\(favourite.displayName), "
                         + "\(favourite.volumeMillilitres) millilitres, added."
                     isDrinkSheetPresented = false
+                },
+                onConfirmationRequired: { favourite in
+                    caloricFavouritePending = favourite
+                    isDrinkSheetPresented = false
+                    isCaloricFavouriteConfirmationPresented = true
                 },
                 onChooseAnother: {
                     isDrinkSheetPresented = false
                     hydrationEditor = HydrationEditorPresentation(record: nil)
                 },
                 onCancel: { isDrinkSheetPresented = false }
+            )
+        }
+        .alert(
+            "This entry is during your recorded fast.",
+            isPresented: $isCaloricFavouriteConfirmationPresented
+        ) {
+            Button("Cancel", role: .cancel) {
+                caloricFavouritePending = nil
+            }
+            Button("Save and end fast") {
+                savePendingCaloricFavourite(endingActiveFast: true)
+            }
+        } message: {
+            Text(
+                "Saving this caloric event records the drink and ends your fast at "
+                    + "\(clock.now.formatted(date: .omitted, time: .shortened))."
             )
         }
         .sheet(item: $hydrationEditor) { presentation in
@@ -408,6 +434,20 @@ extension TodayGoalView {
 
     private func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
         try controller.addFavouriteDrink(favourite)
+    }
+
+    private func savePendingCaloricFavourite(endingActiveFast: Bool) {
+        guard let favourite = caloricFavouritePending else { return }
+        do {
+            try controller.addFavouriteDrink(favourite, endingActiveFast: endingActiveFast)
+            drinkAnnouncement = "\(favourite.displayName), \(favourite.volumeMillilitres) millilitres, added."
+            caloricFavouritePending = nil
+            isCaloricFavouriteConfirmationPresented = false
+        } catch {
+            isCaloricFavouriteConfirmationPresented = false
+            caloricFavouritePending = nil
+            controller.startError = "Your drink couldn’t be added. Please try again."
+        }
     }
 
     private func saveHydration(_ draft: HydrationEntryDraft, record: HydrationEntrySnapshot?, endingActiveFast: Bool) throws {

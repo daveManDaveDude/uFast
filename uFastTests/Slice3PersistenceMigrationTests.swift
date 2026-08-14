@@ -192,6 +192,10 @@ final class Slice3PersistenceMigrationTests: XCTestCase {
         XCTAssertEqual(unknown.reason, .userChoice)
         XCTAssertEqual(unknown.boundaryPair, fixture.boundaries)
         XCTAssertEqual(unknown.createdAt, fixture.createdAt)
+
+        XCTAssertTrue(
+            try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty
+        )
     }
 
     func testRecordedAndReconstructedHistorySurviveDiskReopenWithAdditiveDefaults() throws {

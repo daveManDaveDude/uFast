@@ -6,6 +6,7 @@ struct AddDrinkSheet: View {
 
     let favourites: [HydrationFavourite]
     let onAdd: (HydrationFavourite) throws -> Void
+    var onConfirmationRequired: (HydrationFavourite) -> Void = { _ in }
     let onChooseAnother: () -> Void
     let onCancel: () -> Void
 
@@ -14,7 +15,7 @@ struct AddDrinkSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
                     UFastSectionHeading("Favourites")
-                    ForEach(favourites, id: \.type) { favourite in
+                    ForEach(favourites) { favourite in
                         Button {
                             add(favourite)
                         } label: {
@@ -25,11 +26,14 @@ struct AddDrinkSheet: View {
                                     .frame(width: 44, height: 44)
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(favourite.type.displayName)
+                                    Text(favourite.displayName)
                                         .font(.headline)
                                         .foregroundStyle(UFastTheme.primary)
-                                    Text("\(favourite.volumeMillilitres) ml")
-                                        .foregroundStyle(UFastTheme.secondaryText)
+                                    Text(
+                                        "\(favourite.volumeMillilitres) ml · "
+                                            + "\(favourite.isCaloric ? "Caloric" : "Non-caloric")"
+                                    )
+                                    .foregroundStyle(UFastTheme.secondaryText)
                                 }
                                 Spacer()
                             }
@@ -37,9 +41,10 @@ struct AddDrinkSheet: View {
                         }
                         .buttonStyle(UFastActionRowButtonStyle())
                         .disabled(isSaving)
-                        .accessibilityLabel(favourite.type.displayName)
+                        .accessibilityLabel(favourite.displayName)
                         .accessibilityValue("\(favourite.volumeMillilitres) millilitres")
-                        .accessibilityIdentifier("drink.favourite.\(favourite.type.rawValue)")
+                        .accessibilityHint(favourite.isCaloric ? "Caloric" : "Non-caloric")
+                        .accessibilityIdentifier(identifier(for: favourite))
                     }
 
                     Button("Add another drink") { onChooseAnother() }
@@ -55,6 +60,7 @@ struct AddDrinkSheet: View {
                 }
                 .padding(UFastTheme.Spacing.standard)
             }
+            .accessibilityIdentifier("drink.picker")
             .background(UFastTheme.canvas)
             .navigationTitle("Add a drink")
             .navigationBarTitleDisplayMode(.inline)
@@ -73,10 +79,19 @@ struct AddDrinkSheet: View {
         do {
             try onAdd(favourite)
             saveError = nil
+        } catch HydrationEntrySaveError.confirmationRequired {
+            isSaving = false
+            onConfirmationRequired(favourite)
         } catch {
             saveError = "Your drink couldn’t be added. Please try again."
             isSaving = false
         }
+    }
+
+    private func identifier(for favourite: HydrationFavourite) -> String {
+        favourite.isUserCreated
+            ? "drink.favourite.custom.\(favourite.id.uuidString)"
+            : "drink.favourite.\(favourite.type.rawValue)"
     }
 
     private func symbol(for type: HydrationDrinkType) -> String {

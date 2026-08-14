@@ -1,6 +1,8 @@
 import SwiftData
 import SwiftUI
 
+// swiftlint:disable trailing_comma
+
 // swiftlint:disable blanket_disable_command superfluous_disable_command line_length force_unwrapping switch_case_alignment trailing_comma
 struct HistoryView: View {
     static let futureDisplayDayCount = 1
@@ -13,12 +15,30 @@ struct HistoryView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.timeZone) var timeZone
+    @Query(sort: [
+        SortDescriptor(\HydrationFavouriteRecord.createdAt),
+        SortDescriptor(\HydrationFavouriteRecord.creationOrder),
+        SortDescriptor(\HydrationFavouriteRecord.id),
+    ])
+    private var hydrationFavouriteRecords: [HydrationFavouriteRecord]
     @State var historyData: HistoryDataSlice?
     @State var historyPresentation: HistoryPresentationSnapshot?
     @State var presentationCache = HistoryPresentationCache()
-    @State var motionHistoryData: HistoryDataSlice?
-    @State var motionHistoryPresentation: HistoryPresentationSnapshot?
-    @State var motionPresentationCache = HistoryPresentationCache()
+    /// Dates and compact motion primitives are published through one immutable
+    /// snapshot.  Keeping this as one state value prevents a date page from
+    /// becoming visible before its complete 26-hour projection is available.
+    @State var motionSnapshot: HistoryMotionSnapshot?
+    @State var motionChunks: [HistoryMotionChunk] = []
+    @State var motionGeneration = 0
+    @State var motionInitialLoading = false
+    @State var motionPendingTarget: Date?
+    @State var motionPriorSnapshot: HistoryMotionSnapshot?
+    @State var motionPriorChunks: [HistoryMotionChunk] = []
+    @State var motionPriorSelectedDate: Date?
+    @State var motionPendingEnvironmentRebuild = false
+    @State var historyDataRevision = 0
+    @State var motionLoadingEdges: Set<HistoryMotionEdge> = []
+    @State var motionFailedEdges: Set<HistoryMotionEdge> = []
     @State var editor: CompletedFastEditorPresentation?
     @State var foodEditor: HistoryFoodEditorPresentation?
     @State var hydrationEditor: HistoryHydrationEditorPresentation?
@@ -26,7 +46,6 @@ struct HistoryView: View {
     @State var eventGroupDisclosure: TemporalEventGroup?
     @State var isCalendarPresented = false
     @State var selectedDate: Date
-    @State var historyDayBuffer: TemporalDayBuffer?
     @State var temporalMovementPhase = TemporalCarouselMovementPhase.settled
     @State var coupledScrollPresentation = TemporalCoupledScrollPresentation()
     @State var historyInteractionRevision = 0
@@ -105,7 +124,9 @@ extension HistoryView {
                         }
                     )
                     .padding(.horizontal, UFastTheme.Spacing.standard)
-                    .allowsHitTesting(!temporalMovementPhase.suppressesAutomaticAlignment)
+                    .allowsHitTesting(
+                        !temporalMovementPhase.suppressesAutomaticAlignment && !motionInitialLoading
+                    )
                     .id(historyInteractionRevision)
 
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -114,10 +135,10 @@ extension HistoryView {
                             selection: selectedDateBinding(source: .carousel),
                             intervals: historyPresentation?.intervals(activeEndingAt: clock.now) ?? [],
                             events: historyPresentation?.events ?? [],
-                            motionIntervals: motionHistoryPresentation?.intervals(
+                            motionIntervals: motionSnapshot?.presentation.ribbonIntervals(
                                 activeEndingAt: clock.now
                             ) ?? historyPresentation?.intervals(activeEndingAt: clock.now) ?? [],
-                            motionEvents: motionHistoryPresentation?.events
+                            motionEvents: motionSnapshot?.presentation.ribbonEvents
                                 ?? historyPresentation?.events ?? [],
                             onSelectInterval: openInterval,
                             onSelectEvent: openEvent,
@@ -139,11 +160,14 @@ extension HistoryView {
                             onSettledVisibleWindow: { window in
                                 settledVisibleWindow = window
                                 reloadHistory(in: window.interval)
-                            }
+                            },
+                            onPrefetchIntentAt: requestMotionExtension
                         )
                         .padding(.horizontal, UFastTheme.Spacing.standard)
-                        .allowsHitTesting(!isDateRailMoving)
+                        .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
                     }
+
+                    motionUnavailableNotice
 
                     if isFutureSelection {
                         futureReadOnlyNotice
@@ -197,7 +221,10 @@ extension HistoryView {
             rebuildHistoryPresentation()
         }
         .onChange(of: timeZone.identifier) { _, _ in
-            rebuildHistoryPresentation()
+            rebuildHistoryForEnvironmentChange()
+        }
+        .onChange(of: calendar.identifier) { _, _ in
+            rebuildHistoryForEnvironmentChange()
         }
         .sheet(isPresented: $isCalendarPresented) {
             NavigationStack {
@@ -236,13 +263,13 @@ extension HistoryView {
                         startDate: startDate,
                         endDate: endDate
                     )
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                     editor = nil
                 },
                 onDelete: {
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
                     try applicationCommands.deleteCompletedFast(id: presentation.id)
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                     editor = nil
                 },
                 onCancel: { editor = nil }
@@ -263,13 +290,13 @@ extension HistoryView {
                         goal: authoritativeSettings?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                     foodEditor = nil
                 },
                 onDelete: {
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
                     try applicationCommands.deleteFood(id: presentation.record.id)
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                     foodEditor = nil
                 },
                 onCancel: { foodEditor = nil }
@@ -290,13 +317,13 @@ extension HistoryView {
                         goal: authoritativeSettings?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                     hydrationEditor = nil
                 },
                 onDelete: {
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
                     try applicationCommands.deleteHydration(id: presentation.record.id)
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                     hydrationEditor = nil
                 },
                 onCancel: { hydrationEditor = nil }
@@ -307,7 +334,19 @@ extension HistoryView {
                 presentation: presentation,
                 clock: clock,
                 activeFastStart: authoritativeActiveFast?.startDate,
-                favourites: HydrationFavouriteProvider.favourites(snapshot: authoritativeSettings),
+                favourites: HydrationFavouriteProvider.combined(
+                    settings: authoritativeSettings,
+                    userCreated: hydrationFavouriteRecords.map(\.snapshot)
+                ),
+                resolveFavouriteDraft: { favourite, occurredAt in
+                    guard let applicationCommands else {
+                        throw ApplicationCommandError.recordNotFound
+                    }
+                    return try applicationCommands.hydrationDraft(
+                        for: favourite,
+                        occurredAt: occurredAt
+                    )
+                },
                 onSaveFood: { draft, endingActiveFast in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
                     try applicationCommands.saveFood(
@@ -316,7 +355,7 @@ extension HistoryView {
                         goal: authoritativeSettings?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                 },
                 onSaveHydration: { draft, endingActiveFast in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
@@ -326,7 +365,7 @@ extension HistoryView {
                         goal: authoritativeSettings?.fastingGoal ?? .default,
                         endingActiveFast: endingActiveFast
                     )
-                    reloadHistory()
+                    reloadHistoryAfterMutation()
                 },
                 onClose: { directHistoricalEntry = nil }
             )

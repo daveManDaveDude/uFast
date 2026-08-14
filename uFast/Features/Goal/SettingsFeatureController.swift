@@ -1,9 +1,22 @@
+import Foundation
 import Observation
 
 @MainActor
 protocol SettingsFeatureCommanding: AnyObject {
     func settingsUpdateGoal(_ goal: FastingGoal) throws
     func settingsUpdateHydrationFavourites(water: Int, tea: Int, coffee: Int) throws
+    func settingsCreateFavourite(
+        name: String,
+        volumeMillilitres: Int,
+        isCaloric: Bool
+    ) throws
+    func settingsUpdateFavourite(
+        id: UUID,
+        name: String,
+        volumeMillilitres: Int,
+        isCaloric: Bool
+    ) throws
+    func settingsDeleteFavourite(id: UUID) throws
     func settingsUpdateAutomaticLiveActivityPreference(
         _ preference: AutomaticLiveActivityPreference,
         projectSystemSurfaces: Bool,
@@ -21,6 +34,36 @@ extension ApplicationCommands: SettingsFeatureCommanding {
         try updateHydrationFavourites(water: water, tea: tea, coffee: coffee)
     }
 
+    func settingsCreateFavourite(
+        name: String,
+        volumeMillilitres: Int,
+        isCaloric: Bool
+    ) throws {
+        _ = try createFavourite(
+            name: name,
+            volumeMillilitres: volumeMillilitres,
+            isCaloric: isCaloric
+        )
+    }
+
+    func settingsUpdateFavourite(
+        id: UUID,
+        name: String,
+        volumeMillilitres: Int,
+        isCaloric: Bool
+    ) throws {
+        _ = try updateFavourite(
+            id: id,
+            name: name,
+            volumeMillilitres: volumeMillilitres,
+            isCaloric: isCaloric
+        )
+    }
+
+    func settingsDeleteFavourite(id: UUID) throws {
+        try deleteFavourite(id: id)
+    }
+
     func settingsUpdateAutomaticLiveActivityPreference(
         _ preference: AutomaticLiveActivityPreference,
         projectSystemSurfaces: Bool,
@@ -35,6 +78,39 @@ extension ApplicationCommands: SettingsFeatureCommanding {
 
     func settingsDeleteAllData() throws {
         try deleteAllData()
+    }
+}
+
+extension SettingsFeatureCommanding {
+    func settingsCreateFavourite(
+        name _: String,
+        volumeMillilitres _: Int,
+        isCaloric _: Bool
+    ) throws {
+        throw ApplicationCommandError.recordNotFound
+    }
+
+    func settingsUpdateFavourite(
+        id _: UUID,
+        name _: String,
+        volumeMillilitres _: Int,
+        isCaloric _: Bool
+    ) throws {
+        throw ApplicationCommandError.recordNotFound
+    }
+
+    func settingsDeleteFavourite(id _: UUID) throws {
+        throw ApplicationCommandError.recordNotFound
+    }
+}
+
+extension TodayFeatureCommanding {
+    func todayAddFavouriteDrink(
+        _ favourite: HydrationFavourite,
+        endingActiveFast: Bool
+    ) throws {
+        guard !endingActiveFast else { throw ApplicationCommandError.recordNotFound }
+        try todayAddFavouriteDrink(favourite)
     }
 }
 
@@ -131,6 +207,39 @@ final class SettingsFeatureController {
         } catch {
             deleteError = "Your data couldn’t be deleted. Please try again."
         }
+    }
+
+    func createFavourite(_ name: String, amount: String, isCaloric: Bool) throws {
+        guard let volume = Int(amount), let commands else {
+            throw HydrationFavouriteStoreError.invalidAmount
+        }
+        try commands.settingsCreateFavourite(
+            name: name,
+            volumeMillilitres: volume,
+            isCaloric: isCaloric
+        )
+    }
+
+    func updateFavourite(
+        id: UUID,
+        name: String,
+        amount: String,
+        isCaloric: Bool
+    ) throws {
+        guard let volume = Int(amount), let commands else {
+            throw HydrationFavouriteStoreError.invalidAmount
+        }
+        try commands.settingsUpdateFavourite(
+            id: id,
+            name: name,
+            volumeMillilitres: volume,
+            isCaloric: isCaloric
+        )
+    }
+
+    func deleteFavourite(id: UUID) throws {
+        guard let commands else { throw ApplicationCommandError.recordNotFound }
+        try commands.settingsDeleteFavourite(id: id)
     }
 }
 
