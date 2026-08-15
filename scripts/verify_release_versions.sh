@@ -18,8 +18,9 @@ show_build_settings() {
     local target="$1"
     DEVELOPER_DIR="$developer_dir" xcodebuild \
         -project "$project_file" \
-        -target "$target" \
+        -scheme "$target" \
         -configuration Release \
+        -derivedDataPath "$verification_derived_data" \
         -showBuildSettings 2>/dev/null \
         | awk -F ' = ' '/^[[:space:]]*(MARKETING_VERSION|CURRENT_PROJECT_VERSION) = / {
             key = $1
