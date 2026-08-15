@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PrivacySafetyView: View {
     private let privacyPolicyURL = URL(
-        string: "https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY_AUTOMATIC_LIVE_ACTIVITIES.md"
+        string: "https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md"
     )
     private let supportURL = URL(string: "https://github.com/daveManDaveDude/uFast/issues")
 

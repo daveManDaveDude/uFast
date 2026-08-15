@@ -1,35 +1,53 @@
 # uFast privacy policy
 
-**Effective date:** 1 August 2026
+**Effective date:** 14 August 2026
 
-uFast is a non-medical personal record-keeping app for fasting, food,
-hydration and history. This policy describes the local-only 1.0 release.
+uFast is a non-medical, local-only personal record-keeping app for fasting,
+food, hydration and history.
 
 ## What uFast stores
 
 uFast stores information you choose to enter: fasting intervals, food entries,
 hydration entries, fasting and drink settings, and legacy history required by
-the app's local schema.
+the app's local schema. If you use Live Activities, uFast also stores the
+automatic Live Activity preference and minimal presentation lifecycle metadata
+needed to avoid duplicate requests and honour **Hide for this fast**.
 
 ## Where data is stored
 
-Those records are stored locally in uFast's protected app container on your
-iPhone. uFast does not provide an account, cloud sync, backup, restore, export,
-import or password recovery. Deleting the app or losing the iPhone may
-permanently remove the local records.
+Those records and presentation values are stored locally in uFast's protected
+storage on your iPhone. uFast does not provide an account, cloud sync, backup,
+restore, export, import or password recovery. Deleting the app or losing the
+iPhone may permanently remove the local records.
+
+## Lock Screen, Home Screen and Dynamic Island visibility
+
+Widgets and Live Activities are optional. If you add a widget or enable a Live
+Activity, elapsed time, goal progress and your selected target may be visible
+on the Lock Screen, Home Screen or Dynamic Island according to your iPhone's
+system settings.
+
+Automatic Live Activities are off until you choose to enable them. Each Live
+Activity stays active for up to eight hours. If a fast continues, uFast may
+request a new activity only when you later open or foreground the app. You can
+turn the setting off, remove a widget or choose **Hide for this fast** at any
+time. Live Activity requests are local ActivityKit requests; they use no uFast
+server, APNs or network connection.
 
 ## What uFast does not collect
 
-The 1.0 app does not send user-created fasting, food, hydration or settings
-records to the developer or a third party. It has no analytics, advertising,
-tracking, HealthKit integration or developer-operated backend.
+The app does not send user-created fasting, food, hydration, settings, widget
+or Live Activity records to the developer or a third party. It has no
+analytics, advertising, tracking, HealthKit integration or developer-operated
+backend.
 
 ## Deletion
 
 Settings provides **Delete all data**, which requires two explicit confirmations
-and removes every uFast record stored on the iPhone, including settings and
-legacy history. The action does not remove data outside uFast. uFast cannot
-recover records deleted from the local store or removed with the app.
+and removes every uFast record, setting and Live Activity lifecycle value stored
+on the iPhone, including legacy history. The action does not remove data outside
+uFast. uFast cannot recover records deleted from local storage or removed with
+the app.
 
 ## Support requests
 
