@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Sprint Story"
+  short_description: "Draft sprint-ready stories with Sol readiness gates"
+  default_prompt: "Use $create-sprint-ready-story to draft or append a sprint-ready story with a focused Sol readiness review."

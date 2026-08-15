@@ -76,22 +76,23 @@ are still active.
 
 - The implementation Luna runs focused unit tests and the UI tests added or
   changed by its story before handoff. It should not run the full UI suite
-  unless Sol specifically requests it to diagnose a failure.
-- After reviewing the implementation and changed tests, Sol should delegate
-  noisy integration commands to a fresh, read-only Luna verification worker
-  when one is available. That worker may generate build logs and result bundles
-  but must not edit product or test source.
+  during story work; Luna runs the complete suite at the integration gate or
+  when a Sol reviewer requests a targeted rerun to diagnose a failure.
+- After the implementation handoff, Luna should delegate noisy integration
+  commands to a fresh, read-only Luna verification worker when one is available.
+  That worker may generate build logs and result bundles but must not edit
+  product or test source.
 - The verification worker returns only command status, test counts, concise
   failure summaries, and paths to logs and `.xcresult` bundles. Do not paste
   routine `xcodebuild` output into the main thread.
-- Sol independently inspects the changed tests and actual result artifacts,
-  runs `make verify-ui-result UI_XCRESULT=<path>` for the final UI result, and
-  remains the sole acceptance authority. A verifier handoff is evidence, not
-  acceptance.
-- Sol reruns an expensive command itself only when both conditions hold: the
-  evidence is missing, inconsistent, or shows a failure; and a Luna verification
-  worker is unavailable. Do not duplicate a passing verification run merely to
-  establish independence.
+- A read-only Sol review agent independently inspects the changed tests and
+  actual result artifacts and remains the sole acceptance authority. Luna runs
+  `make verify-ui-result UI_XCRESULT=<path>` for the final UI result and includes
+  its compact output in the Sol integration packet. A verifier handoff is
+  evidence, not acceptance.
+- If evidence is missing, inconsistent, or shows a failure, Sol requests the
+  smallest appropriate rerun from Luna. Do not duplicate a passing verification
+  run merely to establish independence.
 
 ### Test preflight
 
@@ -178,7 +179,12 @@ when the simulator or execution environment materially changes:
 
 ## Codex sprint orchestration
 
-- Sol is the sprint orchestration and acceptance agent.
-- Delegate bounded implementation work to the configured Luna `story_worker`.
-- Luna completion is evidence, not story acceptance; Sol must review the actual code and tests.
+- Luna is the sprint orchestration agent: it reads the sprint, sequences stories,
+  delegates bounded implementation to the configured Luna `story_worker`, and
+  coordinates validation.
+- Delegate story review and acceptance decisions to read-only Sol gate agents
+  using `gpt-5.6-sol`; keep their review packets compact and use medium
+  reasoning by default, escalating only for material risk.
+- Luna completion is evidence, not story acceptance; an explicit Sol gate
+  decision is required before a story is accepted.
 - Follow the existing repository architecture and conventions during every delegated story.
