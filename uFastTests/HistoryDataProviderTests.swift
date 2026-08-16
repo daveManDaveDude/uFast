@@ -314,6 +314,73 @@ final class HistoryDataProviderTests: XCTestCase {
 
 @MainActor
 final class HistoryInferredFastContextTests: XCTestCase {
+    func testMigratedReconstructedFastSuppressesOverlappingInferredCandidate() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let sourceDate = Date(timeIntervalSince1970: 2_350_000_000)
+        let window = DateInterval(
+            start: sourceDate.addingTimeInterval(9 * 60 * 60),
+            duration: 3 * 60 * 60
+        )
+        let source = FoodEntryRecord(
+            draft: .init(description: "Migrated dinner", occurredAt: sourceDate),
+            createdAt: sourceDate
+        )
+        let reconstructed = reconstructedFast(startDate: sourceDate, sourceID: source.id)
+        context.insert(source)
+        context.insert(reconstructed)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let referenceNow = sourceDate.addingTimeInterval(20 * 60 * 60)
+        let data = try SwiftDataHistoryDataProvider(modelContext: context).fetch(window: window)
+        let presentation = HistoryPresentationBuilder.build(
+            data: data,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: referenceNow
+        )
+
+        XCTAssertEqual(data.completedFasts.map(\.id), [reconstructed.id])
+        XCTAssertEqual(presentation.fastItems.map(\.kind), [.previouslySaved])
+        XCTAssertFalse(presentation.fastItems.contains { $0.inferredInterval?.offersSave == true })
+        XCTAssertFalse(presentation.fastItems.contains { $0.inferredInterval?.offersStart == true })
+
+        let motionData = try SwiftDataHistoryMotionDataProvider(modelContext: context)
+            .fetch(window: window, calendar: utcCalendar)
+        let motionPresentation = HistoryPresentationBuilder.build(
+            data: motionData,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: referenceNow
+        )
+        let motion = HistoryMotionPresentation(
+            motionPresentation,
+            inferredContext: HistoryMotionInferredContext(data: motionData)
+        )
+
+        XCTAssertFalse(motion.ribbonIntervals(activeEndingAt: referenceNow).contains {
+            $0.title == "Inferred fast" || $0.title == "Inferred fast in progress"
+        })
+    }
+
+    private func reconstructedFast(startDate: Date, sourceID: UUID) -> FastRecord {
+        FastRecord(
+            reconstructedStart: startDate.addingTimeInterval(10 * 60 * 60),
+            endDate: startDate.addingTimeInterval(11 * 60 * 60),
+            boundaries: ReconstructionBoundaryPair(
+                start: .init(kind: .food, id: sourceID),
+                end: .init(kind: .food, id: UUID())
+            ),
+            adjustedByUser: true
+        )
+    }
+
     func testInferredCandidateIsSuppressedByCompletedFastsOutsideVisibleWindow() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext

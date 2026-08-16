@@ -91,8 +91,12 @@ public enum InferredFastProjector {
             }
             return $0.id.uuidString < $1.id.uuidString
         }
+        let canonicalFoodEvents = ordered.reduce(into: [FoodBoundarySnapshot]()) { result, food in
+            guard result.last?.occurredAt != food.occurredAt else { return }
+            result.append(food)
+        }
 
-        return ordered.compactMap { source in
+        return canonicalFoodEvents.compactMap { source in
             guard source.occurredAt <= now else { return nil }
 
             let eligibilityDate = source.occurredAt.addingTimeInterval(eligibilityDuration)

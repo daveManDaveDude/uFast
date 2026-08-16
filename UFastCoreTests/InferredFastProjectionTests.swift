@@ -90,6 +90,35 @@ final class InferredFastProjectionTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testSameTimestampFoodSourcesProduceOneDeterministicCandidate() throws {
+        let timestamp = Date(timeIntervalSince1970: 35000)
+        let firstID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+        let secondID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
+        let secondFood = FoodBoundarySnapshot(
+            id: secondID,
+            occurredAt: timestamp,
+            description: "Second food",
+            isCaloric: true
+        )
+        let firstFood = FoodBoundarySnapshot(
+            id: firstID,
+            occurredAt: timestamp,
+            description: "First food",
+            isCaloric: true
+        )
+        let foods = [secondFood, firstFood]
+
+        let candidates = InferredFastProjector.project(
+            foodEvents: foods,
+            currentGoal: .default,
+            enabled: true,
+            now: timestamp.addingTimeInterval(9 * 60 * 60)
+        )
+
+        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates.first?.sourceFoodID, firstID)
+    }
+
     func testShortFoodGapStaysExcludedAfterLaterFoodHasPassed() {
         let source = food(at: 50000, description: "Dinner")
         let next = food(at: 50000 + 7 * 60 * 60, description: "Snack")

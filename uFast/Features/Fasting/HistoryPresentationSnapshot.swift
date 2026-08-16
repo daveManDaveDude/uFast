@@ -93,7 +93,6 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
             )
         }
         recordedFasts = (data.completedFasts + [data.activeFast].compactMap(\.self))
-            .filter { $0.origin == .recorded || $0.presentationIntegrity == .unavailable }
             .map(\.recordedInterval)
         currentGoal = data.settings?.fastingGoal ?? .default
         enabled = data.settings?.inferredFastDetectionEnabled ?? false
@@ -363,7 +362,9 @@ enum HistoryPresentationBuilder {
             else { return nil }
             return .unavailable(fast)
         }
-        let excluded = (data.completedFasts + [data.activeFast].compactMap(\.self))
+        let inferredExclusions = (data.completedFasts + [data.activeFast].compactMap(\.self))
+            .map(\.recordedInterval)
+        let legacyAutomaticExclusions = (data.completedFasts + [data.activeFast].compactMap(\.self))
             .filter { $0.origin == .recorded || $0.presentationIntegrity == .unavailable }
             .map(\.recordedInterval)
         let inferred = data.settings.map { settings in
@@ -376,7 +377,7 @@ enum HistoryPresentationBuilder {
                         isCaloric: true
                     )
                 },
-                recordedFasts: excluded,
+                recordedFasts: inferredExclusions,
                 currentGoal: settings.fastingGoal,
                 enabled: settings.inferredFastDetectionEnabled,
                 now: referenceNow,
@@ -387,7 +388,7 @@ enum HistoryPresentationBuilder {
             AutomaticFastProjector.project(
                 boundaries: boundaries,
                 visibleInterval: window,
-                excluding: excluded
+                excluding: legacyAutomaticExclusions
             ).compactMap { interval -> HistoryVisibleFastItem? in
                 guard !legacy.contains(where: { $0.intersects(interval.interval) }) else { return nil }
                 return .automatic(interval)
