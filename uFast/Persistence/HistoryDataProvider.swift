@@ -190,7 +190,7 @@ final class SwiftDataHistoryDataProvider {
 
     private func foodEvents(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.occurredAt < date },
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
             sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
         )
         descriptor.fetchLimit = 1
@@ -199,7 +199,7 @@ final class SwiftDataHistoryDataProvider {
 
     private func foodEvents(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.occurredAt >= date },
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
             sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
         )
         descriptor.fetchLimit = 1
@@ -301,7 +301,7 @@ final class SwiftDataHistoryMotionDataProvider {
 
     private func foodEvents(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.occurredAt < date },
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
             sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
         )
         descriptor.fetchLimit = 1
@@ -310,7 +310,7 @@ final class SwiftDataHistoryMotionDataProvider {
 
     private func foodEvents(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.occurredAt >= date },
+            predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
             sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
         )
         descriptor.fetchLimit = 1

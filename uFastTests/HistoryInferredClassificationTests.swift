@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class HistoryInferredClassificationTests: XCTestCase {
-    func testSettledAndMotionInferencePreserveNonCaloricFoodClassification() throws {
+    func testSettledAndMotionInferenceIgnoreNonCaloricFoodNeighbours() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
         let sourceDate = Date(timeIntervalSince1970: 2_210_000_000)
@@ -13,12 +13,18 @@ final class HistoryInferredClassificationTests: XCTestCase {
             draft: .init(description: "Dinner", occurredAt: sourceDate),
             createdAt: sourceDate
         )
+        let nonCaloricBefore = nonCaloricFood(
+            description: "Non-caloric drink",
+            occurredAt: sourceDate.addingTimeInterval(8.5 * 60 * 60),
+            createdAt: sourceDate
+        )
         let nonCaloricLater = nonCaloricFood(
             description: "Non-caloric snack",
             occurredAt: sourceDate.addingTimeInterval(20 * 60 * 60),
             createdAt: sourceDate
         )
         context.insert(source)
+        context.insert(nonCaloricBefore)
         context.insert(nonCaloricLater)
         context.insert(AppSettingsRecord(hasCompletedOnboarding: true, inferredFastDetectionEnabled: true))
         try context.save()
@@ -49,7 +55,7 @@ final class HistoryInferredClassificationTests: XCTestCase {
             inferredContext: HistoryMotionInferredContext(data: motionData)
         )
         let motionInferred = try XCTUnwrap(
-            motion.ribbonIntervals(activeEndingAt: referenceNow).first(where: { $0.kind == .inferred })
+            motion.ribbonIntervals(activeEndingAt: referenceNow).first(where: { $0.kind == .automatic })
         )
         let motionCandidate = try XCTUnwrap(
             motion.inferredInterval(for: motionInferred.id, at: referenceNow)
