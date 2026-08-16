@@ -135,18 +135,53 @@ final class InferredFastProjectionTests: XCTestCase {
         XCTAssertTrue(projections.isEmpty)
     }
 
-    func testFoodIsAlwaysAUsableSourceAndRecordedFastSuppressesWholeCandidate() throws {
-        let source = food(at: 40000, description: "Food with no details", isCaloric: false)
-        let now = source.occurredAt.addingTimeInterval(9 * 60 * 60)
-        let candidate = try XCTUnwrap(project(source: source, now: now).first)
-        XCTAssertEqual(candidate.sourceFoodID, source.id)
+    func testNonCaloricFoodIsNeitherCandidateSourceNorPunctuator() throws {
+        let nonCaloricSource = food(at: 40000, description: "Food with no details", isCaloric: false)
+        let sourceNow = nonCaloricSource.occurredAt.addingTimeInterval(9 * 60 * 60)
+        XCTAssertTrue(project(source: nonCaloricSource, now: sourceNow).isEmpty)
+
+        let caloricSourceID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000001")
+        )
+        let nonCaloricLaterID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000002")
+        )
+        let caloricSource = FoodBoundarySnapshot(
+            id: caloricSourceID,
+            occurredAt: Date(timeIntervalSince1970: 50000),
+            description: "Dinner",
+            isCaloric: true
+        )
+        let nonCaloricLater = FoodBoundarySnapshot(
+            id: nonCaloricLaterID,
+            occurredAt: caloricSource.occurredAt.addingTimeInterval(20 * 60 * 60),
+            description: "Non-caloric snack",
+            isCaloric: false
+        )
+        let now = nonCaloricLater.occurredAt
+        let candidate = try XCTUnwrap(InferredFastProjector.project(
+            foodEvents: [caloricSource, nonCaloricLater],
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        ).first)
+
+        XCTAssertEqual(candidate.sourceFoodID, caloricSource.id)
+        XCTAssertNil(candidate.nextFoodID)
+        XCTAssertEqual(candidate.endDate, now)
 
         let recorded = RecordedFastInterval(
             id: UUID(),
-            startDate: source.occurredAt.addingTimeInterval(60 * 60),
-            endDate: source.occurredAt.addingTimeInterval(10 * 60 * 60)
+            startDate: caloricSource.occurredAt.addingTimeInterval(60 * 60),
+            endDate: caloricSource.occurredAt.addingTimeInterval(10 * 60 * 60)
         )
-        XCTAssertTrue(project(source: source, now: now, recorded: [recorded]).isEmpty)
+        XCTAssertTrue(InferredFastProjector.project(
+            foodEvents: [caloricSource, nonCaloricLater],
+            recordedFasts: [recorded],
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        ).isEmpty)
     }
 
     func testDaylightSavingChangeStillUsesEightAbsoluteHours() throws {

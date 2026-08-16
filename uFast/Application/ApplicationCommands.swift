@@ -446,7 +446,7 @@ final class ApplicationCommands {
                 id: $0.id,
                 occurredAt: $0.occurredAt,
                 description: $0.foodDescription,
-                isCaloric: true
+                isCaloric: $0.isCaloric
             )
         }
         let recorded = try modelContext.fetch(FetchDescriptor<FastRecord>())

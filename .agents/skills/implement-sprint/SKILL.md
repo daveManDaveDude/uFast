@@ -48,6 +48,102 @@ stalls, not a replacement for the normal cost-effective Luna path.
 - Treat every Luna handoff as evidence, never as approval. Treat every Sol
   decision as a gate that must be recorded with its evidence.
 
+## Worker liveness and bounded rescue
+
+A timeout is an observation, never a terminal state. A missing handoff or empty
+wait result means only `no_handoff_yet`; it is not evidence that Luna is dead or
+stalled. Long reasoning, repository inspection, compilation, simulator startup,
+and UI tests can all be healthy work without a new message.
+
+The worker activity beacon at `.derived-data/agentic/activity/<worker>.json` is
+the first liveness signal. Luna updates it with the repository helper at phase
+boundaries and around long commands. Read it without interrupting the worker.
+The allowed states are:
+
+| State | Meaning | Orchestrator action |
+| --- | --- | --- |
+| `working` | Reasoning, editing, inspecting, or preparing the next command. | Continue waiting and report concise progress when useful. |
+| `waiting_on_tool` | A build, simulator, test, or delegated tool is active. | Inspect the active operation and wait; do not escalate. |
+| `progressing_silently` | No final handoff yet, but files, output, processes, or artifacts are changing. | Treat as healthy work and wait. |
+| `needs_input` | Luna explicitly needs a product or authority decision. | Surface the exact request to the user. |
+| `blocked` | Luna reports a blocker or the correction policy has been met. | Prepare the evidence packet and apply the bounded rescue policy. |
+| `errored` | A worker or tool actually terminated with an error. | Diagnose, resume, or escalate from the error evidence. |
+| `completed` | A structured handoff is available. | Inspect evidence and continue the acceptance workflow. |
+
+### Pre-escalation evidence packet
+
+Before replacing Luna with Terra, perform these checks in order:
+
+1. Read the latest activity beacon and the worker's latest status/live output,
+   including phase, last meaningful activity, active command, touched files and
+   artifacts, hypothesis, and expected next evidence.
+2. Check for an active command, build, simulator, test, or delegated tool. Do
+   not kill a process or overlap a suite.
+3. Compare the worktree, result directory, and expected handoff artifacts with
+   the previous observation. File or artifact changes are evidence of healthy
+   progress even when narration is quiet.
+4. Send one non-interrupting status request to the same Luna context asking for
+   its current phase and expected next evidence. This is a liveness probe, not
+   a new task and must not reset context or start a competing writer.
+5. Wait one additional bounded interval appropriate to the operation. Use a
+   longer interval for compilation, simulator startup, and UI tests than for
+   pure inspection.
+6. Escalate only if the resulting evidence says `blocked` or `errored`, or an
+   explicit focused-test circuit-breaker gate is met. An empty wait result alone
+   never satisfies a gate.
+
+### User override protection
+
+If the beacon says `working`, `waiting_on_tool`, or `progressing_silently`, keep
+Luna as owner. If the user says Luna is active or asks to resume Luna, treat the
+user observation as authoritative: protect Luna from replacement, cancel or
+close any pending Terra rescue, and complete a fresh liveness check before any
+new escalation decision.
+
+### Terra policy
+
+Terra is a single bounded rescue path, not a second implementation lane. Terra
+is eligible only when at least one of these gates is evidenced:
+
+- Luna explicitly reports that it is blocked and cannot proceed.
+- The same failure repeats twice without a source or hypothesis change.
+- Three focused corrections fail on the same acceptance surface.
+- The repository's stated active-correction budget is exceeded with no proven
+  root cause.
+- A tool or worker actually terminates with an error and one bounded Luna
+  recovery attempt is not viable.
+
+Before Terra starts, pause or close Luna and record one compact `LOOP
+ESCALATION` packet containing:
+
+```text
+Story / acceptance surface:
+Failure class:
+Current hypothesis and changed hypothesis:
+Commands attempted and underlying exit codes:
+Observed evidence and artifact paths:
+Luna activity state / last meaningful activity:
+Why Luna cannot safely continue:
+Scope-drift risk:
+Next bounded decision:
+```
+
+Run at most one Terra rescue for the unresolved surface. Never run Terra
+concurrently with Luna against the same write scope. Terra receives the same
+focused handoff contract and remains subject to the two-failure or 30-minute
+rescue budget. A Terra handoff is evidence, not acceptance; the independent Sol
+gate remains required.
+
+### Stable command evidence
+
+Expensive commands must preserve the exact command, destination, worker count,
+underlying `exit_code`, log path, result bundle path, and structural verifier
+output. The repository UI wrapper writes source-frozen evidence under
+`.derived-data/sprint-results/` and reports the underlying `xcodebuild` exit
+code before post-processing. Never use zsh's read-only `status` variable for
+command reporting, and never classify a result from a wrapper cleanup error when
+the underlying result artifact is available.
+
 ## Execution budget and model escalation
 
 Track failed correction attempts by acceptance surface, not merely by command.

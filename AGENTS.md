@@ -113,6 +113,29 @@ are still active.
   gesture. Establish deterministic state observability or move the invariant to
   a pure test first.
 
+### Worker liveness and rescue policy
+
+A timeout is an observation, never a liveness verdict. A missing handoff or
+empty wait result alone does not justify replacing Luna. Workers publish a
+compact activity record in `.derived-data/agentic/activity/<worker>.json` using
+`scripts/agentic_activity.py`; its states are `working`, `waiting_on_tool`,
+`progressing_silently`, `needs_input`, `blocked`, `errored` and `completed`.
+
+Before escalation, the orchestrator must read the latest worker status/activity,
+check active commands or test processes, compare worktree/result artifacts with
+the previous observation, send one non-interrupting status request to the same
+Luna context, and wait one additional operation-appropriate interval. Escalate
+only after evidence of `blocked`, `errored`, or the focused-test circuit breaker.
+If the user says Luna is active, that user override is authoritative: protect
+Luna from replacement, cancel or close any pending Terra rescue, and recheck
+liveness before making a new decision.
+
+Terra is one bounded rescue, never a concurrent write worker. It requires a
+compact pre-escalation evidence packet with the failure class, changed
+hypothesis, commands and underlying exit codes, artifacts, activity timestamp,
+scope risk and reason Luna cannot continue. Run at most one Terra rescue for the
+unresolved surface and retain the independent Sol acceptance gate.
+
 ### Test preflight
 
 Run this preflight once before the first Xcode test command, and repeat it only
@@ -190,6 +213,10 @@ when the simulator or execution environment materially changes:
 - Before running another Xcode command, copy the final integration log and
   `.xcresult` from the rotating `Logs/Test` location to a stable path such as
   `.derived-data/sprint-results/<sprint-id>/`.
+- `make test-ui` uses `scripts/run_ui_tests.sh` to write a stable log and
+  `.xcresult` path under `.derived-data/sprint-results/`. The wrapper reports
+  the underlying `exit_code` before post-processing and must not use zsh's
+  read-only `status` variable.
 
 ## Definition of Done
 

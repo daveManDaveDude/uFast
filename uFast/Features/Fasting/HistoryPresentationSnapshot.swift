@@ -89,7 +89,7 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
                 id: $0.id,
                 occurredAt: $0.occurredAt,
                 description: $0.foodDescription,
-                isCaloric: true
+                isCaloric: $0.isCaloric
             )
         }
         recordedFasts = (data.completedFasts + [data.activeFast].compactMap(\.self))
@@ -374,7 +374,7 @@ enum HistoryPresentationBuilder {
                         id: $0.id,
                         occurredAt: $0.occurredAt,
                         description: $0.foodDescription,
-                        isCaloric: true
+                        isCaloric: $0.isCaloric
                     )
                 },
                 recordedFasts: inferredExclusions,

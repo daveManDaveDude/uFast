@@ -80,16 +80,30 @@ struct StartTimeEditor: View {
     }
 
     private var validationMessage: String? {
-        if isFutureStart {
+        Self.validationMessage(
+            for: selectedStartDate,
+            now: clock.now,
+            hasConflict: hasConflict(selectedStartDate),
+            existingError: validationError
+        )
+    }
+
+    static func validationMessage(
+        for selectedStartDate: Date,
+        now: Date,
+        hasConflict: Bool,
+        existingError: String? = nil
+    ) -> String? {
+        if selectedStartDate > now {
             return "Start time can’t be in the future."
         }
-        if isBeyondMaximumAge {
+        if selectedStartDate < now.addingTimeInterval(-FastStartService.maximumStartAge) {
             return "Start time must be within the past 36 hours."
         }
-        if hasConflict(selectedStartDate) {
+        if hasConflict {
             return "This fast overlaps another recorded fast."
         }
-        return validationError
+        return existingError
     }
 
     var body: some View {
@@ -193,6 +207,8 @@ struct StartTimeEditor: View {
 
     private func confirm() {
         guard !isInvalidStart else {
+            validationError = validationMessage
+            saveError = nil
             return
         }
 

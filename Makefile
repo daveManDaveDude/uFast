@@ -6,7 +6,7 @@ DERIVED_DATA := .derived-data
 SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
 UI_TEST_WORKERS ?= 4
 
-.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint analyze format verify-local-only verify-release-versions verify-ui-result verify-ui-verifier clean
+.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint analyze format verify-local-only verify-release-versions verify-ui-result verify-ui-verifier verify-agentic-config clean
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -51,16 +51,7 @@ test-unit: project
 		test
 
 test-ui: project
-	DEVELOPER_DIR="$(DEVELOPER_DIR)" xcodebuild \
-		-project "$(PROJECT)" \
-		-scheme "$(SCHEME)" \
-		-destination '$(SIMULATOR)' \
-		-derivedDataPath "$(DERIVED_DATA)" \
-		-only-testing:uFastUITests \
-		-parallel-testing-enabled YES \
-		-parallel-testing-worker-count "$(UI_TEST_WORKERS)" \
-		-enableCodeCoverage NO \
-		test
+	DEVELOPER_DIR="$(DEVELOPER_DIR)" PROJECT="$(PROJECT)" SCHEME="$(SCHEME)" DERIVED_DATA="$(DERIVED_DATA)" SIMULATOR='$(SIMULATOR)' UI_TEST_WORKERS="$(UI_TEST_WORKERS)" UI_RESULTS_DIR="$(UI_RESULTS_DIR)" UI_RESULT_BUNDLE="$(UI_RESULT_BUNDLE)" UI_TEST_LOG="$(UI_TEST_LOG)" SOURCE_FREEZE_ID="$(SOURCE_FREEZE_ID)" zsh scripts/run_ui_tests.sh
 
 lint:
 	./scripts/count_swift_sources.sh "SwiftFormat" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests
@@ -83,6 +74,12 @@ verify-ui-result:
 
 verify-ui-verifier:
 	./scripts/verify_ui_xcresult.py --self-test
+
+verify-agentic-config:
+	python3 scripts/agentic_activity.py --self-test
+	python3 scripts/verify_agentic_config.py
+	zsh -n scripts/run_ui_tests.sh
+	zsh scripts/run_ui_tests.sh --self-test
 
 format:
 	./scripts/count_swift_sources.sh "SwiftFormat" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests

@@ -72,9 +72,9 @@ public enum InferredFastProjector {
         TimeInterval(goal.hours * 60 * 60) + postGoalGraceDuration
     }
 
-    /// Projects food-anchored inferred intervals visible in `visibleInterval`.
-    /// Food is always treated as caloric here, including compatibility records
-    /// whose old persisted Boolean may not reflect the current food contract.
+    /// Projects caloric food-anchored inferred intervals visible in
+    /// `visibleInterval`. Non-caloric food is filtered before timestamp
+    /// canonicalization so it cannot become a source or punctuate a candidate.
     public static func project(
         foodEvents: [FoodBoundarySnapshot],
         recordedFasts: [RecordedFastInterval] = [],
@@ -85,7 +85,7 @@ public enum InferredFastProjector {
     ) -> [InferredFastInterval] {
         guard enabled else { return [] }
 
-        let ordered = foodEvents.sorted {
+        let ordered = foodEvents.filter(\.isCaloric).sorted {
             if $0.occurredAt != $1.occurredAt {
                 return $0.occurredAt < $1.occurredAt
             }
