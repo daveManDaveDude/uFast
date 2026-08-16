@@ -188,3 +188,27 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         }
     }
 }
+
+@MainActor
+final class SettingsInferredFastFailureTests: XCTestCase {
+    func testSettingsRestoresInferredFastToggleAndReportsSaveFailure() {
+        let commands = FeatureCommandSpy()
+        let controller = SettingsFeatureController()
+        controller.connect(commands: commands)
+        controller.load(SettingsFeatureSnapshot(settings: [
+            AppSettingsSnapshot(
+                fastingGoal: .default,
+                inferredFastDetectionEnabled: false
+            ),
+        ]))
+
+        commands.error = TestFailure.requested
+        controller.setInferredFastDetection(enabled: true)
+
+        XCTAssertFalse(controller.inferredFastDetectionEnabled)
+        XCTAssertEqual(
+            controller.saveError,
+            "Your inferred fast setting couldn’t be saved. Please try again."
+        )
+    }
+}

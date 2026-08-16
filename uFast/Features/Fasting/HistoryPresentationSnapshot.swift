@@ -1,6 +1,6 @@
 import Foundation
 
-// swiftlint:disable file_length function_body_length function_parameter_count trailing_comma
+// swiftlint:disable file_length function_body_length function_parameter_count trailing_comma opening_brace
 
 struct HistoryPresentationSnapshot: Equatable {
     let window: DateInterval
@@ -220,7 +220,8 @@ private extension HistoryMotionIntervalPrimitive {
         let punctuatingFoodID: UUID?
         if let nextFoodDate = inferredInterval.nextFoodDate,
            nextFoodDate <= now,
-           nextFoodDate < cap {
+           nextFoodDate < cap
+        {
             punctuatingFoodDate = nextFoodDate
             punctuatingFoodID = inferredInterval.nextFoodID
         } else {

@@ -50,6 +50,21 @@ struct HistoryMotionChunk: Equatable, Sendable {
     let presentation: HistoryMotionPresentation
 }
 
+private func historyFastContextWindow(
+    for window: DateInterval,
+    goal: FastingGoal?
+) -> DateInterval {
+    // A candidate can begin one maximum-duration before the visible window and
+    // can extend one maximum-duration beyond it. Keep those recorded fasts as
+    // projection context while the settled builder still filters by `window`.
+    guard let goal else { return window }
+    let candidateExtent = InferredFastProjector.maximumDuration(for: goal)
+    return DateInterval(
+        start: window.start.addingTimeInterval(-candidateExtent),
+        end: window.end.addingTimeInterval(candidateExtent)
+    )
+}
+
 @MainActor
 final class SwiftDataHistoryDataProvider {
     private let modelContext: ModelContext
@@ -59,10 +74,12 @@ final class SwiftDataHistoryDataProvider {
     }
 
     func fetch(window: DateInterval) throws -> HistoryDataSlice {
-        let completed = try completedFasts(intersecting: window).map(HistoryFastSnapshot.init)
         let active = try ActiveFastAuthority.fetch(in: modelContext).map(HistoryFastSnapshot.init)
         let settings = try SwiftDataSettingsStore(modelContext: modelContext)
             .authoritativeRecord().map(AppSettingsSnapshot.init)
+        let completed = try completedFasts(
+            intersecting: historyFastContextWindow(for: window, goal: settings?.fastingGoal)
+        ).map(HistoryFastSnapshot.init)
         let visibleFoods = try foods(in: window)
         let visibleDrinks = try drinks(in: window)
         let neighbours = try nearestCaloricNeighbours(outside: window)
@@ -230,11 +247,18 @@ final class SwiftDataHistoryMotionDataProvider {
         let lower = window.start
         let upper = window.end
         let distantPast = Date.distantPast
+        let settingsRecords = try modelContext.fetch(FetchDescriptor<AppSettingsRecord>())
+        let settings = settingsRecords.count == 1
+            ? settingsRecords.first.map(AppSettingsSnapshot.init)
+            : nil
+        let fastContextWindow = historyFastContextWindow(for: window, goal: settings?.fastingGoal)
+        let fastContextLower = fastContextWindow.start
+        let fastContextUpper = fastContextWindow.end
         let completed = try modelContext.fetch(FetchDescriptor<FastRecord>(
             predicate: #Predicate {
                 $0.endDate != nil
-                    && $0.startDate < upper
-                    && ($0.endDate ?? distantPast) > lower
+                    && $0.startDate < fastContextUpper
+                    && ($0.endDate ?? distantPast) > fastContextLower
             },
             sortBy: [SortDescriptor(\.startDate)]
         )).map(HistoryFastSnapshot.init)
@@ -252,10 +276,6 @@ final class SwiftDataHistoryMotionDataProvider {
             sortBy: [SortDescriptor(\.occurredAt)]
         ))
         let neighbours = try nearestCaloricNeighbours(outside: window)
-        let settingsRecords = try modelContext.fetch(FetchDescriptor<AppSettingsRecord>())
-        let settings = settingsRecords.count == 1
-            ? settingsRecords.first.map(AppSettingsSnapshot.init)
-            : nil
         return HistoryDataSlice(
             window: window,
             completedFasts: completed,

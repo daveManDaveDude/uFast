@@ -158,8 +158,10 @@ final class SettingsFeatureController {
         do {
             guard let commands else { throw ApplicationCommandError.recordNotFound }
             try commands.settingsUpdateInferredFastDetectionEnabled(enabled)
+            saveError = nil
         } catch {
             inferredFastDetectionEnabled = previousValue
+            saveError = "Your inferred fast setting couldn’t be saved. Please try again."
         }
     }
 

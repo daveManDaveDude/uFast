@@ -311,3 +311,65 @@ final class HistoryDataProviderTests: XCTestCase {
         return calendar
     }
 }
+
+@MainActor
+final class HistoryInferredFastContextTests: XCTestCase {
+    func testInferredCandidateIsSuppressedByCompletedFastsOutsideVisibleWindow() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let sourceDate = Date(timeIntervalSince1970: 2_300_000_000)
+        let window = DateInterval(
+            start: sourceDate.addingTimeInterval(9 * 60 * 60),
+            duration: 60 * 60
+        )
+        context.insert(FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: sourceDate),
+            createdAt: sourceDate
+        ))
+        context.insert(FastRecord(
+            startDate: sourceDate.addingTimeInterval(2 * 60 * 60),
+            endDate: sourceDate.addingTimeInterval(3 * 60 * 60),
+            goalAtStart: .default
+        ))
+        context.insert(FastRecord(
+            startDate: sourceDate.addingTimeInterval(15 * 60 * 60),
+            endDate: sourceDate.addingTimeInterval(16 * 60 * 60),
+            goalAtStart: .default
+        ))
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let data = try SwiftDataHistoryDataProvider(modelContext: context).fetch(window: window)
+        let presentation = HistoryPresentationBuilder.build(
+            data: data,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: sourceDate.addingTimeInterval(20 * 60 * 60)
+        )
+
+        XCTAssertEqual(data.completedFasts.count, 2)
+        XCTAssertFalse(presentation.fastItems.contains { $0.kind == .inferred })
+
+        let motionData = try SwiftDataHistoryMotionDataProvider(modelContext: context)
+            .fetch(window: window, calendar: utcCalendar)
+        let motionPresentation = HistoryPresentationBuilder.build(
+            data: motionData,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: sourceDate.addingTimeInterval(20 * 60 * 60)
+        )
+        XCTAssertEqual(motionData.completedFasts.count, 2)
+        XCTAssertFalse(motionPresentation.fastItems.contains { $0.kind == .inferred })
+    }
+
+    private var utcCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        return calendar
+    }
+}
