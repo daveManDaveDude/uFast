@@ -1,4 +1,6 @@
 import Foundation
+import SwiftData
+import SwiftUI
 
 // swiftlint:disable opening_brace function_body_length function_parameter_count cyclomatic_complexity trailing_comma
 
@@ -38,8 +40,68 @@ extension HistoryView {
         return true
     }
 
-    func reloadHistoryAfterMutation(in window: DateInterval? = nil) {
-        reloadHistory(in: window, refreshMotion: true)
+    @discardableResult
+    func refreshHistoryAfterCommittedMutation(in window: DateInterval? = nil) -> Bool {
+        guard let requestedWindow = window
+            ?? settledVisibleWindow?.interval
+            ?? TemporalHistoryPresentation.calendarDayWindow(
+                containing: selectedDate,
+                calendar: calendar
+            )?.interval
+        else { return false }
+
+        let currentMotionSnapshot = motionSnapshot
+        let nextGeneration = motionGeneration + 1
+        var projectionState = HistoryProjectionState(
+            data: historyData,
+            presentation: historyPresentation,
+            motionSnapshot: currentMotionSnapshot,
+            motionChunks: motionChunks,
+            generation: motionGeneration
+        )
+        let source = SwiftDataHistoryProjectionDataSource(modelContext: modelContext)
+        guard HistoryProjectionRefreshBoundary.refresh(
+            state: &projectionState,
+            source: source,
+            window: requestedWindow,
+            locale: locale,
+            calendar: calendar,
+            timeZone: timeZone,
+            referenceNow: clock.now,
+            nextGeneration: nextGeneration
+        ), let data = projectionState.data,
+        let presentation = projectionState.presentation
+        else { return false }
+
+        presentationCache.invalidate()
+        // Do not publish settled data independently of motion data. The
+        // boundary above retains the prior complete pair on any loader error.
+        withTransaction(Transaction(animation: nil)) {
+            historyData = data
+            historyPresentation = presentation
+            historyDataRevision += 1
+            motionGeneration = projectionState.generation
+            motionLoadingEdges.removeAll()
+            motionFailedEdges.removeAll()
+            motionInitialLoading = false
+            motionPendingTarget = nil
+            motionPendingEnvironmentRebuild = false
+            motionPriorSnapshot = nil
+            motionPriorChunks.removeAll()
+            motionPriorSelectedDate = nil
+            motionChunks = projectionState.motionChunks
+            motionSnapshot = projectionState.motionSnapshot
+        }
+
+        if currentMotionSnapshot == nil {
+            _ = ensureMotionRunway(around: selectedDate, force: true)
+        }
+        return true
+    }
+
+    @discardableResult
+    func reloadHistoryAfterMutation(in window: DateInterval? = nil) -> Bool {
+        refreshHistoryAfterCommittedMutation(in: window)
     }
 
     func rebuildHistoryPresentation() {

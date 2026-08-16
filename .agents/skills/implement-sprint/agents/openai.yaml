@@ -1,4 +1,4 @@
 interface:
   display_name: "Implement Sprint"
-  short_description: "Run Luna-orchestrated sprints with Sol review and acceptance gates"
-  default_prompt: "Use $implement-sprint to run a sprint document with Luna coordinating implementation and validation, and read-only Sol agents handling story decisions and final integration evaluation."
+  short_description: "Run Luna sprints with Terra rescue and Sol gates"
+  default_prompt: "Use $implement-sprint to run a sprint with Luna xhigh by default, bounded Terra rescue for stalled loops, and independent Sol acceptance gates."

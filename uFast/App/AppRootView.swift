@@ -8,17 +8,20 @@ struct AppRootView: View {
     let liveActivityCoordinator: ActiveFastLiveActivityCoordinator?
     let applicationCommands: ApplicationCommands?
     let suppressAutomaticLiveActivityOffer: Bool
+    let initialDestination: AppDestination
 
     init(
         clock: any AppClock = SystemAppClock(),
         liveActivityCoordinator: ActiveFastLiveActivityCoordinator? = nil,
         applicationCommands: ApplicationCommands? = nil,
-        suppressAutomaticLiveActivityOffer: Bool = false
+        suppressAutomaticLiveActivityOffer: Bool = false,
+        initialDestination: AppDestination = .today
     ) {
         self.clock = clock
         self.liveActivityCoordinator = liveActivityCoordinator
         self.applicationCommands = applicationCommands
         self.suppressAutomaticLiveActivityOffer = suppressAutomaticLiveActivityOffer
+        self.initialDestination = initialDestination
     }
 
     var body: some View {
@@ -26,13 +29,17 @@ struct AppRootView: View {
             if settingsRecords.count > 1 {
                 DataIntegrityUnavailableView()
             } else if settingsRecords.count == 1, settingsRecords[0].hasCompletedOnboarding {
-                RootTabView(clock: clock)
+                RootTabView(clock: clock, initialSelection: initialDestination)
             } else {
                 FastingGoalOnboardingView()
             }
         }
         .environment(\.liveActivityCoordinator, liveActivityCoordinator)
         .environment(\.applicationCommands, applicationCommands)
+        .environment(
+            \.historyPresentationInvalidation,
+            applicationCommands?.historyPresentationInvalidation
+        )
         .environment(\.suppressAutomaticLiveActivityOffer, suppressAutomaticLiveActivityOffer)
         .task {
             _ = await liveActivityCoordinator?.didBecomeActive()

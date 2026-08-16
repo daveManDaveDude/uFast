@@ -74,10 +74,11 @@ are still active.
 
 ### Test execution ownership
 
-- The implementation Luna runs focused unit tests and the UI tests added or
-  changed by its story before handoff. It should not run the full UI suite
-  during story work; Luna runs the complete suite at the integration gate or
-  when a Sol reviewer requests a targeted rerun to diagnose a failure.
+- The assigned implementation worker—normally Luna xhigh, or Terra after the
+  focused-test circuit breaker—runs focused unit tests and the UI tests added or
+  changed by its story before handoff. It must not run the full UI suite during
+  story work; Luna coordinates the complete suite at the integration gate or a
+  targeted rerun requested by a Sol reviewer.
 - After the implementation handoff, Luna should delegate noisy integration
   commands to a fresh, read-only Luna verification worker when one is available.
   That worker may generate build logs and result bundles but must not edit
@@ -93,6 +94,24 @@ are still active.
 - If evidence is missing, inconsistent, or shows a failure, Sol requests the
   smallest appropriate rerun from Luna. Do not duplicate a passing verification
   run merely to establish independence.
+
+### Focused-test circuit breaker
+
+- Luna xhigh is the default implementation worker. Keep it while progress is
+  evidence-driven; do not replace it merely because a task is difficult.
+- Before rerunning a failed focused command, record the failure class, the source
+  or test change/new hypothesis, and the expected result. Allow only one
+  unchanged-source rerun for an explicit flake check.
+- Stop the current correction loop when the same failure repeats twice without
+  new evidence, three focused corrections fail on the same acceptance surface,
+  or 25 minutes pass without a proven root cause. Compile, launch, fixture and
+  assertion failures all count.
+- On a stop, do not keep editing or testing. Use the `$implement-sprint` compact
+  escalation handoff: replace Luna with one Terra rescue worker, then request a
+  read-only Sol diagnosis if Terra exhausts its bounded rescue budget.
+- Do not broaden a fixture or assertion mainly to match an uncontrolled XCTest
+  gesture. Establish deterministic state observability or move the invariant to
+  a pure test first.
 
 ### Test preflight
 
@@ -164,6 +183,13 @@ when the simulator or execution environment materially changes:
   appears exactly once, no test is skipped unexpectedly, and all four clones
   started successfully. A passing suite that silently fell back to fewer
   workers verifies correctness but not the four-worker runtime configuration.
+- Start the full parallel suite only after all sprint stories are accepted and
+  the combined product/test source is frozen. Do not run an early speculative
+  full suite. A later source edit invalidates the result and requires a new
+  source freeze before another full run.
+- Before running another Xcode command, copy the final integration log and
+  `.xcresult` from the rotating `Logs/Test` location to a stable path such as
+  `.derived-data/sprint-results/<sprint-id>/`.
 
 ## Definition of Done
 
@@ -182,6 +208,10 @@ when the simulator or execution environment materially changes:
 - Luna is the sprint orchestration agent: it reads the sprint, sequences stories,
   delegates bounded implementation to the configured Luna `story_worker`, and
   coordinates validation.
+- Luna xhigh remains the default cost-effective implementation worker. When the
+  focused-test circuit breaker fires, use one `gpt-5.6-terra` rescue worker with
+  a compact no-history packet; if that bounded rescue stalls, use
+  `gpt-5.6-sol` for read-only diagnosis before more edits or tests.
 - Delegate story review and acceptance decisions to read-only Sol gate agents
   using `gpt-5.6-sol`; keep their review packets compact and use medium
   reasoning by default, escalating only for material risk.

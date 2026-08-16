@@ -2,16 +2,18 @@
 
 ## Terms
 
-- **Fast:** a user-recorded interval or an automatic caloric-event gap, not
+- **Fast:** a user-recorded interval or an inferred food-event interval, not
   proof of a biological state.
 - **Caloric event:** an event that counts as a fasting boundary. Food events
   always qualify; hydration follows the user's explicit classification.
 - **Recorded fast:** explicitly started by the user.
+- **Inferred fast:** a read-only interval derived from a caloric food event,
+  visible after eight absolute hours, and capped by the current fasting goal.
 - **Reconstructed fast:** a legacy interval proposed from confirmed boundaries
   and saved after user confirmation before Slice 3.10.
 - **Unknown period:** legacy state saved by the former reconstruction workflow.
-- **Automatic fast:** a read-only interval derived between consecutive caloric
-  events more than eight absolute hours apart.
+- **Legacy automatic fast:** the superseded Slice 3.10 interval derived between
+  consecutive caloric events; D-033 governs new inferred-fast behavior.
 
 ## Rules
 
@@ -33,8 +35,12 @@
 - BR-14: Future health-data integration requires a separate product and privacy
   decision and must not block the local manual tracker.
 - BR-15: Copy describes records and patterns, not diagnosis or guaranteed physiology.
-- BR-16: Correcting an active fast's start is limited to the preceding 24
-  absolute hours; creating a new manually backdated fast may use an older start.
+- BR-16 (amended 15 August 2026 by BF-101): Creating a new manually backdated
+  active fast and correcting an existing active fast's start are each limited
+  to the preceding inclusive 36 absolute hours. The exact instant at
+  `AppClock.now - 36 hours` is valid; older and future instants are rejected.
+  Editing an already completed fast from History remains governed by its
+  existing completed-record contract and is outside this journey.
 - BR-17: Saved fast intervals must not overlap, whether recorded or reconstructed.
   Treat completed intervals as half-open `[start, end)` ranges and an active fast
   as open-ended from its start for conflict checks, so touching boundaries are
@@ -54,26 +60,32 @@
   deleting or reclassifying one of its supporting boundary events, marks the
   affected reconstructed fast for review in the same persistent transaction.
   The app never silently rewrites or deletes the saved fast.
-- BR-22: After Slice 3.10 delivery, consecutive saved caloric events define an
-  automatic fast only when their absolute gap is strictly greater than eight
-  hours. Exactly eight hours or less is not a fast. Both events must exist; a
-  range edge, local-calendar boundary, missing record or current time is not a
-  caloric boundary.
-- BR-23: Automatic fasts are derived for presentation and are never separately
-  persisted, confirmed, adjusted or reviewed. A committed caloric-event change
-  recalculates affected automatic history; a failed or cancelled change does
-  not.
-- BR-24: History presents automatic and user-recorded fasts only when they
-  intersect the exact settled visible interval. Derivation includes the nearest
-  caloric event beyond each visible edge. A user-recorded fast takes
-  presentation precedence over an intersecting automatic fast.
-- BR-25: Starting a fast explicitly remains the only way to create a persisted
-  fasting record. History manual entry creates food or hydration events, not a
-  manually completed fast.
+- BR-22: When inferred-fast detection is enabled, each caloric food event is a
+  candidate source. At exactly eight absolute hours after the source event,
+  the inferred interval becomes visible and starts at the source event's exact
+  instant. Non-caloric food records, hydration records and missing events do
+  not create or terminate an inferred interval.
+- BR-23: An inferred interval ends at the next caloric food event or at the
+  current time when no later caloric food event exists, and never extends past
+  the source event plus the current fasting goal. Goal changes affect the
+  derived cap but do not change the source instant. A later food event closes
+  the current inference and leaves a qualifying historical inferred interval
+  available for explicit saving.
+- BR-24: Inferred intervals are derived for presentation and are never stored
+  as inferred records. History presents them only when the setting is enabled
+  and they intersect the exact settled visible interval, using the nearest
+  caloric food neighbour beyond each visible edge. A persisted real fast takes
+  presentation precedence over an overlapping inferred interval.
+- BR-25: An explicit user action is required before any inferred interval
+  becomes a persisted fast. Saving a historical inferred interval creates a
+  normal completed recorded fast. Starting the current inferred interval
+  creates the one active recorded fast. History's ordinary Add at selected time
+  journey still creates food or hydration events, not a completed fast.
 - BR-26: App-created settings, fasts, food, hydration and legacy history records
-  use one local SwiftData store inside the app’s protected container. The app
-  does not use CloudKit, iCloud record storage, an account or a developer
-  backend. Loss of network access never blocks manual use.
+  use one local SwiftData store inside the app's protected container. Derived
+  inferred intervals do not add a SwiftData entity, cache, CloudKit record or
+  network dependency. Loss of network access never blocks manual use or
+  inferred-fast presentation.
 - BR-27: **Delete all data** requires two explicit confirmations and deletes
   every app-created record in the local store, including settings and legacy
   history. It does not delete data outside uFast.
@@ -144,10 +156,47 @@
   eight-hour window ends. The exception never overrides **Hide for this fast**,
   global off, ActivityKit availability, request coalescing or duplicate
   prevention, and it does not apply to an ordinary same-build relaunch.
+- BR-44: Inferred-fast detection is an opt-in setting, off by default for new
+  and migrated installs. Turning it off does not delete source events or
+  recorded fasts; turning it on recomputes presentation from current local
+  state.
+- BR-45: Saving a historical inferred interval revalidates its source event,
+  boundaries, current goal and overlap rules, then creates one normal completed
+  recorded fast using the current goal. It never creates an active fast,
+  Today-active state or a Live Activity.
+- BR-46: Starting the current inferred interval revalidates the candidate and
+  creates one active recorded fast whose start is the source food event's exact
+  instant. Only that committed active record may update Today, WidgetKit or
+  ActivityKit through their existing post-commit paths.
+- BR-47: A cancelled, failed, conflicting or stale conversion makes no local
+  mutation. After a successful refresh, the candidate is either still shown
+  from authoritative state or is absent.
+- BR-48: Inferred intervals retain the existing blue/sky presentation role for
+  continuity, but their copy and accessibility label identify them as
+  **Inferred fast** or **Inferred fast in progress**. Colour is not the sole
+  distinction.
+- BR-49: Inferred boundaries use absolute instants and the injected `AppClock`.
+  Foreground refreshes update the current candidate without background timers,
+  notifications, remote services or new health-data permissions.
+- BR-50: An inferred interval is **in progress** only while the current instant
+  is before its source timestamp plus the current goal and no later caloric
+  food exists. At the goal cap it becomes a historical inferred interval with
+  the capped end and offers Save fast only. This classification is recalculated
+  if the current goal changes, so Start fast is never offered for a source
+  outside the existing active-start boundary.
+- BR-51: Saving an inferred interval persists the exact projected boundaries:
+  start at the source food timestamp and end at the next caloric food or the
+  source-plus-goal cap, whichever is earlier. Historical Save fast remains a
+  completed-fast action even when its source is older than the active-start
+  backdating boundary; it is subject to normal completed-fast validation.
+- BR-52: If a persisted recorded fast overlaps an inferred candidate, the
+  entire inferred candidate is suppressed from presentation. It is not clipped
+  into a partial interval and cannot be converted around the overlap.
 
 ## Slice 3.10 supersession
 
 When OW-391 through OW-396 are delivered, BR-09 through BR-11 and BR-18 through
 BR-21 remain documentation of the legacy reconstruction store only. They no
 longer govern new user journeys or writes. Legacy data follows D-024 and the
-OW-396 compatibility contract.
+OW-396 compatibility contract. D-033 supersedes D-024 for new inferred-fast
+behavior.

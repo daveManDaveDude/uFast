@@ -21,7 +21,10 @@ struct StartTimeEditor: View {
     let onConfirm: (Date) throws -> Void
     let onCancel: () -> Void
 
+    private let initialStartDate: Date
     @State private var selectedStartDate: Date
+    @State private var isShowingLegacyDraft: Bool
+    @State private var validationError: String?
     @State private var saveError: String?
 
     init(
@@ -37,36 +40,56 @@ struct StartTimeEditor: View {
         self.hasConflict = hasConflict
         self.onConfirm = onConfirm
         self.onCancel = onCancel
+        self.initialStartDate = initialStartDate
         _selectedStartDate = State(initialValue: initialStartDate)
+        _isShowingLegacyDraft = State(
+            initialValue: mode == .correct
+                && initialStartDate < clock.now.addingTimeInterval(-FastStartService.maximumStartAge)
+        )
     }
 
     private var isFutureStart: Bool {
         selectedStartDate > clock.now
     }
 
-    private var isBeyondCorrectionLimit: Bool {
-        switch mode {
-        case .create:
-            false
-        case .correct:
-            selectedStartDate <
-                clock.now.addingTimeInterval(-FastStartService.maximumCorrectionAge)
-        }
+    private var earliestAllowedStartDate: Date {
+        clock.now.addingTimeInterval(-FastStartService.maximumStartAge)
+    }
+
+    private var isBeyondMaximumAge: Bool {
+        selectedStartDate < earliestAllowedStartDate
     }
 
     private var isInvalidStart: Bool {
-        isFutureStart || isBeyondCorrectionLimit || hasConflict(selectedStartDate)
+        isFutureStart
+            || isBeyondMaximumAge
+            || hasConflict(selectedStartDate)
+            || validationError != nil
     }
 
     private var allowedStartRange: ClosedRange<Date> {
-        let earliestDate = switch mode {
-        case .create:
-            Date.distantPast
-        case .correct:
-            clock.now.addingTimeInterval(-FastStartService.maximumCorrectionAge)
-        }
+        // A legacy active fast can legitimately be older than the new policy.
+        // Keep that stored instant visible instead of allowing DatePicker to
+        // clamp it on open. Once replacement is chosen, the picker is bounded
+        // by the same inclusive policy as the service.
+        let earliestDate = isShowingLegacyDraft
+            ? initialStartDate
+            : earliestAllowedStartDate
 
         return earliestDate ... clock.now
+    }
+
+    private var validationMessage: String? {
+        if isFutureStart {
+            return "Start time can’t be in the future."
+        }
+        if isBeyondMaximumAge {
+            return "Start time must be within the past 36 hours."
+        }
+        if hasConflict(selectedStartDate) {
+            return "This fast overlaps another recorded fast."
+        }
+        return validationError
     }
 
     var body: some View {
@@ -81,12 +104,27 @@ struct StartTimeEditor: View {
                         Text(
                             mode == .create
                                 ? "Choose the date and time you intend to record."
-                                : "Corrections are available for the preceding 24 hours."
+                                : "Corrections are available for the preceding 36 hours."
                         )
                         .font(.subheadline)
                         .foregroundStyle(UFastTheme.secondaryText)
                     }
                     .listRowBackground(UFastTheme.surface)
+                }
+
+                if isShowingLegacyDraft {
+                    Section {
+                        Button("Use earliest valid start") {
+                            isShowingLegacyDraft = false
+                            selectedStartDate = earliestAllowedStartDate
+                            validationError = nil
+                            saveError = nil
+                        }
+                        .accessibilityIdentifier("fast.start-use-earliest")
+                    } footer: {
+                        Text("The stored start is older than the preceding 36 hours. Choose a new start to replace it.")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 Section {
@@ -106,14 +144,8 @@ struct StartTimeEditor: View {
                     )
                     .accessibilityIdentifier("fast.start-time")
                 } footer: {
-                    if isFutureStart {
-                        validationLabel("Start time can’t be in the future.")
-                            .accessibilityIdentifier("fast.start-validation")
-                    } else if isBeyondCorrectionLimit {
-                        validationLabel("Start time must be within the past 24 hours.")
-                            .accessibilityIdentifier("fast.start-validation")
-                    } else if hasConflict(selectedStartDate) {
-                        validationLabel("This fast overlaps another recorded fast.")
+                    if let validationMessage {
+                        validationLabel(validationMessage)
                             .accessibilityIdentifier("fast.start-validation")
                     }
                 }
@@ -132,6 +164,10 @@ struct StartTimeEditor: View {
             .scrollContentBackground(.hidden)
             .background(UFastTheme.canvas)
             .tint(UFastTheme.action)
+            .onChange(of: selectedStartDate) { _, _ in
+                validationError = nil
+                saveError = nil
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
@@ -162,7 +198,22 @@ struct StartTimeEditor: View {
 
         do {
             try onConfirm(selectedStartDate)
+            validationError = nil
             saveError = nil
+        } catch let error as FastStartError {
+            switch error {
+            case .futureStartTime:
+                validationError = "Start time can’t be in the future."
+                saveError = nil
+            case .startTimeBeyondMaximumAge:
+                validationError = "Start time must be within the past 36 hours."
+                saveError = nil
+            case .conflict:
+                validationError = "This fast overlaps another recorded fast."
+                saveError = nil
+            case .noActiveFast:
+                saveError = "Your start time couldn’t be saved. Please try again."
+            }
         } catch {
             saveError = "Your start time couldn’t be saved. Please try again."
         }

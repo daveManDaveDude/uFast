@@ -3,11 +3,87 @@ import XCTest
 // swiftlint:disable blanket_disable_command superfluous_disable_command type_body_length
 // swiftlint:disable trailing_comma file_length
 
-final class HydrationFavouriteUITests: XCTestCase {
+final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
+    @MainActor
+    func testWaterQuickAddTakesTwoTapsAndUpdatesTotalOnce() {
+        runWaterQuickAddTakesTwoTapsAndUpdatesTotalOnce()
+    }
+
+    @MainActor
+    func testTeaAndCoffeeUseTheirVisibleDefaults() {
+        runTeaAndCoffeeUseTheirVisibleDefaults()
+    }
+
+    @MainActor
+    func testFavouriteDoesNotChangeActiveFast() {
+        runFavouriteDoesNotChangeActiveFast()
+    }
+
+    @MainActor
+    func testSettingsFavouriteCanBeEditedSavedAndUsedByQuickAdd() {
+        runSettingsFavouriteCanBeEditedSavedAndUsedByQuickAdd()
+    }
+
+    @MainActor
+    func testCreateCustomFavouriteShowsClassificationAndQuickAddsIt() {
+        runCreateCustomFavouriteShowsClassificationAndQuickAddsIt()
+    }
+
+    @MainActor
+    func testCaloricFavouriteAddsImmediatelyWithoutFastAndUsesActiveFastChoice() {
+        runCaloricFavouriteAddsImmediatelyWithoutFastAndUsesActiveFastChoice()
+    }
+
+    @MainActor
+    func testCaloricFavouriteFailureStaysVisibleAndCanBeRetriedDuringActiveFast() {
+        runCaloricFavouriteFailureStaysVisibleAndCanBeRetriedDuringActiveFast()
+    }
+}
+
+final class HydrationFavouriteLifecycleUITests: HydrationFavouriteUITestCase {
+    @MainActor
+    func testCustomFavouriteEditAndRemoveCancelThenConfirm() {
+        runCustomFavouriteEditAndRemoveCancelThenConfirm()
+    }
+
+    @MainActor
+    func testFavouritePersistsAfterRelaunchAndAppearsInTodayAndHistoryPickersInOrder() {
+        runFavouritePersistsAfterRelaunchAndAppearsInTodayAndHistoryPickersInOrder()
+    }
+
+    @MainActor
+    func testEditingFavouriteChangesSubsequentAddWithoutRewritingEarlierEvent() {
+        runEditingFavouriteChangesSubsequentAddWithoutRewritingEarlierEvent()
+    }
+
+    @MainActor
+    func testRemovedFavouriteKeepsHistoricalDrinkAfterRelaunch() {
+        runRemovedFavouriteKeepsHistoricalDrinkAfterRelaunch()
+    }
+}
+
+final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
+    @MainActor
+    func testValidationKeepsSaveDisabledAndExplainsEachInvalidFavouriteField() {
+        runValidationKeepsSaveDisabledAndExplainsEachInvalidFavouriteField()
+    }
+
+    @MainActor
+    func testFavouritePersistenceFailuresRetainCreateEditAndRemovalRetryState() {
+        runFavouritePersistenceFailuresRetainCreateEditAndRemovalRetryState()
+    }
+
+    @MainActor
+    func testDeleteAllDataSupportsCancelSuccessAndFailure() {
+        runDeleteAllDataSupportsCancelSuccessAndFailure()
+    }
+}
+
+class HydrationFavouriteUITestCase: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     @MainActor
-    func testWaterQuickAddTakesTwoTapsAndUpdatesTotalOnce() {
+    fileprivate func runWaterQuickAddTakesTwoTapsAndUpdatesTotalOnce() {
         let app = launch()
         tapDrinkAdd(in: app)
         let water = app.buttons["drink.favourite.water"]
@@ -24,7 +100,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testTeaAndCoffeeUseTheirVisibleDefaults() {
+    fileprivate func runTeaAndCoffeeUseTheirVisibleDefaults() {
         for (identifier, amount) in [("tea", "300 ml"), ("coffee", "300 ml")] {
             let app = launch()
             tapDrinkAdd(in: app)
@@ -35,7 +111,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testFavouriteDoesNotChangeActiveFast() {
+    fileprivate func runFavouriteDoesNotChangeActiveFast() {
         let app = XCUIApplication()
         app.launchArguments = arguments + [
             "--seed-active-fast-start",
@@ -54,7 +130,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsFavouriteCanBeEditedSavedAndUsedByQuickAdd() {
+    fileprivate func runSettingsFavouriteCanBeEditedSavedAndUsedByQuickAdd() {
         let app = launch()
         tapTab("Settings", in: app)
 
@@ -89,7 +165,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testCreateCustomFavouriteShowsClassificationAndQuickAddsIt() {
+    fileprivate func runCreateCustomFavouriteShowsClassificationAndQuickAddsIt() {
         let app = launch()
         tapTab("Settings", in: app)
         let add = app.buttons["settings.favourite.add"]
@@ -113,7 +189,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testCustomFavouriteEditAndRemoveCancelThenConfirm() {
+    fileprivate func runCustomFavouriteEditAndRemoveCancelThenConfirm() {
         let app = launch(additionalArguments: ["--seed-favourite-populated"])
         tapTab("Settings", in: app)
         let row = app.buttons.matching(NSPredicate(format: "label == 'Sparkling water'")).firstMatch
@@ -152,7 +228,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testFavouritePersistsAfterRelaunchAndAppearsInTodayAndHistoryPickersInOrder() {
+    fileprivate func runFavouritePersistsAfterRelaunchAndAppearsInTodayAndHistoryPickersInOrder() {
         let app = launch()
         tapTab("Settings", in: app)
         createFavourite(named: "Sparkling water", amount: "330", in: app)
@@ -167,21 +243,31 @@ final class HydrationFavouriteUITests: XCTestCase {
         tapTab("Today", in: relaunched)
         tapDrinkAdd(in: relaunched)
         assertPickerOrder(["Sparkling water", "Juice"], in: relaunched)
-        tapWhenReady(relaunched.buttons["drink.cancel"], app: relaunched)
-        XCTAssertTrue(relaunched.navigationBars["Add a drink"].waitForNonExistence(timeout: 3))
 
-        tapTab("History", in: relaunched)
+        // Relaunching closes the transient picker without making the persistence journey
+        // depend on the sheet toolbar being exposed under parallel simulator load.
+        relaunched.terminate()
+        let historyApp = launch(resetData: false)
+        tapTab("History", in: historyApp)
         tapWhenReady(
-            relaunched.buttons["history.add-at-selected-time"],
-            in: relaunched.scrollViews["history.content"],
-            app: relaunched
+            historyApp.buttons["history.add-at-selected-time"],
+            in: historyApp.scrollViews["history.content"],
+            app: historyApp
         )
-        tapWhenReady(relaunched.buttons["history.add.drink"], app: relaunched)
-        assertPickerOrder(["Sparkling water", "Juice"], in: relaunched)
+        XCTAssertTrue(
+            historyApp.navigationBars["Add to history"].waitForExistence(timeout: 5),
+            historyApp.debugDescription
+        )
+        tapWhenReady(historyApp.buttons["history.add.drink"], app: historyApp)
+        XCTAssertTrue(
+            historyApp.navigationBars["Add a drink"].waitForExistence(timeout: 5),
+            historyApp.debugDescription
+        )
+        assertPickerOrder(["Sparkling water", "Juice"], in: historyApp)
     }
 
     @MainActor
-    func testEditingFavouriteChangesSubsequentAddWithoutRewritingEarlierEvent() {
+    fileprivate func runEditingFavouriteChangesSubsequentAddWithoutRewritingEarlierEvent() {
         let app = launch()
         tapTab("Settings", in: app)
         createFavourite(named: "Sparkling water", amount: "330", in: app)
@@ -214,7 +300,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testRemovedFavouriteKeepsHistoricalDrinkAfterRelaunch() {
+    fileprivate func runRemovedFavouriteKeepsHistoricalDrinkAfterRelaunch() {
         let app = launch()
         tapTab("Settings", in: app)
         createFavourite(named: "Sparkling water", amount: "330", in: app)
@@ -237,7 +323,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testValidationKeepsSaveDisabledAndExplainsEachInvalidFavouriteField() {
+    fileprivate func runValidationKeepsSaveDisabledAndExplainsEachInvalidFavouriteField() {
         let app = launch(additionalArguments: ["--seed-favourite-populated"])
         tapTab("Settings", in: app)
         tapSettingsControl(app.buttons["settings.favourite.add"], in: app)
@@ -266,7 +352,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testFavouritePersistenceFailuresRetainCreateEditAndRemovalRetryState() {
+    fileprivate func runFavouritePersistenceFailuresRetainCreateEditAndRemovalRetryState() {
         assertCreateFailureRetainsDraft()
         assertEditFailureRetainsCommittedFavourite()
         assertRemovalFailureRetainsCommittedFavourite()
@@ -343,7 +429,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testDeleteAllDataSupportsCancelSuccessAndFailure() {
+    fileprivate func runDeleteAllDataSupportsCancelSuccessAndFailure() {
         let cancelled = launch(additionalArguments: ["--seed-favourite-populated"])
         tapTab("Settings", in: cancelled)
         tapSettingsControl(cancelled.buttons["settings.data.delete-all"], in: cancelled)
@@ -387,7 +473,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testCaloricFavouriteAddsImmediatelyWithoutFastAndUsesActiveFastChoice() {
+    fileprivate func runCaloricFavouriteAddsImmediatelyWithoutFastAndUsesActiveFastChoice() {
         let noFast = launch()
         tapTab("Settings", in: noFast)
         createFavourite(named: "Juice", amount: "250", caloric: true, in: noFast)
@@ -415,7 +501,7 @@ final class HydrationFavouriteUITests: XCTestCase {
     }
 
     @MainActor
-    func testCaloricFavouriteFailureStaysVisibleAndCanBeRetriedDuringActiveFast() {
+    fileprivate func runCaloricFavouriteFailureStaysVisibleAndCanBeRetriedDuringActiveFast() {
         let app = launch(additionalArguments: [
             "--seed-caloric-favourite-active-fast",
             "--simulate-drink-save-failure",

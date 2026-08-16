@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-// swiftlint:disable blanket_disable_command superfluous_disable_command
+// swiftlint:disable blanket_disable_command superfluous_disable_command function_body_length
 // swiftlint:disable opening_brace trailing_comma
 
 private enum SimulatedPersistenceBootstrapError: Error {
@@ -15,12 +15,14 @@ struct UFastApp: App {
     private let liveActivityCoordinator: ActiveFastLiveActivityCoordinator?
     private let applicationCommands: ApplicationCommands?
     private let suppressAutomaticLiveActivityOffer: Bool
+    private let initialDestination: AppDestination
 
     init() {
         let launchConfiguration = AppLaunchConfiguration.current()
         let configuredClock = AppClockConfiguration.clock(fixedNow: launchConfiguration.fixedNow)
         clock = configuredClock
         suppressAutomaticLiveActivityOffer = launchConfiguration.suppressAutomaticLiveActivityOffer
+        initialDestination = launchConfiguration.startsOnHistory ? .history : .today
         let bootstrap = PersistenceBootstrapResult.open {
             if launchConfiguration.simulatePersistenceBootstrapFailure {
                 throw SimulatedPersistenceBootstrapError.requested
@@ -78,7 +80,8 @@ struct UFastApp: App {
                     clock: clock,
                     liveActivityCoordinator: liveActivityCoordinator,
                     applicationCommands: applicationCommands,
-                    suppressAutomaticLiveActivityOffer: suppressAutomaticLiveActivityOffer
+                    suppressAutomaticLiveActivityOffer: suppressAutomaticLiveActivityOffer,
+                    initialDestination: initialDestination
                 )
                 .modelContainer(container)
             case .unavailable:

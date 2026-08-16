@@ -24,6 +24,10 @@ final class ApplicationCommands {
     private let projectionCoordinator: PostCommitProjectionCoordinator
     private let configuration: ApplicationCommandConfiguration
 
+    var historyPresentationInvalidation: HistoryPresentationInvalidation {
+        projectionCoordinator.historyPresentationInvalidation
+    }
+
     init(
         modelContext: ModelContext,
         clock: any AppClock,
@@ -147,6 +151,8 @@ final class ApplicationCommands {
         )
         if endingActiveFast {
             projectionCoordinator.enqueue(.fastEndedOrDeleted)
+        } else {
+            projectionCoordinator.publishHistoryInvalidation()
         }
     }
 
@@ -164,6 +170,8 @@ final class ApplicationCommands {
         )
         if endingActiveFast {
             projectionCoordinator.enqueue(.fastEndedOrDeleted)
+        } else {
+            projectionCoordinator.publishHistoryInvalidation()
         }
     }
 
@@ -227,6 +235,7 @@ final class ApplicationCommands {
 
     func deleteHydration(id: UUID) throws {
         try hydrationRepository().delete(requiredHydrationRecord(id: id))
+        projectionCoordinator.publishHistoryInvalidation()
     }
 
     func updateGoal(_ goal: FastingGoal) throws {

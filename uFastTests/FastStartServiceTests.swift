@@ -41,7 +41,7 @@ final class FastStartServiceTests: XCTestCase {
     func testPastStartCreatesActiveFastAtExactInstantWithCurrentGoal() throws {
         let repository = ActiveFastRepositorySpy()
         let goal = try XCTUnwrap(FastingGoal(hours: 18))
-        let pastStart = now.addingTimeInterval(-3 * 24 * 60 * 60)
+        let pastStart = now.addingTimeInterval(-FastStartService.maximumStartAge)
         let service = FastStartService(
             repository: repository,
             clock: FixedClock(now: now)
@@ -53,6 +53,22 @@ final class FastStartServiceTests: XCTestCase {
         XCTAssertEqual(fast.startDate, pastStart)
         XCTAssertEqual(fast.historicalGoal, goal)
         XCTAssertTrue(fast.isActive)
+    }
+
+    func testPastStartRejectsOneSecondOlderThanSharedWindowWithoutMutation() throws {
+        let repository = ActiveFastRepositorySpy()
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+        let tooOldStart = now.addingTimeInterval(
+            -FastStartService.maximumStartAge - 1
+        )
+
+        XCTAssertThrowsError(try service.startFast(at: tooOldStart, goal: .default)) { error in
+            XCTAssertEqual(error as? FastStartError, .startTimeBeyondMaximumAge)
+        }
+        XCTAssertTrue(repository.savedFasts.isEmpty)
     }
 
     func testCorrectionUpdatesExistingFastAndPreservesIdentityAndHistoricalGoal() throws {
@@ -100,7 +116,7 @@ final class FastStartServiceTests: XCTestCase {
         XCTAssertTrue(repository.updatedStartDates.isEmpty)
     }
 
-    func testCorrectionAllowsExactlyTwentyFourHoursAgo() throws {
+    func testCorrectionAllowsExactlyThirtySixHoursAgo() throws {
         let existingFast = FastRecord(
             startDate: now.addingTimeInterval(-3600),
             goalAtStart: .default
@@ -111,7 +127,7 @@ final class FastStartServiceTests: XCTestCase {
             clock: FixedClock(now: now)
         )
         let earliestAllowedStart = now.addingTimeInterval(
-            -FastStartService.maximumCorrectionAge
+            -FastStartService.maximumStartAge
         )
 
         let correctedFast = try service.correctActiveFastStart(to: earliestAllowedStart)
@@ -120,7 +136,7 @@ final class FastStartServiceTests: XCTestCase {
         XCTAssertEqual(repository.updatedStartDates, [earliestAllowedStart])
     }
 
-    func testCorrectionRejectsMoreThanTwentyFourHoursAgoWithoutMutation() throws {
+    func testCorrectionRejectsOneSecondOlderThanThirtySixHoursWithoutMutation() throws {
         let originalStart = now.addingTimeInterval(-3600)
         let existingFast = FastRecord(
             startDate: originalStart,
@@ -132,16 +148,72 @@ final class FastStartServiceTests: XCTestCase {
             clock: FixedClock(now: now)
         )
         let tooOldStart = now.addingTimeInterval(
-            -FastStartService.maximumCorrectionAge - 1
+            -FastStartService.maximumStartAge - 1
         )
 
         XCTAssertThrowsError(
             try service.correctActiveFastStart(to: tooOldStart)
         ) { error in
-            XCTAssertEqual(error as? FastStartError, .startTimeBeyondCorrectionLimit)
+            XCTAssertEqual(error as? FastStartError, .startTimeBeyondMaximumAge)
         }
         XCTAssertEqual(existingFast.startDate, originalStart)
         XCTAssertTrue(repository.updatedStartDates.isEmpty)
+    }
+
+    func testClockAdvanceRejectsPreviouslyValidCorrectionAtServiceSaveTime() throws {
+        let originalStart = now.addingTimeInterval(-3600)
+        let existingFast = FastRecord(startDate: originalStart, goalAtStart: .default)
+        let repository = ActiveFastRepositorySpy(savedFasts: [existingFast])
+        let clock = MutableClock(now: now)
+        let service = FastStartService(repository: repository, clock: clock)
+        let selectedStart = now.addingTimeInterval(-FastStartService.maximumStartAge)
+
+        clock.now = now.addingTimeInterval(1)
+
+        XCTAssertThrowsError(try service.correctActiveFastStart(to: selectedStart)) { error in
+            XCTAssertEqual(error as? FastStartError, .startTimeBeyondMaximumAge)
+        }
+        XCTAssertEqual(existingFast.startDate, originalStart)
+        XCTAssertTrue(repository.updatedStartDates.isEmpty)
+    }
+
+    func testClockAdvanceRejectsPreviouslyValidManualCreateAtServiceSaveTime() throws {
+        let repository = ActiveFastRepositorySpy()
+        let clock = MutableClock(now: now)
+        let service = FastStartService(repository: repository, clock: clock)
+        let selectedStart = now.addingTimeInterval(-FastStartService.maximumStartAge)
+
+        clock.now = now.addingTimeInterval(1)
+
+        XCTAssertThrowsError(
+            try service.startFast(at: selectedStart, goal: .default)
+        ) { error in
+            XCTAssertEqual(error as? FastStartError, .startTimeBeyondMaximumAge)
+        }
+        XCTAssertTrue(repository.savedFasts.isEmpty)
+    }
+
+    func testLegacyActiveFastRemainsUnchangedUntilValidReplacementIsSaved() throws {
+        let legacyStart = now.addingTimeInterval(-48 * 60 * 60)
+        let historicalGoal = try XCTUnwrap(FastingGoal(hours: 16))
+        let existingFast = FastRecord(startDate: legacyStart, goalAtStart: historicalGoal)
+        let repository = ActiveFastRepositorySpy(savedFasts: [existingFast])
+        let service = FastStartService(
+            repository: repository,
+            clock: FixedClock(now: now)
+        )
+
+        XCTAssertThrowsError(try service.correctActiveFastStart(to: legacyStart)) { error in
+            XCTAssertEqual(error as? FastStartError, .startTimeBeyondMaximumAge)
+        }
+        XCTAssertEqual(existingFast.startDate, legacyStart)
+
+        let replacementStart = now.addingTimeInterval(-FastStartService.maximumStartAge)
+        let corrected = try service.correctActiveFastStart(to: replacementStart)
+
+        XCTAssertEqual(corrected.id, existingFast.id)
+        XCTAssertEqual(corrected.startDate, replacementStart)
+        XCTAssertEqual(corrected.historicalGoal, historicalGoal)
     }
 
     func testCorrectionRequiresAnActiveFast() {
@@ -246,7 +318,7 @@ final class FastStartServiceTests: XCTestCase {
             let repository = ActiveFastRepositorySpy()
             let service = FastStartService(
                 repository: repository,
-                clock: FixedClock(now: now)
+                clock: FixedClock(now: instant.addingTimeInterval(12 * 60 * 60))
             )
 
             let fast = try service.startFast(at: instant, goal: .default)
@@ -276,6 +348,14 @@ final class FastStartServiceTests: XCTestCase {
 
 private struct FixedClock: AppClock {
     let now: Date
+}
+
+private final class MutableClock: AppClock, @unchecked Sendable {
+    var now: Date
+
+    init(now: Date) {
+        self.now = now
+    }
 }
 
 @MainActor

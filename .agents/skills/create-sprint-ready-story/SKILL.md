@@ -20,9 +20,10 @@ readiness decisions that require product or technical judgment.
 - This skill writes planning artifacts only. Do not edit product source, tests,
   project files, generated Xcode files, or implementation configuration.
 - A story is `Ready` only when its outcome, scope, acceptance criteria,
-  dependencies, decisions, architecture boundaries, and validation are clear.
-  Use `Draft` when a material decision remains unresolved; never hide an
-  unresolved decision in implementation wording.
+  dependencies, decisions, architecture boundaries, validation, executability,
+  and test observability are clear. Use `Draft` when a material decision or
+  reproduction remains unresolved; never hide uncertainty in implementation
+  wording.
 - Do not claim that a worker, reviewer, or draft has accepted the story. Record
   the explicit Sol readiness verdict when a Sol gate is used.
 - Never commit or push changes unless the user separately asks.
@@ -82,6 +83,9 @@ differently:
   concurrency, privacy, accessibility and compatibility constraints when relevant;
 - dependencies and explicit product decisions;
 - focused verification, integration verification and human checks;
+- an execution profile containing uncertainty (`low`, `medium`, or `high`),
+  deterministic reproduction, required observability, expected expensive
+  commands, focused correction budget, and maximum rescue tier;
 - a concise Definition of Ready.
 
 Keep the story bounded to one coherent outcome. Separate implementation
@@ -89,6 +93,33 @@ constraints from acceptance behavior. Do not prescribe file names or a design
 that repository inspection does not support. Do not add AI, cloud sync, health
 claims, monetization, analytics, or other out-of-scope capability merely because
 it could be useful.
+
+Use Luna xhigh as the default implementer because it is the repository's
+cost-effective normal path. Recommend Terra at the outset only when the user
+requests it or when a deterministic reproduction already shows material
+cross-cutting complexity. Otherwise give Luna one bounded diagnostic pass and
+use the `implement-sprint` circuit breaker if uncertainty remains.
+
+Use this compact execution profile in the story:
+
+```text
+Execution profile:
+- Uncertainty: low | medium | high
+- Initial implementer: Luna xhigh | Terra medium
+- Deterministic reproduction and observability: ...
+- Focused correction budget: ...
+- Expected expensive commands: ...
+- Maximum rescue tier: Terra | Sol diagnosis
+```
+
+Do not mark a combined investigation-and-fix story `Ready` when deterministic
+reproduction or observable acceptance is missing, or when investigation may
+cross multiple architecture boundaries without a bounded diagnostic outcome.
+Split it into a discovery story and a bounded implementation story when
+acceptance depends on exploratory native gestures, temporary evidence, several
+independent unknowns, or a test harness that does not yet expose the required
+state. Terms such as “slightly,” “looks correct,” or “equivalent evidence”
+require a deterministic observable definition before readiness.
 
 For a compact ledger such as `BACKLOG.md`, add one index entry and link the
 complete story document when the existing convention stores details elsewhere.
@@ -118,8 +149,9 @@ Spawn the reviewer as a read-only default agent with:
 
 Give Sol only a compact packet: the proposed story, authoritative references,
 existing related stories, affected boundaries, unresolved questions, and the
-requested output mode. Tell Sol not to edit files, implement code, or rewrite the
-story. Require this response:
+requested output mode. Include the execution profile and ask whether discovery
+and implementation must be split. Tell Sol not to edit files, implement code,
+or rewrite the story. Require this response:
 
 ```text
 STORY READINESS DECISION
@@ -127,9 +159,12 @@ Verdict: READY | NEEDS_CHANGES | BLOCKED
 Product decision status:
 Scope and acceptance status:
 Architecture/data/accessibility/privacy status:
+Execution profile and testability status:
+Recommended initial implementer: Luna xhigh | Terra medium
+Split required: yes | no
 Missing evidence or contradictions:
 Required changes:
-Reasoning effort: medium | high
+Reasoning effort: medium 
 ```
 
 If `NEEDS_CHANGES`, Luna applies only the required document changes, preserves
@@ -151,6 +186,8 @@ Use `apply_patch` for document edits. Recheck the final file for:
 - broken relative links;
 - unresolved placeholders or contradictory status/criteria;
 - acceptance criteria that cannot be tested;
+- missing execution profile, deterministic observability, or correction budget;
+- an unresolved investigation bundled into implementation;
 - accidental changes outside the requested artifact.
 
 Return a compact handoff:
@@ -163,6 +200,7 @@ Status: Ready | Draft | Blocked
 Artifact: <path>
 Backlog update: <path and entry, or none>
 Sol gate: <verdict, or mechanical update not required>
+Execution profile: <uncertainty, Luna/Terra start, correction budget, rescue tier>
 Open decisions / blockers: <none or list>
 Implement-sprint handoff: <why this path is ready or what remains>
 ```

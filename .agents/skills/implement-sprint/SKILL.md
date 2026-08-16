@@ -1,6 +1,6 @@
 ---
 name: implement-sprint
-description: "Run a sprint-ready story document as a Luna-orchestrated, sequential implementation workflow: understand the whole sprint, delegate exactly one bounded story at a time to the configured Luna story worker, use Luna for focused and noisy validation, delegate read-only review and acceptance decisions to Sol gate agents, and finish with a Sol integration evaluation and human report. Use for $implement-sprint PATH or an equivalent request with a supplied sprint/story document. Do not use for an ordinary one-off feature request without a sprint document."
+description: "Run a sprint-ready story document as a sequential implementation workflow: use the cost-effective Luna xhigh story worker by default, stop repeated correction loops with explicit budgets, escalate bounded rescue work to Terra and unresolved diagnosis to Sol, retain independent Sol acceptance gates, and finish with one source-frozen integration evaluation. Use for $implement-sprint PATH or an equivalent request with a supplied sprint/story document. Do not use for an ordinary one-off feature request without a sprint document."
 ---
 
 # Implement a sprint
@@ -11,25 +11,30 @@ and dispatches corrections. Read-only Sol gate agents own technical review,
 acceptance decisions, and the final integration evaluation. Keep the main thread
 focused on requirements, compact evidence, and explicit Sol decisions.
 
+Keep the configured `story_worker` (`gpt-5.6-luna`, xhigh reasoning) as the
+default implementation agent. Escalation is a circuit breaker for measured
+stalls, not a replacement for the normal cost-effective Luna path.
+
 ## Guardrails
 
 - Require a path to a sprint-ready document. If the path is missing or unreadable,
   stop and request it.
 - Preserve unrelated user changes. Never reset, clean, checkout, or overwrite
   work that predates this sprint.
-- Do not implement product functionality yourself to compensate for a Luna
-  worker defect. Return precise findings to the responsible Luna worker.
-- Delegate write-heavy implementation sequentially: one story, one
-  `story_worker` Luna thread, and one Sol review gate at a time. Continue the
-  same Luna worker and Sol reviewer for corrections when the client supports it.
-- Luna workers own focused tests. A fresh read-only Luna verification worker may
-  execute noisy build, test, lint, and analysis commands. It may create normal
-  build logs and result bundles but must not edit product or test files.
+- Do not implement product functionality yourself to compensate for an
+  implementation-worker defect. Return precise findings to the assigned Luna or
+  Terra worker.
+- Delegate write-heavy implementation sequentially: one story and one
+  write-capable implementation agent at a time. Start with one `story_worker`
+  Luna thread. Continue it for corrections only while its execution budget
+  remains; replace it with one Terra rescue agent when the circuit breaker fires.
+- The assigned implementation worker owns focused tests. A fresh read-only Luna
+  verification worker may execute noisy build, test, lint, and analysis
+  commands. It may create normal build logs and result bundles but must not edit
+  product or test files.
 - For each story, use one read-only Sol gate agent for diff review and the
   acceptance decision. Spawn it as a default agent with model `gpt-5.6-sol`,
-  `reasoning_effort: medium`, and no inherited full-thread context. Escalate to
-  high reasoning only for material architecture, persistence, security,
-  accessibility, ambiguity, or disagreement risks.
+  `reasoning_effort: medium`, and no inherited full-thread context. 
 - Give Sol a compact review packet: the story contract, changed paths and diff
   summary, Luna's handoff, focused validation results, and known uncertainties.
   Do not replay the complete sprint history into every review agent.
@@ -42,6 +47,49 @@ focused on requirements, compact evidence, and explicit Sol decisions.
   and only when it cannot confuse the story-level write/review loop.
 - Treat every Luna handoff as evidence, never as approval. Treat every Sol
   decision as a gate that must be recorded with its evidence.
+
+## Execution budget and model escalation
+
+Track failed correction attempts by acceptance surface, not merely by command.
+A failed compile, assertion, launch, fixture bootstrap, or visual-state check all
+consume one attempt when they follow an edit or explicit diagnostic hypothesis.
+The initial baseline/reproduction does not consume a correction attempt.
+
+Before each rerun, record the failure class, the new evidence or change, and the
+expected result. Do not rerun unchanged source against the same failure except
+for one explicit flake check.
+
+Stop the Luna correction loop when any condition is met:
+
+- the same failure class occurs twice without materially new evidence;
+- three focused correction attempts fail for the same acceptance surface;
+- 25 minutes of active correction elapse without a proven root cause;
+- the proposed fix expands beyond the story's recorded architecture boundary;
+- a fixture or assertion is being broadened mainly to accommodate uncontrolled
+  test behavior rather than the user contract.
+
+Move the story to `ESCALATING`, stop further edits and tests, and create a compact
+`LOOP ESCALATION` packet containing the story criterion, current hypothesis,
+changed paths, exact failure signatures, attempts made, best artifact, scope
+drift risk, and next decision needed. Close or pause the Luna worker before
+starting another writer.
+
+Spawn one Terra rescue agent as `agent_type: default`, model
+`gpt-5.6-terra`, `reasoning_effort: medium`, and `fork_context: false`. Tell it
+that it owns the active story, must preserve existing work, must not widen scope,
+and must return the same implementation handoff contract. Use high reasoning
+only for material architecture, persistence, concurrency, accessibility, or a
+failed medium-reasoning rescue. Terra receives at most two failed focused
+correction attempts or 30 minutes on the unresolved surface.
+
+If Terra's budget is exhausted or the root cause remains ambiguous, stop edits
+and spawn a fresh read-only Sol diagnostic agent with `gpt-5.6-sol`, medium
+reasoning, and no inherited context. Require a `DIAGNOSTIC DECISION` of
+`ROOT_CAUSE_FOUND`, `STORY_SPLIT_REQUIRED`, `PRODUCT_DECISION_REQUIRED`, or
+`BLOCKED`, with the smallest next validation. Route implementation back to one
+Luna or Terra writer from that decision. Sol remains independent and read-only
+by default. Use a write-capable Sol rescue only with explicit human authority;
+a different fresh Sol agent must perform acceptance review afterward.
 
 ## Phase 1 — understand before coding
 
@@ -59,9 +107,16 @@ focused on requirements, compact evidence, and explicit Sol decisions.
 4. Enumerate every story and its acceptance criteria. Record dependencies,
    likely ordering, overlapping files/components, migration or persistence
    implications, and any contradictory or impossible requirements.
-5. If a contradiction blocks a safe plan, report it as `BLOCKED` and ask the
+5. Record or infer an execution profile for each story: uncertainty
+   (`low`, `medium`, or `high`), deterministic reproduction, test observability,
+   expected expensive commands, initial Luna budget, and maximum rescue tier.
+   Keep Luna xhigh as the default. Treat an investigation-and-fix story without
+   a deterministic reproduction as a one-pass diagnostic first; if Luna cannot
+   prove the root cause within that pass, use the escalation policy rather than
+   trial-and-error implementation.
+6. If a contradiction blocks a safe plan, report it as `BLOCKED` and ask the
    human for direction. Do not invent a product decision.
-6. Publish a compact sprint ledger in the conversation before coding. Every story
+7. Publish a compact sprint ledger in the conversation before coding. Every story
    starts as `PENDING` and may move through the following states under Luna's
    coordination and the Sol gate's authority:
 
@@ -69,7 +124,9 @@ focused on requirements, compact evidence, and explicit Sol decisions.
 
    Use `BLOCKED` for a genuine dependency, ambiguity, environment, or validation
    blocker. A worker's “complete” message never performs the `ACCEPTED`
-   transition, and Luna never converts a Sol rejection into acceptance.
+   transition, and Luna never converts a Sol rejection into acceptance. Use
+   `ESCALATING` only while replacing a stalled implementation worker or obtaining
+   a diagnostic decision, then return to `IN PROGRESS` or move to `BLOCKED`.
 
 ## Phase 2 — execute one story at a time
 
@@ -78,12 +135,12 @@ For each story in dependency order:
 1. Luna moves it to `IN PROGRESS` and states its outcome, complete acceptance
    criteria, dependencies already accepted, relevant repository context, likely
    files, and the validation expected.
-2. Spawn exactly one bounded `story_worker` agent. Give it only the active
-   story's implementation brief plus the minimum repository/sprint context it
-   needs. Explicitly say that it must not implement any other story and must
-   return the complete `STORY IMPLEMENTATION HANDOFF` contract from its agent
-   instructions. Require focused tests, including changed story-specific UI
-   tests, but do not ask it to run the full UI suite by default.
+2. Spawn exactly one bounded `story_worker` Luna xhigh agent. Give it only the
+   active story's implementation brief plus the minimum repository/sprint
+   context it needs. Explicitly say that it must not implement any other story
+   and must return the complete `STORY IMPLEMENTATION HANDOFF` contract from its
+   agent instructions. Require focused tests, including changed story-specific
+   UI tests, but do not ask it to run the full UI suite by default.
 3. Wait for the handoff. If it is missing, incomplete, or claims acceptance,
    ask the same worker to return a corrected handoff before review.
 4. Luna moves the story to `IN REVIEW`, checks that the handoff is complete,
@@ -109,12 +166,14 @@ For each story in dependency order:
    the validation needed next. Sol may request a Luna rerun when evidence is
    missing or inconsistent, but should not run expensive commands itself.
 6. If Sol returns `CHANGES REQUESTED`, Luna moves the story to `CHANGES
-   REQUESTED` and sends the precise findings to the same Luna worker thread.
-   Include file/symbol evidence, the failed criterion, expected behavior, and the
-   exact validation that must be rerun. Do not silently fix it in the Luna
-   orchestration thread. Return to step 3, then send the changed evidence to the
-   same Sol reviewer for re-review. Spawn a new Sol reviewer only if the prior
-   reviewer is unavailable or its context is no longer reliable.
+   REQUESTED` and sends the precise findings to the assigned implementation
+   worker. Include file/symbol evidence, the failed criterion, expected behavior,
+   and the exact validation that must be rerun. Do not silently fix it in the
+   Luna orchestration thread. Reuse the same worker only while its execution
+   budget remains; otherwise follow `Execution budget and model escalation`.
+   Return to step 3, then send the changed evidence to the same Sol reviewer for
+   re-review. Spawn a new Sol reviewer only if the prior reviewer is unavailable
+   or its context is no longer reliable.
 7. If Sol returns `BLOCKED`, record the evidence, move the story to `BLOCKED`,
    and stop rather than accepting or moving to a dependent story.
 8. Only when Sol returns `ACCEPTED` with sufficient evidence may Luna move the
@@ -130,6 +189,11 @@ lint`, `make analyze`, and local-only verification. Complete the repository's
 test preflight first. Choose the smallest focused checks during a story review,
 then run the complete appropriate suite once at sprint integration. Do not run
 overlapping UI suites; respect the repository's parallel-worker rules.
+
+For focused validation, run pure/domain checks before UI checks. A UI rerun must
+correspond to a source/test change or one recorded flake hypothesis. Do not use
+repeated native gestures to discover test expectations; first add deterministic
+state observability or reduce the behavior to a pure invariant when practical.
 
 Luna delegates noisy integration execution to a fresh read-only Luna
 verification worker when available. Its handoff must contain:
@@ -161,22 +225,33 @@ After every story is `ACCEPTED`:
    scope expansion.
 2. Verify that the accepted stories work together and that important journeys
    spanning stories still behave correctly.
-3. After focused story tests pass, assign one fresh read-only Luna verification
+3. Declare a source freeze after the combined diff and focused evidence are
+   ready. Do not start the full UI suite before this point. Any later product or
+   test-source edit invalidates the integration result; finish corrections and
+   establish a new source freeze before another complete suite.
+4. After source freeze, assign one fresh read-only Luna verification
    worker to run the complete appropriate build, test, lint/static-analysis, and
    repository verification suite. Keep raw command output in log files and
-   return compact evidence.
-4. Spawn one fresh read-only Sol integration gate with
-   `agent_type: default`, `model: gpt-5.6-sol`, `reasoning_effort: high`, and
+   return compact evidence. Run the complete UI suite once. Before any later
+   Xcode command, copy its log and `.xcresult` to a stable, sprint-specific path
+   outside the rotating Xcode `Logs/Test` directory.
+5. If the complete suite has an unrelated failure, allow one smallest targeted
+   diagnostic rerun. Do not describe the suite or result verifier as passing,
+   and do not start another complete suite unless Sol requests it after new
+   evidence or source changes.
+6. Spawn one fresh read-only Sol integration gate with
+   `agent_type: default`, `model: gpt-5.6-sol`, `reasoning_effort: medium`, and
    `fork_context: false`. Give it the combined diff, accepted story decisions,
    validation artifacts, and cross-story journeys. Require an
    `INTEGRATION DECISION` of `ACCEPTED`, `CHANGES REQUESTED`, or `BLOCKED`.
    Luna must not override this decision. If evidence is missing, Luna reruns the
    smallest appropriate command and sends the compact result back to Sol.
-5. Recheck `git status --short` for unexpected changes. Preserve unrelated work
+7. Recheck `git status --short` for unexpected changes. Preserve unrelated work
    and identify it clearly in the report.
-6. If integration exposes a defect in a story, send it back to that story's Luna
-   worker for correction, then re-review the story and repeat the integration
-   checks. Sol remains the only acceptance authority.
+8. If integration exposes a defect in a story, send it to the currently assigned
+   Luna or Terra implementation worker, applying the same correction budget and
+   escalation rules. Then re-review the story and repeat integration from a new
+   source freeze. Sol remains the only acceptance authority.
 
 ## Final human report
 
@@ -217,9 +292,10 @@ Recommended human checks:
 ...
 ```
 
-Include the sprint ledger, each implementation and verification Luna handoff
+Include the sprint ledger, each implementation-worker and verification handoff
 outcome, every Sol story-gate decision and feedback cycle (including an explicit
 “no changes requested” conclusion when there was no correction cycle), the final
-Sol integration decision, combined validation, and any blocker.
+Sol integration decision, combined validation, each circuit-breaker/escalation
+event, and any blocker.
 Never describe a sprint as complete while a story is `BLOCKED` or merely in
 review.

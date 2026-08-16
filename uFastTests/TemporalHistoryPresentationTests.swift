@@ -104,6 +104,215 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertFalse(try XCTUnwrap(result.first { $0.id == overnight.id }).continuesAfter)
     }
 
+    func testPageGeometryUsesHalfOpenIntersectionAndOriginalBoundaries() throws {
+        let calendar = try londonCalendar()
+        let day = try date(2026, 7, 22, 12, calendar: calendar)
+        let window = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: day, calendar: calendar)
+        )
+        let before = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000021")),
+            start: date(2026, 7, 21, 20, calendar: calendar),
+            end: window.interval.start
+        )
+        let crossing = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000022")),
+            start: date(2026, 7, 21, 19, calendar: calendar),
+            end: date(2026, 7, 23, 2, calendar: calendar)
+        )
+        let touchingStart = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000023")),
+            start: window.interval.start,
+            end: date(2026, 7, 22, 4, calendar: calendar)
+        )
+        let touchingEnd = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000024")),
+            start: date(2026, 7, 22, 20, calendar: calendar),
+            end: window.interval.end
+        )
+        let after = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000025")),
+            start: window.interval.end,
+            end: date(2026, 7, 23, 4, calendar: calendar)
+        )
+
+        let clipped = TemporalHistoryPresentation.clip(
+            [before, crossing, touchingStart, touchingEnd, after],
+            to: window
+        )
+
+        XCTAssertEqual(
+            Set(clipped.map(\.id)),
+            Set([crossing.id, touchingStart.id, touchingEnd.id])
+        )
+        let crossingSegment = try XCTUnwrap(clipped.first { $0.id == crossing.id })
+        XCTAssertEqual(crossingSegment.visibleStart, window.interval.start)
+        XCTAssertEqual(crossingSegment.visibleEnd, window.interval.end)
+        XCTAssertTrue(crossingSegment.continuesBefore)
+        XCTAssertTrue(crossingSegment.continuesAfter)
+        let touchingStartSegment = try XCTUnwrap(clipped.first { $0.id == touchingStart.id })
+        XCTAssertEqual(touchingStartSegment.visibleStart, window.interval.start)
+        XCTAssertFalse(touchingStartSegment.continuesBefore)
+        XCTAssertFalse(touchingStartSegment.continuesAfter)
+        let touchingEndSegment = try XCTUnwrap(clipped.first { $0.id == touchingEnd.id })
+        XCTAssertEqual(touchingEndSegment.visibleEnd, window.interval.end)
+        XCTAssertFalse(touchingEndSegment.continuesBefore)
+        XCTAssertFalse(touchingEndSegment.continuesAfter)
+    }
+
+    func testAdjacentPageFragmentsKeepIdentityLaneAndComplementaryContinuation() throws {
+        let calendar = try londonCalendar()
+        let firstDay = try date(2026, 7, 22, 12, calendar: calendar)
+        let secondDay = try XCTUnwrap(
+            TemporalHistoryPresentation.adjacentDay(
+                to: firstDay,
+                direction: 1,
+                calendar: calendar
+            )
+        )
+        let interval = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000026")),
+            start: date(2026, 7, 22, 19, 6, calendar: calendar),
+            end: date(2026, 7, 23, 13, 19, calendar: calendar)
+        )
+        let firstWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: firstDay, calendar: calendar)
+        )
+        let secondWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: secondDay, calendar: calendar)
+        )
+        let first = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [interval],
+                in: firstWindow,
+                surfaceWidth: 320
+            ).first
+        )
+        let second = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [interval],
+                in: secondWindow,
+                surfaceWidth: 320
+            ).first
+        )
+
+        XCTAssertEqual(first.id, second.id)
+        XCTAssertEqual(first.lane, second.lane)
+        XCTAssertTrue(first.continuesAfter)
+        XCTAssertFalse(first.continuesBefore)
+        XCTAssertTrue(second.continuesBefore)
+        XCTAssertFalse(second.continuesAfter)
+        XCTAssertEqual(first.segment.visibleEnd, second.segment.visibleStart)
+        XCTAssertEqual(first.segment.visibleEnd, secondWindow.interval.start)
+        XCTAssertEqual(second.segment.visibleStart, secondWindow.interval.start)
+    }
+
+    func testPageGeometryClipsFiniteFragmentsToThePageBounds() throws {
+        let calendar = try londonCalendar()
+        let window = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(
+                containing: date(2026, 7, 22, 12, calendar: calendar),
+                calendar: calendar
+            )
+        )
+        let valid = TemporalIntervalInput(
+            id: UUID(),
+            start: .distantPast,
+            end: .distantFuture
+        )
+        let invalid = TemporalIntervalInput(
+            id: UUID(),
+            start: Date(timeIntervalSinceReferenceDate: .nan),
+            end: Date(timeIntervalSinceReferenceDate: .infinity)
+        )
+
+        let geometry = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [valid, invalid],
+                in: window,
+                surfaceWidth: 320
+            ).first
+        )
+        XCTAssertTrue(geometry.startX.isFinite)
+        XCTAssertTrue(geometry.endX.isFinite)
+        XCTAssertTrue(geometry.visualStartX.isFinite)
+        XCTAssertTrue(geometry.visualWidth.isFinite)
+        XCTAssertTrue(geometry.leadingHitPadding.isFinite)
+        XCTAssertTrue(geometry.trailingHitPadding.isFinite)
+        XCTAssertGreaterThanOrEqual(geometry.startX, 0)
+        XCTAssertLessThanOrEqual(geometry.endX, 320)
+        XCTAssertGreaterThanOrEqual(geometry.visualStartX, 0)
+        XCTAssertLessThanOrEqual(geometry.visualStartX + geometry.visualWidth, 320)
+        XCTAssertTrue(
+            TemporalHistoryPresentation.pageGeometry(
+                [valid],
+                in: window,
+                surfaceWidth: .nan
+            ).isEmpty
+        )
+    }
+
+    func testLondonMidnightScreenshotFixtureUsesTheSameAbsoluteInterval() throws {
+        let calendar = try londonCalendar()
+        let previousDay = try date(2026, 7, 21, 12, calendar: calendar)
+        let currentDay = try XCTUnwrap(
+            TemporalHistoryPresentation.adjacentDay(
+                to: previousDay,
+                direction: 1,
+                calendar: calendar
+            )
+        )
+        let nextDay = try XCTUnwrap(
+            TemporalHistoryPresentation.adjacentDay(
+                to: currentDay,
+                direction: 1,
+                calendar: calendar
+            )
+        )
+        let interval = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000027")),
+            start: date(2026, 7, 21, 19, 6, calendar: calendar),
+            end: date(2026, 7, 22, 13, 19, calendar: calendar)
+        )
+        let previousWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: previousDay, calendar: calendar)
+        )
+        let currentWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: currentDay, calendar: calendar)
+        )
+        let nextWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: nextDay, calendar: calendar)
+        )
+        let previous = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [interval],
+                in: previousWindow,
+                surfaceWidth: 320
+            ).first
+        )
+        let current = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [interval],
+                in: currentWindow,
+                surfaceWidth: 320
+            ).first
+        )
+
+        XCTAssertEqual(previous.id, current.id)
+        XCTAssertEqual(previous.segment.originalStart, interval.start)
+        XCTAssertEqual(current.segment.originalEnd, interval.end)
+        XCTAssertTrue(previous.continuesAfter)
+        XCTAssertTrue(current.continuesBefore)
+        XCTAssertFalse(current.continuesAfter)
+        XCTAssertTrue(
+            TemporalHistoryPresentation.pageGeometry(
+                [interval],
+                in: nextWindow,
+                surfaceWidth: 320
+            ).isEmpty
+        )
+    }
+
     func testLiveIntervalContinuationKeepsAdjacentPageBackgroundSeamless() {
         XCTAssertTrue(
             TemporalHistoryPresentation.intervalContinuationShowsContent(

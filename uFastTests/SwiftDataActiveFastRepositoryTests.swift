@@ -94,6 +94,31 @@ final class SwiftDataActiveFastRepositoryTests: XCTestCase {
         XCTAssertFalse(context.hasChanges)
     }
 
+    func testLegacyActiveStartCanBeReopenedAndReplacedWithoutChangingIdentityOrGoal() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let legacyStart = now.addingTimeInterval(-48 * 60 * 60)
+        let goal = try XCTUnwrap(FastingGoal(hours: 18))
+        let fast = FastRecord(startDate: legacyStart, goalAtStart: goal)
+        context.insert(fast)
+        try context.save()
+
+        let repository = SwiftDataActiveFastRepository(modelContext: context)
+        let reopened = try XCTUnwrap(try repository.activeFast())
+        XCTAssertEqual(reopened.id, fast.id)
+        XCTAssertEqual(reopened.startDate, legacyStart)
+        XCTAssertEqual(reopened.historicalGoal, goal)
+
+        let replacementStart = now.addingTimeInterval(-36 * 60 * 60)
+        try repository.updateStartDate(of: reopened, to: replacementStart)
+
+        let stored = try XCTUnwrap(try context.fetch(FetchDescriptor<FastRecord>()).first)
+        XCTAssertEqual(stored.id, fast.id)
+        XCTAssertEqual(stored.startDate, replacementStart)
+        XCTAssertEqual(stored.historicalGoal, goal)
+    }
+
     func testCompletionUpdatesExistingRecordInPlaceAndCapturesGoal() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext

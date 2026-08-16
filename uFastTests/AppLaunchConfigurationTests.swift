@@ -70,6 +70,18 @@ final class AppLaunchConfigurationTests: XCTestCase {
         ))
     }
 
+    func testParsesStartOnHistoryOnlyForTheUITestingLaunch() {
+        let uiTesting = AppLaunchConfiguration(arguments: [
+            "uFast", "--ui-testing", "--ui-testing-start-history",
+        ])
+        let production = AppLaunchConfiguration(arguments: [
+            "uFast", "--ui-testing-start-history",
+        ])
+
+        XCTAssertTrue(uiTesting.startsOnHistory)
+        XCTAssertFalse(production.startsOnHistory)
+    }
+
     func testProductionIgnoresFixtureAndFailureArgumentsWithoutUITestingGate() {
         let configuration = AppLaunchConfiguration(arguments: [
             "uFast", "--reset-data", "--seed-onboarded", "--fixed-now", "1234",
@@ -84,6 +96,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.liveActivityAdapter, .activityKit)
         XCTAssertFalse(configuration.simulatePersistenceBootstrapFailure)
         XCTAssertFalse(configuration.suppressAutomaticLiveActivityOffer)
+        XCTAssertFalse(configuration.startsOnHistory)
     }
 
     func testInvalidOrMissingDateValuesAreIgnored() {

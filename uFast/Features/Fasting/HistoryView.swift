@@ -12,6 +12,7 @@ struct HistoryView: View {
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.locale) var locale
     @Environment(\.applicationCommands) var applicationCommands
+    @Environment(\.historyPresentationInvalidation) var historyPresentationInvalidation
     @Environment(\.modelContext) var modelContext
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.timeZone) var timeZone
@@ -199,6 +200,10 @@ extension HistoryView {
         .onChange(of: isTabSelected) { _, isSelected in
             guard isSelected else { return }
             resetToCurrentDayIfSelected()
+            refreshHistoryAfterCommittedMutation()
+        }
+        .onChange(of: historyInvalidationRevision) { _, _ in
+            refreshHistoryAfterCommittedMutation()
         }
         .onDisappear {
             interruptTemporalMotion()
@@ -416,5 +421,9 @@ extension HistoryView {
                 }
             )
         }
+    }
+
+    var historyInvalidationRevision: Int {
+        historyPresentationInvalidation?.revision ?? 0
     }
 }

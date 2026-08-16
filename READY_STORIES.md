@@ -8,6 +8,10 @@ is preparation for later refinement and must not be implemented as if ready.
 The shared visual contract and implementation-ready Slice 1.5 stories OW-150
 through OW-155 are maintained in `SLICE_1_5_UX_STORIES.md`.
 
+The OW-410 inferred-fast contract is maintained in
+`docs/OW-410_INFERRED_FAST_DETECTION_STORY.md`. It is **Ready** after the
+required read-only Sol readiness gate.
+
 The refined Slice 2 contract and stories OW-201 through OW-205 are maintained
 in `SLICE_2_TODAY_STORIES.md`. They remain Draft until its six decisions are
 accepted in `DECISIONS.md`.
@@ -129,8 +133,9 @@ BR-02, BR-03 and BR-05.
 
 **Epic:** E1 Fasting loop  
 **Priority:** P0  
-**Status:** Done 19 July 2026
-**Updated:** 19 July 2026 — active-start correction is limited to 24 hours
+**Status:** Done 19 July 2026; boundary amended 15 August 2026 by BF-101
+**Updated:** 15 August 2026 — manual active-fast starts and active-start
+correction share an inclusive 36 absolute-hour window
 
 ### User story
 
@@ -151,7 +156,7 @@ catch-up stories.
 - MVP scope: manual start, edit and backdate of fasts; unknown time remains
   unknown.
 - Decisions: D-001 manual fast start, D-004 seven-day guided catch-up horizon
-  and D-010 active-start correction window.
+  and D-010 active-start correction window, as amended by BF-101.
 - Existing boundaries: `AppClock`, `FastRecord` and local SwiftData persistence.
 
 ### In scope
@@ -160,8 +165,9 @@ catch-up stories.
   **Start fast**.
 - When a fast is active, offer **Edit start time**.
 - Let the user select a local calendar date and time no later than the current
-  instant supplied by `AppClock`. When correcting an existing active fast, limit
-  the saved start to the preceding 24 absolute hours.
+  instant supplied by `AppClock`, and within the preceding inclusive 36
+  absolute hours for both a new manually backdated active fast and an active-fast
+  correction.
 - Initialise a new past-time selection to the current date and time; initialise
   a correction to the active fast's stored start time.
 - On confirmation, create one active fast or update the existing active fast in
@@ -169,9 +175,9 @@ catch-up stories.
 - For a newly backdated fast, capture the current fasting goal as its historical
   goal. When correcting an existing fast, preserve its identifier and captured
   historical goal.
-- Permit an older manually chosen start when creating a new backdated fast;
-  D-004's seven-day limit applies to the later guided catch-up flow, not manual
-  entry. BR-16 separately limits correction of an existing active fast.
+- D-004's seven-day limit continues to govern the later guided Catch-up flow;
+  its older-manual-entry allowance is superseded for this Start-time journey.
+  Completed-fast History editing remains governed by its existing contract.
 - Save only after explicit confirmation; cancelling leaves persisted data
   unchanged.
 
@@ -197,10 +203,10 @@ boundary is introduced by OW-104.
 - Given an active fast, when the user chooses **Edit start time**, selects a
   different past time and confirms, then the same record is updated, its target
   reflects the corrected start and no second active fast is created.
-- Given an active fast start correction exactly 24 hours before `AppClock.now`,
-  confirmation succeeds; given a correction more than 24 hours before now,
-  confirmation is unavailable and the explanation says **Start time must be
-  within the past 24 hours.**
+- Given either a new manually backdated start or an active fast start correction
+  exactly 36 absolute hours before `AppClock.now`, confirmation succeeds; given
+  an instant more than 36 hours before now, confirmation is unavailable and the
+  explanation says **Start time must be within the past 36 hours.**
 - Given an active fast whose start is being edited, when the editor opens, then
   it shows the stored start date and time rather than the current time.
 - Given either editor, when the user attempts to select a future instant, then
@@ -229,9 +235,10 @@ boundary is introduced by OW-104.
   never a duplicate.
 - Future value: invalid even if it becomes possible through a time-zone, clock or
   accessibility-adjustment edge case; validate again when saving.
-- Correction limit: exactly 24 absolute hours ago is valid; an older correction
-  is rejected without changing the stored active fast. New backdated creation
-  remains able to use an older explicitly chosen instant.
+- Start-time limit: exactly 36 absolute hours ago is valid; an older proposal is
+  rejected without changing the stored active fast or creating a record. A
+  legacy active record older than the window remains visible as an invalid draft
+  until the user chooses an in-window replacement.
 - Precision: persist the exact instant produced by the date/time control; do not
   silently move it to a meal, goal boundary or another inferred time.
 - Offline: all behavior remains available without connectivity.
@@ -252,8 +259,8 @@ boundary is introduced by OW-104.
   controls labelled **Date** and **Time**, and actions **Cancel** and **Start
   fast** or **Save** according to context.
 - Use the validation copy **Start time can’t be in the future.**
-- For an active correction beyond the allowed window, use **Start time must be
-  within the past 24 hours.**
+- For either manual active-fast start or active correction beyond the allowed
+  window, use **Start time must be within the past 36 hours.**
 - After saving, return to Today; do not add praise, warnings, streak language or
   claims about biological fasting state.
 
@@ -262,13 +269,13 @@ boundary is introduced by OW-104.
 - OW-002 completed.
 - OW-101 supplies active-fast creation, single-record enforcement, persistence
   failure handling and clock injection.
-- D-010 establishes the correction window; no schema or architecture decision is
-  required.
+- D-010 is superseded for this journey by BF-101's shared 36-hour window; no
+  schema or architecture decision is required.
 
 ### Verification
 
-- Unit-test older past creation, in-place correction, the exact 24-hour
-  correction boundary, too-old and future rejection, captured-goal preservation,
+- Unit-test the shared 36-hour boundary for creation and correction, exact
+  boundary, one-second-older and future rejection, captured-goal preservation,
   cancellation and the single-active-fast invariant with an injected clock.
 - Persistence-test relaunch and simulated save failure.
 - UI-test the inactive secondary action, active edit path, initial values,

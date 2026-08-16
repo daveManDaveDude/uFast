@@ -30,12 +30,7 @@ enum UITestDataReset {
                 )
             )
         }
-        if configuration.seedSlice3History {
-            try UITestSeedFixtures.seedSlice3History(in: context, clock: clock)
-        }
-        if configuration.seedHistoryEventGrouping {
-            try UITestSeedFixtures.seedHistoryEventGrouping(in: context, clock: clock)
-        }
+        try seedHistoryFixtures(in: context, configuration: configuration, clock: clock)
         seedFavouriteFixtures(in: context, configuration: configuration, clock: clock)
         if let startDate = configuration.seedActiveFastStart {
             let fast = FastRecord(
@@ -56,6 +51,26 @@ enum UITestDataReset {
         }
         seedIntegrityFixtures(in: context, configuration: configuration, now: now)
         try context.save()
+    }
+
+    private static func seedHistoryFixtures(
+        in context: ModelContext,
+        configuration: DevelopmentFixtureConfiguration,
+        clock: any AppClock
+    ) throws {
+        if configuration.seedSlice3History {
+            try UITestSeedFixtures.seedSlice3History(in: context, clock: clock)
+        }
+        if configuration.seedHistoryEventGrouping {
+            try UITestSeedFixtures.seedHistoryEventGrouping(in: context, clock: clock)
+        }
+        if configuration.seedHistoryMidnightSeam {
+            try UITestSeedFixtures.seedHistoryMidnightSeam(
+                in: context,
+                clock: clock,
+                extendsActiveFast: configuration.seedHistoryMidnightSeamExtended
+            )
+        }
     }
 
     private static func seedFavouriteFixtures(
