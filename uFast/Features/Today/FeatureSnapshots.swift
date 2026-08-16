@@ -4,6 +4,7 @@ struct AppSettingsSnapshot: Equatable {
     let id: UUID
     let fastingGoal: FastingGoal
     let automaticLiveActivityPreference: AutomaticLiveActivityPreference
+    let inferredFastDetectionEnabled: Bool
     let waterFavouriteMillilitres: Int
     let teaFavouriteMillilitres: Int
     let coffeeFavouriteMillilitres: Int
@@ -12,6 +13,7 @@ struct AppSettingsSnapshot: Equatable {
         id: UUID = UUID(),
         fastingGoal: FastingGoal = .default,
         automaticLiveActivityPreference: AutomaticLiveActivityPreference = .notAsked,
+        inferredFastDetectionEnabled: Bool = false,
         waterFavouriteMillilitres: Int = 500,
         teaFavouriteMillilitres: Int = 300,
         coffeeFavouriteMillilitres: Int = 300
@@ -19,6 +21,7 @@ struct AppSettingsSnapshot: Equatable {
         self.id = id
         self.fastingGoal = fastingGoal
         self.automaticLiveActivityPreference = automaticLiveActivityPreference
+        self.inferredFastDetectionEnabled = inferredFastDetectionEnabled
         self.waterFavouriteMillilitres = waterFavouriteMillilitres
         self.teaFavouriteMillilitres = teaFavouriteMillilitres
         self.coffeeFavouriteMillilitres = coffeeFavouriteMillilitres
@@ -28,6 +31,7 @@ struct AppSettingsSnapshot: Equatable {
         id = record.id
         fastingGoal = record.fastingGoal
         automaticLiveActivityPreference = record.automaticLiveActivityPreference
+        inferredFastDetectionEnabled = record.inferredFastDetectionEnabled
         waterFavouriteMillilitres = record.waterFavouriteMillilitres
         teaFavouriteMillilitres = record.teaFavouriteMillilitres
         coffeeFavouriteMillilitres = record.coffeeFavouriteMillilitres

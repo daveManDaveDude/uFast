@@ -90,3 +90,10 @@ extension SwiftDataActiveFastRepository: CompletedFastRepository {
         try transaction.save()
     }
 }
+
+extension SwiftDataActiveFastRepository: CompletedFastCreationRepository {
+    func saveCompletedFast(_ fast: FastRecord) throws {
+        modelContext.insert(fast)
+        try transaction.save()
+    }
+}

@@ -51,15 +51,17 @@ not rewrite or remove that data.
   an inferred interval.
 - At exactly eight absolute hours after the source food event, the interval is
   eligible. The interval starts at the source event's exact timestamp, not at
-  the eight-hour threshold.
+  the eight-hour threshold. If no later caloric food event punctuates it before
+  the maximum, that maximum is the source timestamp plus the user's current
+  fasting goal duration and 12 absolute hours.
 - If there is no later caloric food event, the interval ends at the current
-  instant and is capped at source timestamp plus the user's current fasting
-  goal. It never grows beyond that cap. While the current instant is before
-  that cap it is labelled **Inferred fast in progress**; at the cap it remains
-  visible as a historical **Inferred fast** with Save fast only.
-- A later caloric food event closes the current inferred interval. A historical
-  interval remains available when it qualifies, ending at the later food event
-  or the current-goal cap, whichever comes first.
+  instant until that maximum and is capped there. It never grows beyond that
+  maximum. While the current instant is before the maximum it is labelled
+  **Inferred fast in progress**; at the maximum it remains visible as a
+  historical **Inferred fast** with Save fast only.
+- A later caloric food event closes the current inferred interval only when it
+  occurs before the maximum. A historical interval remains available when it
+  qualifies, ending at that later food event or the maximum, whichever applies.
 - An inferred interval is shown only when it intersects the exact settled
   History interval. The existing nearest-neighbour loading rules remain the
   source of boundary context. A persisted recorded fast takes precedence over
@@ -79,18 +81,18 @@ not rewrite or remove that data.
   action. After confirmation and successful revalidation, save one ordinary
   completed recorded `FastRecord` using the goal current at conversion, with
   start equal to the source food timestamp and end equal to the projected
-  next-food or goal-cap boundary. It is not an inferred record, it does not
-  become active and it does not trigger Today-active state, WidgetKit or
-  ActivityKit.
+  punctuating-food or goal-plus-12-hour maximum boundary. It is not an inferred
+  record, it does not become active and it does not trigger Today-active state,
+  WidgetKit or ActivityKit.
 - Tapping the current real-time inferred interval offers an explicit
   **Start fast** action. After confirmation and successful revalidation, save
   one active recorded `FastRecord` whose start is the source food event's exact
   timestamp. The existing active-fast post-commit path may then update Today,
   WidgetKit and ActivityKit according to their existing contracts.
-- **Start fast** is not offered after the current-goal cap. A capped candidate
-  is historical and can only be saved as a completed fast. This also prevents
-  an old no-later-food source from bypassing the existing 36-hour active-start
-  boundary.
+- **Start fast** is not offered after the goal-plus-12-hour maximum. A capped
+  candidate is historical and can only be saved as a completed fast. This also
+  prevents an old no-later-food source from bypassing the existing 36-hour
+  active-start boundary.
 - Both actions revalidate the source event, inferred boundaries, current goal,
   active-fast authority and overlap constraints immediately before commit.
 - Cancellation, stale candidates, conflicts, validation errors and persistence
@@ -106,7 +108,8 @@ not rewrite or remove that data.
   recorded fasts, the current goal, the setting and an injected `AppClock`.
 - Settled History and current/motion History presentation using the same
   projection and exact visible interval rules.
-- Real-time foreground updates at the eight-hour threshold and goal cap.
+- Real-time foreground updates at the eight-hour threshold and goal-plus-
+  12-hour maximum.
 - Distinct inferred labels, accessibility semantics and stable identifiers for
   the setting, inferred rows and conversion actions.
 - Historical Save fast and current Start fast confirmation/conversion flows.
@@ -140,21 +143,21 @@ not rewrite or remove that data.
   exact projected start/end and is not displayed as an inferred row afterward.
 - **Current start:** use a calm confirmation that explains the active fast will
   start from the source food time. The action is available only before the
-  current-goal cap, so the source is necessarily inside the existing 36-hour
-  active-start boundary for the current 8–24 hour goal range.
+  goal-plus-12-hour maximum, so the source is necessarily inside the existing
+  36-hour active-start boundary for the current 8–24 hour goal range.
 - **Stale candidate:** if the source is edited, deleted or reclassified, a
   later caloric event is added, the goal or setting changes, or a conflicting
   fast appears, do not save the old candidate. Refresh and explain that it is
   no longer available when user feedback is needed.
-- **Goal change:** recompute the inferred cap immediately. A completed fast
+- **Goal change:** recompute the inferred maximum immediately. A completed fast
   saved from a candidate retains the goal captured at conversion under the
   existing recorded-fast rule.
 - **Overlap:** enforce the existing half-open recorded-fast conflict rules.
   Recorded-fast precedence suppresses the whole inferred candidate; it is not
   a clipping rule or permission to create an overlap.
-- **Threshold and cap:** exactly eight hours is eligible; one second earlier
-  is not. A current interval stops at the source plus the current goal even if
-  the user leaves the app open longer.
+- **Threshold and maximum:** exactly eight hours is eligible; one second earlier
+  is not. A current interval stops at the source plus the current goal and 12
+  absolute hours even if the user leaves the app open longer.
 - **Time:** use absolute instants and injected `AppClock` values across time
   zones and daylight-saving changes. Do not use fixed local-day arithmetic.
 - **Opt-out:** disabling the setting removes derived inferred rows and actions
@@ -177,10 +180,11 @@ not rewrite or remove that data.
 3. With the setting enabled, a caloric food event at `T` produces no inferred
    interval at `T + 8h - 1s`, and becomes eligible at exactly `T + 8h`.
 4. A current inferred interval starts at `T`, advances with the injected
-   current time, and ends at `min(now, T + currentGoal)` when no later caloric
-   food exists.
-5. When the next caloric food is at `N`, a qualifying historical interval is
-   `[T, min(N, T + currentGoal))`; a next food before eight hours produces no
+   current time, and ends at `min(now, T + currentGoal + 12h)` when no later
+   caloric food punctuates it.
+5. When the next caloric food is at `N` before `T + currentGoal + 12h`, a
+   qualifying historical interval is `[T, N)`; otherwise it ends at
+   `[T, T + currentGoal + 12h)`. A next food before eight hours produces no
    inferred interval.
 6. Hydration and non-caloric records neither create, split nor close an
    inferred interval. Food remains caloric regardless of optional nutrition
@@ -204,7 +208,7 @@ not rewrite or remove that data.
     setting to off, and creates no inferred SwiftData rows, cache entries or
     network records.
 13. Focused tests cover absolute time, DST/time-zone changes, exact threshold,
-    goal-cap transition to historical Save-only state, opt-out, empty and
+    goal-plus-12-hour transition to historical Save-only state, opt-out, empty and
     offline/no-network state, Dynamic Type, VoiceOver and stable UI interaction
     under the repository's parallel UI-test runtime.
 
@@ -244,8 +248,8 @@ not rewrite or remove that data.
 ## Focused verification
 
 - Pure domain tests for source selection, exact eight-hour threshold, current
-  goal cap, later-food termination, non-caloric-event behavior, overlap
-  precedence, DST/time-zone changes and opt-out.
+  goal-plus-12-hour maximum, later-food termination, non-caloric-event behavior,
+  overlap precedence, DST/time-zone changes and opt-out.
 - Persistence/application tests for default and migrated settings, no inferred
   rows, transactional conversion, stale revalidation, failure/cancel behavior,
   recorded-fast counts and post-commit surface spies.

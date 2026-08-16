@@ -2,7 +2,7 @@ import Foundation
 @testable import uFast
 import XCTest
 
-// swiftlint:disable function_body_length trailing_comma
+// swiftlint:disable function_body_length type_body_length trailing_comma
 
 final class HistoryMotionStreamingTests: XCTestCase {
     private struct TenYearStressFixture {
@@ -335,5 +335,42 @@ final class HistoryMotionStreamingTests: XCTestCase {
 
         XCTAssertEqual(merged?.intervals.count, 1)
         XCTAssertEqual(merged?.events.count, 1)
+    }
+
+    func testMotionContextCreatesInferredFastWhenForegroundClockCrossesThreshold() throws {
+        let sourceDate = Date(timeIntervalSince1970: 2_000_000_000)
+        let window = DateInterval(start: sourceDate, duration: 24 * 60 * 60)
+        let snapshot = HistoryPresentationSnapshot(window: window, fastItems: [], events: [])
+        let context = HistoryMotionInferredContext(
+            foodEvents: [FoodBoundarySnapshot(
+                id: UUID(),
+                occurredAt: sourceDate,
+                description: "Dinner",
+                isCaloric: true
+            )],
+            recordedFasts: [],
+            currentGoal: .default,
+            enabled: true
+        )
+        let motion = HistoryMotionPresentation(snapshot, inferredContext: context)
+        let beforeEligibility = sourceDate.addingTimeInterval(8 * 60 * 60 - 1)
+        let eligible = sourceDate.addingTimeInterval(8 * 60 * 60)
+        let cap = sourceDate.addingTimeInterval(24 * 60 * 60)
+
+        XCTAssertTrue(motion.ribbonIntervals(activeEndingAt: beforeEligibility).isEmpty)
+
+        let currentRibbon = try XCTUnwrap(motion.ribbonIntervals(activeEndingAt: eligible).first)
+        XCTAssertEqual(currentRibbon.title, "Inferred fast in progress")
+        XCTAssertTrue(currentRibbon.accessibilityLabel.contains("Start fast available"))
+        let current = try XCTUnwrap(motion.inferredInterval(for: currentRibbon.id, at: eligible))
+        XCTAssertTrue(current.offersStart)
+
+        let cappedRibbon = try XCTUnwrap(motion.ribbonIntervals(activeEndingAt: cap).first)
+        XCTAssertEqual(cappedRibbon.title, "Inferred fast")
+        XCTAssertTrue(cappedRibbon.accessibilityLabel.contains("Save fast available"))
+        let capped = try XCTUnwrap(motion.inferredInterval(for: currentRibbon.id, at: cap))
+        XCTAssertEqual(capped.state, .historical)
+        XCTAssertTrue(capped.offersSave)
+        XCTAssertFalse(capped.offersStart)
     }
 }

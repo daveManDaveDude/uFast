@@ -87,7 +87,10 @@ enum HistoryProjectionRefreshBoundary {
                     )
                     return HistoryMotionChunk(
                         coverage: chunk.coverage,
-                        presentation: HistoryMotionPresentation(exact)
+                        presentation: HistoryMotionPresentation(
+                            exact,
+                            inferredContext: HistoryMotionInferredContext(data: motionData)
+                        )
                     )
                 }
                 guard let merged = SwiftDataHistoryDataProvider.mergeMotionChunks(

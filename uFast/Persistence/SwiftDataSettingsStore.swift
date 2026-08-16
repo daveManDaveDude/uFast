@@ -7,6 +7,7 @@ struct AppSettingsUserVisibleSnapshot: Equatable, Sendable {
     let teaFavouriteMillilitres: Int
     let coffeeFavouriteMillilitres: Int
     let automaticLiveActivityPreferenceRawValue: String
+    let inferredFastDetectionEnabled: Bool
 }
 
 enum SettingsStoreError: Error, Equatable {
@@ -89,6 +90,15 @@ final class SwiftDataSettingsStore {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
         settings.setAutomaticLiveActivityPreference(preference)
+        try transaction.save {
+            settings.restore(from: snapshot)
+        }
+    }
+
+    func updateInferredFastDetectionEnabled(_ enabled: Bool) throws {
+        let settings = try requiredAuthority()
+        let snapshot = settings.userVisibleSnapshot
+        settings.setInferredFastDetectionEnabled(enabled)
         try transaction.save {
             settings.restore(from: snapshot)
         }

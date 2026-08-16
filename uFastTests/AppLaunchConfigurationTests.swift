@@ -2,7 +2,7 @@
 import XCTest
 
 // SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
-// swiftlint:disable trailing_comma
+// swiftlint:disable function_body_length trailing_comma
 final class AppLaunchConfigurationTests: XCTestCase {
     func testParsesEverySupportedUITestOptionIntoTypedConfiguration() {
         let configuration = AppLaunchConfiguration(arguments: [
@@ -18,6 +18,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             "--simulate-food-save-failure", "--simulate-drink-save-failure",
             "--simulate-goal-save-failure",
             "--simulate-live-activity-settings-save-failure",
+            "--simulate-inferred-fast-detection-save-failure",
             "--simulate-delete-all-failure", "--simulate-live-activity-unsupported",
             "--simulate-live-activity-request-failure",
             "--simulate-live-activity-hide-failure",
@@ -47,6 +48,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             simulateDrinkSaveFailure: true,
             simulateGoalSaveFailure: true,
             simulateLiveActivitySettingsSaveFailure: true,
+            simulateInferredFastDetectionSaveFailure: true,
             simulateDeleteAllFailure: true
         ))
         XCTAssertEqual(configuration.liveActivityAdapter, .deterministic(

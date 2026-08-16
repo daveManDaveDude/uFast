@@ -22,6 +22,7 @@ protocol SettingsFeatureCommanding: AnyObject {
         projectSystemSurfaces: Bool,
         completion: ((PostCommitProjectionOutcome) -> Void)?
     ) throws
+    func settingsUpdateInferredFastDetectionEnabled(_ enabled: Bool) throws
     func settingsDeleteAllData() throws
 }
 
@@ -76,6 +77,10 @@ extension ApplicationCommands: SettingsFeatureCommanding {
         )
     }
 
+    func settingsUpdateInferredFastDetectionEnabled(_ enabled: Bool) throws {
+        try updateInferredFastDetectionEnabled(enabled)
+    }
+
     func settingsDeleteAllData() throws {
         try deleteAllData()
     }
@@ -121,6 +126,7 @@ final class SettingsFeatureController {
     var saveError: String?
     var deleteError: String?
     var automaticallyShowLiveActivities = false
+    var inferredFastDetectionEnabled = false
     var liveActivityStatus: String?
     var waterAmount = "500"
     var teaAmount = "300"
@@ -140,9 +146,21 @@ final class SettingsFeatureController {
         guard snapshot.settings.count == 1, let settings = snapshot.settings.first else { return }
         selection = settings.fastingGoal
         automaticallyShowLiveActivities = settings.automaticLiveActivityPreference == .enabled
+        inferredFastDetectionEnabled = settings.inferredFastDetectionEnabled
         waterAmount = String(settings.waterFavouriteMillilitres)
         teaAmount = String(settings.teaFavouriteMillilitres)
         coffeeAmount = String(settings.coffeeFavouriteMillilitres)
+    }
+
+    func setInferredFastDetection(enabled: Bool) {
+        let previousValue = inferredFastDetectionEnabled
+        inferredFastDetectionEnabled = enabled
+        do {
+            guard let commands else { throw ApplicationCommandError.recordNotFound }
+            try commands.settingsUpdateInferredFastDetectionEnabled(enabled)
+        } catch {
+            inferredFastDetectionEnabled = previousValue
+        }
     }
 
     func saveGoal(_ goal: FastingGoal, previousGoal: FastingGoal) {

@@ -174,6 +174,10 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         }
     }
 
+    func settingsUpdateInferredFastDetectionEnabled(_: Bool) throws {
+        try failIfRequested()
+    }
+
     func settingsDeleteAllData() throws {
         try failIfRequested()
     }

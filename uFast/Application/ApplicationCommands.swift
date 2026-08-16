@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+// swiftlint:disable file_length type_body_length
+
 struct ApplicationCommandConfiguration: Equatable {
     var simulateFastSaveFailure = false
     var simulateFastHistoryFailure = false
@@ -9,12 +11,19 @@ struct ApplicationCommandConfiguration: Equatable {
     var simulateFavouriteSaveFailure = false
     var simulateGoalSaveFailure = false
     var simulateLiveActivitySettingsSaveFailure = false
+    var simulateInferredFastDetectionSaveFailure = false
     var simulateDeleteAllFailure = false
 }
 
 struct ApplicationCommandOutcome: Equatable {
     let recordID: UUID?
     let projectionEnqueued: Bool
+}
+
+enum InferredFastConversionError: Error, Equatable {
+    case candidateUnavailable
+    case conflictingRecordedFast
+    case activeFastAlreadyExists
 }
 
 @MainActor
@@ -97,6 +106,7 @@ final class ApplicationCommands {
             repository: completedFastRepository(),
             clock: clock
         ).update(id: id, startDate: startDate, endDate: endDate)
+        projectionCoordinator.publishHistoryInvalidation()
     }
 
     func completedFastValidationError(
@@ -112,6 +122,63 @@ final class ApplicationCommands {
 
     func deleteCompletedFast(id: UUID) throws {
         try CompletedFastService(repository: completedFastRepository(), clock: clock).delete(id: id)
+        projectionCoordinator.publishHistoryInvalidation()
+    }
+
+    func saveInferredFast(
+        sourceFoodID: UUID,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String? = nil,
+        expectedGoal: FastingGoal? = nil
+    ) throws -> ApplicationCommandOutcome {
+        let candidate = try revalidatedInferredCandidate(
+            sourceFoodID: sourceFoodID,
+            expectedStartDate: expectedStartDate,
+            expectedEndDate: expectedEndDate,
+            expectedSourceDescription: expectedSourceDescription,
+            expectedGoal: expectedGoal,
+            expectedState: .historical
+        )
+        let fast = try CompletedFastCreationService(
+            repository: completedFastRepository(),
+            clock: clock
+        ).save(
+            startDate: candidate.startDate,
+            endDate: candidate.endDate,
+            goal: candidate.goal
+        )
+        projectionCoordinator.publishHistoryInvalidation()
+        return ApplicationCommandOutcome(recordID: fast.id, projectionEnqueued: false)
+    }
+
+    func startInferredFast(
+        sourceFoodID: UUID,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String? = nil,
+        expectedGoal: FastingGoal? = nil
+    ) throws -> ApplicationCommandOutcome {
+        let candidate = try revalidatedInferredCandidate(
+            sourceFoodID: sourceFoodID,
+            expectedStartDate: expectedStartDate,
+            expectedEndDate: expectedEndDate,
+            expectedSourceDescription: expectedSourceDescription,
+            expectedGoal: expectedGoal,
+            expectedState: .inProgress
+        )
+        let repository = activeFastRepository()
+        guard try repository.activeFast() == nil else {
+            throw InferredFastConversionError.activeFastAlreadyExists
+        }
+        let fast = try FastStartService(repository: repository, clock: clock).startFast(
+            at: candidate.startDate,
+            goal: candidate.goal
+        )
+        projectionCoordinator.enqueue(
+            .activeFastStarted(fast: fast, goal: candidate.goal, now: clock.now)
+        )
+        return ApplicationCommandOutcome(recordID: fast.id, projectionEnqueued: true)
     }
 
     func saveFood(
@@ -129,11 +196,14 @@ final class ApplicationCommands {
         )
         if endingActiveFast {
             projectionCoordinator.enqueue(.fastEndedOrDeleted)
+        } else {
+            projectionCoordinator.publishHistoryInvalidation()
         }
     }
 
     func deleteFood(id: UUID) throws {
         try foodRepository().delete(requiredFoodRecord(id: id))
+        projectionCoordinator.publishHistoryInvalidation()
     }
 
     func saveHydration(
@@ -244,7 +314,16 @@ final class ApplicationCommands {
             projectionCoordinator.enqueue(
                 .activeFastChanged(fast: activeFast, goal: goal, now: clock.now)
             )
+        } else {
+            projectionCoordinator.publishHistoryInvalidation()
         }
+    }
+
+    func updateInferredFastDetectionEnabled(_ enabled: Bool) throws {
+        try settingsStore(
+            simulateFailure: configuration.simulateInferredFastDetectionSaveFailure
+        ).updateInferredFastDetectionEnabled(enabled)
+        projectionCoordinator.enqueue(.inferredFastDetectionChanged(enabled))
     }
 
     func updateHydrationFavourites(water: Int, tea: Int, coffee: Int) throws {
@@ -335,6 +414,76 @@ final class ApplicationCommands {
             throw ApplicationCommandError.recordNotFound
         }
         return record
+    }
+
+    // The expectation captures the presentation identity used to detect a
+    // changed source while intentionally allowing an in-progress end to advance.
+    // swiftlint:disable:next function_body_length function_parameter_count
+    private func revalidatedInferredCandidate(
+        sourceFoodID: UUID,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String?,
+        expectedGoal: FastingGoal?,
+        expectedState: InferredFastState
+    ) throws -> InferredFastInterval {
+        // Resolve the active authority before validating or converting either
+        // inferred state.  A historical save must not bypass the same
+        // zero/one/many integrity rule used by current-start conversion.
+        _ = try ActiveFastAuthority.fetch(in: modelContext)
+        guard let settings = try authoritativeSettingsRecord(),
+              settings.inferredFastDetectionEnabled,
+              expectedGoal == nil || expectedGoal == settings.fastingGoal
+        else { throw InferredFastConversionError.candidateUnavailable }
+
+        let foods = try modelContext.fetch(FetchDescriptor<FoodEntryRecord>())
+        guard let source = foods.first(where: { $0.id == sourceFoodID }),
+              source.occurredAt == expectedStartDate,
+              expectedSourceDescription == nil || source.foodDescription == expectedSourceDescription
+        else { throw InferredFastConversionError.candidateUnavailable }
+        let foodSnapshots = foods.map {
+            FoodBoundarySnapshot(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                description: $0.foodDescription,
+                isCaloric: true
+            )
+        }
+        let recorded = try modelContext.fetch(FetchDescriptor<FastRecord>())
+            .map(\.recordedInterval)
+        let withoutRecordedConflicts = InferredFastProjector.project(
+            foodEvents: foodSnapshots,
+            currentGoal: settings.fastingGoal,
+            enabled: true,
+            now: clock.now,
+            visibleInterval: Date.distantPast ..< Date.distantFuture
+        )
+        guard let candidate = withoutRecordedConflicts.first(where: { interval in
+            interval.sourceFoodID == sourceFoodID
+                && interval.startDate == expectedStartDate
+                && (expectedState == .inProgress || interval.endDate == expectedEndDate)
+                && interval.state == expectedState
+        }) else {
+            let hasUnconflictedShape = withoutRecordedConflicts.contains {
+                $0.sourceFoodID == sourceFoodID
+                    && $0.startDate == expectedStartDate
+                    && (expectedState == .inProgress || $0.endDate == expectedEndDate)
+                    && $0.state == expectedState
+            }
+            if hasUnconflictedShape {
+                throw InferredFastConversionError.conflictingRecordedFast
+            }
+            throw InferredFastConversionError.candidateUnavailable
+        }
+
+        guard !FastConflictChecker.hasConflict(
+            proposedStart: candidate.startDate,
+            proposedEnd: candidate.endDate,
+            among: recorded
+        ) else {
+            throw InferredFastConversionError.conflictingRecordedFast
+        }
+        return candidate
     }
 }
 

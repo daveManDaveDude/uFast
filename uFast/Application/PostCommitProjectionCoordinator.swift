@@ -1,11 +1,14 @@
 import Foundation
 import Observation
 
+// swiftlint:disable cyclomatic_complexity
+
 enum PostCommitProjectionEvent {
     case activeFastStarted(fast: FastRecord, goal: FastingGoal, now: Date)
     case activeFastChanged(fast: FastRecord, goal: FastingGoal, now: Date)
     case fastEndedOrDeleted
     case automaticPreferenceChanged(AutomaticLiveActivityPreference)
+    case inferredFastDetectionChanged(Bool)
     case allDataDeleted
 }
 
@@ -32,6 +35,8 @@ final class HistoryPresentationInvalidation {
             publish()
         case .automaticPreferenceChanged, .allDataDeleted:
             break
+        case .inferredFastDetectionChanged:
+            publish()
         }
     }
 }
@@ -67,6 +72,8 @@ final class PostCommitProjectionCoordinator {
                     WidgetProjectionSupport.clear()
                 case .automaticPreferenceChanged:
                     break
+                case .inferredFastDetectionChanged:
+                    break
                 }
             },
             activityEffect: { event in
@@ -80,6 +87,8 @@ final class PostCommitProjectionCoordinator {
                     return await liveActivityCoordinator.didCommitFastEndOrDeletion()
                 case let .automaticPreferenceChanged(preference):
                     return await liveActivityCoordinator.didCommitAutomaticPreference(preference)
+                case .inferredFastDetectionChanged:
+                    return nil
                 case .allDataDeleted:
                     return await liveActivityCoordinator.didCommitDeleteAllData()
                 }

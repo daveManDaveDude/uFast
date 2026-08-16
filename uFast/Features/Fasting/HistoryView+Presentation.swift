@@ -1,6 +1,6 @@
 import SwiftUI
 
-// swiftlint:disable opening_brace
+// swiftlint:disable file_length opening_brace
 
 extension HistoryView {
     @ViewBuilder
@@ -135,6 +135,9 @@ extension HistoryView {
         if let editor {
             return "fast-\(editor.id)"
         }
+        if let inferredConversion {
+            return "inferred-\(inferredConversion.id)"
+        }
         if let foodEditor {
             return "food-\(foodEditor.id)"
         }
@@ -234,6 +237,10 @@ extension HistoryView {
 
     var showsSettledHistoryDetails: Bool {
         temporalMovementPhase.showsTimelineDetails && !isDateRailMoving
+    }
+
+    var showsFutureReadOnlyAppearance: Bool {
+        temporalMovementPhase.showsFutureReadOnlyAppearance && !isDateRailMoving
     }
 
     var futureReadOnlyNotice: some View {
@@ -461,6 +468,17 @@ extension HistoryView {
             onSelectToday()
             return
         }
+        if let inferred = liveHistoryPresentation?.fastItems.first(where: { $0.id == id }),
+           inferred.kind == .inferred,
+           let interval = inferred.inferredInterval
+        {
+            inferredConversion = InferredFastConversionPresentation(interval: interval)
+            return
+        }
+        if let interval = motionSnapshot?.presentation.inferredInterval(for: id, at: clock.now) {
+            inferredConversion = InferredFastConversionPresentation(interval: interval)
+            return
+        }
         if let fast = completedFasts.first(where: { $0.id == id }), let end = fast.endDate {
             if fast.origin == .recorded {
                 editor = CompletedFastEditorPresentation(id: fast.id, startDate: fast.startDate, endDate: end)
@@ -471,6 +489,10 @@ extension HistoryView {
     func openVisibleFast(_ item: HistoryVisibleFastItem) {
         if item.kind == .active {
             onSelectToday()
+            return
+        }
+        if item.kind == .inferred, let interval = item.inferredInterval {
+            inferredConversion = InferredFastConversionPresentation(interval: interval)
             return
         }
         guard item.kind == .recorded,

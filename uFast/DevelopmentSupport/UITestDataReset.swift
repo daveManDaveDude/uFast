@@ -90,6 +90,9 @@ enum UITestDataReset {
         if configuration.seedCaloricFavouriteActiveFast {
             UITestSeedFixtures.seedCaloricFavouriteActiveFast(in: context, clock: clock)
         }
+        if configuration.seedInferredFast {
+            UITestSeedFixtures.seedInferredFast(in: context, clock: clock)
+        }
     }
 
     private static func seedIntegrityFixtures(

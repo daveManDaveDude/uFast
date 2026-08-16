@@ -22,6 +22,11 @@ protocol CompletedFastRepository {
     func deleteCompletedFast(id: UUID) throws
 }
 
+@MainActor
+protocol CompletedFastCreationRepository: CompletedFastRepository {
+    func saveCompletedFast(_ fast: FastRecord) throws
+}
+
 enum CompletedFastError: Error, Equatable {
     case startTimeNotBeforeEndTime
     case futureStartTime
@@ -94,5 +99,47 @@ final class CompletedFastService {
 
     func delete(id: UUID) throws {
         try repository.deleteCompletedFast(id: id)
+    }
+}
+
+@MainActor
+final class CompletedFastCreationService {
+    private let repository: any CompletedFastCreationRepository
+    private let clock: any AppClock
+
+    init(
+        repository: any CompletedFastCreationRepository,
+        clock: any AppClock
+    ) {
+        self.repository = repository
+        self.clock = clock
+    }
+
+    func save(
+        startDate: Date,
+        endDate: Date,
+        goal: FastingGoal
+    ) throws -> FastRecord {
+        guard startDate < endDate else {
+            throw CompletedFastError.startTimeNotBeforeEndTime
+        }
+        guard startDate <= clock.now else {
+            throw CompletedFastError.futureStartTime
+        }
+        guard endDate <= clock.now else {
+            throw CompletedFastError.futureEndTime
+        }
+        let intervals = try repository.recordedFasts().map(\.recordedInterval)
+        guard !FastConflictChecker.hasConflict(
+            proposedStart: startDate,
+            proposedEnd: endDate,
+            among: intervals
+        ) else {
+            throw CompletedFastError.conflict
+        }
+
+        let fast = FastRecord(startDate: startDate, endDate: endDate, goalAtStart: goal)
+        try repository.saveCompletedFast(fast)
+        return fast
     }
 }

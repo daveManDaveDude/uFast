@@ -15,6 +15,7 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedFavouriteDuplicateName = false
     var seedFavouriteValidation = false
     var seedCaloricFavouriteActiveFast = false
+    var seedInferredFast = false
 
     static let disabled = Self()
 }
@@ -75,7 +76,8 @@ struct AppLaunchConfiguration {
             seedFavouritePopulated: arguments.contains("--seed-favourite-populated"),
             seedFavouriteDuplicateName: arguments.contains("--seed-favourite-duplicate-name"),
             seedFavouriteValidation: arguments.contains("--seed-favourite-validation"),
-            seedCaloricFavouriteActiveFast: arguments.contains("--seed-caloric-favourite-active-fast")
+            seedCaloricFavouriteActiveFast: arguments.contains("--seed-caloric-favourite-active-fast"),
+            seedInferredFast: arguments.contains("--seed-inferred-fast")
         )
         commands = Self.commandConfiguration(from: arguments)
         liveActivityAdapter = Self.liveActivityAdapterConfiguration(from: arguments)
@@ -99,6 +101,9 @@ struct AppLaunchConfiguration {
             simulateGoalSaveFailure: arguments.contains("--simulate-goal-save-failure"),
             simulateLiveActivitySettingsSaveFailure: arguments.contains(
                 "--simulate-live-activity-settings-save-failure"
+            ),
+            simulateInferredFastDetectionSaveFailure: arguments.contains(
+                "--simulate-inferred-fast-detection-save-failure"
             ),
             simulateDeleteAllFailure: arguments.contains("--simulate-delete-all-failure")
         )

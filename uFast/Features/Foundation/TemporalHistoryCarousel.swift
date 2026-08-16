@@ -194,7 +194,7 @@ struct TemporalHistoryCarousel: View {
                     showsVisualRibbon: false,
                     windowOverride: settledVisibleWindow,
                     emptySemanticMessage: "No recorded items in this time window.",
-                    futureReadOnlyFrom: readOnlyFromDate
+                    futureReadOnlyFrom: futureReadOnlyFromDate
                 )
                 .allowsHitTesting(movementPhase == .settled && allowsRecordActivation)
                 .accessibilityHidden(movementPhase != .settled)
@@ -291,12 +291,13 @@ extension TemporalHistoryCarousel {
         )
         let pageIntervals = source == .settled ? intervals : motionIntervals
         let pageEvents = source == .settled ? events : motionEvents
-        let canActivateRecord = movementPhase.allowsTimelineInteraction
-            && allowsRecordActivation
-        let canSelectEmpty = movementPhase.allowsTimelineInteraction
-            && allowsEmptySelection
-        let selectInterval: ((UUID) -> Void)? = allowsRecordActivation ? { id in
-            guard canActivateRecord else { return }
+        let interaction = Self.timelineInteractionState(
+            movementPhase: movementPhase,
+            allowsRecordActivation: allowsRecordActivation,
+            allowsEmptySelection: allowsEmptySelection
+        )
+        let selectInterval: ((UUID) -> Void)? = interaction.isVisuallyEnabled ? { id in
+            guard interaction.allowsRecordActivation else { return }
             onSelectInterval(id)
         } : nil
         return TemporalRibbonView(
@@ -305,21 +306,21 @@ extension TemporalHistoryCarousel {
             events: pageEvents,
             onSelectInterval: selectInterval,
             onSelectEvent: { id in
-                guard canActivateRecord else { return }
+                guard interaction.allowsRecordActivation else { return }
                 onSelectEvent(id)
             },
             onSelectGroup: { group in
-                guard canActivateRecord else { return }
+                guard interaction.allowsRecordActivation else { return }
                 onSelectEventGroup?(group)
             },
-            onSelectEmpty: canSelectEmpty ? onSelectEmpty : nil,
+            onSelectEmpty: interaction.allowsEmptySelection ? onSelectEmpty : nil,
             onNavigateDay: nil,
             canNavigateForward: true,
             accessibilityIdentifierPrefix: "history",
             showsDayHeader: false,
             // Preserve the resting control appearance during motion. Actions
-            // remain gated by canActivateRecord/canSelectEmpty until idle.
-            isInteractive: allowsRecordActivation || allowsEmptySelection,
+            // remain gated by the movement-aware callbacks until idle.
+            isInteractive: interaction.isVisuallyEnabled,
             showsSemanticItems: false,
             usesContinuousSurface: true,
             includesSemanticItems: false,
@@ -333,7 +334,7 @@ extension TemporalHistoryCarousel {
                 containing: date,
                 calendar: calendar
             ),
-            futureReadOnlyFrom: readOnlyFromDate
+            futureReadOnlyFrom: futureReadOnlyFromDate
         )
         .background {
             GeometryReader { proxy in
@@ -347,6 +348,34 @@ extension TemporalHistoryCarousel {
         .scrollTransition(.identity, axis: .horizontal) { content, _ in
             content
         }
+    }
+
+    struct TimelineInteractionState: Equatable, Sendable {
+        let isVisuallyEnabled: Bool
+        let allowsRecordActivation: Bool
+        let allowsEmptySelection: Bool
+    }
+
+    static func timelineInteractionState(
+        movementPhase: TemporalCarouselMovementPhase,
+        allowsRecordActivation: Bool,
+        allowsEmptySelection: Bool
+    ) -> TimelineInteractionState {
+        let allowsTimelineInteraction = movementPhase.allowsTimelineInteraction
+        return TimelineInteractionState(
+            isVisuallyEnabled: !allowsTimelineInteraction
+                || allowsRecordActivation
+                || allowsEmptySelection,
+            allowsRecordActivation: allowsTimelineInteraction && allowsRecordActivation,
+            allowsEmptySelection: allowsTimelineInteraction && allowsEmptySelection
+        )
+    }
+
+    var futureReadOnlyFromDate: Date? {
+        // The ribbon shade remains visible during motion. Read-only control
+        // styling and action guards are handled independently by the rail and
+        // timeline interaction state.
+        readOnlyFromDate
     }
 
     func movementPhase(for scrollPhase: ScrollPhase) -> TemporalCarouselMovementPhase {

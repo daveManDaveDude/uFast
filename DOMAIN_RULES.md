@@ -8,7 +8,8 @@
   always qualify; hydration follows the user's explicit classification.
 - **Recorded fast:** explicitly started by the user.
 - **Inferred fast:** a read-only interval derived from a caloric food event,
-  visible after eight absolute hours, and capped by the current fasting goal.
+  visible after eight absolute hours, and capped by the current fasting goal
+  duration plus 12 absolute hours.
 - **Reconstructed fast:** a legacy interval proposed from confirmed boundaries
   and saved after user confirmation before Slice 3.10.
 - **Unknown period:** legacy state saved by the former reconstruction workflow.
@@ -65,12 +66,14 @@
   the inferred interval becomes visible and starts at the source event's exact
   instant. Non-caloric food records, hydration records and missing events do
   not create or terminate an inferred interval.
-- BR-23: An inferred interval ends at the next caloric food event or at the
-  current time when no later caloric food event exists, and never extends past
-  the source event plus the current fasting goal. Goal changes affect the
-  derived cap but do not change the source instant. A later food event closes
-  the current inference and leaves a qualifying historical inferred interval
-  available for explicit saving.
+- BR-23: An inferred interval ends at the first later caloric food event when
+  that event occurs before the source event plus the current fasting goal
+  duration plus 12 absolute hours. With no such punctuating event, it ends at
+  the current time until that maximum, then at the maximum, and never extends
+  past it. Goal changes affect the derived maximum but do not change the
+  source instant. A later food event closes the current inference and leaves a
+  qualifying historical inferred interval available for explicit saving only
+  when it occurs before the maximum.
 - BR-24: Inferred intervals are derived for presentation and are never stored
   as inferred records. History presents them only when the setting is enabled
   and they intersect the exact settled visible interval, using the nearest
@@ -179,16 +182,18 @@
   Foreground refreshes update the current candidate without background timers,
   notifications, remote services or new health-data permissions.
 - BR-50: An inferred interval is **in progress** only while the current instant
-  is before its source timestamp plus the current goal and no later caloric
-  food exists. At the goal cap it becomes a historical inferred interval with
-  the capped end and offers Save fast only. This classification is recalculated
-  if the current goal changes, so Start fast is never offered for a source
-  outside the existing active-start boundary.
+  is before its source timestamp plus the current fasting goal duration plus 12
+  absolute hours and no later caloric food event punctuates it. At that maximum
+  it becomes a historical inferred interval with the capped end and offers
+  Save fast only. This classification is recalculated if the current goal
+  changes, so Start fast is never offered for a source outside the existing
+  active-start boundary.
 - BR-51: Saving an inferred interval persists the exact projected boundaries:
-  start at the source food timestamp and end at the next caloric food or the
-  source-plus-goal cap, whichever is earlier. Historical Save fast remains a
-  completed-fast action even when its source is older than the active-start
-  backdating boundary; it is subject to normal completed-fast validation.
+  start at the source food timestamp and end at the first later caloric food
+  before the maximum or the source-plus-goal-plus-12-hour maximum, whichever
+  applies. Historical Save fast remains a completed-fast action even when its
+  source is older than the active-start backdating boundary; it is subject to
+  normal completed-fast validation.
 - BR-52: If a persisted recorded fast overlaps an inferred candidate, the
   entire inferred candidate is suppressed from presentation. It is not clipped
   into a partial interval and cannot be converted around the overlap.

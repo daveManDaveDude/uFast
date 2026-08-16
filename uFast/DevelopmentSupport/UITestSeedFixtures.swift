@@ -50,6 +50,26 @@ enum UITestSeedFixtures {
         ))
     }
 
+    static func seedInferredFast(in context: ModelContext, clock: any AppClock) {
+        guard let settings = try? context.fetch(FetchDescriptor<AppSettingsRecord>()).first,
+              let firstID = UUID(uuidString: "10200000-0000-0000-0000-000000000001"),
+              let secondID = UUID(uuidString: "10200000-0000-0000-0000-000000000002")
+        else { return }
+        settings.setInferredFastDetectionEnabled(true)
+        let historicalDate = clock.now.addingTimeInterval(-20 * 60 * 60)
+        let currentDate = clock.now.addingTimeInterval(-8 * 60 * 60)
+        context.insert(FoodEntryRecord(
+            id: firstID,
+            draft: .init(description: "Inferred supper", occurredAt: historicalDate),
+            createdAt: historicalDate
+        ))
+        context.insert(FoodEntryRecord(
+            id: secondID,
+            draft: .init(description: "Inferred breakfast", occurredAt: currentDate),
+            createdAt: currentDate
+        ))
+    }
+
     static func seedSlice3History(in context: ModelContext, clock: any AppClock) throws {
         if try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty {
             context.insert(AppSettingsRecord(hasCompletedOnboarding: true))

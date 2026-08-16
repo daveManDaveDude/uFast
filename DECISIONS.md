@@ -781,10 +781,11 @@ is shown.
   inferred-fast projection. The setting is off by default for new and migrated
   installs. When enabled, a caloric food event becomes eligible exactly eight
   absolute hours after its timestamp; the interval starts at that exact source
-  instant, ends at the next caloric food event or the current instant, and is
-  capped by the source instant plus the current fasting goal. A later food
-  closes the current inference while leaving a qualifying historical interval
-  available for explicit saving.
+  instant, ends at the first later caloric food event before the source instant
+  plus the current goal duration and 12 absolute hours, or at the current
+  instant while below that maximum, and is capped by that maximum. A later
+  food closes the current inference only when it punctuates before the maximum,
+  while a qualifying historical interval remains available for explicit saving.
 - **Decision:** Inferred intervals are presentation-only and recalculated from
   local events, the current goal, the opt-in setting and injected time. They do
   not create a persisted inferred record or cache, and a persisted real fast
@@ -813,8 +814,9 @@ is shown.
 - **Status:** Accepted clarification to D-033
 - **Accepted:** 16 August 2026
 - **Decision:** An inferred interval is current/in progress only from its
-  eight-hour eligibility instant until the current-goal cap, exclusive of the
-  cap, when no later caloric food exists. At the cap it remains visible as a
+  eight-hour eligibility instant until the maximum of the current goal
+  duration plus 12 absolute hours, exclusive of that maximum, when no later
+  caloric food event punctuates it. At the maximum it remains visible as a
   historical inferred interval with its capped end and offers **Save fast**,
   not **Start fast**. A goal change recomputes this classification from the
   authoritative current goal.

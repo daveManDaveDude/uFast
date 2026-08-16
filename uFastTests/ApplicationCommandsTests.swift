@@ -2,7 +2,7 @@ import SwiftData
 @testable import uFast
 import XCTest
 
-// swiftlint:disable function_body_length
+// swiftlint:disable file_length function_body_length type_body_length
 
 @MainActor
 final class ApplicationCommandsTests: XCTestCase {
@@ -314,6 +314,286 @@ final class ApplicationCommandsTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 0)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 0)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 0)
+    }
+
+    func testHistoricalInferredSaveCreatesCompletedFastWithoutSystemSurfaceEffects() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let source = FoodEntryRecord(
+            draft: .init(
+                description: "Dinner",
+                occurredAt: now.addingTimeInterval(-25 * 60 * 60)
+            ),
+            createdAt: now.addingTimeInterval(-25 * 60 * 60)
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        var widgetEffects = 0
+        var activityEffects = 0
+        let projection = PostCommitProjectionCoordinator(
+            widgetEffect: { _ in widgetEffects += 1 },
+            activityEffect: { _ in activityEffects += 1; return .updated }
+        )
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: projection
+        )
+        let start = source.occurredAt
+        let end = start.addingTimeInterval(24 * 60 * 60)
+
+        let outcome = try commands.saveInferredFast(
+            sourceFoodID: source.id,
+            expectedStartDate: start,
+            expectedEndDate: end
+        )
+
+        XCTAssertFalse(outcome.projectionEnqueued)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 1)
+        let fast = try XCTUnwrap(context.fetch(FetchDescriptor<FastRecord>()).first)
+        XCTAssertFalse(fast.isActive)
+        XCTAssertEqual(fast.startDate, start)
+        XCTAssertEqual(fast.endDate, end)
+        XCTAssertEqual(fast.capturedHistoricalGoal, .default)
+        XCTAssertEqual(widgetEffects, 0)
+        XCTAssertEqual(activityEffects, 0)
+    }
+
+    func testHistoricalInferredSaveRejectsAmbiguousActiveAuthorityWithoutMutation() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let sourceDate = now.addingTimeInterval(-25 * 60 * 60)
+        let source = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: sourceDate),
+            createdAt: sourceDate
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        context.insert(FastRecord(
+            startDate: now.addingTimeInterval(24 * 60 * 60),
+            goalAtStart: .default
+        ))
+        context.insert(FastRecord(
+            startDate: now.addingTimeInterval(48 * 60 * 60),
+            goalAtStart: .default
+        ))
+        try context.save()
+
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            )
+        )
+        let foodCountBefore = try context.fetchCount(FetchDescriptor<FoodEntryRecord>())
+        let fastCountBefore = try context.fetchCount(FetchDescriptor<FastRecord>())
+
+        XCTAssertThrowsError(try commands.saveInferredFast(
+            sourceFoodID: source.id,
+            expectedStartDate: sourceDate,
+            expectedEndDate: sourceDate.addingTimeInterval(24 * 60 * 60)
+        )) { error in
+            XCTAssertEqual(
+                error as? ActiveFastIntegrityError,
+                .multipleActiveFasts(count: 2)
+            )
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), foodCountBefore)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), fastCountBefore)
+        XCTAssertFalse(context.hasChanges)
+    }
+
+    func testCurrentInferredStartUsesSourceInstantBeforePostCommitSurfaces() async throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let sourceDate = now.addingTimeInterval(-10 * 60 * 60)
+        let source = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: sourceDate),
+            createdAt: sourceDate
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        var order: [String] = []
+        let projection = PostCommitProjectionCoordinator(
+            widgetEffect: { event in
+                XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 1)
+                XCTAssertFalse(context.hasChanges)
+                if case .activeFastStarted = event {
+                    order.append("widget")
+                }
+            },
+            activityEffect: { event in
+                if case .activeFastStarted = event {
+                    order.append("activity")
+                }
+                return .shown(activityIdentifier: "inferred")
+            }
+        )
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: projection
+        )
+
+        let outcome = try commands.startInferredFast(
+            sourceFoodID: source.id,
+            expectedStartDate: sourceDate,
+            expectedEndDate: now
+        )
+        await projection.waitForPendingEffects()
+
+        XCTAssertTrue(outcome.projectionEnqueued)
+        XCTAssertEqual(order, ["widget", "activity"])
+        let fast = try XCTUnwrap(context.fetch(FetchDescriptor<FastRecord>()).first)
+        XCTAssertTrue(fast.isActive)
+        XCTAssertEqual(fast.startDate, sourceDate)
+    }
+
+    func testCurrentInferredStartAcceptsAnAdvancingNowEndpointButRejectsSourceEdits() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let displayedNow = Date(timeIntervalSince1970: 1_800_000_000)
+        let sourceDate = displayedNow.addingTimeInterval(-10 * 60 * 60)
+        let source = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: sourceDate),
+            createdAt: sourceDate
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let projection = PostCommitProjectionCoordinator(
+            widgetEffect: { _ in },
+            activityEffect: { _ in nil }
+        )
+        let advancedCommands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: displayedNow.addingTimeInterval(60)),
+            projectionCoordinator: projection
+        )
+        _ = try advancedCommands.startInferredFast(
+            sourceFoodID: source.id,
+            expectedStartDate: sourceDate,
+            expectedEndDate: displayedNow,
+            expectedSourceDescription: "Dinner",
+            expectedGoal: .default
+        )
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 1)
+
+        let secondContainer = try PersistenceContainer.make(inMemory: true)
+        let secondContext = secondContainer.mainContext
+        let editedSource = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: sourceDate),
+            createdAt: sourceDate
+        )
+        secondContext.insert(editedSource)
+        secondContext.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try secondContext.save()
+        editedSource.update(
+            from: .init(description: "Updated dinner", occurredAt: sourceDate),
+            at: displayedNow
+        )
+        try secondContext.save()
+
+        let staleCommands = ApplicationCommands(
+            modelContext: secondContext,
+            clock: FixedAppClock(now: displayedNow.addingTimeInterval(60)),
+            projectionCoordinator: projection
+        )
+        XCTAssertThrowsError(try staleCommands.startInferredFast(
+            sourceFoodID: editedSource.id,
+            expectedStartDate: sourceDate,
+            expectedEndDate: displayedNow,
+            expectedSourceDescription: "Dinner",
+            expectedGoal: .default
+        )) { error in
+            XCTAssertEqual(error as? InferredFastConversionError, .candidateUnavailable)
+        }
+        XCTAssertEqual(try secondContext.fetchCount(FetchDescriptor<FastRecord>()), 0)
+        XCTAssertFalse(secondContext.hasChanges)
+    }
+
+    func testStaleInferredCandidateAndPersistenceFailureLeaveFastCountUnchanged() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let sourceDate = now.addingTimeInterval(-25 * 60 * 60)
+        let source = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: sourceDate),
+            createdAt: sourceDate
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+        let projection = PostCommitProjectionCoordinator(
+            widgetEffect: { _ in },
+            activityEffect: { _ in nil }
+        )
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: projection
+        )
+        let start = sourceDate
+        let oldEnd = sourceDate.addingTimeInterval(24 * 60 * 60)
+        let later = FoodEntryRecord(
+            draft: .init(description: "Breakfast", occurredAt: now.addingTimeInterval(-2 * 60 * 60)),
+            createdAt: now.addingTimeInterval(-2 * 60 * 60)
+        )
+        context.insert(later)
+        try context.save()
+
+        XCTAssertThrowsError(try commands.saveInferredFast(
+            sourceFoodID: source.id,
+            expectedStartDate: start,
+            expectedEndDate: oldEnd
+        )) { error in
+            XCTAssertEqual(error as? InferredFastConversionError, .candidateUnavailable)
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 0)
+
+        context.delete(later)
+        try context.save()
+        let failing = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: projection,
+            configuration: .init(simulateFastHistoryFailure: true)
+        )
+        XCTAssertThrowsError(try failing.saveInferredFast(
+            sourceFoodID: source.id,
+            expectedStartDate: start,
+            expectedEndDate: oldEnd
+        ))
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 0)
+        XCTAssertFalse(context.hasChanges)
     }
 }
 

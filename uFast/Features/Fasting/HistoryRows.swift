@@ -75,6 +75,14 @@ struct CompletedFastEditorPresentation: Identifiable {
     let endDate: Date
 }
 
+struct InferredFastConversionPresentation: Identifiable {
+    let interval: InferredFastInterval
+
+    var id: UUID {
+        interval.id
+    }
+}
+
 #Preview("History · Empty") {
     HistoryView().modelContainer(PreviewFixtures.modelContainer)
 }

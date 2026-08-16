@@ -14,6 +14,7 @@ struct TemporalDateNavigator: View {
     var selectedRange: Range<Date>?
     var maximumDate: Date?
     var readOnlyAfterDate: Date?
+    var showsReadOnlyAppearance = true
     var automaticScrollEnabled = true
     var coupledPresentation: TemporalCoupledScrollPresentation?
     var presentationDay: Date?
@@ -137,6 +138,7 @@ extension TemporalDateNavigator {
         let isReadOnly = readOnlyAfterDate.map {
             calendar.startOfDay(for: date) > calendar.startOfDay(for: $0)
         } ?? false
+        let showsReadOnlyStyle = isReadOnly && showsReadOnlyAppearance
         let accessibilityValue = dateChipAccessibilityValue(
             isSelected: isSelected,
             isInRange: isInRange,
@@ -144,11 +146,16 @@ extension TemporalDateNavigator {
             isReadOnly: isReadOnly
         )
         return Button { selection = date } label: {
-            dateChipLabel(date, isSelected: isSelected, isInRange: isInRange, isReadOnly: isReadOnly)
+            dateChipLabel(
+                date,
+                isSelected: isSelected,
+                isInRange: isInRange,
+                isReadOnly: showsReadOnlyStyle
+            )
         }
         .buttonStyle(.plain)
         .disabled(!isSelectable)
-        .opacity(isSelectable ? (isReadOnly ? 0.78 : 1) : 0.45)
+        .opacity(isSelectable ? (showsReadOnlyStyle ? 0.78 : 1) : 0.45)
         .accessibilityLabel(fullDate(date))
         .accessibilityValue(accessibilityValue)
         .accessibilityHint(isReadOnly ? "Future day, history is read only." : "")
@@ -301,6 +308,7 @@ extension TemporalDateNavigator {
         let isReadOnly = readOnlyAfterDate.map {
             calendar.startOfDay(for: date) > calendar.startOfDay(for: $0)
         } ?? false
+        let showsReadOnlyStyle = isReadOnly && showsReadOnlyAppearance
         return VStack(spacing: 4) {
             Text(weekday(date))
                 .font(.caption2.weight(.semibold))
@@ -309,13 +317,15 @@ extension TemporalDateNavigator {
             dateChipStatus(isSelected: isSelected, isInRange: false)
         }
         .foregroundStyle(
-            isSelected ? UFastTheme.onAction : (isReadOnly ? UFastTheme.secondaryText : UFastTheme.primary)
+            isSelected
+                ? UFastTheme.onAction
+                : (showsReadOnlyStyle ? UFastTheme.secondaryText : UFastTheme.primary)
         )
         .frame(width: measuredChipStride - 5)
         .frame(minHeight: chipHeight)
         .background(
-            isSelected ? UFastTheme.action.opacity(isReadOnly ? 0.78 : 1) :
-                (isReadOnly ? UFastTheme.formSurface : UFastTheme.raisedSurface)
+            isSelected ? UFastTheme.action.opacity(showsReadOnlyStyle ? 0.78 : 1) :
+                (showsReadOnlyStyle ? UFastTheme.formSurface : UFastTheme.raisedSurface)
         )
         .clipShape(.rect(cornerRadius: UFastTheme.Radius.control))
         .overlay {
@@ -325,7 +335,7 @@ extension TemporalDateNavigator {
                     lineWidth: isSelected ? 2 : 1
                 )
         }
-        .opacity(isSelectable ? (isReadOnly ? 0.78 : 1) : 0.45)
+        .opacity(isSelectable ? (showsReadOnlyStyle ? 0.78 : 1) : 0.45)
     }
 
     var chipWidth: CGFloat {

@@ -173,6 +173,7 @@ final class Slice3PersistenceMigrationTests: XCTestCase {
         XCTAssertEqual(settings.teaFavouriteMillilitres, 425)
         XCTAssertEqual(settings.coffeeFavouriteMillilitres, 225)
         XCTAssertEqual(settings.automaticLiveActivityPreference, .notAsked)
+        XCTAssertFalse(settings.inferredFastDetectionEnabled)
 
         let fasts = try context.fetch(FetchDescriptor<FastRecord>())
         XCTAssertEqual(fasts.count, 3)

@@ -146,6 +146,45 @@ final class HistoryDataProviderTests: XCTestCase {
         )
     }
 
+    func testInferredProjectionUsesNearestFoodEvenWhenHydrationIsCloser() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let start = Date(timeIntervalSince1970: 2_200_000_000)
+        let window = DateInterval(
+            start: start.addingTimeInterval(9 * 60 * 60),
+            duration: 60 * 60
+        )
+        let source = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: start),
+            createdAt: start
+        )
+        context.insert(source)
+        context.insert(HydrationEntryRecord(
+            type: .water,
+            volumeMillilitres: 500,
+            occurredAt: start.addingTimeInterval(8.5 * 60 * 60),
+            isCaloric: false,
+            createdAt: start
+        ))
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let data = try SwiftDataHistoryDataProvider(modelContext: context).fetch(window: window)
+        let presentation = HistoryPresentationBuilder.build(
+            data: data,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: window.end
+        )
+        let inferred = try XCTUnwrap(presentation.fastItems.first(where: { $0.kind == .inferred }))
+        XCTAssertEqual(inferred.id, source.id)
+        XCTAssertEqual(inferred.startDate, start)
+    }
+
     func testMotionCoverageIsCalendarBoundedAcrossDaylightSavingAndMaximumDate() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/London"))

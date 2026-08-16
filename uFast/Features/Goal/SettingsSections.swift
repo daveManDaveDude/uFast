@@ -109,6 +109,27 @@ struct SettingsLiveActivitiesSection: View {
     }
 }
 
+struct SettingsInferredFastSection: View {
+    let isOn: Binding<Bool>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+            UFastSectionHeading("Inferred fasts")
+            Toggle("Detect inferred fasts", isOn: isOn)
+                .accessibilityIdentifier("settings.inferred-fasts.toggle")
+            Text(
+                "When enabled, uFast shows a clearly labelled fasting interval "
+                    + "after eight hours without a caloric food event. Nothing is "
+                    + "saved until you choose Save fast or Start fast."
+            )
+            .font(.subheadline)
+            .foregroundStyle(UFastTheme.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .uFastCard(accent: UFastTheme.sky)
+    }
+}
+
 struct SettingsFavouritesSection: View {
     @Binding var water: String
     @Binding var tea: String

@@ -37,6 +37,41 @@ final class HistoryCaloricNeighbourOrderingTests: XCTestCase {
         XCTAssertEqual(first.intervals, second.intervals)
     }
 
+    func testMotionInferredIntervalRefreshesItsEndAndSaveOnlyLifecycle() throws {
+        let source = Date(timeIntervalSince1970: 2_000_000_000)
+        let interval = InferredFastInterval(
+            sourceFoodID: UUID(), sourceDate: source, sourceDescription: "Dinner",
+            nextFoodID: nil, nextFoodDate: nil, startDate: source,
+            endDate: source.addingTimeInterval(8 * 60 * 60), goal: .default, state: .inProgress
+        )
+        let motion = HistoryMotionPresentation(
+            window: DateInterval(start: source, duration: 24 * 60 * 60),
+            intervals: [HistoryMotionIntervalPrimitive(
+                id: interval.id, start: interval.startDate, end: interval.endDate,
+                kind: .automatic, isActive: false, semanticKind: .inferred,
+                inferredInterval: interval
+            )],
+            events: []
+        )
+
+        let live = try XCTUnwrap(motion.inferredInterval(
+            for: interval.id, at: source.addingTimeInterval(10 * 60 * 60)
+        ))
+        XCTAssertEqual(live.endDate, source.addingTimeInterval(10 * 60 * 60))
+        XCTAssertEqual(live.state, .inProgress)
+        XCTAssertTrue(live.offersStart)
+
+        let capped = try XCTUnwrap(motion.inferredInterval(
+            for: interval.id, at: source.addingTimeInterval(24 * 60 * 60)
+        ))
+        XCTAssertEqual(capped.endDate, source.addingTimeInterval(24 * 60 * 60))
+        XCTAssertEqual(capped.state, .historical)
+        XCTAssertTrue(capped.offersSave)
+        XCTAssertFalse(capped.offersStart)
+        XCTAssertTrue(try XCTUnwrap(motion.ribbonIntervals(activeEndingAt: capped.endDate).first)
+            .accessibilityLabel.contains("Inferred fast"))
+    }
+
     private func makeFixture() throws -> Fixture {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext

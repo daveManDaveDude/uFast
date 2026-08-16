@@ -14,7 +14,8 @@ historical scope contract for 1.0; post-MVP priorities are in `ROADMAP.md`.
   caloric/non-caloric state.
 - Backdated food and hydration entry from History.
 - Opt-in inferred fasting history anchored to caloric food events after eight
-  absolute hours, capped by the current goal, with explicit save/start actions.
+  absolute hours, capped by the current goal duration plus 12 absolute hours,
+  with explicit save/start actions.
 - Fast history and supporting details scoped to the settled calendar view.
 - Local-only, offline manual use with app-created records stored in SwiftData on
   this iPhone.

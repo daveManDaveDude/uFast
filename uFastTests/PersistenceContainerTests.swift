@@ -9,10 +9,12 @@ final class PersistenceContainerTests: XCTestCase {
     func testCurrentVersionedSchemaAndMigrationPlanCoverEveryProductionModel() {
         XCTAssertEqual(UFastSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
         XCTAssertEqual(UFastSchemaV2.versionIdentifier, Schema.Version(2, 0, 0))
-        XCTAssertEqual(UFastMigrationPlan.schemas.count, 2)
+        XCTAssertEqual(UFastSchemaV3.versionIdentifier, Schema.Version(3, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 3)
         XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
-        XCTAssertEqual(UFastMigrationPlan.stages.count, 1)
+        XCTAssertTrue(UFastMigrationPlan.schemas[2] == UFastSchemaV3.self)
+        XCTAssertEqual(UFastMigrationPlan.stages.count, 2)
         XCTAssertEqual(PersistenceContainer.schema.entities.count, 6)
 
         let releaseSchema = Schema(versionedSchema: UFastSchemaV1.self)
@@ -121,6 +123,35 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertNil(PersistenceContainer.configuration(inMemory: true).cloudKitContainerIdentifier)
     }
 
+    func testV2SettingsStoreMigratesWithInferredDetectionOff() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "uFast-v2-settings-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "production.store")
+        let v2Schema = Schema(versionedSchema: UFastSchemaV2.self)
+        let v2Configuration = ModelConfiguration(
+            schema: v2Schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        let v2Container = try ModelContainer(
+            for: v2Schema,
+            configurations: [v2Configuration]
+        )
+        let v2Settings = UFastSchemaV2.AppSettingsRecord()
+        v2Settings.hasCompletedOnboarding = true
+        v2Container.mainContext.insert(v2Settings)
+        try v2Container.mainContext.save()
+
+        let migrated = try PersistenceContainer.make(storeURL: storeURL)
+        let settings = try XCTUnwrap(
+            migrated.mainContext.fetch(FetchDescriptor<AppSettingsRecord>()).first
+        )
+        XCTAssertTrue(settings.hasCompletedOnboarding)
+        XCTAssertFalse(settings.inferredFastDetectionEnabled)
+    }
+
     func testAppSettingsRoundTripInLocalContainer() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
@@ -137,6 +168,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(storedSettings.count, 1)
         XCTAssertEqual(storedSettings.first?.fastingGoalHours, 16)
         XCTAssertEqual(storedSettings.first?.hasCompletedOnboarding, true)
+        XCTAssertEqual(storedSettings.first?.inferredFastDetectionEnabled, false)
     }
 
     func testChangedGoalPersistsWhenSettingsAreFetchedAgain() throws {

@@ -525,6 +525,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertFalse(TemporalCarouselMovementPhase.settled.suppressesAutomaticAlignment)
         XCTAssertTrue(TemporalCarouselMovementPhase.settled.allowsTimelineInteraction)
         XCTAssertTrue(TemporalCarouselMovementPhase.settled.showsTimelineDetails)
+        XCTAssertTrue(TemporalCarouselMovementPhase.settled.showsFutureReadOnlyAppearance)
 
         for phase in [
             TemporalCarouselMovementPhase.userDriven,
@@ -535,7 +536,54 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             XCTAssertTrue(phase.suppressesAutomaticAlignment)
             XCTAssertFalse(phase.allowsTimelineInteraction)
             XCTAssertFalse(phase.showsTimelineDetails)
+            XCTAssertFalse(phase.showsFutureReadOnlyAppearance)
         }
+    }
+
+    func testFutureAdjacentMotionKeepsTimelineAppearanceWhileActionsStayGated() {
+        let moving = TemporalHistoryCarousel.timelineInteractionState(
+            movementPhase: .decelerating,
+            allowsRecordActivation: false,
+            allowsEmptySelection: false
+        )
+        XCTAssertTrue(moving.isVisuallyEnabled)
+        XCTAssertFalse(moving.allowsRecordActivation)
+        XCTAssertFalse(moving.allowsEmptySelection)
+
+        let settledFuture = TemporalHistoryCarousel.timelineInteractionState(
+            movementPhase: .settled,
+            allowsRecordActivation: false,
+            allowsEmptySelection: false
+        )
+        XCTAssertFalse(settledFuture.isVisuallyEnabled)
+        XCTAssertFalse(settledFuture.allowsRecordActivation)
+        XCTAssertFalse(settledFuture.allowsEmptySelection)
+    }
+
+    func testFutureShadingInputRemainsAvailableDuringAdjacentDayMotion() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        var carousel = TemporalHistoryCarousel(
+            dates: [],
+            selection: .constant(now),
+            intervals: [],
+            events: [],
+            motionIntervals: [],
+            motionEvents: [],
+            onSelectInterval: { _ in },
+            onSelectEvent: { _ in },
+            onSelectEmpty: { _ in },
+            onNavigateDay: { _ in },
+            canNavigateForward: true,
+            allowsRecordActivation: false,
+            allowsEmptySelection: false,
+            showsTimelineDetails: false,
+            readOnlyFromDate: now,
+            onMovementPhaseChange: { _ in },
+            onCoupledPresentationChange: { _ in }
+        )
+        carousel.movementPhase = .decelerating
+
+        XCTAssertEqual(carousel.futureReadOnlyFromDate, now)
     }
 
     func testFlushPageGeometryUsesOneContainerWidthPerCalendarDay() throws {
