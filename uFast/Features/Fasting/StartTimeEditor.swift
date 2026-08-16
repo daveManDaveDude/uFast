@@ -106,6 +106,11 @@ struct StartTimeEditor: View {
         return existingError
     }
 
+    static func isWithinCurrentStartWindow(for selectedStartDate: Date, now: Date) -> Bool {
+        selectedStartDate >= now.addingTimeInterval(-FastStartService.maximumStartAge)
+            && selectedStartDate <= now
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -179,6 +184,9 @@ struct StartTimeEditor: View {
             .background(UFastTheme.canvas)
             .tint(UFastTheme.action)
             .onChange(of: selectedStartDate) { _, _ in
+                if Self.isWithinCurrentStartWindow(for: selectedStartDate, now: clock.now) {
+                    isShowingLegacyDraft = false
+                }
                 validationError = nil
                 saveError = nil
             }

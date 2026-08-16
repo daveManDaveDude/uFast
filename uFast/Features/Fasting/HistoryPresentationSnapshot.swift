@@ -344,15 +344,15 @@ enum HistoryPresentationBuilder {
             guard fast.presentationIntegrity == .available,
                   fast.origin == .reconstructed,
                   let end = fast.endDate,
-                  !LegacyFastCompatibility.isExactlyReproducible(
-                      startDate: fast.startDate,
-                      endDate: end,
-                      boundaries: fast.boundaryPair,
-                      caloricBoundaries: boundaries
-                  ),
                   AutomaticFastProjector.intersects(fast.startDate ..< end, window),
                   !recorded.contains(where: { $0.intersects(fast.startDate ..< end) })
             else { return nil }
+            guard data.settings != nil || !LegacyFastCompatibility.isExactlyReproducible(
+                startDate: fast.startDate,
+                endDate: end,
+                boundaries: fast.boundaryPair,
+                caloricBoundaries: boundaries
+            ) else { return nil }
             return .previouslySaved(fast)
         }
         let unavailable = data.completedFasts.compactMap { fast -> HistoryVisibleFastItem? in

@@ -33,4 +33,33 @@ final class StartTimeEditorTests: XCTestCase {
             "This fast overlaps another recorded fast."
         )
     }
+
+    func testLegacyDraftReplacementWindowClosesOnlyForCurrentValidDates() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+        XCTAssertTrue(
+            StartTimeEditor.isWithinCurrentStartWindow(
+                for: now.addingTimeInterval(-FastStartService.maximumStartAge),
+                now: now
+            )
+        )
+        XCTAssertTrue(
+            StartTimeEditor.isWithinCurrentStartWindow(
+                for: now.addingTimeInterval(-3600),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            StartTimeEditor.isWithinCurrentStartWindow(
+                for: now.addingTimeInterval(-FastStartService.maximumStartAge - 1),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            StartTimeEditor.isWithinCurrentStartWindow(
+                for: now.addingTimeInterval(1),
+                now: now
+            )
+        )
+    }
 }

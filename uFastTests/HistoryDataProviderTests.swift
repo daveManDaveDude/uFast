@@ -229,6 +229,22 @@ final class HistoryDataProviderTests: XCTestCase {
         )
     }
 
+    func testExactLegacyFastRemainsVisibleWhenSettingsDisableInferredDetection() throws {
+        let fixture = try legacyFixture(adjusted: false, includeSettings: true)
+        let data = try SwiftDataHistoryDataProvider(modelContext: fixture.context).fetch(
+            window: fixture.window
+        )
+        let presentation = HistoryPresentationBuilder.build(
+            data: data,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: fixture.window.end
+        )
+
+        XCTAssertEqual(presentation.fastItems.map(\.kind), [.previouslySaved])
+    }
+
     func testNonReproducibleLegacyFastRemainsReadOnlyWithoutAutomaticDuplicate() throws {
         let fixture = try legacyFixture(adjusted: true)
         let data = try SwiftDataHistoryDataProvider(modelContext: fixture.context).fetch(
@@ -247,7 +263,8 @@ final class HistoryDataProviderTests: XCTestCase {
     }
 
     private func legacyFixture(
-        adjusted: Bool
+        adjusted: Bool,
+        includeSettings: Bool = false
     ) throws -> LegacyFixture {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
@@ -286,6 +303,9 @@ final class HistoryDataProviderTests: XCTestCase {
         context.insert(second)
         context.insert(fast)
         context.insert(unknown)
+        if includeSettings {
+            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        }
         try context.save()
         return LegacyFixture(
             container: container,
