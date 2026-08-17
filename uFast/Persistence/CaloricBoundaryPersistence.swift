@@ -157,14 +157,12 @@ struct CaloricBoundaryReconciler {
         let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
         let boundaries = try planner.allBoundaries()
         let fasts = try planner.fasts()
+        try validate(fasts)
         let snapshots = planner.snapshots(for: fasts)
         var changedCount = 0
         var activeFastEnded = false
 
         for fast in fasts {
-            guard fast.startDate <= (fast.endDate ?? Date.distantFuture) else {
-                throw CaloricBoundaryReconciliationError.invalidFastRecord(fast.id)
-            }
             let previousEnd = fast.endDate
             let previousReview = fast.reviewState
             let previousProvenance = fast.provenanceSnapshot
@@ -206,6 +204,15 @@ struct CaloricBoundaryReconciler {
             changedCount: changedCount,
             activeFastEnded: activeFastEnded
         )
+    }
+
+    private func validate(_ fasts: [FastRecord]) throws {
+        guard let invalidFast = fasts.first(where: {
+            $0.startDate > ($0.endDate ?? Date.distantFuture)
+        }) else {
+            return
+        }
+        throw CaloricBoundaryReconciliationError.invalidFastRecord(invalidFast.id)
     }
 
     private func reconcile(_ fast: FastRecord, against boundaries: [CaloricBoundary]) -> Bool {

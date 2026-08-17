@@ -72,11 +72,12 @@ enum CaloricBoundaryImpactAnalyzer {
             }
 
             let referencedOldEnd = fast.boundaryPair?.end == mutation.oldReference
-            let oldBoundaryWasChanged = mutation.oldReference != nil && (
-                mutation.newBoundary == nil
-                    || mutation.newBoundary?.occurredAt != mutation.oldOccurredAt
-                    || mutation.oldIsCaloric != (mutation.newBoundary != nil)
+            let movedLater = Self.movedLater(
+                newBoundary: mutation.newBoundary,
+                oldOccurredAt: mutation.oldOccurredAt
             )
+            let oldBoundaryWasChanged = mutation.oldReference != nil
+                && (mutation.newBoundary == nil || movedLater)
             let needsReview = fast.origin == .reconstructed
                 && referencedOldEnd
                 && oldBoundaryWasChanged
@@ -91,6 +92,14 @@ enum CaloricBoundaryImpactAnalyzer {
             reconstructedFastIDs: reconstructed,
             reconstructedReviewIDs: review
         )
+    }
+
+    private static func movedLater(
+        newBoundary: CaloricBoundary?,
+        oldOccurredAt: Date?
+    ) -> Bool {
+        guard let newBoundary, let oldOccurredAt else { return false }
+        return newBoundary.occurredAt > oldOccurredAt
     }
 
     private static func hasEarlierBoundary(

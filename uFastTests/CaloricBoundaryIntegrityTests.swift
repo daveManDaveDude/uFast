@@ -315,6 +315,117 @@ final class CaloricBoundaryIntegrityTests: XCTestCase {
 }
 
 extension CaloricBoundaryIntegrityTests {
+    func testMovingReconstructedEndEarlierKeepsFastConfirmed() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let oldEndDate = start.addingTimeInterval(18 * 60 * 60)
+        let startRecord = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: start),
+            createdAt: start
+        )
+        let endRecord = FoodEntryRecord(
+            draft: .init(description: "Breakfast", occurredAt: oldEndDate),
+            createdAt: oldEndDate
+        )
+        let pair = ReconstructionBoundaryPair(
+            start: .init(kind: .food, id: startRecord.id),
+            end: .init(kind: .food, id: endRecord.id)
+        )
+        let fast = FastRecord(
+            reconstructedStart: start,
+            endDate: oldEndDate,
+            boundaries: pair,
+            adjustedByUser: false
+        )
+        context.insert(startRecord)
+        context.insert(endRecord)
+        context.insert(fast)
+        try context.save()
+
+        let earlierEndDate = start.addingTimeInterval(11 * 60 * 60)
+        try SwiftDataFoodEntryRepository(modelContext: context).update(
+            endRecord,
+            with: .init(description: "Breakfast", occurredAt: earlierEndDate),
+            at: earlierEndDate
+        )
+
+        XCTAssertEqual(fast.endDate, earlierEndDate)
+        XCTAssertEqual(fast.boundaryPair?.end, pair.end)
+        XCTAssertEqual(fast.reviewState, .confirmed)
+    }
+
+    func testReconciliationValidatesEveryFastBeforeMutatingAnyRecord() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let boundaryDate = start.addingTimeInterval(9 * 60 * 60)
+        let boundary = FoodEntryRecord(
+            draft: .init(description: "Juice", occurredAt: boundaryDate),
+            createdAt: boundaryDate
+        )
+        let validFast = FastRecord(startDate: start, goalAtStart: .default)
+        let invalidFast = FastRecord(
+            startDate: boundaryDate,
+            endDate: start,
+            goalAtStart: .default
+        )
+        context.insert(boundary)
+        context.insert(validFast)
+        context.insert(invalidFast)
+        try context.save()
+
+        let goal = try XCTUnwrap(FastingGoal(hours: 16))
+        XCTAssertThrowsError(try CaloricBoundaryReconciler(
+            modelContext: context,
+            currentGoal: goal
+        ).reconcile()) {
+            XCTAssertEqual(
+                $0 as? CaloricBoundaryReconciliationError,
+                .invalidFastRecord(invalidFast.id)
+            )
+        }
+
+        XCTAssertNil(validFast.endDate)
+        XCTAssertEqual(validFast.goalHoursAtStart, FastingGoal.default.hours)
+        XCTAssertEqual(invalidFast.startDate, boundaryDate)
+        XCTAssertEqual(invalidFast.endDate, start)
+    }
+
+    func testMovingReconstructedEndEarlierKeepsConfirmedReviewState() {
+        let fastID = UUID()
+        let oldEnd = start.addingTimeInterval(18 * 60 * 60)
+        let earlierEnd = start.addingTimeInterval(11 * 60 * 60)
+        let oldReference = CaloricBoundaryReference(kind: .food, id: UUID())
+        let pair = CaloricBoundaryPair(start: .init(kind: .food, id: UUID()), end: oldReference)
+        let impact = CaloricBoundaryImpactAnalyzer.impact(
+            for: CaloricBoundaryMutation(
+                oldReference: oldReference,
+                oldOccurredAt: oldEnd,
+                oldIsCaloric: true,
+                newBoundary: CaloricBoundary(
+                    reference: oldReference,
+                    occurredAt: earlierEnd,
+                    description: "Moved earlier"
+                ),
+                resultingBoundaries: [CaloricBoundary(
+                    reference: oldReference,
+                    occurredAt: earlierEnd,
+                    description: "Moved earlier"
+                )]
+            ),
+            fasts: [PersistedFastBoundarySnapshot(
+                id: fastID,
+                startDate: start,
+                endDate: oldEnd,
+                origin: .reconstructed,
+                reviewState: .confirmed,
+                boundaryPair: pair
+            )]
+        )
+
+        XCTAssertEqual(impact.reconstructedFastIDs, [fastID])
+        XCTAssertTrue(impact.reconstructedReviewIDs.isEmpty)
+    }
+
     func testConfirmationContextKeepsActivePrecedenceAndCombinedImpactDetails() {
         let activeID = UUID()
         let completedID = UUID()
