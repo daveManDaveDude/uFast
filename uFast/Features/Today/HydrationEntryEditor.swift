@@ -211,7 +211,7 @@ struct HydrationEntryEditor: View {
             "\(action) this caloric drink refreshes derived inferred History at \(time)."
         }
         var details = consequence
-        if confirmationContext.includesReconstructedFast {
+        if confirmationContext.includesReconstructedReview {
             details += " At least one affected fast is reconstructed and will be marked for review."
         }
         if confirmationContext.isCombined {

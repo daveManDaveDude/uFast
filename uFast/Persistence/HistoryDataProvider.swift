@@ -169,7 +169,7 @@ final class SwiftDataHistoryDataProvider {
         let upper = window.end
         return try modelContext.fetch(FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
     }
 
@@ -178,7 +178,7 @@ final class SwiftDataHistoryDataProvider {
         let upper = window.end
         return try modelContext.fetch(FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
     }
 
@@ -216,7 +216,7 @@ final class SwiftDataHistoryDataProvider {
     private func caloricDrinks(before date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -225,7 +225,7 @@ final class SwiftDataHistoryDataProvider {
     private func caloricDrinks(after date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -276,11 +276,11 @@ final class SwiftDataHistoryMotionDataProvider {
             .map(HistoryFastSnapshot.init)
         let foods = try modelContext.fetch(FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
         let drinks = try modelContext.fetch(FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
         let neighbours = try nearestCaloricNeighbours(outside: window)
         return HistoryDataSlice(
@@ -327,7 +327,7 @@ final class SwiftDataHistoryMotionDataProvider {
     private func caloricDrinks(before date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -336,7 +336,7 @@ final class SwiftDataHistoryMotionDataProvider {
     private func caloricDrinks(after date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)

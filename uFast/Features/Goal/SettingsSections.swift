@@ -119,7 +119,7 @@ struct SettingsInferredFastSection: View {
                 .accessibilityIdentifier("settings.inferred-fasts.toggle")
             Text(
                 "When enabled, uFast shows a clearly labelled fasting interval "
-                    + "after eight hours without a caloric food event. Nothing is "
+                    + "after eight hours without a caloric food or drink event. Nothing is "
                     + "saved until you choose Save fast or Start fast."
             )
             .font(.subheadline)

@@ -382,19 +382,12 @@ final class ApplicationCommands {
     ) throws {
         let draft = try hydrationDraft(for: favourite, occurredAt: clock.now)
         let goal = try authoritativeSettingsRecord()?.fastingGoal ?? .default
-        let activeBefore = try ActiveFastAuthority.fetch(in: modelContext)
-        try HydrationEntryService(repository: hydrationRepository(), clock: clock).save(
+        try saveHydration(
             draft,
             replacing: nil,
             goal: goal,
             endingActiveFast: endingActiveFast
         )
-        let activeAfter = try ActiveFastAuthority.fetch(in: modelContext)
-        if activeBefore != nil, activeAfter == nil {
-            projectionCoordinator.enqueue(.fastEndedOrDeleted)
-        } else {
-            projectionCoordinator.publishHistoryInvalidation()
-        }
     }
 
     func hydrationDraft(

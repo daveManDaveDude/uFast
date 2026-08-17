@@ -332,7 +332,7 @@ extension CaloricBoundaryIntegrityTests {
 
         XCTAssertEqual(context.kind, .active)
         XCTAssertEqual(context.affectedPersistedFastCount, 3)
-        XCTAssertTrue(context.includesReconstructedFast)
+        XCTAssertTrue(context.includesReconstructedReview)
         XCTAssertTrue(context.includesInferredInterval)
         XCTAssertTrue(context.isCombined)
     }
@@ -345,6 +345,8 @@ extension CaloricBoundaryIntegrityTests {
             reconstructedReviewIDs: []
         )
         let context = CaloricEventConfirmationContext(persistedImpact: impact)
+
+        XCTAssertFalse(context.includesReconstructedReview)
 
         let foodMessage = FoodEntryEditor.activeConfirmationMessage(
             context: context,

@@ -6,7 +6,7 @@ struct AddDrinkSheet: View {
 
     let favourites: [HydrationFavourite]
     let onAdd: (HydrationFavourite) throws -> Void
-    var onConfirmationRequired: (HydrationFavourite) -> Void = { _ in }
+    var onConfirmationRequired: (HydrationFavourite, CaloricEventConfirmationContext) -> Void = { _, _ in }
     let onChooseAnother: () -> Void
     let onCancel: () -> Void
 
@@ -81,10 +81,22 @@ struct AddDrinkSheet: View {
             saveError = nil
         } catch HydrationEntrySaveError.confirmationRequired {
             isSaving = false
-            onConfirmationRequired(favourite)
-        } catch HydrationEntrySaveError.confirmationRequiredWithImpact {
+            onConfirmationRequired(favourite, .init(fallbackKind: .active))
+        } catch let HydrationEntrySaveError.confirmationRequiredWithImpact(context) {
             isSaving = false
-            onConfirmationRequired(favourite)
+            onConfirmationRequired(favourite, context)
+        } catch HydrationEntrySaveError.completedFastConfirmationRequired {
+            isSaving = false
+            onConfirmationRequired(favourite, .init(fallbackKind: .completed))
+        } catch let HydrationEntrySaveError.completedConfirmationWithImpact(context) {
+            isSaving = false
+            onConfirmationRequired(favourite, context)
+        } catch HydrationEntrySaveError.inferredFastConfirmationRequired {
+            isSaving = false
+            onConfirmationRequired(favourite, .init(fallbackKind: .inferred))
+        } catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) {
+            isSaving = false
+            onConfirmationRequired(favourite, context)
         } catch {
             saveError = "Your drink couldn’t be added. Please try again."
             isSaving = false

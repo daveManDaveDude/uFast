@@ -19,6 +19,9 @@ struct TodayGoalView: View {
     @State var foodEditor: FoodEditorPresentation?
     @State var isDrinkSheetPresented = false
     @State var caloricFavouritePending: HydrationFavourite?
+    @State var caloricFavouriteConfirmationContext = CaloricEventConfirmationContext(
+        fallbackKind: .active
+    )
     @State var isCaloricFavouriteConfirmationPresented = false
     @State var hydrationEditor: HydrationEditorPresentation?
     @State var drinkAnnouncement: String?
@@ -213,9 +216,10 @@ struct TodayGoalView: View {
                         + "\(favourite.volumeMillilitres) millilitres, added."
                     isDrinkSheetPresented = false
                 },
-                onConfirmationRequired: { favourite in
+                onConfirmationRequired: { favourite, context in
                     caloricFavouriteSaveError = nil
                     caloricFavouritePending = favourite
+                    caloricFavouriteConfirmationContext = context
                     isDrinkSheetPresented = false
                     isCaloricFavouriteConfirmationPresented = true
                 },
@@ -227,20 +231,19 @@ struct TodayGoalView: View {
             )
         }
         .alert(
-            "This entry is during your recorded fast.",
+            caloricFavouriteConfirmationTitle,
             isPresented: $isCaloricFavouriteConfirmationPresented
         ) {
             Button("Cancel", role: .cancel) {
                 caloricFavouritePending = nil
             }
-            Button("Save and end fast") {
-                savePendingCaloricFavourite(endingActiveFast: true)
+            Button(caloricFavouriteConfirmationActionTitle) {
+                savePendingCaloricFavourite(
+                    endingActiveFast: caloricFavouriteConfirmationContext.kind == .active
+                )
             }
         } message: {
-            Text(
-                "Saving this caloric event records the drink and ends your fast at "
-                    + "\(clock.now.formatted(date: .omitted, time: .shortened))."
-            )
+            Text(caloricFavouriteConfirmationMessage)
         }
         .sheet(item: $hydrationEditor) { presentation in
             HydrationEntryEditor(

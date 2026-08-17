@@ -16,7 +16,17 @@ final class InferredFastUITests: XCTestCase {
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(toggle.value as? String, "0")
         toggle.tap()
-        XCTAssertEqual(toggle.value as? String, "1")
+        let enabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                (object as? XCUIElement)?.value as? String == "1"
+            },
+            object: toggle
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [enabled], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
 
         app.terminate()
         app.launchArguments = launchArguments()

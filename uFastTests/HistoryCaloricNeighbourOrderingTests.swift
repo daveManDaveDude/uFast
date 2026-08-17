@@ -9,16 +9,16 @@ final class HistoryCaloricNeighbourOrderingTests: XCTestCase {
         let provider: SwiftDataHistoryMotionDataProvider
         let boundaryTime: Date
         let nextBoundaryTime: Date
-        let latestDrinkID: UUID
+        let expectedDrinkID: UUID
     }
 
     func testEqualTimeNeighboursKeepAutomaticFastIdentityAcrossMotionChunkSeam() throws {
         let fixture = try makeFixture()
-        let seam = fixture.boundaryTime.addingTimeInterval(60 * 60)
+        let seam = fixture.boundaryTime.addingTimeInterval(2 * 60 * 60)
         let first = try presentation(
             provider: fixture.provider,
             window: DateInterval(
-                start: fixture.boundaryTime.addingTimeInterval(-60 * 60),
+                start: fixture.boundaryTime.addingTimeInterval(60 * 60),
                 end: seam
             ),
             referenceNow: fixture.nextBoundaryTime
@@ -32,8 +32,8 @@ final class HistoryCaloricNeighbourOrderingTests: XCTestCase {
             referenceNow: fixture.nextBoundaryTime
         )
 
-        XCTAssertEqual(first.intervals.map(\.id), [fixture.latestDrinkID])
-        XCTAssertEqual(second.intervals.map(\.id), [fixture.latestDrinkID])
+        XCTAssertEqual(first.intervals.map(\.id), [fixture.expectedDrinkID])
+        XCTAssertEqual(second.intervals.map(\.id), [fixture.expectedDrinkID])
         XCTAssertEqual(first.intervals, second.intervals)
     }
 
@@ -72,6 +72,45 @@ final class HistoryCaloricNeighbourOrderingTests: XCTestCase {
             calendar: utcCalendar
         )
         XCTAssertEqual(motionData.foods.map(\.id), [firstID])
+        XCTAssertEqual(try inferredID(in: motionData, at: window.end), firstID)
+    }
+
+    func testEqualTimeCaloricDrinkNeighbourUsesProjectorUUIDTieBreak() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let sourceDate = Date(timeIntervalSince1970: 2_100_000_000)
+        let window = DateInterval(
+            start: sourceDate.addingTimeInterval(9 * 60 * 60),
+            duration: 60 * 60
+        )
+        let firstID = try XCTUnwrap(UUID(uuidString: "10000000-0000-0000-0000-000000000001"))
+        let secondID = try XCTUnwrap(UUID(uuidString: "10000000-0000-0000-0000-000000000002"))
+        for id in [secondID, firstID] {
+            context.insert(HydrationEntryRecord(
+                id: id,
+                type: .custom,
+                customName: "Juice",
+                volumeMillilitres: 250,
+                occurredAt: sourceDate,
+                isCaloric: true,
+                createdAt: sourceDate
+            ))
+        }
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let settledData = try SwiftDataHistoryDataProvider(modelContext: context).fetch(window: window)
+        XCTAssertEqual(settledData.drinks.map(\.id), [firstID])
+        XCTAssertEqual(try inferredID(in: settledData, at: window.end), firstID)
+
+        let motionData = try SwiftDataHistoryMotionDataProvider(modelContext: context).fetch(
+            window: window,
+            calendar: utcCalendar
+        )
+        XCTAssertEqual(motionData.drinks.map(\.id), [firstID])
         XCTAssertEqual(try inferredID(in: motionData, at: window.end), firstID)
     }
 
@@ -144,7 +183,7 @@ final class HistoryCaloricNeighbourOrderingTests: XCTestCase {
             provider: SwiftDataHistoryMotionDataProvider(modelContext: context),
             boundaryTime: boundaryTime,
             nextBoundaryTime: nextBoundaryTime,
-            latestDrinkID: latestDrinkID
+            expectedDrinkID: earlierDrinkID
         )
     }
 

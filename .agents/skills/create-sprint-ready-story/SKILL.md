@@ -21,9 +21,13 @@ readiness decisions that require product or technical judgment.
   project files, generated Xcode files, or implementation configuration.
 - A story is `Ready` only when its outcome, scope, acceptance criteria,
   dependencies, decisions, architecture boundaries, validation, executability,
-  and test observability are clear. Use `Draft` when a material decision or
+  and test observability are clear. Every acceptance criterion must map to an
+  observable result and a verification surface. Use `Draft` when a material decision or
   reproduction remains unresolved; never hide uncertainty in implementation
   wording.
+- Treat existing fixture seeds, legacy tests, and shared journeys as explicit
+  dependencies. A story that changes a domain invariant must identify the
+  downstream fixtures and tests whose assumptions may need to change.
 - Do not claim that a worker, reviewer, or draft has accepted the story. Record
   the explicit Sol readiness verdict when a Sol gate is used.
 - Never commit or push changes unless the user separately asks.
@@ -83,6 +87,10 @@ differently:
   concurrency, privacy, accessibility and compatibility constraints when relevant;
 - dependencies and explicit product decisions;
 - focused verification, integration verification and human checks;
+- an acceptance-to-observability matrix covering each criterion, its expected
+  result, test layer/path, negative or edge path, and required artifact;
+- a downstream-fixture and legacy-suite impact inventory for changed domain,
+  persistence, navigation, or user-visible behavior;
 - an execution profile containing uncertainty (`low`, `medium`, or `high`),
   deterministic reproduction, required observability, expected expensive
   commands, focused correction budget, and maximum rescue tier;
@@ -107,10 +115,27 @@ Execution profile:
 - Uncertainty: low | medium | high
 - Initial implementer: Luna xhigh | Terra medium
 - Deterministic reproduction and observability: ...
+- Acceptance matrix and downstream fixture/legacy-suite impact: ...
 - Focused correction budget: ...
 - Expected expensive commands: ...
 - Maximum rescue tier: Terra | Sol diagnosis
 ```
+
+Before marking a story `Ready`, include a compact matrix in the story or its
+linked verification section:
+
+```text
+| AC | Observable result | Test layer/path | Negative/edge path | Artifact |
+|----|-------------------|-----------------|--------------------|----------|
+| AC1 | ...               | ...             | ...                | ...      |
+```
+
+For every impacted interactive flow, name the stable accessibility identifier
+or semantic query that tests should use. Do not leave selectors to be inferred
+from visible labels after implementation. For every changed invariant, list
+the existing fixture seeds and legacy suites that must remain valid or be
+updated deliberately. Include static analysis (normally `make analyze`) in the
+focused or integration verification plan when source changes are involved.
 
 Do not mark a combined investigation-and-fix story `Ready` when deterministic
 reproduction or observable acceptance is missing, or when investigation may
@@ -147,17 +172,19 @@ Spawn the reviewer as a read-only default agent with:
   architecture, persistence, security, ambiguity, or disagreement;
 - `fork_context: false`.
 
-Give Sol only a compact packet: the proposed story, authoritative references,
-existing related stories, affected boundaries, unresolved questions, and the
-requested output mode. Include the execution profile and ask whether discovery
-and implementation must be split. Tell Sol not to edit files, implement code,
-or rewrite the story. Require this response:
+Give Sol only a compact packet: the proposed story, acceptance-to-observability
+matrix, downstream fixture/legacy-suite inventory, authoritative references,
+existing related stories, affected boundaries, unresolved questions, execution
+profile, and requested output mode. Ask whether discovery and implementation
+must be split. Tell Sol not to edit files, implement code, or rewrite the story.
+Require this response:
 
 ```text
 STORY READINESS DECISION
 Verdict: READY | NEEDS_CHANGES | BLOCKED
 Product decision status:
 Scope and acceptance status:
+Test observability and fixture-impact status:
 Architecture/data/accessibility/privacy status:
 Execution profile and testability status:
 Recommended initial implementer: Luna xhigh | Terra medium
@@ -186,6 +213,8 @@ Use `apply_patch` for document edits. Recheck the final file for:
 - broken relative links;
 - unresolved placeholders or contradictory status/criteria;
 - acceptance criteria that cannot be tested;
+- acceptance criteria missing from the observability matrix;
+- missing downstream fixture or legacy-suite impact analysis;
 - missing execution profile, deterministic observability, or correction budget;
 - an unresolved investigation bundled into implementation;
 - accidental changes outside the requested artifact.

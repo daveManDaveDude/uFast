@@ -47,6 +47,16 @@ stalls, not a replacement for the normal cost-effective Luna path.
   and only when it cannot confuse the story-level write/review loop.
 - Treat every Luna handoff as evidence, never as approval. Treat every Sol
   decision as a gate that must be recorded with its evidence.
+- Maintain a compact structured ledger for each worker, reviewer, command, and
+  gate: agent handle, role/model, start/end, status, handoff/verdict, changed
+  paths, command and exit code, test counts, artifacts, source-freeze ID, and
+  correction/rescue relationship. Record token or credit usage only when the
+  platform exposes it; otherwise write `not recorded` and never infer it.
+- Before starting expensive source-frozen integration, confirm that the final
+  independent Sol integration gate can be spawned or that a reliable reviewer
+  handle is reserved. If reviewer capacity is unavailable, stop before the
+  full suite and report `BLOCKED`; do not spend the integration run without a
+  viable acceptance gate.
 
 ## Worker liveness and bounded rescue
 
@@ -203,16 +213,24 @@ a different fresh Sol agent must perform acceptance review afterward.
 4. Enumerate every story and its acceptance criteria. Record dependencies,
    likely ordering, overlapping files/components, migration or persistence
    implications, and any contradictory or impossible requirements.
-5. Record or infer an execution profile for each story: uncertainty
+5. Build an acceptance-to-observability matrix for every criterion. For each
+   row, record the expected result, test layer/path, negative or edge path,
+   required artifact, and any stable accessibility identifier or semantic
+   selector needed by UI tests.
+6. Scan the current tests and deterministic fixtures for downstream impact.
+   Record legacy suites and seeded journeys that depend on the invariant or
+   user-visible behavior being changed; include them in focused validation or
+   explain why they are unaffected.
+7. Record or infer an execution profile for each story: uncertainty
    (`low`, `medium`, or `high`), deterministic reproduction, test observability,
    expected expensive commands, initial Luna budget, and maximum rescue tier.
    Keep Luna xhigh as the default. Treat an investigation-and-fix story without
    a deterministic reproduction as a one-pass diagnostic first; if Luna cannot
    prove the root cause within that pass, use the escalation policy rather than
    trial-and-error implementation.
-6. If a contradiction blocks a safe plan, report it as `BLOCKED` and ask the
+8. If a contradiction blocks a safe plan, report it as `BLOCKED` and ask the
    human for direction. Do not invent a product decision.
-7. Publish a compact sprint ledger in the conversation before coding. Every story
+9. Publish a compact sprint ledger in the conversation before coding. Every story
    starts as `PENDING` and may move through the following states under Luna's
    coordination and the Sol gate's authority:
 
@@ -231,18 +249,22 @@ For each story in dependency order:
 1. Luna moves it to `IN PROGRESS` and states its outcome, complete acceptance
    criteria, dependencies already accepted, relevant repository context, likely
    files, and the validation expected.
-2. Spawn exactly one bounded `story_worker` Luna xhigh agent. Give it only the
+2. Spawn exactly one bounded `story_worker` Luna xhigh agent. Give it the
    active story's implementation brief plus the minimum repository/sprint
-   context it needs. Explicitly say that it must not implement any other story
+   context it needs, including the acceptance matrix and downstream fixture/
+   legacy-suite inventory. Explicitly say that it must not implement any other story
    and must return the complete `STORY IMPLEMENTATION HANDOFF` contract from its
-   agent instructions. Require focused tests, including changed story-specific
-   UI tests, but do not ask it to run the full UI suite by default.
+   agent instructions. Require focused tests for every matrix row, affected
+   legacy/fixture suite, and changed story-specific UI test. Require static
+   analysis when source changes are involved, but do not ask it to run the full
+   UI suite by default.
 3. Wait for the handoff. If it is missing, incomplete, or claims acceptance,
    ask the same worker to return a corrected handoff before review.
 4. Luna moves the story to `IN REVIEW`, checks that the handoff is complete,
    collects the actual status, diff summary, changed tests, and validation
-   artifacts, and prepares the compact review packet. Luna does not make the
-   acceptance decision.
+   artifacts. Confirm that every acceptance-matrix row and impacted legacy
+   suite has evidence, including analyzer results and stable UI selectors where
+   relevant. Luna does not make the acceptance decision.
 5. Spawn one Sol story gate with `agent_type: default`, `model: gpt-5.6-sol`,
    `reasoning_effort: medium`, and `fork_context: false`. Instruct it to inspect
    the actual repository state, not just the handoff, including:
@@ -291,6 +313,14 @@ correspond to a source/test change or one recorded flake hypothesis. Do not use
 repeated native gestures to discover test expectations; first add deterministic
 state observability or reduce the behavior to a pure invariant when practical.
 
+For every story gate, verify the complete acceptance-to-observability matrix,
+the downstream fixture/legacy-suite inventory, and the planned static-analysis
+gate. Treat a changed domain invariant with a failing legacy fixture as a real
+integration finding until its expected behavior is established, not as generic
+test noise. Design accessibility identifiers and test selectors together and
+prefer stable identifiers or scoped semantic queries over visible-label
+matching.
+
 Luna delegates noisy integration execution to a fresh read-only Luna
 verification worker when available. Its handoff must contain:
 
@@ -317,20 +347,22 @@ After every story is `ACCEPTED`:
 
 1. Inspect the combined diff from the recorded baseline and all changed/untracked
    files. Look for duplicated or conflicting implementations, architectural
-   drift, incomplete migrations, temporary/debug code, new TODOs, and accidental
-   scope expansion.
+   drift, incomplete migrations, temporary/debug code, new TODOs, accidental
+   scope expansion, and unreviewed fixture/legacy-suite impact.
 2. Verify that the accepted stories work together and that important journeys
    spanning stories still behave correctly.
-3. Declare a source freeze after the combined diff and focused evidence are
-   ready. Do not start the full UI suite before this point. Any later product or
-   test-source edit invalidates the integration result; finish corrections and
-   establish a new source freeze before another complete suite.
+3. Declare a source freeze only after the combined diff, acceptance matrix,
+   downstream fixture/legacy-suite evidence, focused tests, static analysis,
+   and accessibility-selector review are ready. Do not start the full UI suite
+   before this point. Any later product or test-source edit invalidates the
+   integration result; finish corrections and establish a new source freeze
+   before another complete suite.
 4. After source freeze, assign one fresh read-only Luna verification
    worker to run the complete appropriate build, test, lint/static-analysis, and
    repository verification suite. Keep raw command output in log files and
-   return compact evidence. Run the complete UI suite once. Before any later
-   Xcode command, copy its log and `.xcresult` to a stable, sprint-specific path
-   outside the rotating Xcode `Logs/Test` directory.
+   return compact evidence. Run the complete UI suite once with a unique source
+   freeze ID. Before any later Xcode command, copy its log and `.xcresult` to a
+   stable, sprint-specific path outside the rotating Xcode `Logs/Test` directory.
 5. If the complete suite has an unrelated failure, allow one smallest targeted
    diagnostic rerun. Do not describe the suite or result verifier as passing,
    and do not start another complete suite unless Sol requests it after new
@@ -338,7 +370,8 @@ After every story is `ACCEPTED`:
 6. Spawn one fresh read-only Sol integration gate with
    `agent_type: default`, `model: gpt-5.6-sol`, `reasoning_effort: medium`, and
    `fork_context: false`. Give it the combined diff, accepted story decisions,
-   validation artifacts, and cross-story journeys. Require an
+   acceptance matrix, fixture/legacy-suite inventory, validation artifacts,
+   source-freeze ID, and cross-story journeys. Require an
    `INTEGRATION DECISION` of `ACCEPTED`, `CHANGES REQUESTED`, or `BLOCKED`.
    Luna must not override this decision. If evidence is missing, Luna reruns the
    smallest appropriate command and sends the compact result back to Sol.
@@ -395,3 +428,28 @@ Sol integration decision, combined validation, each circuit-breaker/escalation
 event, and any blocker.
 Never describe a sprint as complete while a story is `BLOCKED` or merely in
 review.
+
+After the prose report, emit a compact machine-readable `SPRINT HISTORY RECORD`
+with stable keys so a later summary page can consume sprint history without
+parsing narrative text. Include:
+
+```json
+{
+  "sprint": "...",
+  "stories": [],
+  "workers": [],
+  "handoffs": [],
+  "solDecisions": [],
+  "correctionLoops": 0,
+  "terraRescues": 0,
+  "validation": [],
+  "sourceFreezeIds": [],
+  "artifacts": [],
+  "durationSeconds": null,
+  "usage": { "tokens": "not recorded", "credits": "not recorded" }
+}
+```
+
+Populate values from actual platform metadata and command artifacts. Use
+`null`, an empty list, or `not recorded` when history does not expose a value;
+never estimate token, credit, duration, or worker counts from prose.

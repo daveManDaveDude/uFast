@@ -15,7 +15,7 @@ enum CaloricEventConfirmationKind: Equatable, Sendable {
 struct CaloricEventConfirmationContext: Equatable, Sendable {
     let kind: CaloricEventConfirmationKind
     let affectedPersistedFastCount: Int
-    let includesReconstructedFast: Bool
+    let includesReconstructedReview: Bool
     let includesInferredInterval: Bool
 
     init(
@@ -31,8 +31,7 @@ struct CaloricEventConfirmationContext: Equatable, Sendable {
             fallbackKind
         }
         affectedPersistedFastCount = persistedImpact.affectedPersistedFastCount
-        includesReconstructedFast = !persistedImpact.reconstructedFastIDs.isEmpty
-            || !persistedImpact.reconstructedReviewIDs.isEmpty
+        includesReconstructedReview = !persistedImpact.reconstructedReviewIDs.isEmpty
         self.includesInferredInterval = includesInferredInterval
     }
 
@@ -44,7 +43,7 @@ struct CaloricEventConfirmationContext: Equatable, Sendable {
         Self(
             kind: kind,
             affectedPersistedFastCount: affectedPersistedFastCount,
-            includesReconstructedFast: includesReconstructedFast,
+            includesReconstructedReview: includesReconstructedReview,
             includesInferredInterval: true
         )
     }
@@ -52,12 +51,12 @@ struct CaloricEventConfirmationContext: Equatable, Sendable {
     private init(
         kind: CaloricEventConfirmationKind,
         affectedPersistedFastCount: Int,
-        includesReconstructedFast: Bool,
+        includesReconstructedReview: Bool,
         includesInferredInterval: Bool
     ) {
         self.kind = kind
         self.affectedPersistedFastCount = affectedPersistedFastCount
-        self.includesReconstructedFast = includesReconstructedFast
+        self.includesReconstructedReview = includesReconstructedReview
         self.includesInferredInterval = includesInferredInterval
     }
 }
