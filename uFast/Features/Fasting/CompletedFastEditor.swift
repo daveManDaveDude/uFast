@@ -148,7 +148,11 @@ struct CompletedFastEditor: View {
     }
 
     private var validationMessage: String? {
-        switch validationError {
+        Self.validationMessage(for: validationError)
+    }
+
+    static func validationMessage(for error: CompletedFastError?) -> String? {
+        switch error {
         case .startTimeNotBeforeEndTime:
             "Start time must be before end time."
         case .futureStartTime:
@@ -157,6 +161,8 @@ struct CompletedFastEditor: View {
             "End time can’t be in the future."
         case .conflict:
             "This fast overlaps another recorded fast."
+        case let .crossesCaloricBoundary(date):
+            "This fast must end at or before the caloric event at \(date.formatted(date: .omitted, time: .shortened))."
         case .noCompletedFast, nil:
             nil
         }

@@ -78,8 +78,8 @@ struct CompletedFastEditorPresentation: Identifiable {
 struct InferredFastConversionPresentation: Identifiable {
     let interval: InferredFastInterval
 
-    var id: UUID {
-        interval.id
+    var id: CaloricBoundaryReference {
+        interval.sourceBoundaryReference
     }
 }
 

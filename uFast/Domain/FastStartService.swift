@@ -14,6 +14,7 @@ enum FastStartError: Error, Equatable {
     case noActiveFast
     case startTimeBeyondMaximumAge
     case conflict
+    case crossesCaloricBoundary(Date)
 }
 
 @MainActor
@@ -38,6 +39,7 @@ final class FastStartService {
 
     func startFast(at startDate: Date, goal: FastingGoal) throws -> FastRecord {
         try validate(startDate: startDate)
+        try validateCaloricBoundary(startDate: startDate)
 
         if let activeFast = try repository.activeFast() {
             return activeFast
@@ -57,6 +59,7 @@ final class FastStartService {
 
     func correctActiveFastStart(to startDate: Date) throws -> FastRecord {
         try validate(startDate: startDate)
+        try validateCaloricBoundary(startDate: startDate)
         guard let activeFast = try repository.activeFast() else {
             throw FastStartError.noActiveFast
         }
@@ -89,5 +92,14 @@ final class FastStartService {
         guard startDate >= now.addingTimeInterval(-Self.maximumStartAge) else {
             throw FastStartError.startTimeBeyondMaximumAge
         }
+    }
+
+    private func validateCaloricBoundary(startDate: Date) throws {
+        guard let query = repository as? any CaloricBoundaryQuerying,
+              let boundary = try query.savedCaloricBoundaries().first(where: {
+                  $0.occurredAt > startDate
+              })
+        else { return }
+        throw FastStartError.crossesCaloricBoundary(boundary.occurredAt)
     }
 }

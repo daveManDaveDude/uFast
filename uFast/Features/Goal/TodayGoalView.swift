@@ -190,8 +190,8 @@ struct TodayGoalView: View {
                     foodEditor = nil
                 },
                 onDelete: presentation.record.map { record in
-                    {
-                        try deleteFood(record)
+                    { confirmingInferredImpact in
+                        try deleteFood(record, confirmingInferredImpact: confirmingInferredImpact)
                         foodEditor = nil
                     }
                 },
@@ -251,7 +251,10 @@ struct TodayGoalView: View {
                     try saveHydration(draft, record: presentation.record, endingActiveFast: endingActiveFast)
                     hydrationEditor = nil
                 },
-                onDelete: presentation.record.map { record in { try deleteHydration(record); hydrationEditor = nil } },
+                onDelete: presentation.record.map { record in { confirmingInferredImpact in
+                    try deleteHydration(record, confirmingInferredImpact: confirmingInferredImpact)
+                    hydrationEditor = nil
+                } },
                 onCancel: { hydrationEditor = nil }
             )
         }
@@ -437,8 +440,8 @@ extension TodayGoalView {
         )
     }
 
-    private func deleteFood(_ record: FoodEntrySnapshot) throws {
-        try controller.deleteFood(id: record.id)
+    private func deleteFood(_ record: FoodEntrySnapshot, confirmingInferredImpact: Bool = false) throws {
+        try controller.deleteFood(id: record.id, confirmingInferredImpact: confirmingInferredImpact)
     }
 
     private func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
@@ -454,8 +457,8 @@ extension TodayGoalView {
         )
     }
 
-    private func deleteHydration(_ record: HydrationEntrySnapshot) throws {
-        try controller.deleteHydration(id: record.id)
+    private func deleteHydration(_ record: HydrationEntrySnapshot, confirmingInferredImpact: Bool = false) throws {
+        try controller.deleteHydration(id: record.id, confirmingInferredImpact: confirmingInferredImpact)
     }
 
     func openTimelineEntry(_ entry: TodayTimelineEntry) {

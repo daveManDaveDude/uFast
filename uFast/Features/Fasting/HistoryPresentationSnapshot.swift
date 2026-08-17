@@ -67,17 +67,20 @@ struct HistoryMotionEventPrimitive: Equatable, Sendable {
 
 struct HistoryMotionInferredContext: Equatable, Sendable {
     let foodEvents: [FoodBoundarySnapshot]
+    let hydrationEvents: [HydrationBoundarySnapshot]
     let recordedFasts: [RecordedFastInterval]
     let currentGoal: FastingGoal
     let enabled: Bool
 
     init(
         foodEvents: [FoodBoundarySnapshot],
+        hydrationEvents: [HydrationBoundarySnapshot] = [],
         recordedFasts: [RecordedFastInterval],
         currentGoal: FastingGoal,
         enabled: Bool
     ) {
         self.foodEvents = foodEvents
+        self.hydrationEvents = hydrationEvents
         self.recordedFasts = recordedFasts
         self.currentGoal = currentGoal
         self.enabled = enabled
@@ -92,6 +95,14 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
                 isCaloric: $0.isCaloric
             )
         }
+        hydrationEvents = data.drinks.map {
+            HydrationBoundarySnapshot(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                description: $0.displayName,
+                isCaloric: $0.isCaloric
+            )
+        }
         recordedFasts = (data.completedFasts + [data.activeFast].compactMap(\.self))
             .map(\.recordedInterval)
         currentGoal = data.settings?.fastingGoal ?? .default
@@ -100,7 +111,10 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
 
     func project(now: Date, visibleInterval: Range<Date>) -> [InferredFastInterval] {
         InferredFastProjector.project(
-            foodEvents: foodEvents,
+            boundaries: CaloricBoundaryExtractor.boundaries(
+                food: foodEvents,
+                hydration: hydrationEvents
+            ),
             recordedFasts: recordedFasts,
             currentGoal: currentGoal,
             enabled: enabled,
@@ -215,29 +229,29 @@ private extension HistoryMotionIntervalPrimitive {
         let cap = inferredInterval.sourceDate.addingTimeInterval(
             InferredFastProjector.maximumDuration(for: inferredInterval.goal)
         )
-        let punctuatingFoodDate: Date?
-        let punctuatingFoodID: UUID?
-        if let nextFoodDate = inferredInterval.nextFoodDate,
-           nextFoodDate <= now,
-           nextFoodDate < cap
+        let punctuatingBoundaryDate: Date?
+        let punctuatingBoundaryReference: CaloricBoundaryReference?
+        if let nextBoundaryDate = inferredInterval.nextBoundaryDate,
+           nextBoundaryDate <= now,
+           nextBoundaryDate < cap
         {
-            punctuatingFoodDate = nextFoodDate
-            punctuatingFoodID = inferredInterval.nextFoodID
+            punctuatingBoundaryDate = nextBoundaryDate
+            punctuatingBoundaryReference = inferredInterval.nextBoundaryReference
         } else {
-            punctuatingFoodDate = nil
-            punctuatingFoodID = nil
+            punctuatingBoundaryDate = nil
+            punctuatingBoundaryReference = nil
         }
-        let currentEnd = min(punctuatingFoodDate ?? now, cap)
+        let currentEnd = min(punctuatingBoundaryDate ?? now, cap)
         guard inferredInterval.sourceDate < currentEnd else { return nil }
-        let state: InferredFastState = punctuatingFoodDate == nil && now < cap
+        let state: InferredFastState = punctuatingBoundaryDate == nil && now < cap
             ? .inProgress
             : .historical
         return InferredFastInterval(
-            sourceFoodID: inferredInterval.sourceFoodID,
+            sourceBoundaryReference: inferredInterval.sourceBoundaryReference,
             sourceDate: inferredInterval.sourceDate,
             sourceDescription: inferredInterval.sourceDescription,
-            nextFoodID: punctuatingFoodID,
-            nextFoodDate: punctuatingFoodDate,
+            nextBoundaryReference: punctuatingBoundaryReference,
+            nextBoundaryDate: punctuatingBoundaryDate,
             startDate: inferredInterval.startDate,
             endDate: currentEnd,
             goal: inferredInterval.goal,
@@ -369,14 +383,7 @@ enum HistoryPresentationBuilder {
             .map(\.recordedInterval)
         let inferred = data.settings.map { settings in
             InferredFastProjector.project(
-                foodEvents: data.foods.map {
-                    FoodBoundarySnapshot(
-                        id: $0.id,
-                        occurredAt: $0.occurredAt,
-                        description: $0.foodDescription,
-                        isCaloric: $0.isCaloric
-                    )
-                },
+                boundaries: boundaries,
                 recordedFasts: inferredExclusions,
                 currentGoal: settings.fastingGoal,
                 enabled: settings.inferredFastDetectionEnabled,

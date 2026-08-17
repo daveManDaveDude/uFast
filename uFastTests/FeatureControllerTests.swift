@@ -123,7 +123,7 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         try failIfRequested()
     }
 
-    func deleteFood(id _: UUID) throws {
+    func deleteFood(id _: UUID, confirmingInferredImpact _: Bool) throws {
         try failIfRequested()
     }
 
@@ -140,7 +140,7 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         try failIfRequested()
     }
 
-    func deleteHydration(id _: UUID) throws {
+    func deleteHydration(id _: UUID, confirmingInferredImpact _: Bool) throws {
         try failIfRequested()
     }
 

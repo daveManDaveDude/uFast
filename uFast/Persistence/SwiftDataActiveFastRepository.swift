@@ -7,7 +7,7 @@ enum ActiveFastPersistenceError: Error {
 }
 
 @MainActor
-final class SwiftDataActiveFastRepository: ActiveFastRepository {
+final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundaryQuerying {
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
 
@@ -30,6 +30,10 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository {
 
     func recordedFasts() throws -> [FastRecord] {
         try modelContext.fetch(FetchDescriptor<FastRecord>())
+    }
+
+    func savedCaloricBoundaries() throws -> [CaloricBoundary] {
+        try CaloricBoundaryPersistencePlanner(modelContext: modelContext).allBoundaries()
     }
 
     func saveNewActiveFast(_ fast: FastRecord) throws {

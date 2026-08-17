@@ -365,6 +365,156 @@ final class ApplicationCommandsTests: XCTestCase {
         XCTAssertEqual(activityEffects, 0)
     }
 
+    func testHistoricalInferredHydrationSaveUsesHydrationBoundaryReference() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let sourceDate = now.addingTimeInterval(-25 * 60 * 60)
+        let source = HydrationEntryRecord(
+            type: .custom,
+            customName: "Juice",
+            volumeMillilitres: 250,
+            occurredAt: sourceDate,
+            isCaloric: true,
+            createdAt: sourceDate
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            )
+        )
+
+        let outcome = try commands.saveInferredFast(
+            sourceBoundaryReference: .init(kind: .hydration, id: source.id),
+            expectedStartDate: sourceDate,
+            expectedEndDate: sourceDate.addingTimeInterval(24 * 60 * 60),
+            expectedSourceDescription: "Juice"
+        )
+
+        XCTAssertNotNil(outcome.recordID)
+        let fast = try XCTUnwrap(context.fetch(FetchDescriptor<FastRecord>()).first)
+        XCTAssertEqual(fast.startDate, sourceDate)
+        XCTAssertEqual(fast.endDate, sourceDate.addingTimeInterval(24 * 60 * 60))
+    }
+
+    func testPresentedInferredSourceRemovalRequiresConfirmationBeforeHydrationMutation() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let source = HydrationEntryRecord(
+            type: .custom,
+            customName: "Juice",
+            volumeMillilitres: 250,
+            occurredAt: now.addingTimeInterval(-10 * 60 * 60),
+            isCaloric: true,
+            createdAt: now
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            )
+        )
+        let nonCaloric = HydrationEntryDraft(
+            type: .custom,
+            customName: "Juice",
+            volumeMillilitres: 250,
+            occurredAt: source.occurredAt,
+            isCaloric: false
+        )
+
+        XCTAssertThrowsError(try commands.saveHydration(
+            nonCaloric,
+            replacing: source.id,
+            goal: .default,
+            endingActiveFast: false
+        )) { error in
+            guard case let .inferredConfirmationWithImpact(context) =
+                error as? HydrationEntrySaveError
+            else {
+                return XCTFail("Expected inferred impact confirmation, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .inferred)
+            XCTAssertEqual(context.affectedPersistedFastCount, 0)
+            XCTAssertTrue(context.includesInferredInterval)
+        }
+        XCTAssertTrue(source.isCaloric)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 0)
+        XCTAssertFalse(context.hasChanges)
+
+        try commands.saveHydration(
+            nonCaloric,
+            replacing: source.id,
+            goal: .default,
+            endingActiveFast: true
+        )
+        XCTAssertFalse(source.isCaloric)
+    }
+
+    func testPresentedInferredMoveLaterAndDeleteRequireConfirmationWithoutMutation() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let source = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: now.addingTimeInterval(-10 * 60 * 60)),
+            createdAt: now
+        )
+        context.insert(source)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            )
+        )
+
+        XCTAssertThrowsError(try commands.saveFood(
+            .init(description: "Dinner", occurredAt: now.addingTimeInterval(-60 * 60)),
+            replacing: source.id,
+            goal: .default,
+            endingActiveFast: false
+        )) { error in
+            guard case .inferredConfirmationWithImpact = error as? FoodEntrySaveError else {
+                return XCTFail("Expected inferred impact confirmation, got \(error)")
+            }
+        }
+        XCTAssertEqual(source.occurredAt, now.addingTimeInterval(-10 * 60 * 60))
+        XCTAssertFalse(context.hasChanges)
+
+        XCTAssertThrowsError(try commands.deleteFood(id: source.id)) { error in
+            guard case .inferredConfirmationWithImpact = error as? FoodEntrySaveError else {
+                return XCTFail("Expected inferred impact confirmation, got \(error)")
+            }
+        }
+        XCTAssertNotNil(try context.fetch(FetchDescriptor<FoodEntryRecord>()).first)
+        XCTAssertFalse(context.hasChanges)
+    }
+
     func testHistoricalInferredSaveRejectsAmbiguousActiveAuthorityWithoutMutation() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext

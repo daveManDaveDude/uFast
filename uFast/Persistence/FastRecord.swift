@@ -29,6 +29,32 @@ struct FastRecordProvenanceSnapshot: Equatable, Sendable {
     let startBoundaryID: UUID?
     let endBoundaryKindRaw: String?
     let endBoundaryID: UUID?
+    let reviewBoundaryKindRaw: String?
+    let reviewBoundaryID: UUID?
+
+    init(
+        originRaw: String,
+        reviewStateRaw: String,
+        wasAdjustedByUser: Bool,
+        hasHistoricalGoal: Bool,
+        startBoundaryKindRaw: String?,
+        startBoundaryID: UUID?,
+        endBoundaryKindRaw: String?,
+        endBoundaryID: UUID?,
+        reviewBoundaryKindRaw: String? = nil,
+        reviewBoundaryID: UUID? = nil
+    ) {
+        self.originRaw = originRaw
+        self.reviewStateRaw = reviewStateRaw
+        self.wasAdjustedByUser = wasAdjustedByUser
+        self.hasHistoricalGoal = hasHistoricalGoal
+        self.startBoundaryKindRaw = startBoundaryKindRaw
+        self.startBoundaryID = startBoundaryID
+        self.endBoundaryKindRaw = endBoundaryKindRaw
+        self.endBoundaryID = endBoundaryID
+        self.reviewBoundaryKindRaw = reviewBoundaryKindRaw
+        self.reviewBoundaryID = reviewBoundaryID
+    }
 }
 
 @Model
@@ -45,6 +71,8 @@ final class FastRecord {
     private(set) var startBoundaryID: UUID?
     private(set) var endBoundaryKindRaw: String?
     private(set) var endBoundaryID: UUID?
+    private(set) var reviewBoundaryKindRaw: String?
+    private(set) var reviewBoundaryID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -125,7 +153,9 @@ final class FastRecord {
             startBoundaryKindRaw: startBoundaryKindRaw,
             startBoundaryID: startBoundaryID,
             endBoundaryKindRaw: endBoundaryKindRaw,
-            endBoundaryID: endBoundaryID
+            endBoundaryID: endBoundaryID,
+            reviewBoundaryKindRaw: reviewBoundaryKindRaw,
+            reviewBoundaryID: reviewBoundaryID
         )
     }
 
@@ -163,6 +193,26 @@ final class FastRecord {
         reviewStateRaw = FastReviewState.needsReview.rawValue
     }
 
+    func replaceEndBoundary(with reference: CaloricBoundaryReference) {
+        guard origin == .reconstructed else { return }
+        endBoundaryKindRaw = reference.kind.rawValue
+        endBoundaryID = reference.id
+    }
+
+    var retainedReviewBoundary: CaloricBoundaryReference? {
+        guard let kindRaw = reviewBoundaryKindRaw,
+              let kind = CaloricBoundaryKind(rawValue: kindRaw),
+              let reviewBoundaryID
+        else { return nil }
+        return CaloricBoundaryReference(kind: kind, id: reviewBoundaryID)
+    }
+
+    func retainReviewBoundary(_ reference: CaloricBoundaryReference) {
+        guard origin == .reconstructed else { return }
+        reviewBoundaryKindRaw = reference.kind.rawValue
+        reviewBoundaryID = reference.id
+    }
+
     func restoreProvenance(_ snapshot: FastRecordProvenanceSnapshot) {
         originRaw = snapshot.originRaw
         reviewStateRaw = snapshot.reviewStateRaw
@@ -172,6 +222,8 @@ final class FastRecord {
         startBoundaryID = snapshot.startBoundaryID
         endBoundaryKindRaw = snapshot.endBoundaryKindRaw
         endBoundaryID = snapshot.endBoundaryID
+        reviewBoundaryKindRaw = snapshot.reviewBoundaryKindRaw
+        reviewBoundaryID = snapshot.reviewBoundaryID
     }
 
     func restorePersistedHistoricalGoal(rawHours: Int, isCaptured: Bool) {

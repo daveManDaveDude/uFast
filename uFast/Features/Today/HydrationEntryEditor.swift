@@ -14,16 +14,20 @@ struct HydrationEntryEditor: View {
     @State private var showsDeleteConfirmation = false
     @State private var showsFastEndConfirmation = false
     @State private var pendingDraft: HydrationEntryDraft?
+    @State private var confirmationContext = CaloricEventConfirmationContext(
+        fallbackKind: .active
+    )
+    @State private var pendingDeletion = false
 
     let record: HydrationEntrySnapshot?
     let clock: any AppClock
     let activeFastStart: Date?
     let allowedRange: Range<Date>?
     let onSave: (HydrationEntryDraft, Bool) throws -> Void
-    let onDelete: (() throws -> Void)?
+    let onDelete: ((Bool) throws -> Void)?
     let onCancel: () -> Void
 
-    init(record: HydrationEntryRecord?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: (() throws -> Void)?, onCancel: @escaping () -> Void) {
+    init(record: HydrationEntryRecord?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: ((Bool) throws -> Void)?, onCancel: @escaping () -> Void) {
         self.init(
             snapshot: record.map(HydrationEntrySnapshot.init), clock: clock,
             activeFastStart: activeFastStart, initialDraft: initialDraft,
@@ -31,7 +35,7 @@ struct HydrationEntryEditor: View {
         )
     }
 
-    init(snapshot record: HydrationEntrySnapshot?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: (() throws -> Void)?, onCancel: @escaping () -> Void) {
+    init(snapshot record: HydrationEntrySnapshot?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: ((Bool) throws -> Void)?, onCancel: @escaping () -> Void) {
         self.record = record; self.clock = clock; self.activeFastStart = activeFastStart
         self.allowedRange = allowedRange
         self.onSave = onSave; self.onDelete = onDelete; self.onCancel = onCancel
@@ -94,17 +98,28 @@ struct HydrationEntryEditor: View {
             .navigationTitle(record == nil ? "Add another drink" : "Edit drink")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .accessibilityIdentifier("drink.cancel")
+                }
                 ToolbarItem(placement: .confirmationAction) { Button(record == nil ? "Save drink" : "Save changes") { save() }.disabled(validDraft == nil).accessibilityIdentifier("drink.editor.save") }
             }
             .alert("Delete this drink?", isPresented: $showsDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) { delete() }
             } message: { Text("This removes it from your local record.") }
-            .alert("This entry is during your recorded fast.", isPresented: $showsFastEndConfirmation) {
-                Button("Cancel", role: .cancel) { pendingDraft = nil }
-                Button("Save and end fast") { saveEndingFast() }
-            } message: { Text("Saving this caloric event records the drink and ends your fast at (occurredAt.formatted(date: .omitted, time: .shortened)).") }
+            .alert(confirmationTitle, isPresented: $showsFastEndConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    pendingDraft = nil
+                    pendingDeletion = false
+                }
+                .accessibilityIdentifier("drink.confirmation.cancel")
+                Button(confirmationActionTitle) { saveEndingFast() }
+                    .accessibilityIdentifier("drink.confirmation.primary")
+            } message: {
+                Text(confirmationMessage)
+                    .accessibilityIdentifier("drink.confirmation.consequence")
+            }
         }
     }
 
@@ -135,17 +150,107 @@ struct HydrationEntryEditor: View {
     private func save() {
         guard let draft = validDraft else { return }
         do { try onSave(draft, false) }
-        catch HydrationEntrySaveError.confirmationRequired { pendingDraft = draft; showsFastEndConfirmation = true }
+        catch let HydrationEntrySaveError.confirmationRequiredWithImpact(context) { showConfirmation(context, draft: draft) }
+        catch let HydrationEntrySaveError.completedConfirmationWithImpact(context) { showConfirmation(context, draft: draft) }
+        catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) { showConfirmation(context, draft: draft) }
+        catch HydrationEntrySaveError.confirmationRequired { showConfirmation(.init(fallbackKind: .active), draft: draft) }
+        catch HydrationEntrySaveError.completedFastConfirmationRequired { showConfirmation(.init(fallbackKind: .completed), draft: draft) }
+        catch HydrationEntrySaveError.inferredFastConfirmationRequired { showConfirmation(.init(fallbackKind: .inferred), draft: draft) }
         catch HydrationEntrySaveError.eventAtActiveFastStart { saveError = "Choose a time after the fast started, or change the fast start time." }
         catch HydrationEntrySaveError.fastConflict { saveError = "This fast overlaps another recorded fast. Correct the fast before saving." }
         catch { saveError = "Your drink couldn’t be saved. Please try again." }
     }
 
     private func saveEndingFast() {
+        if pendingDeletion {
+            do {
+                try onDelete?(true)
+                pendingDeletion = false
+                showsFastEndConfirmation = false
+                saveError = nil
+            } catch {
+                saveError = "Your drink couldn’t be deleted. Please try again."
+            }
+            return
+        }
         guard let pendingDraft else { return }; do { try onSave(pendingDraft, true) } catch { saveError = "Your drink and fast couldn’t be saved. Please try again." }
     }
 
+    private var confirmationTitle: String {
+        switch confirmationContext.kind {
+        case .active: "This entry is during your recorded fast."
+        case .completed: "This drink updates \(confirmationContext.affectedPersistedFastCount) recorded fast(s)."
+        case .inferred: "This drink updates inferred History."
+        }
+    }
+
+    private var confirmationActionTitle: String {
+        if pendingDeletion {
+            return "Delete and update History"
+        }
+        switch confirmationContext.kind {
+        case .active: return "Save and end fast"
+        case .completed: return "Save and update fast"
+        case .inferred: return "Save and update History"
+        }
+    }
+
+    private var confirmationMessage: String {
+        let time = occurredAt.formatted(date: .omitted, time: .shortened)
+        let action = pendingDeletion ? "Deleting" : "Saving"
+        let consequence = switch confirmationContext.kind {
+        case .active:
+            Self.activeConfirmationMessage(
+                context: confirmationContext,
+                action: action,
+                time: time
+            )
+        case .completed:
+            "\(action) this caloric drink updates \(confirmationContext.affectedPersistedFastCount) recorded fast(s) at \(time)."
+        case .inferred:
+            "\(action) this caloric drink refreshes derived inferred History at \(time)."
+        }
+        var details = consequence
+        if confirmationContext.includesReconstructedFast {
+            details += " At least one affected fast is reconstructed and will be marked for review."
+        }
+        if confirmationContext.isCombined {
+            details += " It also refreshes the derived inferred interval."
+        }
+        return details
+    }
+
     private func delete() {
-        do { try onDelete?() } catch { saveError = "Your drink couldn’t be deleted. Please try again." }
+        do {
+            try onDelete?(false)
+        } catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) {
+            showConfirmation(context, pendingDeletion: true)
+        } catch {
+            saveError = "Your drink couldn’t be deleted. Please try again."
+        }
+    }
+
+    private func showConfirmation(
+        _ context: CaloricEventConfirmationContext,
+        draft: HydrationEntryDraft? = nil,
+        pendingDeletion: Bool = false
+    ) {
+        confirmationContext = context
+        pendingDraft = draft
+        self.pendingDeletion = pendingDeletion
+        showsFastEndConfirmation = true
+    }
+}
+
+extension HydrationEntryEditor {
+    static func activeConfirmationMessage(
+        context: CaloricEventConfirmationContext,
+        action: String,
+        time: String
+    ) -> String {
+        guard context.affectedPersistedFastCount > 1 else {
+            return "\(action) this caloric drink records it and ends your fast at \(time)."
+        }
+        return "Ending your active fast at \(time) updates \(context.affectedPersistedFastCount) persisted fasts."
     }
 }

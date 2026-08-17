@@ -136,7 +136,7 @@ extension HistoryView {
             return "fast-\(editor.id)"
         }
         if let inferredConversion {
-            return "inferred-\(inferredConversion.id)"
+            return "inferred-\(inferredConversion.id.kind.rawValue)-\(inferredConversion.id.id.uuidString)"
         }
         if let foodEditor {
             return "food-\(foodEditor.id)"
@@ -507,6 +507,46 @@ extension HistoryView {
             foodEditor = HistoryFoodEditorPresentation(record: food)
         } else if let drink = hydrationEntries.first(where: { $0.id == id }) {
             hydrationEditor = HistoryHydrationEditorPresentation(record: drink)
+        }
+    }
+}
+
+extension HistoryView {
+    var historyTimeline: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            TemporalHistoryCarousel(
+                dates: historyDates,
+                selection: selectedDateBinding(source: .carousel),
+                intervals: liveHistoryPresentation?.intervals(activeEndingAt: clock.now) ?? [],
+                events: liveHistoryPresentation?.events ?? [],
+                motionIntervals: motionIntervalsAtCurrentTime,
+                motionEvents: motionSnapshot?.presentation.ribbonEvents
+                    ?? historyPresentation?.events ?? [],
+                onSelectInterval: openInterval,
+                onSelectEvent: openEvent,
+                onSelectEventGroup: { group in
+                    eventGroupDisclosure = group
+                },
+                onSelectEmpty: { instant in
+                    beginHistoricalEntry(at: instant)
+                },
+                onNavigateDay: navigateDay,
+                canNavigateForward: canNavigateForward,
+                allowsRecordActivation: !isFutureSelection,
+                allowsEmptySelection: !isFutureSelection,
+                showsTimelineDetails: showsSettledHistoryDetails,
+                presentationDay: selectedDate,
+                readOnlyFromDate: clock.now,
+                onMovementPhaseChange: updateTemporalMovementPhase,
+                onCoupledPresentationChange: coupledScrollPresentation.handle,
+                onSettledVisibleWindow: { window in
+                    settledVisibleWindow = window
+                    reloadHistory(in: window.interval)
+                },
+                onPrefetchIntentAt: requestMotionExtension
+            )
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+            .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
         }
     }
 }

@@ -33,7 +33,16 @@ struct UFastApp: App {
         switch bootstrap {
         case let .ready(container):
             do {
-                try SwiftDataSettingsStore(modelContext: container.mainContext).prepareForUse()
+                let settingsStore = SwiftDataSettingsStore(modelContext: container.mainContext)
+                try settingsStore.prepareForUse()
+                let currentGoal = try settingsStore.authoritativeRecord()?.fastingGoal ?? .default
+                _ = try CaloricBoundaryReconciler(
+                    modelContext: container.mainContext,
+                    currentGoal: currentGoal,
+                    saveAction: launchConfiguration.commands.simulateBoundaryReconciliationFailure
+                        ? { throw SimulatedPersistenceBootstrapError.requested }
+                        : nil
+                ).reconcile()
                 try Self.resetDataIfRequested(
                     in: container,
                     clock: configuredClock,

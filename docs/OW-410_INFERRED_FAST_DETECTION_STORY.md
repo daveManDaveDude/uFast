@@ -8,7 +8,8 @@
 ## User outcome
 
 As a person who sometimes forgets to start a fast, I want uFast to show a
-clearly labelled inferred fast after eight hours without a caloric food event,
+clearly labelled inferred fast after eight hours without a later caloric
+boundary,
 so that I can understand the gap in my History and choose whether to save it
 as a real completed fast or start it as a real active fast.
 
@@ -24,6 +25,17 @@ is useful in real time while preserving user control and the distinction
 between inferred and recorded history.
 
 ## Context and authoritative decisions
+
+### OW-411 supersession amendment — 17 August 2026
+
+OW-411 generalizes the food-only boundary language in this story. Where this
+document says that only a caloric food event can source or punctuate an
+inferred interval, read it as **a caloric food or explicitly caloric hydration
+event**. The shared `CaloricBoundary` representation and extractor are now the
+authoritative source for both persisted-fast reconciliation and derived
+inference. OW-410 remains the delivered opt-in, derived, no-inferred-persistence
+baseline; it does not authorize a second persistence model or silent fast
+lengthening when an event is removed or moved later.
 
 The implementation must follow these repository contracts:
 
@@ -46,22 +58,22 @@ not rewrite or remove that data.
 
 - Add a user-facing setting for inferred fast detection. It is off by default
   for new and migrated installs and persists locally across relaunch.
-- When enabled, only a saved caloric food event can be a source. Hydration,
-  non-caloric hydration and other non-food records cannot create or terminate
-  an inferred interval.
-- At exactly eight absolute hours after the source food event, the interval is
+- When enabled, a saved caloric food or explicitly caloric hydration event can
+  be a source. Non-caloric hydration and other non-boundary records cannot
+  create or terminate an inferred interval.
+- At exactly eight absolute hours after the source caloric event, the interval is
   eligible. The interval starts at the source event's exact timestamp, not at
-  the eight-hour threshold. If no later caloric food event punctuates it before
+  the eight-hour threshold. If no later caloric food or hydration event punctuates it before
   the maximum, that maximum is the source timestamp plus the user's current
   fasting goal duration and 12 absolute hours.
-- If there is no later caloric food event, the interval ends at the current
+- If there is no later caloric food or hydration event, the interval ends at the current
   instant until that maximum and is capped there. It never grows beyond that
   maximum. While the current instant is before the maximum it is labelled
   **Inferred fast in progress**; at the maximum it remains visible as a
   historical **Inferred fast** with Save fast only.
-- A later caloric food event closes the current inferred interval only when it
+- A later caloric food or explicitly caloric hydration event closes the current inferred interval only when it
   occurs before the maximum. A historical interval remains available when it
-  qualifies, ending at that later food event or the maximum, whichever applies.
+  qualifies, ending at that later caloric event or the maximum, whichever applies.
 - An inferred interval is shown only when it intersects the exact settled
   History interval. The existing nearest-neighbour loading rules remain the
   source of boundary context. A persisted recorded fast takes precedence over
@@ -86,7 +98,7 @@ not rewrite or remove that data.
   WidgetKit or ActivityKit.
 - Tapping the current real-time inferred interval offers an explicit
   **Start fast** action. After confirmation and successful revalidation, save
-  one active recorded `FastRecord` whose start is the source food event's exact
+  one active recorded `FastRecord` whose start is the source caloric event's exact
   timestamp. The existing active-fast post-commit path may then update Today,
   WidgetKit and ActivityKit according to their existing contracts.
 - **Start fast** is not offered after the goal-plus-12-hour maximum. A capped
@@ -104,7 +116,8 @@ not rewrite or remove that data.
 ## In scope
 
 - An opt-in setting with a safe default and migration behavior.
-- A framework-independent inferred-fast projector over local food events,
+- A framework-independent inferred-fast projector over local caloric food and
+  explicitly caloric hydration events,
   recorded fasts, the current goal, the setting and an injected `AppClock`.
 - Settled History and current/motion History presentation using the same
   projection and exact visible interval rules.
@@ -123,8 +136,8 @@ not rewrite or remove that data.
 
 ## Out of scope
 
-- Inferring from caloric hydration, HealthKit, external health data or missing
-  events.
+- Inferring calories, changing explicit hydration classification, HealthKit,
+  external health data or missing events.
 - A SwiftData entity, cache, CloudKit record, account, network request or
   background delivery mechanism for inferred intervals.
 - Automatically persisting, starting, ending or rewriting a recorded fast.
@@ -177,18 +190,18 @@ not rewrite or remove that data.
    disabled without deleting source events or recorded fasts.
 2. With the setting disabled, no inferred interval or inferred conversion
    action appears anywhere in History or fast detail.
-3. With the setting enabled, a caloric food event at `T` produces no inferred
+3. With the setting enabled, a caloric food or explicitly caloric hydration event at `T` produces no inferred
    interval at `T + 8h - 1s`, and becomes eligible at exactly `T + 8h`.
 4. A current inferred interval starts at `T`, advances with the injected
    current time, and ends at `min(now, T + currentGoal + 12h)` when no later
-   caloric food punctuates it.
-5. When the next caloric food is at `N` before `T + currentGoal + 12h`, a
+   caloric food or hydration event punctuates it.
+5. When the next caloric food or hydration event is at `N` before `T + currentGoal + 12h`, a
    qualifying historical interval is `[T, N)`; otherwise it ends at
    `[T, T + currentGoal + 12h)`. A next food before eight hours produces no
    inferred interval.
-6. Hydration and non-caloric records neither create, split nor close an
-   inferred interval. Food remains caloric regardless of optional nutrition
-   details.
+6. Explicitly caloric hydration can create, split or close an inferred interval;
+   non-caloric hydration and other non-boundary records cannot. Food remains
+   caloric regardless of optional nutrition details.
 7. An overlapping persisted recorded fast takes presentation precedence, and
    conversion still rejects any recorded-fast conflict through normal domain
    validation.
@@ -217,7 +230,7 @@ not rewrite or remove that data.
 - Keep inference in a pure domain service or projector with immutable,
   `Sendable` inputs and outputs. It must not import SwiftUI, SwiftData,
   ActivityKit or WidgetKit.
-- Supply local food events, recorded-fast intervals, current goal, setting,
+- Supply local caloric food/hydration boundaries, recorded-fast intervals, current goal, setting,
   settled visible interval and `AppClock.now` through existing application
   boundaries. Fetch enough nearest caloric context for crossing intervals.
 - Do not add an inferred-fast persistence model or write derived rows to the

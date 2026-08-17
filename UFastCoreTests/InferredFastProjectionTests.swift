@@ -145,6 +145,32 @@ final class InferredFastProjectionTests: XCTestCase {
         XCTAssertEqual(candidates.first?.sourceFoodID, firstID)
     }
 
+    func testSameTimestampFoodAndHydrationUseStableBoundaryProvenance() throws {
+        let timestamp = Date(timeIntervalSince1970: 36000)
+        let foodID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000011"))
+        let hydrationID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000012"))
+        let food = CaloricBoundary(
+            reference: .init(kind: .food, id: foodID),
+            occurredAt: timestamp,
+            description: "Food"
+        )
+        let hydration = CaloricBoundary(
+            reference: .init(kind: .hydration, id: hydrationID),
+            occurredAt: timestamp,
+            description: "Drink"
+        )
+
+        for boundaries in [[hydration, food], [food, hydration]] {
+            let candidate = try XCTUnwrap(InferredFastProjector.project(
+                boundaries: boundaries,
+                currentGoal: .default,
+                enabled: true,
+                now: timestamp.addingTimeInterval(9 * 60 * 60)
+            ).first)
+            XCTAssertEqual(candidate.sourceBoundaryReference, food.reference)
+        }
+    }
+
     func testShortFoodGapStaysExcludedAfterLaterFoodHasPassed() {
         let source = food(at: 50000, description: "Dinner")
         let next = food(at: 50000 + 7 * 60 * 60, description: "Snack")
@@ -208,6 +234,51 @@ final class InferredFastProjectionTests: XCTestCase {
             enabled: true,
             now: now
         ).isEmpty)
+    }
+
+    func testCaloricHydrationSourcesAndPunctuatesInferredIntervals() throws {
+        let food = food(at: 60000, description: "Dinner")
+        let drinkID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000010"))
+        let drink = HydrationBoundarySnapshot(
+            id: drinkID,
+            occurredAt: food.occurredAt.addingTimeInterval(20 * 60 * 60),
+            description: "Juice",
+            isCaloric: true
+        )
+        let nonCaloricID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000011"))
+        let water = HydrationBoundarySnapshot(
+            id: nonCaloricID,
+            occurredAt: food.occurredAt.addingTimeInterval(22 * 60 * 60),
+            description: "Water",
+            isCaloric: false
+        )
+        let boundaries = CaloricBoundaryExtractor.boundaries(
+            food: [food],
+            hydration: [drink, water]
+        )
+        let now = drink.occurredAt
+
+        let candidate = try XCTUnwrap(InferredFastProjector.project(
+            boundaries: boundaries,
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        ).first { $0.sourceBoundaryReference == CaloricBoundaryReference(kind: .food, id: food.id) })
+        XCTAssertEqual(candidate.nextBoundaryReference, CaloricBoundaryReference(kind: .hydration, id: drinkID))
+        XCTAssertEqual(candidate.nextBoundaryDate, drink.occurredAt)
+
+        let hydrationOnly = try XCTUnwrap(InferredFastProjector.project(
+            boundaries: [CaloricBoundary(
+                reference: CaloricBoundaryReference(kind: .hydration, id: drinkID),
+                occurredAt: drink.occurredAt,
+                description: drink.description
+            )],
+            currentGoal: .default,
+            enabled: true,
+            now: drink.occurredAt.addingTimeInterval(9 * 60 * 60)
+        ).first)
+        XCTAssertEqual(hydrationOnly.sourceKind, .hydration)
+        XCTAssertEqual(hydrationOnly.sourceBoundaryReference.id, drinkID)
     }
 
     func testDaylightSavingChangeStillUsesEightAbsoluteHours() throws {

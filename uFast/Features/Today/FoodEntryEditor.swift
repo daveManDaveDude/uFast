@@ -12,13 +12,17 @@ struct FoodEntryEditor: View {
     @State private var showsDeleteConfirmation = false
     @State private var showsFastEndConfirmation = false
     @State private var pendingFastEndDraft: FoodEntryDraft?
+    @State private var confirmationContext = CaloricEventConfirmationContext(
+        fallbackKind: .active
+    )
+    @State private var pendingDeletion = false
 
     let record: FoodEntrySnapshot?
     let clock: any AppClock
     let activeFastStart: Date?
     let allowedRange: Range<Date>?
     let onSave: (FoodEntryDraft, Bool) throws -> Void
-    let onDelete: (() throws -> Void)?
+    let onDelete: ((Bool) throws -> Void)?
     let onCancel: () -> Void
 
     init(
@@ -28,7 +32,7 @@ struct FoodEntryEditor: View {
         initialOccurredAt: Date? = nil,
         allowedRange: Range<Date>? = nil,
         onSave: @escaping (FoodEntryDraft, Bool) throws -> Void,
-        onDelete: (() throws -> Void)?,
+        onDelete: ((Bool) throws -> Void)?,
         onCancel: @escaping () -> Void
     ) {
         self.record = record
@@ -178,21 +182,19 @@ struct FoodEntryEditor: View {
             } message: {
                 Text("This removes it from your local record.")
             }
-            .alert(
-                "This entry is during your recorded fast.",
-                isPresented: $showsFastEndConfirmation
-            ) {
+            .alert(confirmationTitle, isPresented: $showsFastEndConfirmation) {
                 Button("Cancel", role: .cancel) {
                     pendingFastEndDraft = nil
+                    pendingDeletion = false
                 }
-                Button("Save and end fast") {
+                .accessibilityIdentifier("food.confirmation.cancel")
+                Button(confirmationActionTitle) {
                     saveEndingFast()
                 }
+                .accessibilityIdentifier("food.confirmation.primary")
             } message: {
-                Text(
-                    "Saving this caloric event records the food and ends your fast at "
-                        + occurredAt.formatted(date: .omitted, time: .shortened) + "."
-                )
+                Text(confirmationMessage)
+                    .accessibilityIdentifier("food.confirmation.consequence")
             }
         }
     }
@@ -237,7 +239,104 @@ struct FoodEntryEditor: View {
         activeFastStart == occurredAt
     }
 
-    private func nutritionField(
+    private func validationLabel(_ message: String, identifier: String) -> some View {
+        Label(message, systemImage: "exclamationmark.circle")
+            .font(.footnote)
+            .foregroundStyle(UFastTheme.error)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier(identifier)
+    }
+
+    private func save() {
+        guard let draft = validDraft else {
+            return
+        }
+        do {
+            try onSave(draft, false)
+            saveError = nil
+        } catch let FoodEntrySaveError.confirmationRequiredWithImpact(context) {
+            showConfirmation(context, draft: draft)
+        } catch let FoodEntrySaveError.completedConfirmationWithImpact(context) {
+            showConfirmation(context, draft: draft)
+        } catch let FoodEntrySaveError.inferredConfirmationWithImpact(context) {
+            showConfirmation(context, draft: draft)
+        } catch FoodEntrySaveError.confirmationRequired {
+            showConfirmation(.init(fallbackKind: .active), draft: draft)
+        } catch FoodEntrySaveError.completedFastConfirmationRequired {
+            showConfirmation(.init(fallbackKind: .completed), draft: draft)
+        } catch FoodEntrySaveError.inferredFastConfirmationRequired {
+            showConfirmation(.init(fallbackKind: .inferred), draft: draft)
+        } catch FoodEntrySaveError.eventAtActiveFastStart {
+            saveError = "Choose a time after the fast started, or change the fast start time."
+        } catch FoodEntrySaveError.fastConflict {
+            saveError = "This fast overlaps another recorded fast. Correct the fast before saving."
+        } catch {
+            saveError = "Your food event couldn’t be saved. Please try again."
+        }
+    }
+
+    private func saveEndingFast() {
+        if pendingDeletion {
+            do {
+                try onDelete?(true)
+                pendingDeletion = false
+                showsFastEndConfirmation = false
+                saveError = nil
+            } catch {
+                saveError = "Your food event couldn’t be deleted. Please try again."
+            }
+            return
+        }
+        guard let draft = pendingFastEndDraft else {
+            return
+        }
+        do {
+            try onSave(draft, true)
+            saveError = nil
+            pendingFastEndDraft = nil
+        } catch {
+            saveError = "Your food event and fast couldn’t be saved. Please try again."
+        }
+    }
+
+    private func delete() {
+        do {
+            try onDelete?(false)
+            saveError = nil
+        } catch let FoodEntrySaveError.inferredConfirmationWithImpact(context) {
+            showConfirmation(context, pendingDeletion: true)
+        } catch {
+            saveError = "Your food event couldn’t be deleted. Please try again."
+        }
+    }
+
+    private func showConfirmation(
+        _ context: CaloricEventConfirmationContext,
+        draft: FoodEntryDraft? = nil,
+        pendingDeletion: Bool = false
+    ) {
+        confirmationContext = context
+        pendingFastEndDraft = draft
+        self.pendingDeletion = pendingDeletion
+        showsFastEndConfirmation = true
+    }
+}
+
+extension FoodEntryEditor {
+    static func activeConfirmationMessage(
+        context: CaloricEventConfirmationContext,
+        action: String,
+        time: String
+    ) -> String {
+        guard context.affectedPersistedFastCount > 1 else {
+            return "\(action) this caloric event records the food and ends your fast at \(time)."
+        }
+        return "Ending your active fast at \(time) updates \(context.affectedPersistedFastCount) persisted fasts."
+    }
+}
+
+private extension FoodEntryEditor {
+    func nutritionField(
         _ label: String,
         unit: String,
         identifier: String,
@@ -261,53 +360,50 @@ struct FoodEntryEditor: View {
         .accessibilityHint("Optional, from 0 to 1,000,000 \(unit).")
     }
 
-    private func validationLabel(_ message: String, identifier: String) -> some View {
-        Label(message, systemImage: "exclamationmark.circle")
-            .font(.footnote)
-            .foregroundStyle(UFastTheme.error)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier(identifier)
-    }
-
-    private func save() {
-        guard let draft = validDraft else {
-            return
-        }
-        do {
-            try onSave(draft, false)
-            saveError = nil
-        } catch FoodEntrySaveError.confirmationRequired {
-            pendingFastEndDraft = draft
-            showsFastEndConfirmation = true
-        } catch FoodEntrySaveError.eventAtActiveFastStart {
-            saveError = "Choose a time after the fast started, or change the fast start time."
-        } catch FoodEntrySaveError.fastConflict {
-            saveError = "This fast overlaps another recorded fast. Correct the fast before saving."
-        } catch {
-            saveError = "Your food event couldn’t be saved. Please try again."
+    var confirmationTitle: String {
+        switch confirmationContext.kind {
+        case .active: "This entry is during your recorded fast."
+        case .completed:
+            "This entry updates \(confirmationContext.affectedPersistedFastCount) recorded fast(s)."
+        case .inferred: "This entry updates inferred History."
         }
     }
 
-    private func saveEndingFast() {
-        guard let draft = pendingFastEndDraft else {
-            return
+    var confirmationActionTitle: String {
+        if pendingDeletion {
+            return "Delete and update History"
         }
-        do {
-            try onSave(draft, true)
-            saveError = nil
-            pendingFastEndDraft = nil
-        } catch {
-            saveError = "Your food event and fast couldn’t be saved. Please try again."
+        switch confirmationContext.kind {
+        case .active: return "Save and end fast"
+        case .completed: return "Save and update fast"
+        case .inferred: return "Save and update History"
         }
     }
 
-    private func delete() {
-        do {
-            try onDelete?()
-            saveError = nil
-        } catch {
-            saveError = "Your food event couldn’t be deleted. Please try again."
+    var confirmationMessage: String {
+        let time = occurredAt.formatted(date: .omitted, time: .shortened)
+        let action = pendingDeletion ? "Deleting" : "Saving"
+        let consequence = switch confirmationContext.kind {
+        case .active:
+            Self.activeConfirmationMessage(
+                context: confirmationContext,
+                action: action,
+                time: time
+            )
+        case .completed:
+            "\(action) this caloric event updates \(confirmationContext.affectedPersistedFastCount) "
+                + "recorded fast(s) at \(time)."
+        case .inferred:
+            "\(action) this caloric event refreshes derived inferred History at \(time)."
         }
+        var details = consequence
+        if confirmationContext.includesReconstructedFast {
+            details += " At least one affected fast is reconstructed and will be marked for review."
+        }
+        if confirmationContext.isCombined {
+            details += " It also refreshes the derived inferred interval."
+        }
+        return details
     }
 }
 

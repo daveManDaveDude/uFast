@@ -224,7 +224,7 @@ enum UITestSeedFixtures {
     private static func seedGroupingFast(in context: ModelContext, day: Date, calendar: Calendar) {
         guard let fastStart = calendar.date(byAdding: .day, value: -1, to: day),
               let start = calendar.date(bySettingHour: 21, minute: 30, second: 0, of: fastStart),
-              let end = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: day),
+              let end = calendar.date(bySettingHour: 10, minute: 8, second: 0, of: day),
               let id = UUID(uuidString: "39700000-0000-0000-0000-000000000001")
         else { return }
         context.insert(FastRecord(id: id, startDate: start, endDate: end, goalAtStart: .default))

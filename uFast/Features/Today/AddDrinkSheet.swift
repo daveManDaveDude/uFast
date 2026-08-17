@@ -82,6 +82,9 @@ struct AddDrinkSheet: View {
         } catch HydrationEntrySaveError.confirmationRequired {
             isSaving = false
             onConfirmationRequired(favourite)
+        } catch HydrationEntrySaveError.confirmationRequiredWithImpact {
+            isSaving = false
+            onConfirmationRequired(favourite)
         } catch {
             saveError = "Your drink couldn’t be added. Please try again."
             isSaving = false

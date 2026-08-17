@@ -263,7 +263,7 @@ extension HistoryView {
                     }
                     if interval.isInProgress {
                         _ = try applicationCommands.startInferredFast(
-                            sourceFoodID: interval.sourceFoodID,
+                            sourceBoundaryReference: interval.sourceBoundaryReference,
                             expectedStartDate: interval.startDate,
                             expectedEndDate: interval.endDate,
                             expectedSourceDescription: interval.sourceDescription,
@@ -271,7 +271,7 @@ extension HistoryView {
                         )
                     } else {
                         _ = try applicationCommands.saveInferredFast(
-                            sourceFoodID: interval.sourceFoodID,
+                            sourceBoundaryReference: interval.sourceBoundaryReference,
                             expectedStartDate: interval.startDate,
                             expectedEndDate: interval.endDate,
                             expectedSourceDescription: interval.sourceDescription,
@@ -303,9 +303,12 @@ extension HistoryView {
                     reloadHistoryAfterMutation()
                     foodEditor = nil
                 },
-                onDelete: {
+                onDelete: { confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteFood(id: presentation.record.id)
+                    try applicationCommands.deleteFood(
+                        id: presentation.record.id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                     reloadHistoryAfterMutation()
                     foodEditor = nil
                 },
@@ -330,9 +333,12 @@ extension HistoryView {
                     reloadHistoryAfterMutation()
                     hydrationEditor = nil
                 },
-                onDelete: {
+                onDelete: { confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteHydration(id: presentation.record.id)
+                    try applicationCommands.deleteHydration(
+                        id: presentation.record.id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                     reloadHistoryAfterMutation()
                     hydrationEditor = nil
                 },
@@ -404,9 +410,12 @@ extension HistoryView {
                         endingActiveFast: endingActiveFast
                     )
                 },
-                deleteFood: { id in
+                deleteFood: { id, confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteFood(id: id)
+                    try applicationCommands.deleteFood(
+                        id: id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                 },
                 saveHydration: { id, draft, endingActiveFast in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
@@ -417,9 +426,12 @@ extension HistoryView {
                         endingActiveFast: endingActiveFast
                     )
                 },
-                deleteHydration: { id in
+                deleteHydration: { id, confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteHydration(id: id)
+                    try applicationCommands.deleteHydration(
+                        id: id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                 },
                 onMutationSucceeded: { original, mutation in
                     refreshGroupSurface(for: original, mutation: mutation)
@@ -456,43 +468,5 @@ extension HistoryView {
             !temporalMovementPhase.suppressesAutomaticAlignment && !motionInitialLoading
         )
         .id(historyInteractionRevision)
-    }
-
-    var historyTimeline: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
-            TemporalHistoryCarousel(
-                dates: historyDates,
-                selection: selectedDateBinding(source: .carousel),
-                intervals: liveHistoryPresentation?.intervals(activeEndingAt: clock.now) ?? [],
-                events: liveHistoryPresentation?.events ?? [],
-                motionIntervals: motionIntervalsAtCurrentTime,
-                motionEvents: motionSnapshot?.presentation.ribbonEvents
-                    ?? historyPresentation?.events ?? [],
-                onSelectInterval: openInterval,
-                onSelectEvent: openEvent,
-                onSelectEventGroup: { group in
-                    eventGroupDisclosure = group
-                },
-                onSelectEmpty: { instant in
-                    beginHistoricalEntry(at: instant)
-                },
-                onNavigateDay: navigateDay,
-                canNavigateForward: canNavigateForward,
-                allowsRecordActivation: !isFutureSelection,
-                allowsEmptySelection: !isFutureSelection,
-                showsTimelineDetails: showsSettledHistoryDetails,
-                presentationDay: selectedDate,
-                readOnlyFromDate: clock.now,
-                onMovementPhaseChange: updateTemporalMovementPhase,
-                onCoupledPresentationChange: coupledScrollPresentation.handle,
-                onSettledVisibleWindow: { window in
-                    settledVisibleWindow = window
-                    reloadHistory(in: window.interval)
-                },
-                onPrefetchIntentAt: requestMotionExtension
-            )
-            .padding(.horizontal, UFastTheme.Spacing.standard)
-            .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
-        }
     }
 }

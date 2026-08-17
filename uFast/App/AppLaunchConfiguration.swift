@@ -105,7 +105,10 @@ struct AppLaunchConfiguration {
             simulateInferredFastDetectionSaveFailure: arguments.contains(
                 "--simulate-inferred-fast-detection-save-failure"
             ),
-            simulateDeleteAllFailure: arguments.contains("--simulate-delete-all-failure")
+            simulateDeleteAllFailure: arguments.contains("--simulate-delete-all-failure"),
+            simulateBoundaryReconciliationFailure: arguments.contains(
+                "--simulate-caloric-boundary-reconciliation-failure"
+            )
         )
     }
 

@@ -123,6 +123,13 @@ final class SwiftDataHistoryDataProvider {
                     }
                     .values
                     .sorted { $0.occurredAt < $1.occurredAt },
+                hydrationEvents: inferredContexts
+                    .flatMap(\.hydrationEvents)
+                    .reduce(into: [UUID: HydrationBoundarySnapshot]()) { result, event in
+                        result[event.id] = event
+                    }
+                    .values
+                    .sorted { $0.occurredAt < $1.occurredAt },
                 recordedFasts: inferredContexts
                     .flatMap(\.recordedFasts)
                     .reduce(into: [UUID: RecordedFastInterval]()) { result, fast in

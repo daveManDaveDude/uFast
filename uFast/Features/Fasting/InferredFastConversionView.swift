@@ -23,7 +23,7 @@ struct InferredFastConversionView: View {
 
     private var explanation: String {
         interval.isInProgress
-            ? "This will start a real active fast from the source food time."
+            ? "This will start a real active fast from the source event time."
             : "This will save one completed fast using the interval shown above."
     }
 
@@ -51,8 +51,11 @@ struct InferredFastConversionView: View {
                         .accessibilityIdentifier("history.inferred.confirmation")
                     }
 
-                    Section("Source food") {
-                        LabeledContent("Food", value: interval.sourceDescription)
+                    Section("Source caloric event") {
+                        LabeledContent(
+                            interval.sourceKind == .food ? "Food" : "Drink",
+                            value: interval.sourceDescription
+                        )
                         LabeledContent("Started", value: interval.startDate.formatted(
                             .dateTime.month(.abbreviated).day().hour().minute()
                         ))

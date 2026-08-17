@@ -2,14 +2,14 @@
 
 ## Terms
 
-- **Fast:** a user-recorded interval or an inferred food-event interval, not
+- **Fast:** a user-recorded interval or an inferred caloric-event interval, not
   proof of a biological state.
 - **Caloric event:** an event that counts as a fasting boundary. Food events
   always qualify; hydration follows the user's explicit classification.
 - **Recorded fast:** explicitly started by the user.
-- **Inferred fast:** a read-only interval derived from a caloric food event,
-  visible after eight absolute hours, and capped by the current fasting goal
-  duration plus 12 absolute hours.
+- **Inferred fast:** a read-only interval derived from an ordered caloric food
+  or explicitly caloric hydration event, visible after eight absolute hours,
+  and capped by the current fasting goal duration plus 12 absolute hours.
 - **Reconstructed fast:** a legacy interval proposed from confirmed boundaries
   and saved after user confirmation before Slice 3.10.
 - **Unknown period:** legacy state saved by the former reconstruction workflow.
@@ -23,10 +23,17 @@
 - BR-03: Only one active fast can exist.
 - BR-04: End must be after start; both can be backdated.
 - BR-05: Completed fasts retain the goal applicable when active.
-- BR-06: Hydration does not break a fast unless marked caloric.
+- BR-06: Hydration does not break, source or punctuate a fast unless it is
+  explicitly marked caloric. A caloric hydration event is authoritative in the
+  same way as a food event.
 - BR-07: Food events are always caloric. Hydration classification remains
-  explicit and correctable.
-- BR-08: A caloric event inside an active fast prompts; it never silently changes the fast.
+  explicit and correctable, and changing that classification changes the
+  authoritative boundary stream without silently lengthening persisted fasts.
+- BR-08: A caloric food or explicitly caloric hydration event strictly after
+  an active fast start requires confirmation and atomically completes that
+  fast at the event. An event exactly at the start remains invalid for the
+  interactive journey; no active, completed or reconstructed fast is silently
+  changed by an unconfirmed event save.
 - BR-09: Reconstruction uses confirmed caloric boundaries and requires confirmation before save.
 - BR-10: Insufficient or conflicting evidence remains unknown.
 - BR-11: Changing a boundary invalidates affected reconstructed history for review.
@@ -58,27 +65,28 @@
   stored only after explicit review or when a bounded candidate is blocked by
   insufficient or conflicting evidence.
 - BR-21: Adding a caloric event inside a reconstructed interval, or editing,
-  deleting or reclassifying one of its supporting boundary events, marks the
-  affected reconstructed fast for review in the same persistent transaction.
-  The app never silently rewrites or deletes the saved fast.
-- BR-22: When inferred-fast detection is enabled, each caloric food event is a
-  candidate source. At exactly eight absolute hours after the source event,
-  the inferred interval becomes visible and starts at the source event's exact
-  instant. Non-caloric food records, hydration records and missing events do
-  not create or terminate an inferred interval.
-- BR-23: An inferred interval ends at the first later caloric food event when
-  that event occurs before the source event plus the current fasting goal
-  duration plus 12 absolute hours. With no such punctuating event, it ends at
-  the current time until that maximum, then at the maximum, and never extends
-  past it. Goal changes affect the derived maximum but do not change the
-  source instant. A later food event closes the current inference and leaves a
-  qualifying historical inferred interval available for explicit saving only
-  when it occurs before the maximum.
+  deleting or reclassifying one of its supporting food or hydration boundary
+  events, marks the affected reconstructed fast for review in the same
+  persistent transaction. A new earlier boundary may shorten a persisted row;
+  removing or moving its referenced end never silently lengthens it or rewrites
+  its saved provenance.
+- BR-22: When inferred-fast detection is enabled, each caloric food or
+  explicitly caloric hydration event is a candidate source. At exactly eight
+  absolute hours after the source event, the inferred interval becomes visible
+  and starts at the source event's exact instant. Non-caloric hydration and
+  other non-boundary records do not create or terminate an inferred interval.
+- BR-23: An inferred interval ends at the first later caloric food or
+  explicitly caloric hydration event when that event occurs before the source
+  event plus the current fasting goal duration plus 12 absolute hours. With no
+  such punctuating event, it ends at the current time until that maximum, then
+  at the maximum, and never extends past it. Goal changes affect the derived
+  maximum but do not change the source instant.
 - BR-24: Inferred intervals are derived for presentation and are never stored
   as inferred records. History presents them only when the setting is enabled
   and they intersect the exact settled visible interval, using the nearest
-  caloric food neighbour beyond each visible edge. A persisted real fast takes
-  presentation precedence over an overlapping inferred interval.
+  caloric food or hydration neighbour beyond each visible edge. A persisted
+  real fast takes presentation precedence over an overlapping inferred
+  interval, and event mutations recompute rather than persist inferred state.
 - BR-25: An explicit user action is required before any inferred interval
   becomes a persisted fast. Saving a historical inferred interval creates a
   normal completed recorded fast. Starting the current inferred interval
@@ -163,33 +171,35 @@
   and migrated installs. Turning it off does not delete source events or
   recorded fasts; turning it on recomputes presentation from current local
   state.
-- BR-45: Saving a historical inferred interval revalidates its source event,
-  boundaries, current goal and overlap rules, then creates one normal completed
-  recorded fast using the current goal. It never creates an active fast,
-  Today-active state or a Live Activity.
+- BR-45: Saving a historical inferred interval revalidates its generic
+  caloric food or hydration source, boundaries, current goal and overlap rules,
+  then creates one normal completed recorded fast using the current goal. It
+  never creates an active fast, Today-active state or a Live Activity.
 - BR-46: Starting the current inferred interval revalidates the candidate and
-  creates one active recorded fast whose start is the source food event's exact
-  instant. Only that committed active record may update Today, WidgetKit or
-  ActivityKit through their existing post-commit paths.
+  creates one active recorded fast whose start is the source caloric event's
+  exact instant. Only that committed active record may update Today, WidgetKit
+  or ActivityKit through their existing post-commit paths.
 - BR-47: A cancelled, failed, conflicting or stale conversion makes no local
   mutation. After a successful refresh, the candidate is either still shown
   from authoritative state or is absent.
 - BR-48: Inferred intervals retain the existing blue/sky presentation role for
-  continuity, but their copy and accessibility label identify them as
-  **Inferred fast** or **Inferred fast in progress**. Colour is not the sole
-  distinction.
+  continuity, but their generic food/drink source copy and accessibility label
+  identify them as **Inferred fast** or **Inferred fast in progress**. Colour is
+  not the sole distinction.
 - BR-49: Inferred boundaries use absolute instants and the injected `AppClock`.
   Foreground refreshes update the current candidate without background timers,
   notifications, remote services or new health-data permissions.
 - BR-50: An inferred interval is **in progress** only while the current instant
   is before its source timestamp plus the current fasting goal duration plus 12
-  absolute hours and no later caloric food event punctuates it. At that maximum
+  absolute hours and no later caloric food or hydration event punctuates it.
+  At that maximum
   it becomes a historical inferred interval with the capped end and offers
   Save fast only. This classification is recalculated if the current goal
   changes, so Start fast is never offered for a source outside the existing
   active-start boundary.
 - BR-51: Saving an inferred interval persists the exact projected boundaries:
-  start at the source food timestamp and end at the first later caloric food
+  start at the source caloric event timestamp and end at the first later
+  caloric food or hydration event
   before the maximum or the source-plus-goal-plus-12-hour maximum, whichever
   applies. Historical Save fast remains a completed-fast action even when its
   source is older than the active-start backdating boundary; it is subject to

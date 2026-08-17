@@ -7,19 +7,57 @@ public enum InferredFastState: String, Equatable, Hashable, Sendable {
     case historical
 }
 
-/// A read-only interval derived from one saved food event.  This value is
+/// A read-only interval derived from one saved caloric boundary.  This value is
 /// intentionally independent of SwiftData and UI frameworks; it is safe to
 /// rebuild whenever local authoritative state or AppClock.now changes.
 public struct InferredFastInterval: Equatable, Hashable, Sendable {
-    public let sourceFoodID: UUID
+    public let sourceBoundaryReference: CaloricBoundaryReference
     public let sourceDate: Date
     public let sourceDescription: String
-    public let nextFoodID: UUID?
-    public let nextFoodDate: Date?
+    public let nextBoundaryReference: CaloricBoundaryReference?
+    public let nextBoundaryDate: Date?
     public let startDate: Date
     public let endDate: Date
     public let goal: FastingGoal
     public let state: InferredFastState
+
+    public var sourceFoodID: UUID {
+        sourceBoundaryReference.id
+    }
+
+    public var sourceKind: CaloricBoundaryKind {
+        sourceBoundaryReference.kind
+    }
+
+    public var nextFoodID: UUID? {
+        nextBoundaryReference?.id
+    }
+
+    public var nextFoodDate: Date? {
+        nextBoundaryDate
+    }
+
+    public init(
+        sourceBoundaryReference: CaloricBoundaryReference,
+        sourceDate: Date,
+        sourceDescription: String,
+        nextBoundaryReference: CaloricBoundaryReference?,
+        nextBoundaryDate: Date?,
+        startDate: Date,
+        endDate: Date,
+        goal: FastingGoal,
+        state: InferredFastState
+    ) {
+        self.sourceBoundaryReference = sourceBoundaryReference
+        self.sourceDate = sourceDate
+        self.sourceDescription = sourceDescription
+        self.nextBoundaryReference = nextBoundaryReference
+        self.nextBoundaryDate = nextBoundaryDate
+        self.startDate = startDate
+        self.endDate = endDate
+        self.goal = goal
+        self.state = state
+    }
 
     public init(
         sourceFoodID: UUID,
@@ -32,15 +70,19 @@ public struct InferredFastInterval: Equatable, Hashable, Sendable {
         goal: FastingGoal,
         state: InferredFastState
     ) {
-        self.sourceFoodID = sourceFoodID
-        self.sourceDate = sourceDate
-        self.sourceDescription = sourceDescription
-        self.nextFoodID = nextFoodID
-        self.nextFoodDate = nextFoodDate
-        self.startDate = startDate
-        self.endDate = endDate
-        self.goal = goal
-        self.state = state
+        self.init(
+            sourceBoundaryReference: CaloricBoundaryReference(kind: .food, id: sourceFoodID),
+            sourceDate: sourceDate,
+            sourceDescription: sourceDescription,
+            nextBoundaryReference: nextFoodID.map {
+                CaloricBoundaryReference(kind: .food, id: $0)
+            },
+            nextBoundaryDate: nextFoodDate,
+            startDate: startDate,
+            endDate: endDate,
+            goal: goal,
+            state: state
+        )
     }
 
     public var id: UUID {
@@ -75,11 +117,11 @@ public struct InferredFastInterval: Equatable, Hashable, Sendable {
             ? .inProgress
             : .historical
         return Self(
-            sourceFoodID: sourceFoodID,
+            sourceBoundaryReference: sourceBoundaryReference,
             sourceDate: sourceDate,
             sourceDescription: sourceDescription,
-            nextFoodID: nextFoodID,
-            nextFoodDate: nextFoodDate,
+            nextBoundaryReference: nextBoundaryReference,
+            nextBoundaryDate: nextBoundaryDate,
             startDate: startDate,
             endDate: refreshedEndDate,
             goal: goal,
@@ -97,8 +139,8 @@ public enum InferredFastProjector {
     }
 
     /// Projects caloric food-anchored inferred intervals visible in
-    /// `visibleInterval`. Non-caloric food is filtered before timestamp
-    /// canonicalization so it cannot become a source or punctuate a candidate.
+    /// `visibleInterval`. This overload preserves the OW-410 API while the
+    /// boundary overload below is the shared food/drink authority.
     public static func project(
         foodEvents: [FoodBoundarySnapshot],
         recordedFasts: [RecordedFastInterval] = [],
@@ -107,20 +149,37 @@ public enum InferredFastProjector {
         now: Date,
         visibleInterval: Range<Date> = Date.distantPast ..< Date.distantFuture
     ) -> [InferredFastInterval] {
+        let boundaries = CaloricBoundaryExtractor.boundaries(food: foodEvents, hydration: [])
+        return project(
+            boundaries: boundaries,
+            recordedFasts: recordedFasts,
+            currentGoal: currentGoal,
+            enabled: enabled,
+            now: now,
+            visibleInterval: visibleInterval
+        )
+    }
+
+    /// Projects over the complete ordered caloric boundary stream. Food and
+    /// explicitly caloric hydration use the same source, punctuation, cap and
+    /// deterministic identity rules.
+    public static func project(
+        boundaries: [CaloricBoundary],
+        recordedFasts: [RecordedFastInterval] = [],
+        currentGoal: FastingGoal,
+        enabled: Bool,
+        now: Date,
+        visibleInterval: Range<Date> = Date.distantPast ..< Date.distantFuture
+    ) -> [InferredFastInterval] {
         guard enabled else { return [] }
 
-        let ordered = foodEvents.filter(\.isCaloric).sorted {
-            if $0.occurredAt != $1.occurredAt {
-                return $0.occurredAt < $1.occurredAt
-            }
-            return $0.id.uuidString < $1.id.uuidString
-        }
-        let canonicalFoodEvents = ordered.reduce(into: [FoodBoundarySnapshot]()) { result, food in
-            guard result.last?.occurredAt != food.occurredAt else { return }
-            result.append(food)
+        let ordered = CaloricBoundaryOrdering.sorted(boundaries)
+        let canonicalBoundaries = ordered.reduce(into: [CaloricBoundary]()) { result, boundary in
+            guard result.last?.occurredAt != boundary.occurredAt else { return }
+            result.append(boundary)
         }
 
-        return canonicalFoodEvents.compactMap { source in
+        return canonicalBoundaries.compactMap { source in
             guard source.occurredAt <= now else { return nil }
 
             let eligibilityDate = source.occurredAt.addingTimeInterval(eligibilityDuration)
@@ -129,18 +188,18 @@ public enum InferredFastProjector {
             let maximumDate = source.occurredAt.addingTimeInterval(
                 maximumDuration(for: currentGoal)
             )
-            let laterFood = ordered.first {
+            let laterBoundary = ordered.first {
                 $0.occurredAt > source.occurredAt
                     && $0.occurredAt <= now
                     && $0.occurredAt < maximumDate
             }
-            if let laterFood, laterFood.occurredAt < eligibilityDate {
+            if let laterBoundary, laterBoundary.occurredAt < eligibilityDate {
                 return nil
             }
-            let endDate = min(laterFood?.occurredAt ?? now, maximumDate)
+            let endDate = min(laterBoundary?.occurredAt ?? now, maximumDate)
             guard source.occurredAt < endDate else { return nil }
 
-            let state: InferredFastState = laterFood == nil && now < maximumDate
+            let state: InferredFastState = laterBoundary == nil && now < maximumDate
                 ? .inProgress
                 : .historical
             let interval = source.occurredAt ..< endDate
@@ -149,11 +208,11 @@ public enum InferredFastProjector {
             else { return nil }
 
             return InferredFastInterval(
-                sourceFoodID: source.id,
+                sourceBoundaryReference: source.reference,
                 sourceDate: source.occurredAt,
                 sourceDescription: source.description,
-                nextFoodID: laterFood?.id,
-                nextFoodDate: laterFood?.occurredAt,
+                nextBoundaryReference: laterBoundary?.reference,
+                nextBoundaryDate: laterBoundary?.occurredAt,
                 startDate: source.occurredAt,
                 endDate: endDate,
                 goal: currentGoal,
@@ -172,6 +231,24 @@ public enum InferredFastProjector {
     ) -> [InferredFastInterval] {
         project(
             foodEvents: foodEvents,
+            recordedFasts: recordedFasts,
+            currentGoal: currentGoal,
+            enabled: enabled,
+            now: clock.now,
+            visibleInterval: visibleInterval
+        )
+    }
+
+    public static func project(
+        boundaries: [CaloricBoundary],
+        currentGoal: FastingGoal,
+        enabled: Bool,
+        clock: any AppClock,
+        recordedFasts: [RecordedFastInterval] = [],
+        visibleInterval: Range<Date> = Date.distantPast ..< Date.distantFuture
+    ) -> [InferredFastInterval] {
+        project(
+            boundaries: boundaries,
             recordedFasts: recordedFasts,
             currentGoal: currentGoal,
             enabled: enabled,

@@ -202,7 +202,14 @@ The accepted contract and implementation-ready story are in
 `docs/OW-410_INFERRED_FAST_DETECTION_STORY.md`.
 
 - OW-410 P0 — Detect, present and explicitly convert opt-in inferred fasts.
-  **Ready; Sol readiness gate passed.**
+  **Implemented in source; focused baseline acceptance passed. OW-411
+  supersedes its food-only boundary wording.**
+
+## Slice 3.13 — Caloric-boundary integrity
+
+- OW-411 P0 — Make every caloric food or drink event end the persisted or
+  inferred fast it enters and reconcile existing local records. **Implemented
+  in source; focused validation recorded 17 August 2026. Sol review pending.**
 
 ## Sprint-ready product refinements
 

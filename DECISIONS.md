@@ -832,3 +832,36 @@ is shown.
 - **Consequence:** D-034 amends BR-24, BR-45 and BR-46 through BR-52 and makes
   the source/end timestamps and no-later-food lifecycle testable without adding
   a new persistence type.
+
+## D-035 Caloric event boundary integrity
+
+- **Status:** Accepted for OW-411 implementation
+- **Accepted:** 17 August 2026
+- **Decision:** A caloric boundary is one shared, framework-independent value
+  representing either an always-caloric food event or hydration explicitly
+  classified as caloric. The earliest boundary strictly after a fast start is
+  authoritative for active completion, completed-fast shortening, reconstructed
+  provenance and inferred source/punctuation. Equal timestamps use the shared
+  kind-and-identifier ordering and half-open interval semantics.
+- **Decision:** Event create, edit, delete and reclassification use one local
+  persistence transaction for the event and every affected persisted-fast
+  change. Active and completed impacts require context-specific confirmation;
+  cancel or failure restores the complete prior snapshot. Removing, moving
+  later or reclassifying a former persisted end never silently lengthens the
+  row. Reconstructed rows whose referenced end is no longer current retain
+  their end, retain the old reference as review evidence and become Needs
+  review.
+- **Decision:** Existing stores run an idempotent, atomic reconciliation pass
+  before settings, widget, Live Activity or feature consumers use them. It may
+  apply the same invariant to legacy rows, including capturing the current goal
+  when an active row is completed. Inferred intervals remain derived and
+  unpersisted; they use the complete caloric food/drink boundary stream.
+- **Decision:** Manual active-start correction and completed-fast create/edit
+  validation query the same authoritative caloric-boundary service and reject
+  proposals that cross a saved boundary. Post-commit History invalidation and
+  active-fast WidgetKit/ActivityKit effects remain downstream of a successful
+  local commit.
+- **Consequence:** D-035 supersedes the food-only source/punctuation wording in
+  D-033/D-034 and OW-410, and amends BR-06 through BR-08, BR-21 through BR-24
+  and BR-45 through BR-52. It does not add inferred persistence, network work,
+  health claims or automatic fast creation.

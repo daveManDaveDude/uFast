@@ -235,12 +235,19 @@ struct StartTimeEditor: View {
             case .conflict:
                 validationError = "This fast overlaps another recorded fast."
                 saveError = nil
+            case let .crossesCaloricBoundary(date):
+                validationError = Self.caloricBoundaryMessage(for: date)
+                saveError = nil
             case .noActiveFast:
                 saveError = "Your start time couldn’t be saved. Please try again."
             }
         } catch {
             saveError = "Your start time couldn’t be saved. Please try again."
         }
+    }
+
+    static func caloricBoundaryMessage(for date: Date) -> String {
+        "Start after the caloric event at \(date.formatted(date: .omitted, time: .shortened))."
     }
 }
 

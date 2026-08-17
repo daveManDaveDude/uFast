@@ -33,6 +33,7 @@ enum CompletedFastError: Error, Equatable {
     case futureEndTime
     case conflict
     case noCompletedFast
+    case crossesCaloricBoundary(Date)
 }
 
 @MainActor
@@ -63,6 +64,10 @@ final class CompletedFastService {
             return .futureEndTime
         }
 
+        if let boundary = try crossingBoundary(startDate: startDate, endDate: endDate) {
+            return .crossesCaloricBoundary(boundary.occurredAt)
+        }
+
         let intervals = try repository.recordedFasts().map(\.recordedInterval)
         guard !FastConflictChecker.hasConflict(
             proposedStart: startDate,
@@ -74,6 +79,13 @@ final class CompletedFastService {
         }
 
         return nil
+    }
+
+    private func crossingBoundary(startDate: Date, endDate: Date) throws -> CaloricBoundary? {
+        guard let query = repository as? any CaloricBoundaryQuerying else { return nil }
+        return try query.savedCaloricBoundaries().first {
+            $0.occurredAt > startDate && endDate > $0.occurredAt
+        }
     }
 
     @discardableResult
@@ -129,6 +141,9 @@ final class CompletedFastCreationService {
         guard endDate <= clock.now else {
             throw CompletedFastError.futureEndTime
         }
+        if let boundary = try crossingBoundary(startDate: startDate, endDate: endDate) {
+            throw CompletedFastError.crossesCaloricBoundary(boundary.occurredAt)
+        }
         let intervals = try repository.recordedFasts().map(\.recordedInterval)
         guard !FastConflictChecker.hasConflict(
             proposedStart: startDate,
@@ -141,5 +156,12 @@ final class CompletedFastCreationService {
         let fast = FastRecord(startDate: startDate, endDate: endDate, goalAtStart: goal)
         try repository.saveCompletedFast(fast)
         return fast
+    }
+
+    private func crossingBoundary(startDate: Date, endDate: Date) throws -> CaloricBoundary? {
+        guard let query = repository as? any CaloricBoundaryQuerying else { return nil }
+        return try query.savedCaloricBoundaries().first {
+            $0.occurredAt > startDate && endDate > $0.occurredAt
+        }
     }
 }

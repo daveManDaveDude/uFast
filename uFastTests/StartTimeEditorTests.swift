@@ -62,4 +62,14 @@ final class StartTimeEditorTests: XCTestCase {
             )
         )
     }
+
+    func testCaloricBoundaryMessagesInterpolateTheBlockingInstant() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let formatted = date.formatted(date: .omitted, time: .shortened)
+
+        XCTAssertTrue(StartTimeEditor.caloricBoundaryMessage(for: date).contains(formatted))
+        XCTAssertTrue(
+            CompletedFastEditor.validationMessage(for: .crossesCaloricBoundary(date))?.contains(formatted) == true
+        )
+    }
 }

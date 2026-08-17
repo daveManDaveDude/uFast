@@ -46,10 +46,18 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
         app.buttons["drink.editor.save"].tap()
         let alert = app.alerts["This entry is during your recorded fast."]
         XCTAssertTrue(alert.waitForExistence(timeout: 2))
-        XCTAssertEqual(alert.buttons.count, 2)
+        XCTAssertTrue(
+            alert.descendants(matching: .any)
+                .matching(identifier: "drink.confirmation.primary").firstMatch.exists
+        )
+        XCTAssertTrue(
+            alert.descendants(matching: .any)
+                .matching(identifier: "drink.confirmation.cancel").firstMatch.exists
+        )
         XCTAssertTrue(alert.buttons["Save and end fast"].exists)
         XCTAssertFalse(alert.buttons["Save entry only"].exists)
-        alert.buttons["Cancel"].tap()
+        alert.descendants(matching: .any)
+            .matching(identifier: "drink.confirmation.cancel").firstMatch.tap()
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
         XCTAssertFalse(app.staticTexts["Juice"].exists)

@@ -29,11 +29,18 @@ final class CaloricFoodUITests: XCTestCase {
 
         let alert = app.alerts["This entry is during your recorded fast."]
         XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        XCTAssertTrue(
+            alert.descendants(matching: .any)
+                .matching(identifier: "food.confirmation.primary").firstMatch.exists
+        )
+        XCTAssertTrue(
+            alert.descendants(matching: .any)
+                .matching(identifier: "food.confirmation.cancel").firstMatch.exists
+        )
         XCTAssertTrue(alert.buttons["Save and end fast"].exists)
-        XCTAssertTrue(alert.buttons["Cancel"].exists)
         XCTAssertFalse(alert.buttons["Save entry only"].exists)
-        XCTAssertEqual(alert.buttons.count, 2)
-        alert.buttons["Cancel"].tap()
+        alert.descendants(matching: .any)
+            .matching(identifier: "food.confirmation.cancel").firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Log food"].exists)
         app.buttons["food.cancel"].tap()
 
@@ -49,7 +56,10 @@ final class CaloricFoodUITests: XCTestCase {
         app.buttons["food.save"].tap()
         let alert = app.alerts["This entry is during your recorded fast."]
         XCTAssertTrue(alert.waitForExistence(timeout: 2))
-        alert.buttons["Save and end fast"].tap()
+        let primaryAction = alert.descendants(matching: .any)
+            .matching(identifier: "food.confirmation.primary").firstMatch
+        XCTAssertTrue(primaryAction.waitForExistence(timeout: 2), app.debugDescription)
+        primaryAction.tap()
 
         XCTAssertTrue(app.staticTexts["fast.inactive-state"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Lunch"].exists)
