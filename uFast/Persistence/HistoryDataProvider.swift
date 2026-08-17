@@ -191,7 +191,7 @@ final class SwiftDataHistoryDataProvider {
     private func foodEvents(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -200,7 +200,7 @@ final class SwiftDataHistoryDataProvider {
     private func foodEvents(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -302,7 +302,7 @@ final class SwiftDataHistoryMotionDataProvider {
     private func foodEvents(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -311,7 +311,7 @@ final class SwiftDataHistoryMotionDataProvider {
     private func foodEvents(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)

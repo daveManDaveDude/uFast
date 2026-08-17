@@ -256,11 +256,11 @@ extension HistoryView {
         .sheet(item: $inferredConversion) { presentation in
             InferredFastConversionView(
                 presentation: presentation,
-                onConfirm: {
+                clock: clock,
+                onConfirm: { interval in
                     guard let applicationCommands else {
                         throw ApplicationCommandError.recordNotFound
                     }
-                    let interval = presentation.interval
                     if interval.isInProgress {
                         _ = try applicationCommands.startInferredFast(
                             sourceFoodID: interval.sourceFoodID,

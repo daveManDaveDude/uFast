@@ -31,13 +31,7 @@ final class HistoryInferredClassificationTests: XCTestCase {
 
         let referenceNow = sourceDate.addingTimeInterval(20 * 60 * 60)
         let settledData = try SwiftDataHistoryDataProvider(modelContext: context).fetch(window: window)
-        let settled = HistoryPresentationBuilder.build(
-            data: settledData,
-            locale: Locale(identifier: "en_GB"),
-            calendar: utcCalendar,
-            timeZone: .gmt,
-            referenceNow: referenceNow
-        )
+        let settled = build(settledData, referenceNow: referenceNow)
         let settledInferred = try XCTUnwrap(settled.fastItems.first(where: { $0.kind == .inferred })?.inferredInterval)
         XCTAssertEqual(settledInferred.sourceFoodID, source.id)
         XCTAssertNil(settledInferred.nextFoodID)
@@ -45,13 +39,7 @@ final class HistoryInferredClassificationTests: XCTestCase {
         let motionData = try SwiftDataHistoryMotionDataProvider(modelContext: context)
             .fetch(window: window, calendar: utcCalendar)
         let motion = HistoryMotionPresentation(
-            HistoryPresentationBuilder.build(
-                data: motionData,
-                locale: Locale(identifier: "en_GB"),
-                calendar: utcCalendar,
-                timeZone: .gmt,
-                referenceNow: referenceNow
-            ),
+            build(motionData, referenceNow: referenceNow),
             inferredContext: HistoryMotionInferredContext(data: motionData)
         )
         let motionInferred = try XCTUnwrap(
@@ -62,6 +50,19 @@ final class HistoryInferredClassificationTests: XCTestCase {
         )
         XCTAssertEqual(motionCandidate.sourceFoodID, source.id)
         XCTAssertNil(motionCandidate.nextFoodID)
+    }
+
+    private func build(
+        _ data: HistoryDataSlice,
+        referenceNow: Date
+    ) -> HistoryPresentationSnapshot {
+        HistoryPresentationBuilder.build(
+            data: data,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: referenceNow
+        )
     }
 
     private func nonCaloricFood(

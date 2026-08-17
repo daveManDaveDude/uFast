@@ -252,6 +252,47 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         )
     }
 
+    func testPageGeometryTransfersUnavailableEdgeHitPaddingInward() throws {
+        let calendar = try londonCalendar()
+        let window = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(
+                containing: date(2026, 7, 22, 12, calendar: calendar),
+                calendar: calendar
+            )
+        )
+        let leadingEdge = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000028")),
+            start: window.interval.start,
+            end: window.interval.start.addingTimeInterval(1)
+        )
+        let trailingEdge = try TemporalIntervalInput(
+            id: XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000029")),
+            start: window.interval.end.addingTimeInterval(-1),
+            end: window.interval.end
+        )
+
+        let geometry = TemporalHistoryPresentation.pageGeometry(
+            [leadingEdge, trailingEdge],
+            in: window,
+            surfaceWidth: 320
+        )
+        let leading = try XCTUnwrap(geometry.first { $0.id == leadingEdge.id })
+        let trailing = try XCTUnwrap(geometry.first { $0.id == trailingEdge.id })
+
+        XCTAssertEqual(leading.leadingHitPadding, 0)
+        XCTAssertEqual(
+            leading.visualWidth + leading.leadingHitPadding + leading.trailingHitPadding,
+            44,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(trailing.trailingHitPadding, 0)
+        XCTAssertEqual(
+            trailing.visualWidth + trailing.leadingHitPadding + trailing.trailingHitPadding,
+            44,
+            accuracy: 0.000_001
+        )
+    }
+
     func testLondonMidnightScreenshotFixtureUsesTheSameAbsoluteInterval() throws {
         let calendar = try londonCalendar()
         let previousDay = try date(2026, 7, 21, 12, calendar: calendar)

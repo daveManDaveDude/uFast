@@ -75,11 +75,10 @@ extension TemporalIntervalSegment {
               boundedVisualWidth > 0
         else { return nil }
 
-        let desiredHitPadding = max((44 - boundedVisualWidth) / 2, 0)
-        let leadingHitPadding = min(desiredHitPadding, boundedVisualStartX)
-        let trailingHitPadding = min(
-            desiredHitPadding,
-            max(surfaceWidth - boundedVisualStartX - boundedVisualWidth, 0)
+        let hitPadding = Self.hitPadding(
+            visualStartX: boundedVisualStartX,
+            visualWidth: boundedVisualWidth,
+            surfaceWidth: surfaceWidth
         )
         return TemporalIntervalPageGeometry(
             segment: self,
@@ -87,9 +86,29 @@ extension TemporalIntervalSegment {
             endX: endX,
             visualStartX: boundedVisualStartX,
             visualWidth: boundedVisualWidth,
-            leadingHitPadding: leadingHitPadding,
-            trailingHitPadding: trailingHitPadding
+            leadingHitPadding: hitPadding.leading,
+            trailingHitPadding: hitPadding.trailing
         )
+    }
+
+    private static func hitPadding(
+        visualStartX: Double,
+        visualWidth: Double,
+        surfaceWidth: Double
+    ) -> (leading: Double, trailing: Double) {
+        let desired = max((44 - visualWidth) / 2, 0)
+        let availableLeading = visualStartX
+        let availableTrailing = max(surfaceWidth - visualStartX - visualWidth, 0)
+        var leading = min(desired, availableLeading)
+        var trailing = min(desired, availableTrailing)
+        let unallocated = max(desired * 2 - leading - trailing, 0)
+        let leadingRemainder = min(unallocated, max(availableLeading - leading, 0))
+        leading += leadingRemainder
+        trailing += min(
+            unallocated - leadingRemainder,
+            max(availableTrailing - trailing, 0)
+        )
+        return (leading, trailing)
     }
 }
 

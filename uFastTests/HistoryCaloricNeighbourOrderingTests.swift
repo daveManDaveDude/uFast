@@ -37,6 +37,44 @@ final class HistoryCaloricNeighbourOrderingTests: XCTestCase {
         XCTAssertEqual(first.intervals, second.intervals)
     }
 
+    func testEqualTimeCaloricFoodNeighbourUsesProjectorUUIDTieBreak() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let sourceDate = Date(timeIntervalSince1970: 2_100_000_000)
+        let window = DateInterval(
+            start: sourceDate.addingTimeInterval(9 * 60 * 60),
+            duration: 60 * 60
+        )
+        let firstID = try XCTUnwrap(UUID(uuidString: "10000000-0000-0000-0000-000000000001"))
+        let secondID = try XCTUnwrap(UUID(uuidString: "10000000-0000-0000-0000-000000000002"))
+        context.insert(FoodEntryRecord(
+            id: secondID,
+            draft: .init(description: "Second source", occurredAt: sourceDate),
+            createdAt: sourceDate
+        ))
+        context.insert(FoodEntryRecord(
+            id: firstID,
+            draft: .init(description: "First source", occurredAt: sourceDate),
+            createdAt: sourceDate
+        ))
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+
+        let settledData = try SwiftDataHistoryDataProvider(modelContext: context).fetch(window: window)
+        XCTAssertEqual(settledData.foods.map(\.id), [firstID])
+        XCTAssertEqual(try inferredID(in: settledData, at: window.end), firstID)
+
+        let motionData = try SwiftDataHistoryMotionDataProvider(modelContext: context).fetch(
+            window: window,
+            calendar: utcCalendar
+        )
+        XCTAssertEqual(motionData.foods.map(\.id), [firstID])
+        XCTAssertEqual(try inferredID(in: motionData, at: window.end), firstID)
+    }
+
     func testMotionInferredIntervalRefreshesItsEndAndSaveOnlyLifecycle() throws {
         let source = Date(timeIntervalSince1970: 2_000_000_000)
         let interval = InferredFastInterval(
@@ -124,6 +162,17 @@ final class HistoryCaloricNeighbourOrderingTests: XCTestCase {
             timeZone: .gmt,
             referenceNow: referenceNow
         ))
+    }
+
+    private func inferredID(in data: HistoryDataSlice, at referenceNow: Date) throws -> UUID {
+        let presentation = HistoryPresentationBuilder.build(
+            data: data,
+            locale: Locale(identifier: "en_GB"),
+            calendar: utcCalendar,
+            timeZone: .gmt,
+            referenceNow: referenceNow
+        )
+        return try XCTUnwrap(presentation.fastItems.first(where: { $0.kind == .inferred })).id
     }
 
     private var utcCalendar: Calendar {

@@ -2,14 +2,15 @@ import SwiftUI
 
 struct InferredFastConversionView: View {
     let presentation: InferredFastConversionPresentation
-    let onConfirm: () throws -> Void
+    let clock: any AppClock
+    let onConfirm: (InferredFastInterval) throws -> Void
     let onCancel: () -> Void
     let onFailure: () -> Void
 
     @State private var errorMessage: String?
 
     private var interval: InferredFastInterval {
-        presentation.interval
+        presentation.interval.refreshed(at: clock.now)
     }
 
     private var actionTitle: String {
@@ -33,63 +34,65 @@ struct InferredFastConversionView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        Text(title)
-                            .font(.headline)
-                            .foregroundStyle(UFastTheme.primary)
-                        Text(explanation)
-                            .font(.subheadline)
-                            .foregroundStyle(UFastTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("history.inferred.confirmation")
-                }
-
-                Section("Source food") {
-                    LabeledContent("Food", value: interval.sourceDescription)
-                    LabeledContent("Started", value: interval.startDate.formatted(
-                        .dateTime.month(.abbreviated).day().hour().minute()
-                    ))
-                    LabeledContent("Ends", value: interval.endDate.formatted(
-                        .dateTime.month(.abbreviated).day().hour().minute()
-                    ))
-                    LabeledContent("Duration") {
-                        Text(duration)
-                            .accessibilityIdentifier("history.inferred.duration")
-                    }
-                }
-
-                if let errorMessage {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            NavigationStack {
+                Form {
                     Section {
-                        Label(errorMessage, systemImage: "exclamationmark.circle")
-                            .foregroundStyle(UFastTheme.error)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("history.inferred.conversion-error")
+                        VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                            Text(title)
+                                .font(.headline)
+                                .foregroundStyle(UFastTheme.primary)
+                            Text(explanation)
+                                .font(.subheadline)
+                                .foregroundStyle(UFastTheme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("history.inferred.confirmation")
+                    }
+
+                    Section("Source food") {
+                        LabeledContent("Food", value: interval.sourceDescription)
+                        LabeledContent("Started", value: interval.startDate.formatted(
+                            .dateTime.month(.abbreviated).day().hour().minute()
+                        ))
+                        LabeledContent("Ends", value: interval.endDate.formatted(
+                            .dateTime.month(.abbreviated).day().hour().minute()
+                        ))
+                        LabeledContent("Duration") {
+                            Text(duration)
+                                .accessibilityIdentifier("history.inferred.duration")
+                        }
+                    }
+
+                    if let errorMessage {
+                        Section {
+                            Label(errorMessage, systemImage: "exclamationmark.circle")
+                                .foregroundStyle(UFastTheme.error)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("history.inferred.conversion-error")
+                        }
+                    }
+
+                    Section {
+                        Button(actionTitle, action: confirm)
+                            .buttonStyle(UFastPrimaryButtonStyle())
+                            .accessibilityIdentifier(
+                                interval.isInProgress
+                                    ? "history.inferred.start"
+                                    : "history.inferred.save"
+                            )
                     }
                 }
-
-                Section {
-                    Button(actionTitle, action: confirm)
-                        .buttonStyle(UFastPrimaryButtonStyle())
-                        .accessibilityIdentifier(
-                            interval.isInProgress
-                                ? "history.inferred.start"
-                                : "history.inferred.save"
-                        )
-                }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .scrollContentBackground(.hidden)
-            .background(UFastTheme.canvas)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                        .accessibilityIdentifier("history.inferred.cancel")
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .scrollContentBackground(.hidden)
+                .background(UFastTheme.canvas)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", action: onCancel)
+                            .accessibilityIdentifier("history.inferred.cancel")
+                    }
                 }
             }
         }
@@ -97,7 +100,7 @@ struct InferredFastConversionView: View {
 
     private func confirm() {
         do {
-            try onConfirm()
+            try onConfirm(interval)
             errorMessage = nil
         } catch {
             errorMessage = errorDescription(for: error)

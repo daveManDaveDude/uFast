@@ -62,6 +62,30 @@ public struct InferredFastInterval: Equatable, Hashable, Sendable {
     public var offersSave: Bool {
         state == .historical
     }
+
+    /// Refreshes the disposable interval while a conversion sheet remains
+    /// foregrounded. A punctuating food boundary is fixed; an unpunctuated
+    /// candidate advances to the current instant until its goal-plus-grace cap.
+    public func refreshed(at now: Date) -> Self {
+        let maximumDate = sourceDate.addingTimeInterval(
+            InferredFastProjector.maximumDuration(for: goal)
+        )
+        let refreshedEndDate = min(nextFoodDate ?? now, maximumDate)
+        let refreshedState: InferredFastState = nextFoodDate == nil && now < maximumDate
+            ? .inProgress
+            : .historical
+        return Self(
+            sourceFoodID: sourceFoodID,
+            sourceDate: sourceDate,
+            sourceDescription: sourceDescription,
+            nextFoodID: nextFoodID,
+            nextFoodDate: nextFoodDate,
+            startDate: startDate,
+            endDate: refreshedEndDate,
+            goal: goal,
+            state: refreshedState
+        )
+    }
 }
 
 public enum InferredFastProjector {

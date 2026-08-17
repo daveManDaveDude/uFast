@@ -48,6 +48,32 @@ final class InferredFastProjectionTests: XCTestCase {
         XCTAssertTrue(capped.offersSave)
     }
 
+    func testRefreshingAnOpenCandidateTracksNowUntilTheGoalPlusTwelveHourCap() throws {
+        let source = food(at: 15000, description: "Dinner")
+        let candidate = try XCTUnwrap(project(
+            source: source,
+            now: source.occurredAt.addingTimeInterval(9 * 60 * 60)
+        ).first)
+        let refreshed = candidate.refreshed(
+            at: source.occurredAt.addingTimeInterval(10 * 60 * 60)
+        )
+        XCTAssertEqual(
+            refreshed.endDate,
+            source.occurredAt.addingTimeInterval(10 * 60 * 60)
+        )
+        XCTAssertTrue(refreshed.offersStart)
+        XCTAssertFalse(refreshed.offersSave)
+
+        let cap = source.occurredAt.addingTimeInterval(
+            InferredFastProjector.maximumDuration(for: candidate.goal)
+        )
+        let capped = candidate.refreshed(at: cap)
+        XCTAssertEqual(capped.endDate, cap)
+        XCTAssertFalse(capped.offersStart)
+        XCTAssertTrue(capped.offersSave)
+        XCTAssertEqual(capped.state, .historical)
+    }
+
     func testLaterFoodBeforeGoalPlusTwelveHourCapTerminatesIntervalAtFood() throws {
         let source = food(at: 20000, description: "Dinner")
         let next = food(at: 20000 + 20 * 60 * 60, description: "Breakfast")
