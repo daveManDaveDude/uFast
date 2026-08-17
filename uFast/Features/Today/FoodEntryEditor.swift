@@ -303,6 +303,10 @@ struct FoodEntryEditor: View {
         do {
             try onDelete?(false)
             saveError = nil
+        } catch let FoodEntrySaveError.confirmationRequiredWithImpact(context) {
+            showConfirmation(context, pendingDeletion: true)
+        } catch let FoodEntrySaveError.completedConfirmationWithImpact(context) {
+            showConfirmation(context, pendingDeletion: true)
         } catch let FoodEntrySaveError.inferredConfirmationWithImpact(context) {
             showConfirmation(context, pendingDeletion: true)
         } catch {
@@ -371,7 +375,10 @@ private extension FoodEntryEditor {
 
     var confirmationActionTitle: String {
         if pendingDeletion {
-            return "Delete and update History"
+            switch confirmationContext.kind {
+            case .active, .completed: return "Delete and update fast"
+            case .inferred: return "Delete and update History"
+            }
         }
         switch confirmationContext.kind {
         case .active: return "Save and end fast"

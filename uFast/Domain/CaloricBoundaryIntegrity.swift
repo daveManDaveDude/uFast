@@ -116,6 +116,7 @@ protocol CaloricBoundaryAwareFoodEntryRepository: CaloricBoundaryQuerying {
         for draft: FoodEntryDraft,
         replacing record: FoodEntryRecord?
     ) throws -> CaloricEventImpact
+    func caloricEventImpact(forDeletion record: FoodEntryRecord) throws -> CaloricEventImpact
     func saveCaloricEvent(
         _ draft: FoodEntryDraft,
         replacing record: FoodEntryRecord?,
@@ -129,6 +130,7 @@ protocol CaloricHydrationRepository: CaloricBoundaryQuerying {
         for draft: HydrationEntryDraft,
         replacing record: HydrationEntryRecord?
     ) throws -> CaloricEventImpact
+    func caloricEventImpact(forDeletion record: HydrationEntryRecord) throws -> CaloricEventImpact
     func saveCaloricEvent(
         _ draft: HydrationEntryDraft,
         replacing record: HydrationEntryRecord?,

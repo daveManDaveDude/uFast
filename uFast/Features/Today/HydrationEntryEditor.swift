@@ -186,7 +186,10 @@ struct HydrationEntryEditor: View {
 
     private var confirmationActionTitle: String {
         if pendingDeletion {
-            return "Delete and update History"
+            switch confirmationContext.kind {
+            case .active, .completed: return "Delete and update fast"
+            case .inferred: return "Delete and update History"
+            }
         }
         switch confirmationContext.kind {
         case .active: return "Save and end fast"
@@ -223,6 +226,10 @@ struct HydrationEntryEditor: View {
     private func delete() {
         do {
             try onDelete?(false)
+        } catch let HydrationEntrySaveError.confirmationRequiredWithImpact(context) {
+            showConfirmation(context, pendingDeletion: true)
+        } catch let HydrationEntrySaveError.completedConfirmationWithImpact(context) {
+            showConfirmation(context, pendingDeletion: true)
         } catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) {
             showConfirmation(context, pendingDeletion: true)
         } catch {

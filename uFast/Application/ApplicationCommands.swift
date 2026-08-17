@@ -320,6 +320,17 @@ final class ApplicationCommands {
             resultingEventIsCaloric: false,
             replacing: reference
         )
+        let persistedImpact = try foodRepository().caloricEventImpact(forDeletion: record)
+        if persistedImpact.requiresConfirmation, !confirmingInferredImpact {
+            let context = CaloricEventConfirmationContext(
+                persistedImpact: persistedImpact,
+                includesInferredInterval: inferredImpact.requiresConfirmation
+            )
+            if persistedImpact.affectsActiveFast {
+                throw FoodEntrySaveError.confirmationRequiredWithImpact(context)
+            }
+            throw FoodEntrySaveError.completedConfirmationWithImpact(context)
+        }
         if inferredImpact.requiresConfirmation, !confirmingInferredImpact {
             throw FoodEntrySaveError.inferredConfirmationWithImpact(
                 CaloricEventConfirmationContext(
@@ -457,6 +468,17 @@ final class ApplicationCommands {
             resultingEventIsCaloric: false,
             replacing: reference
         )
+        let persistedImpact = try hydrationRepository().caloricEventImpact(forDeletion: record)
+        if persistedImpact.requiresConfirmation, !confirmingInferredImpact {
+            let context = CaloricEventConfirmationContext(
+                persistedImpact: persistedImpact,
+                includesInferredInterval: inferredImpact.requiresConfirmation
+            )
+            if persistedImpact.affectsActiveFast {
+                throw HydrationEntrySaveError.confirmationRequiredWithImpact(context)
+            }
+            throw HydrationEntrySaveError.completedConfirmationWithImpact(context)
+        }
         if inferredImpact.requiresConfirmation, !confirmingInferredImpact {
             throw HydrationEntrySaveError.inferredConfirmationWithImpact(
                 CaloricEventConfirmationContext(

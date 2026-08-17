@@ -142,6 +142,19 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
         }
     }
 
+    func caloricEventImpact(forDeletion record: HydrationEntryRecord) throws -> CaloricEventImpact {
+        let oldReference = CaloricBoundaryReference(kind: .hydration, id: record.id)
+        let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
+        let mutation = try CaloricBoundaryMutation(
+            oldReference: oldReference,
+            oldOccurredAt: record.occurredAt,
+            oldIsCaloric: record.isCaloric,
+            newBoundary: nil,
+            resultingBoundaries: planner.allBoundaries(excluding: oldReference)
+        )
+        return try planner.impact(for: mutation, fasts: planner.fasts())
+    }
+
     func savedCaloricBoundaries() throws -> [CaloricBoundary] {
         try CaloricBoundaryPersistencePlanner(modelContext: modelContext).allBoundaries()
     }

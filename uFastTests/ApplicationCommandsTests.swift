@@ -515,6 +515,121 @@ final class ApplicationCommandsTests: XCTestCase {
         XCTAssertFalse(context.hasChanges)
     }
 
+    func testDeletingFoodSurfacesPersistedCompletedAndReconstructedImpact() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let end = start.addingTimeInterval(18 * 60 * 60)
+        let startRecord = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: start),
+            createdAt: start
+        )
+        let endRecord = FoodEntryRecord(
+            draft: .init(description: "Breakfast", occurredAt: end),
+            createdAt: end
+        )
+        let pair = ReconstructionBoundaryPair(
+            start: .init(kind: .food, id: startRecord.id),
+            end: .init(kind: .food, id: endRecord.id)
+        )
+        let fast = FastRecord(
+            reconstructedStart: start,
+            endDate: end,
+            boundaries: pair,
+            adjustedByUser: false
+        )
+        context.insert(startRecord)
+        context.insert(endRecord)
+        context.insert(fast)
+        try context.save()
+
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: end),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            )
+        )
+
+        XCTAssertThrowsError(try commands.deleteFood(id: endRecord.id)) { error in
+            guard case let .completedConfirmationWithImpact(context) = error as? FoodEntrySaveError else {
+                return XCTFail("Expected persisted completed-fast confirmation, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .completed)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertTrue(context.includesReconstructedReview)
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 2)
+        XCTAssertEqual(fast.reviewState, .confirmed)
+        XCTAssertFalse(context.hasChanges)
+
+        try commands.deleteFood(id: endRecord.id, confirmingInferredImpact: true)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 1)
+        XCTAssertEqual(fast.reviewState, .needsReview)
+        XCTAssertEqual(fast.retainedReviewBoundary, pair.end)
+    }
+
+    func testDeletingCaloricHydrationSurfacesPersistedCompletedImpact() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let end = start.addingTimeInterval(16 * 60 * 60)
+        let startRecord = FoodEntryRecord(
+            draft: .init(description: "Dinner", occurredAt: start),
+            createdAt: start
+        )
+        let drink = HydrationEntryRecord(
+            type: .custom,
+            customName: "Juice",
+            volumeMillilitres: 250,
+            occurredAt: end,
+            isCaloric: true,
+            createdAt: end
+        )
+        let pair = ReconstructionBoundaryPair(
+            start: .init(kind: .food, id: startRecord.id),
+            end: .init(kind: .hydration, id: drink.id)
+        )
+        let fast = FastRecord(
+            reconstructedStart: start,
+            endDate: end,
+            boundaries: pair,
+            adjustedByUser: false
+        )
+        context.insert(startRecord)
+        context.insert(fast)
+        context.insert(drink)
+        try context.save()
+
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: end),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            )
+        )
+
+        XCTAssertThrowsError(try commands.deleteHydration(id: drink.id)) { error in
+            guard case let .completedConfirmationWithImpact(context) = error as? HydrationEntrySaveError else {
+                return XCTFail("Expected persisted completed-fast confirmation, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .completed)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertTrue(context.includesReconstructedReview)
+        }
+        XCTAssertNotNil(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).first)
+        XCTAssertEqual(fast.endDate, end)
+        XCTAssertFalse(context.hasChanges)
+
+        try commands.deleteHydration(id: drink.id, confirmingInferredImpact: true)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
+        XCTAssertEqual(fast.endDate, end)
+        XCTAssertEqual(fast.reviewState, .needsReview)
+        XCTAssertEqual(fast.retainedReviewBoundary, pair.end)
+    }
+
     func testHistoricalInferredSaveRejectsAmbiguousActiveAuthorityWithoutMutation() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
