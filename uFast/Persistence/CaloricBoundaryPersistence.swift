@@ -45,7 +45,7 @@ struct CaloricBoundaryPersistencePlanner {
                 id: $0.id,
                 occurredAt: $0.occurredAt,
                 description: $0.foodDescription,
-                isCaloric: $0.isCaloric
+                isCaloric: true
             )
         }
         let hydration = try modelContext.fetch(FetchDescriptor<HydrationEntryRecord>()).map {

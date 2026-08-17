@@ -238,9 +238,7 @@ struct TodayGoalView: View {
                 caloricFavouritePending = nil
             }
             Button(caloricFavouriteConfirmationActionTitle) {
-                savePendingCaloricFavourite(
-                    endingActiveFast: caloricFavouriteConfirmationContext.kind == .active
-                )
+                savePendingCaloricFavourite(endingActiveFast: true)
             }
         } message: {
             Text(caloricFavouriteConfirmationMessage)

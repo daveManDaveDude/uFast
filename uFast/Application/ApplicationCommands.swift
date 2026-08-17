@@ -654,7 +654,7 @@ final class ApplicationCommands {
                 id: $0.id,
                 occurredAt: $0.occurredAt,
                 description: $0.foodDescription,
-                isCaloric: $0.isCaloric
+                isCaloric: true
             )
         }
         let hydrationSnapshots = drinks.map {

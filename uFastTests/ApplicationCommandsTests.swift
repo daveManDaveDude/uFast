@@ -617,7 +617,7 @@ final class ApplicationCommandsTests: XCTestCase {
         XCTAssertEqual(fast.startDate, sourceDate)
     }
 
-    func testInferredRevalidationPreservesFoodCaloricClassification() throws {
+    func testInferredRevalidationTreatsCompatibilityFoodAsCaloric() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -647,39 +647,14 @@ final class ApplicationCommandsTests: XCTestCase {
             projectionCoordinator: projection
         )
 
-        XCTAssertThrowsError(try commands.startInferredFast(
+        _ = try commands.startInferredFast(
             sourceFoodID: nonCaloricSource.id,
             expectedStartDate: nonCaloricSource.occurredAt,
             expectedEndDate: now
-        )) { error in
-            XCTAssertEqual(error as? InferredFastConversionError, .candidateUnavailable)
-        }
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 0)
-
-        let caloricSource = FoodEntryRecord(
-            draft: .init(description: "Dinner", occurredAt: now.addingTimeInterval(-20 * 60 * 60)),
-            createdAt: now
         )
-        let nonCaloricLater = FoodEntryRecord(
-            draft: .init(description: "Non-caloric snack", occurredAt: now.addingTimeInterval(-2 * 60 * 60)),
-            createdAt: now
-        )
-        nonCaloricLater.restore(from: FoodEntryRecordSnapshot(
-            draft: nonCaloricLater.draft,
-            isCaloric: false,
-            updatedAt: now
-        ))
-        context.insert(caloricSource)
-        context.insert(nonCaloricLater)
-        try context.save()
-
-        _ = try commands.startInferredFast(
-            sourceFoodID: caloricSource.id,
-            expectedStartDate: caloricSource.occurredAt,
-            expectedEndDate: now
-        )
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 1)
         let fast = try XCTUnwrap(context.fetch(FetchDescriptor<FastRecord>()).first)
-        XCTAssertEqual(fast.startDate, caloricSource.occurredAt)
+        XCTAssertEqual(fast.startDate, nonCaloricSource.occurredAt)
         XCTAssertTrue(fast.isActive)
     }
 

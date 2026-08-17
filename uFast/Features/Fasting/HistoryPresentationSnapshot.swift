@@ -92,7 +92,7 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
                 id: $0.id,
                 occurredAt: $0.occurredAt,
                 description: $0.foodDescription,
-                isCaloric: $0.isCaloric
+                isCaloric: true
             )
         }
         hydrationEvents = data.drinks.map {
@@ -334,7 +334,7 @@ enum HistoryPresentationBuilder {
         let window = data.window.start ..< data.window.end
         let boundaries = CaloricBoundaryExtractor.boundaries(
             food: data.foods.map {
-                .init(id: $0.id, occurredAt: $0.occurredAt, description: $0.foodDescription, isCaloric: $0.isCaloric)
+                .init(id: $0.id, occurredAt: $0.occurredAt, description: $0.foodDescription, isCaloric: true)
             },
             hydration: data.drinks.map {
                 .init(id: $0.id, occurredAt: $0.occurredAt, description: $0.displayName, isCaloric: $0.isCaloric)
@@ -587,7 +587,10 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         case .automatic: "Fast"
         case .inferred where inferredInterval?.isInProgress == true: "Inferred fast in progress"
         case .inferred: "Inferred fast"
-        case .previouslySaved: "Previously saved fast"
+        case .previouslySaved:
+            fast?.reviewState == .needsReview
+                ? "Previously saved fast · Needs review"
+                : "Previously saved fast"
         case .unavailable: "Saved fast · Details unavailable"
         }
     }
@@ -628,6 +631,9 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         if kind == .recorded, let goal = fast?.capturedHistoricalGoal {
             components.append("goal \(goal.hours) hours")
         }
+        if let reviewBoundaryUnavailableDescription {
+            components.append(reviewBoundaryUnavailableDescription)
+        }
         if kind == .inferred {
             components.append(
                 inferredInterval?.isInProgress == true
@@ -656,10 +662,25 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         if kind == .recorded, let goal = fast?.capturedHistoricalGoal {
             components.append("goal \(goal.hours) hours")
         }
+        if let reviewBoundaryUnavailableDescription {
+            components.append(reviewBoundaryUnavailableDescription)
+        }
         if kind == .inferred {
-            components.append("source food \(inferredInterval?.sourceDescription ?? "")")
+            let sourceKind = inferredInterval.map {
+                $0.sourceKind == .hydration ? "drink" : "food"
+            } ?? "food"
+            components.append("source \(sourceKind) \(inferredInterval?.sourceDescription ?? "")")
             components.append(inferredInterval?.isInProgress == true ? "Start fast available" : "Save fast available")
         }
         return components.joined(separator: ", ")
+    }
+
+    private var reviewBoundaryUnavailableDescription: String? {
+        guard fast?.reviewState == .needsReview else { return nil }
+        guard let reference = fast?.retainedReviewBoundary else {
+            return "boundary evidence unavailable"
+        }
+        let kind = reference.kind == .hydration ? "drink" : "food"
+        return "former \(kind) boundary unavailable"
     }
 }
