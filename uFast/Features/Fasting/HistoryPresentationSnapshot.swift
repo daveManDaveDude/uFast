@@ -419,11 +419,11 @@ enum HistoryPresentationBuilder {
         let foods = data.foods.map { food in
             let nutrition = nutritionDetail(food.nutrition)
             let detail = ([eventDetail(
-                category: "Food", caloric: food.isCaloric, date: food.occurredAt,
+                category: "Food", caloric: true, date: food.occurredAt,
                 locale: locale, calendar: calendar, timeZone: timeZone
             )] + (nutrition.map { [$0] } ?? [])).joined(separator: " · ")
             let accessibility = ([
-                "\(food.foodDescription), food, \(food.isCaloric ? "caloric" : "non-caloric"), "
+                "\(food.foodDescription), food, caloric, "
                     + formatted(food.occurredAt, locale: locale, calendar: calendar, timeZone: timeZone),
             ] + (nutrition.map { [$0] } ?? [])).joined(separator: ", ")
             return TemporalRibbonEventItem(

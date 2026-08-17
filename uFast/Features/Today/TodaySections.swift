@@ -190,9 +190,7 @@ extension TodayGoalView {
                         .accessibilityIdentifier("drink.caloric-favourite.save-error")
 
                     Button("Try adding drink again") {
-                        savePendingCaloricFavourite(
-                            endingActiveFast: caloricFavouriteConfirmationContext.kind == .active
-                        )
+                        savePendingCaloricFavourite(endingActiveFast: true)
                     }
                     .buttonStyle(UFastSecondaryButtonStyle())
                     .accessibilityIdentifier("drink.caloric-favourite.retry")

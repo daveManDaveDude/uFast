@@ -62,7 +62,8 @@ struct FoodEntrySnapshot: Equatable {
         foodDescription = record.foodDescription
         occurredAt = record.occurredAt
         nutrition = record.nutrition
-        isCaloric = record.isCaloric
+        // Food is always caloric. Older stores may contain a stale persisted flag.
+        isCaloric = true
     }
 }
 

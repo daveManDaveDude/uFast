@@ -101,6 +101,51 @@ final class HistoryInferredClassificationTests: XCTestCase {
         )
     }
 
+    func testCompatibilityFoodPresentationRemainsCaloricAcrossTodayAndHistory() throws {
+        let now = Date(timeIntervalSince1970: 2_100_000_000)
+        let record = FoodEntryRecord(
+            draft: .init(description: "Legacy dinner", occurredAt: now),
+            createdAt: now
+        )
+        record.restore(from: FoodEntryRecordSnapshot(
+            draft: record.draft,
+            isCaloric: false,
+            updatedAt: now
+        ))
+
+        let snapshot = FoodEntrySnapshot(record)
+        XCTAssertTrue(snapshot.isCaloric)
+        let timeline = TodayTimeline.entries(
+            food: [snapshot],
+            drinks: [],
+            now: now,
+            calendar: utcCalendar
+        )
+        let timelineEntry = try XCTUnwrap(timeline.first)
+        guard case let .food(_, _, isCaloric) = timelineEntry.kind else {
+            return XCTFail("Expected a food timeline entry")
+        }
+        XCTAssertTrue(isCaloric)
+
+        let window = DateInterval(start: now.addingTimeInterval(-60), duration: 120)
+        let presentation = build(
+            HistoryDataSlice(
+                window: window,
+                completedFasts: [],
+                activeFast: nil,
+                foods: [snapshot],
+                drinks: [],
+                settings: nil
+            ),
+            referenceNow: now
+        )
+        let event = try XCTUnwrap(presentation.events.first)
+        XCTAssertTrue(event.detail.contains("Caloric"))
+        XCTAssertTrue(event.accessibilityLabel.contains("caloric"))
+        XCTAssertFalse(event.detail.contains("Non-caloric"))
+        XCTAssertFalse(event.accessibilityLabel.contains("non-caloric"))
+    }
+
     func testReviewedLegacyFastIdentifiesItsUnavailableBoundaryInSettledAndMotion() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
