@@ -10,6 +10,7 @@ struct HistoryFastSnapshot: Equatable {
     let reviewState: FastReviewState?
     let presentationIntegrity: FastRecordPresentationIntegrity
     let boundaryPair: ReconstructionBoundaryPair?
+    let retainedReviewBoundary: CaloricBoundaryReference?
 
     init(_ record: FastRecord) {
         id = record.id
@@ -20,6 +21,7 @@ struct HistoryFastSnapshot: Equatable {
         reviewState = record.reviewState
         presentationIntegrity = record.presentationIntegrity
         boundaryPair = record.boundaryPair
+        retainedReviewBoundary = record.retainedReviewBoundary
     }
 
     var recordedInterval: RecordedFastInterval {
@@ -50,6 +52,21 @@ struct HistoryMotionChunk: Equatable, Sendable {
     let presentation: HistoryMotionPresentation
 }
 
+private func historyFastContextWindow(
+    for window: DateInterval,
+    goal: FastingGoal?
+) -> DateInterval {
+    // A candidate can begin one maximum-duration before the visible window and
+    // can extend one maximum-duration beyond it. Keep those recorded fasts as
+    // projection context while the settled builder still filters by `window`.
+    guard let goal else { return window }
+    let candidateExtent = InferredFastProjector.maximumDuration(for: goal)
+    return DateInterval(
+        start: window.start.addingTimeInterval(-candidateExtent),
+        end: window.end.addingTimeInterval(candidateExtent)
+    )
+}
+
 @MainActor
 final class SwiftDataHistoryDataProvider {
     private let modelContext: ModelContext
@@ -59,10 +76,12 @@ final class SwiftDataHistoryDataProvider {
     }
 
     func fetch(window: DateInterval) throws -> HistoryDataSlice {
-        let completed = try completedFasts(intersecting: window).map(HistoryFastSnapshot.init)
         let active = try ActiveFastAuthority.fetch(in: modelContext).map(HistoryFastSnapshot.init)
         let settings = try SwiftDataSettingsStore(modelContext: modelContext)
             .authoritativeRecord().map(AppSettingsSnapshot.init)
+        let completed = try completedFasts(
+            intersecting: historyFastContextWindow(for: window, goal: settings?.fastingGoal)
+        ).map(HistoryFastSnapshot.init)
         let visibleFoods = try foods(in: window)
         let visibleDrinks = try drinks(in: window)
         let neighbours = try nearestCaloricNeighbours(outside: window)
@@ -96,10 +115,39 @@ final class SwiftDataHistoryDataProvider {
                 events.append(event)
             }
         }
+        let inferredContexts = chunks.compactMap(\.presentation.inferredContext)
+        let inferredContext = inferredContexts.first.map { first in
+            HistoryMotionInferredContext(
+                foodEvents: inferredContexts
+                    .flatMap(\.foodEvents)
+                    .reduce(into: [UUID: FoodBoundarySnapshot]()) { result, event in
+                        result[event.id] = event
+                    }
+                    .values
+                    .sorted { $0.occurredAt < $1.occurredAt },
+                hydrationEvents: inferredContexts
+                    .flatMap(\.hydrationEvents)
+                    .reduce(into: [UUID: HydrationBoundarySnapshot]()) { result, event in
+                        result[event.id] = event
+                    }
+                    .values
+                    .sorted { $0.occurredAt < $1.occurredAt },
+                recordedFasts: inferredContexts
+                    .flatMap(\.recordedFasts)
+                    .reduce(into: [UUID: RecordedFastInterval]()) { result, fast in
+                        result[fast.id] = fast
+                    }
+                    .values
+                    .sorted { $0.startDate < $1.startDate },
+                currentGoal: first.currentGoal,
+                enabled: first.enabled
+            )
+        }
         return HistoryMotionPresentation(
             window: window,
             intervals: intervals.sorted { $0.start < $1.start },
-            events: events.sorted { $0.occurredAt < $1.occurredAt }
+            events: events.sorted { $0.occurredAt < $1.occurredAt },
+            inferredContext: inferredContext
         )
     }
 
@@ -123,7 +171,7 @@ final class SwiftDataHistoryDataProvider {
         let upper = window.end
         return try modelContext.fetch(FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
     }
 
@@ -132,38 +180,36 @@ final class SwiftDataHistoryDataProvider {
         let upper = window.end
         return try modelContext.fetch(FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
     }
 
     private func nearestCaloricNeighbours(
         outside window: DateInterval
     ) throws -> (foods: [FoodEntryRecord], drinks: [HydrationEntryRecord]) {
-        let beforeFoods = try caloricFoods(before: window.start, order: .reverse)
+        let beforeFoods = try foodEvents(before: window.start, order: .reverse)
         let beforeDrinks = try caloricDrinks(before: window.start, order: .reverse)
-        let afterFoods = try caloricFoods(after: window.end, order: .forward)
+        let afterFoods = try foodEvents(after: window.end, order: .forward)
         let afterDrinks = try caloricDrinks(after: window.end, order: .forward)
-        let before = nearestFoodOrDrink(foods: beforeFoods, drinks: beforeDrinks, latest: true)
-        let after = nearestFoodOrDrink(foods: afterFoods, drinks: afterDrinks, latest: false)
         return (
-            [before.food, after.food].compactMap(\.self),
-            [before.drink, after.drink].compactMap(\.self)
+            [beforeFoods.first, afterFoods.first].compactMap(\.self),
+            [beforeDrinks.first, afterDrinks.first].compactMap(\.self)
         )
     }
 
-    private func caloricFoods(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
+    private func foodEvents(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            predicate: #Predicate { $0.occurredAt < date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
     }
 
-    private func caloricFoods(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
+    private func foodEvents(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            predicate: #Predicate { $0.occurredAt >= date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -172,7 +218,7 @@ final class SwiftDataHistoryDataProvider {
     private func caloricDrinks(before date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -181,32 +227,10 @@ final class SwiftDataHistoryDataProvider {
     private func caloricDrinks(after date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
-    }
-
-    private func nearestFoodOrDrink(
-        foods: [FoodEntryRecord],
-        drinks: [HydrationEntryRecord],
-        latest: Bool
-    ) -> (food: FoodEntryRecord?, drink: HydrationEntryRecord?) {
-        guard let food = foods.first else { return (nil, drinks.first) }
-        guard let drink = drinks.first else { return (food, nil) }
-        let foodBoundary = CaloricBoundary(
-            reference: .init(kind: .food, id: food.id),
-            occurredAt: food.occurredAt,
-            description: ""
-        )
-        let drinkBoundary = CaloricBoundary(
-            reference: .init(kind: .hydration, id: drink.id),
-            occurredAt: drink.occurredAt,
-            description: ""
-        )
-        let foodPrecedes = CaloricBoundaryOrdering.precedes(foodBoundary, drinkBoundary)
-        let foodWins = latest ? !foodPrecedes : foodPrecedes
-        return foodWins ? (food, nil) : (nil, drink)
     }
 
     private func appendUnique<Record: Identifiable>(
@@ -232,11 +256,18 @@ final class SwiftDataHistoryMotionDataProvider {
         let lower = window.start
         let upper = window.end
         let distantPast = Date.distantPast
+        let settingsRecords = try modelContext.fetch(FetchDescriptor<AppSettingsRecord>())
+        let settings = settingsRecords.count == 1
+            ? settingsRecords.first.map(AppSettingsSnapshot.init)
+            : nil
+        let fastContextWindow = historyFastContextWindow(for: window, goal: settings?.fastingGoal)
+        let fastContextLower = fastContextWindow.start
+        let fastContextUpper = fastContextWindow.end
         let completed = try modelContext.fetch(FetchDescriptor<FastRecord>(
             predicate: #Predicate {
                 $0.endDate != nil
-                    && $0.startDate < upper
-                    && ($0.endDate ?? distantPast) > lower
+                    && $0.startDate < fastContextUpper
+                    && ($0.endDate ?? distantPast) > fastContextLower
             },
             sortBy: [SortDescriptor(\.startDate)]
         )).map(HistoryFastSnapshot.init)
@@ -247,11 +278,11 @@ final class SwiftDataHistoryMotionDataProvider {
             .map(HistoryFastSnapshot.init)
         let foods = try modelContext.fetch(FetchDescriptor<FoodEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
         let drinks = try modelContext.fetch(FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.occurredAt >= lower && $0.occurredAt < upper },
-            sortBy: [SortDescriptor(\.occurredAt)]
+            sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
         let neighbours = try nearestCaloricNeighbours(outside: window)
         return HistoryDataSlice(
@@ -260,38 +291,36 @@ final class SwiftDataHistoryMotionDataProvider {
             activeFast: active,
             foods: appendUnique(foods, neighbours.foods).map(FoodEntrySnapshot.init),
             drinks: appendUnique(drinks, neighbours.drinks).map(HydrationEntrySnapshot.init),
-            settings: nil
+            settings: settings
         )
     }
 
     private func nearestCaloricNeighbours(
         outside window: DateInterval
     ) throws -> (foods: [FoodEntryRecord], drinks: [HydrationEntryRecord]) {
-        let beforeFoods = try caloricFoods(before: window.start, order: .reverse)
+        let beforeFoods = try foodEvents(before: window.start, order: .reverse)
         let beforeDrinks = try caloricDrinks(before: window.start, order: .reverse)
-        let afterFoods = try caloricFoods(after: window.end, order: .forward)
+        let afterFoods = try foodEvents(after: window.end, order: .forward)
         let afterDrinks = try caloricDrinks(after: window.end, order: .forward)
-        let before = nearestFoodOrDrink(foods: beforeFoods, drinks: beforeDrinks, latest: true)
-        let after = nearestFoodOrDrink(foods: afterFoods, drinks: afterDrinks, latest: false)
         return (
-            [before.food, after.food].compactMap(\.self),
-            [before.drink, after.drink].compactMap(\.self)
+            [beforeFoods.first, afterFoods.first].compactMap(\.self),
+            [beforeDrinks.first, afterDrinks.first].compactMap(\.self)
         )
     }
 
-    private func caloricFoods(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
+    private func foodEvents(before date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            predicate: #Predicate { $0.occurredAt < date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
     }
 
-    private func caloricFoods(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
+    private func foodEvents(after date: Date, order: SortOrder) throws -> [FoodEntryRecord] {
         var descriptor = FetchDescriptor<FoodEntryRecord>(
-            predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            predicate: #Predicate { $0.occurredAt >= date },
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -300,7 +329,7 @@ final class SwiftDataHistoryMotionDataProvider {
     private func caloricDrinks(before date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt < date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
@@ -309,32 +338,10 @@ final class SwiftDataHistoryMotionDataProvider {
     private func caloricDrinks(after date: Date, order: SortOrder) throws -> [HydrationEntryRecord] {
         var descriptor = FetchDescriptor<HydrationEntryRecord>(
             predicate: #Predicate { $0.isCaloric && $0.occurredAt >= date },
-            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id, order: order)]
+            sortBy: [SortDescriptor(\.occurredAt, order: order), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor)
-    }
-
-    private func nearestFoodOrDrink(
-        foods: [FoodEntryRecord],
-        drinks: [HydrationEntryRecord],
-        latest: Bool
-    ) -> (food: FoodEntryRecord?, drink: HydrationEntryRecord?) {
-        guard let food = foods.first else { return (nil, drinks.first) }
-        guard let drink = drinks.first else { return (food, nil) }
-        let foodBoundary = CaloricBoundary(
-            reference: .init(kind: .food, id: food.id),
-            occurredAt: food.occurredAt,
-            description: ""
-        )
-        let drinkBoundary = CaloricBoundary(
-            reference: .init(kind: .hydration, id: drink.id),
-            occurredAt: drink.occurredAt,
-            description: ""
-        )
-        let foodPrecedes = CaloricBoundaryOrdering.precedes(foodBoundary, drinkBoundary)
-        let foodWins = latest ? !foodPrecedes : foodPrecedes
-        return foodWins ? (food, nil) : (nil, drink)
     }
 
     private func appendUnique<Record: Identifiable>(
@@ -385,6 +392,12 @@ actor SwiftDataHistoryMotionRangeLoader {
             timeZone: calendar.timeZone,
             referenceNow: referenceNow
         )
-        return HistoryMotionChunk(coverage: coverage, presentation: HistoryMotionPresentation(exact))
+        return HistoryMotionChunk(
+            coverage: coverage,
+            presentation: HistoryMotionPresentation(
+                exact,
+                inferredContext: HistoryMotionInferredContext(data: data)
+            )
+        )
     }
 }

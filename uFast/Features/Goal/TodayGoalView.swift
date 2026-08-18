@@ -19,6 +19,9 @@ struct TodayGoalView: View {
     @State var foodEditor: FoodEditorPresentation?
     @State var isDrinkSheetPresented = false
     @State var caloricFavouritePending: HydrationFavourite?
+    @State var caloricFavouriteConfirmationContext = CaloricEventConfirmationContext(
+        fallbackKind: .active
+    )
     @State var isCaloricFavouriteConfirmationPresented = false
     @State var hydrationEditor: HydrationEditorPresentation?
     @State var drinkAnnouncement: String?
@@ -190,8 +193,8 @@ struct TodayGoalView: View {
                     foodEditor = nil
                 },
                 onDelete: presentation.record.map { record in
-                    {
-                        try deleteFood(record)
+                    { confirmingInferredImpact in
+                        try deleteFood(record, confirmingInferredImpact: confirmingInferredImpact)
                         foodEditor = nil
                     }
                 },
@@ -213,9 +216,10 @@ struct TodayGoalView: View {
                         + "\(favourite.volumeMillilitres) millilitres, added."
                     isDrinkSheetPresented = false
                 },
-                onConfirmationRequired: { favourite in
+                onConfirmationRequired: { favourite, context in
                     caloricFavouriteSaveError = nil
                     caloricFavouritePending = favourite
+                    caloricFavouriteConfirmationContext = context
                     isDrinkSheetPresented = false
                     isCaloricFavouriteConfirmationPresented = true
                 },
@@ -227,20 +231,17 @@ struct TodayGoalView: View {
             )
         }
         .alert(
-            "This entry is during your recorded fast.",
+            caloricFavouriteConfirmationTitle,
             isPresented: $isCaloricFavouriteConfirmationPresented
         ) {
             Button("Cancel", role: .cancel) {
                 caloricFavouritePending = nil
             }
-            Button("Save and end fast") {
+            Button(caloricFavouriteConfirmationActionTitle) {
                 savePendingCaloricFavourite(endingActiveFast: true)
             }
         } message: {
-            Text(
-                "Saving this caloric event records the drink and ends your fast at "
-                    + "\(clock.now.formatted(date: .omitted, time: .shortened))."
-            )
+            Text(caloricFavouriteConfirmationMessage)
         }
         .sheet(item: $hydrationEditor) { presentation in
             HydrationEntryEditor(
@@ -251,7 +252,10 @@ struct TodayGoalView: View {
                     try saveHydration(draft, record: presentation.record, endingActiveFast: endingActiveFast)
                     hydrationEditor = nil
                 },
-                onDelete: presentation.record.map { record in { try deleteHydration(record); hydrationEditor = nil } },
+                onDelete: presentation.record.map { record in { confirmingInferredImpact in
+                    try deleteHydration(record, confirmingInferredImpact: confirmingInferredImpact)
+                    hydrationEditor = nil
+                } },
                 onCancel: { hydrationEditor = nil }
             )
         }
@@ -437,8 +441,8 @@ extension TodayGoalView {
         )
     }
 
-    private func deleteFood(_ record: FoodEntrySnapshot) throws {
-        try controller.deleteFood(id: record.id)
+    private func deleteFood(_ record: FoodEntrySnapshot, confirmingInferredImpact: Bool = false) throws {
+        try controller.deleteFood(id: record.id, confirmingInferredImpact: confirmingInferredImpact)
     }
 
     private func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
@@ -454,8 +458,8 @@ extension TodayGoalView {
         )
     }
 
-    private func deleteHydration(_ record: HydrationEntrySnapshot) throws {
-        try controller.deleteHydration(id: record.id)
+    private func deleteHydration(_ record: HydrationEntrySnapshot, confirmingInferredImpact: Bool = false) throws {
+        try controller.deleteHydration(id: record.id, confirmingInferredImpact: confirmingInferredImpact)
     }
 
     func openTimelineEntry(_ entry: TodayTimelineEntry) {

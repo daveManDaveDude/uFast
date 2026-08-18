@@ -6,6 +6,61 @@ enum CaloricEventSaveDecision: Equatable {
     case invalidAtActiveFastStart
 }
 
+enum CaloricEventConfirmationKind: Equatable, Sendable {
+    case active
+    case completed
+    case inferred
+}
+
+struct CaloricEventConfirmationContext: Equatable, Sendable {
+    let kind: CaloricEventConfirmationKind
+    let affectedPersistedFastCount: Int
+    let includesReconstructedReview: Bool
+    let includesInferredInterval: Bool
+
+    init(
+        persistedImpact: CaloricEventImpact = .none,
+        fallbackKind: CaloricEventConfirmationKind = .inferred,
+        includesInferredInterval: Bool = false
+    ) {
+        kind = if persistedImpact.affectsActiveFast {
+            .active
+        } else if persistedImpact.requiresConfirmation {
+            .completed
+        } else {
+            fallbackKind
+        }
+        affectedPersistedFastCount = persistedImpact.affectedPersistedFastCount
+        includesReconstructedReview = !persistedImpact.reconstructedReviewIDs.isEmpty
+        self.includesInferredInterval = includesInferredInterval
+    }
+
+    var isCombined: Bool {
+        affectedPersistedFastCount > 0 && includesInferredInterval
+    }
+
+    func includingInferredInterval() -> Self {
+        Self(
+            kind: kind,
+            affectedPersistedFastCount: affectedPersistedFastCount,
+            includesReconstructedReview: includesReconstructedReview,
+            includesInferredInterval: true
+        )
+    }
+
+    private init(
+        kind: CaloricEventConfirmationKind,
+        affectedPersistedFastCount: Int,
+        includesReconstructedReview: Bool,
+        includesInferredInterval: Bool
+    ) {
+        self.kind = kind
+        self.affectedPersistedFastCount = affectedPersistedFastCount
+        self.includesReconstructedReview = includesReconstructedReview
+        self.includesInferredInterval = includesInferredInterval
+    }
+}
+
 enum CaloricEventSavePolicy {
     static func decision(
         isCaloric: Bool,
@@ -27,8 +82,37 @@ enum CaloricEventSavePolicy {
 
 enum FoodEntrySaveError: Error, Equatable {
     case confirmationRequired
+    case confirmationRequiredWithImpact(CaloricEventConfirmationContext)
+    case completedFastConfirmationRequired
+    case completedConfirmationWithImpact(CaloricEventConfirmationContext)
+    case inferredFastConfirmationRequired
+    case inferredConfirmationWithImpact(CaloricEventConfirmationContext)
     case eventAtActiveFastStart
     case fastConflict
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.confirmationRequired, .confirmationRequired),
+             (.confirmationRequiredWithImpact, .confirmationRequiredWithImpact),
+             (.confirmationRequired, .confirmationRequiredWithImpact),
+             (.confirmationRequiredWithImpact, .confirmationRequired):
+            true
+        case (.completedFastConfirmationRequired, .completedFastConfirmationRequired),
+             (.completedConfirmationWithImpact, .completedConfirmationWithImpact),
+             (.completedFastConfirmationRequired, .completedConfirmationWithImpact),
+             (.completedConfirmationWithImpact, .completedFastConfirmationRequired):
+            true
+        case (.inferredFastConfirmationRequired, .inferredFastConfirmationRequired),
+             (.inferredConfirmationWithImpact, .inferredConfirmationWithImpact),
+             (.inferredFastConfirmationRequired, .inferredConfirmationWithImpact),
+             (.inferredConfirmationWithImpact, .inferredFastConfirmationRequired):
+            true
+        case (.eventAtActiveFastStart, .eventAtActiveFastStart), (.fastConflict, .fastConflict):
+            true
+        default:
+            false
+        }
+    }
 }
 
 @MainActor
@@ -46,6 +130,76 @@ final class FoodEntryService {
         replacing record: FoodEntryRecord?,
         goal: FastingGoal,
         endingActiveFast: Bool = false
+    ) throws {
+        if let boundaryAwareRepository = repository as? any CaloricBoundaryAwareFoodEntryRepository {
+            try saveWithBoundaryAwareRepository(
+                boundaryAwareRepository,
+                draft,
+                replacing: record,
+                goal: goal,
+                endingActiveFast: endingActiveFast
+            )
+            return
+        }
+
+        try saveWithBasicRepository(
+            draft,
+            replacing: record,
+            goal: goal,
+            endingActiveFast: endingActiveFast
+        )
+    }
+
+    private func saveWithBoundaryAwareRepository(
+        _ repository: any CaloricBoundaryAwareFoodEntryRepository,
+        _ draft: FoodEntryDraft,
+        replacing record: FoodEntryRecord?,
+        goal: FastingGoal,
+        endingActiveFast: Bool
+    ) throws {
+        let impact = try repository.caloricEventImpact(for: draft, replacing: record)
+        let activeFastStart = try self.repository.activeFast()?.startDate
+        switch CaloricEventSavePolicy.decision(
+            isCaloric: draft.isCaloric,
+            occurredAt: draft.occurredAt,
+            activeFastStart: activeFastStart
+        ) {
+        case .invalidAtActiveFastStart:
+            throw FoodEntrySaveError.eventAtActiveFastStart
+        case .requiresEndingActiveFast where !endingActiveFast:
+            throw FoodEntrySaveError.confirmationRequiredWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: impact,
+                    fallbackKind: .active
+                )
+            )
+        case .saveWithoutEndingFast where impact.requiresConfirmation && !endingActiveFast:
+            throw FoodEntrySaveError.completedConfirmationWithImpact(
+                CaloricEventConfirmationContext(persistedImpact: impact)
+            )
+        default:
+            break
+        }
+        if impact.requiresConfirmation, !endingActiveFast {
+            throw impact.affectsActiveFast
+                ? FoodEntrySaveError.confirmationRequiredWithImpact(
+                    CaloricEventConfirmationContext(
+                        persistedImpact: impact,
+                        fallbackKind: .active
+                    )
+                )
+                : FoodEntrySaveError.completedConfirmationWithImpact(
+                    CaloricEventConfirmationContext(persistedImpact: impact)
+                )
+        }
+        try repository.saveCaloricEvent(draft, replacing: record, goal: goal)
+    }
+
+    private func saveWithBasicRepository(
+        _ draft: FoodEntryDraft,
+        replacing record: FoodEntryRecord?,
+        goal: FastingGoal,
+        endingActiveFast: Bool
     ) throws {
         let activeFast = try repository.activeFast()
         let decision = CaloricEventSavePolicy.decision(

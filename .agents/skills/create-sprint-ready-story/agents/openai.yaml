@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Sprint Story"
+  short_description: "Draft executable stories with Sol readiness gates"
+  default_prompt: "Use $create-sprint-ready-story to draft a bounded story with an execution profile, correction budget, and focused Sol readiness review."

@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+// swiftlint:disable file_length type_body_length
+
 struct ApplicationCommandConfiguration: Equatable {
     var simulateFastSaveFailure = false
     var simulateFastHistoryFailure = false
@@ -9,12 +11,53 @@ struct ApplicationCommandConfiguration: Equatable {
     var simulateFavouriteSaveFailure = false
     var simulateGoalSaveFailure = false
     var simulateLiveActivitySettingsSaveFailure = false
+    var simulateInferredFastDetectionSaveFailure = false
     var simulateDeleteAllFailure = false
+    var simulateBoundaryReconciliationFailure = false
 }
 
 struct ApplicationCommandOutcome: Equatable {
     let recordID: UUID?
     let projectionEnqueued: Bool
+}
+
+enum InferredFastConversionError: Error, Equatable {
+    case candidateUnavailable
+    case conflictingRecordedFast
+    case activeFastAlreadyExists
+}
+
+private struct InferredProjectionIdentity: Equatable {
+    let startDate: Date
+    let endDate: Date
+
+    init(_ interval: InferredFastInterval) {
+        startDate = interval.startDate
+        endDate = interval.endDate
+    }
+}
+
+private struct PresentedInferredImpact: Equatable {
+    let before: [InferredFastInterval]
+    let after: [InferredFastInterval]
+
+    static let none = Self(before: [], after: [])
+
+    var requiresConfirmation: Bool {
+        let beforeBySource = Dictionary(uniqueKeysWithValues: before.map {
+            ($0.sourceBoundaryReference, InferredProjectionIdentity($0))
+        })
+        let afterBySource = Dictionary(uniqueKeysWithValues: after.map {
+            ($0.sourceBoundaryReference, InferredProjectionIdentity($0))
+        })
+        return beforeBySource.contains { sourceReference, beforeIdentity in
+            guard let afterIdentity = afterBySource[sourceReference] else {
+                return true
+            }
+            return afterIdentity.startDate != beforeIdentity.startDate
+                || afterIdentity.endDate < beforeIdentity.endDate
+        }
+    }
 }
 
 @MainActor
@@ -23,6 +66,10 @@ final class ApplicationCommands {
     private let clock: any AppClock
     private let projectionCoordinator: PostCommitProjectionCoordinator
     private let configuration: ApplicationCommandConfiguration
+
+    var historyPresentationInvalidation: HistoryPresentationInvalidation {
+        projectionCoordinator.historyPresentationInvalidation
+    }
 
     init(
         modelContext: ModelContext,
@@ -93,6 +140,7 @@ final class ApplicationCommands {
             repository: completedFastRepository(),
             clock: clock
         ).update(id: id, startDate: startDate, endDate: endDate)
+        projectionCoordinator.publishHistoryInvalidation()
     }
 
     func completedFastValidationError(
@@ -108,6 +156,115 @@ final class ApplicationCommands {
 
     func deleteCompletedFast(id: UUID) throws {
         try CompletedFastService(repository: completedFastRepository(), clock: clock).delete(id: id)
+        projectionCoordinator.publishHistoryInvalidation()
+    }
+
+    func saveInferredFast(
+        sourceFoodID: UUID,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String? = nil,
+        expectedGoal: FastingGoal? = nil
+    ) throws -> ApplicationCommandOutcome {
+        let candidate = try revalidatedInferredCandidate(
+            sourceBoundaryReference: CaloricBoundaryReference(kind: .food, id: sourceFoodID),
+            expectedStartDate: expectedStartDate,
+            expectedEndDate: expectedEndDate,
+            expectedSourceDescription: expectedSourceDescription,
+            expectedGoal: expectedGoal,
+            expectedState: .historical
+        )
+        let fast = try CompletedFastCreationService(
+            repository: completedFastRepository(),
+            clock: clock
+        ).save(
+            startDate: candidate.startDate,
+            endDate: candidate.endDate,
+            goal: candidate.goal
+        )
+        projectionCoordinator.publishHistoryInvalidation()
+        return ApplicationCommandOutcome(recordID: fast.id, projectionEnqueued: false)
+    }
+
+    func saveInferredFast(
+        sourceBoundaryReference: CaloricBoundaryReference,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String? = nil,
+        expectedGoal: FastingGoal? = nil
+    ) throws -> ApplicationCommandOutcome {
+        let candidate = try revalidatedInferredCandidate(
+            sourceBoundaryReference: sourceBoundaryReference,
+            expectedStartDate: expectedStartDate,
+            expectedEndDate: expectedEndDate,
+            expectedSourceDescription: expectedSourceDescription,
+            expectedGoal: expectedGoal,
+            expectedState: .historical
+        )
+        let fast = try CompletedFastCreationService(
+            repository: completedFastRepository(),
+            clock: clock
+        ).save(startDate: candidate.startDate, endDate: candidate.endDate, goal: candidate.goal)
+        projectionCoordinator.publishHistoryInvalidation()
+        return ApplicationCommandOutcome(recordID: fast.id, projectionEnqueued: false)
+    }
+
+    func startInferredFast(
+        sourceFoodID: UUID,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String? = nil,
+        expectedGoal: FastingGoal? = nil
+    ) throws -> ApplicationCommandOutcome {
+        let candidate = try revalidatedInferredCandidate(
+            sourceBoundaryReference: CaloricBoundaryReference(kind: .food, id: sourceFoodID),
+            expectedStartDate: expectedStartDate,
+            expectedEndDate: expectedEndDate,
+            expectedSourceDescription: expectedSourceDescription,
+            expectedGoal: expectedGoal,
+            expectedState: .inProgress
+        )
+        let repository = activeFastRepository()
+        guard try repository.activeFast() == nil else {
+            throw InferredFastConversionError.activeFastAlreadyExists
+        }
+        let fast = try FastStartService(repository: repository, clock: clock).startFast(
+            at: candidate.startDate,
+            goal: candidate.goal
+        )
+        projectionCoordinator.enqueue(
+            .activeFastStarted(fast: fast, goal: candidate.goal, now: clock.now)
+        )
+        return ApplicationCommandOutcome(recordID: fast.id, projectionEnqueued: true)
+    }
+
+    func startInferredFast(
+        sourceBoundaryReference: CaloricBoundaryReference,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String? = nil,
+        expectedGoal: FastingGoal? = nil
+    ) throws -> ApplicationCommandOutcome {
+        let candidate = try revalidatedInferredCandidate(
+            sourceBoundaryReference: sourceBoundaryReference,
+            expectedStartDate: expectedStartDate,
+            expectedEndDate: expectedEndDate,
+            expectedSourceDescription: expectedSourceDescription,
+            expectedGoal: expectedGoal,
+            expectedState: .inProgress
+        )
+        let repository = activeFastRepository()
+        guard try repository.activeFast() == nil else {
+            throw InferredFastConversionError.activeFastAlreadyExists
+        }
+        let fast = try FastStartService(repository: repository, clock: clock).startFast(
+            at: candidate.startDate,
+            goal: candidate.goal
+        )
+        projectionCoordinator.enqueue(
+            .activeFastStarted(fast: fast, goal: candidate.goal, now: clock.now)
+        )
+        return ApplicationCommandOutcome(recordID: fast.id, projectionEnqueued: true)
     }
 
     func saveFood(
@@ -117,19 +274,73 @@ final class ApplicationCommands {
         endingActiveFast: Bool
     ) throws {
         let record = try recordID.flatMap { try foodRecord(id: $0) }
-        try FoodEntryService(repository: foodRepository(), clock: clock).save(
-            draft,
-            replacing: record,
-            goal: goal,
-            endingActiveFast: endingActiveFast
+        let eventReference = record.map {
+            CaloricBoundaryReference(kind: .food, id: $0.id)
+        } ?? CaloricBoundaryReference(kind: .food, id: UUID())
+        let inferredImpact = try presentedInferredImpact(
+            resultingEventReference: eventReference,
+            resultingEventDate: draft.occurredAt,
+            resultingEventIsCaloric: draft.isCaloric,
+            replacing: record.map { CaloricBoundaryReference(kind: .food, id: $0.id) }
         )
-        if endingActiveFast {
+        let persistedImpact = try foodRepository().caloricEventImpact(for: draft, replacing: record)
+        if inferredImpact.requiresConfirmation, !persistedImpact.requiresConfirmation, !endingActiveFast {
+            throw FoodEntrySaveError.inferredConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: .none,
+                    includesInferredInterval: true
+                )
+            )
+        }
+        let activeBefore = try ActiveFastAuthority.fetch(in: modelContext)
+        do {
+            try FoodEntryService(repository: foodRepository(), clock: clock).save(
+                draft,
+                replacing: record,
+                goal: goal,
+                endingActiveFast: endingActiveFast
+            )
+        } catch let error as FoodEntrySaveError where inferredImpact.requiresConfirmation {
+            throw error.includingInferredImpact(persistedImpact: persistedImpact)
+        }
+        let activeAfter = try ActiveFastAuthority.fetch(in: modelContext)
+        if activeBefore != nil, activeAfter == nil {
             projectionCoordinator.enqueue(.fastEndedOrDeleted)
+        } else {
+            projectionCoordinator.publishHistoryInvalidation()
         }
     }
 
-    func deleteFood(id: UUID) throws {
-        try foodRepository().delete(requiredFoodRecord(id: id))
+    func deleteFood(id: UUID, confirmingInferredImpact: Bool = false) throws {
+        let record = try requiredFoodRecord(id: id)
+        let reference = CaloricBoundaryReference(kind: .food, id: id)
+        let inferredImpact = try presentedInferredImpact(
+            resultingEventReference: reference,
+            resultingEventDate: record.occurredAt,
+            resultingEventIsCaloric: false,
+            replacing: reference
+        )
+        let persistedImpact = try foodRepository().caloricEventImpact(forDeletion: record)
+        if persistedImpact.requiresConfirmation, !confirmingInferredImpact {
+            let context = CaloricEventConfirmationContext(
+                persistedImpact: persistedImpact,
+                includesInferredInterval: inferredImpact.requiresConfirmation
+            )
+            if persistedImpact.affectsActiveFast {
+                throw FoodEntrySaveError.confirmationRequiredWithImpact(context)
+            }
+            throw FoodEntrySaveError.completedConfirmationWithImpact(context)
+        }
+        if inferredImpact.requiresConfirmation, !confirmingInferredImpact {
+            throw FoodEntrySaveError.inferredConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: .none,
+                    includesInferredInterval: true
+                )
+            )
+        }
+        try foodRepository().delete(record)
+        projectionCoordinator.publishHistoryInvalidation()
     }
 
     func saveHydration(
@@ -139,14 +350,40 @@ final class ApplicationCommands {
         endingActiveFast: Bool
     ) throws {
         let record = try recordID.flatMap { try hydrationRecord(id: $0) }
-        try HydrationEntryService(repository: hydrationRepository(), clock: clock).save(
-            draft,
-            replacing: record,
-            goal: goal,
-            endingActiveFast: endingActiveFast
+        let eventReference = record.map {
+            CaloricBoundaryReference(kind: .hydration, id: $0.id)
+        } ?? CaloricBoundaryReference(kind: .hydration, id: UUID())
+        let inferredImpact = try presentedInferredImpact(
+            resultingEventReference: eventReference,
+            resultingEventDate: draft.occurredAt,
+            resultingEventIsCaloric: draft.isCaloric,
+            replacing: record.map { CaloricBoundaryReference(kind: .hydration, id: $0.id) }
         )
-        if endingActiveFast {
+        let persistedImpact = try hydrationRepository().caloricEventImpact(for: draft, replacing: record)
+        if inferredImpact.requiresConfirmation, !persistedImpact.requiresConfirmation, !endingActiveFast {
+            throw HydrationEntrySaveError.inferredConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: .none,
+                    includesInferredInterval: true
+                )
+            )
+        }
+        let activeBefore = try ActiveFastAuthority.fetch(in: modelContext)
+        do {
+            try HydrationEntryService(repository: hydrationRepository(), clock: clock).save(
+                draft,
+                replacing: record,
+                goal: goal,
+                endingActiveFast: endingActiveFast
+            )
+        } catch let error as HydrationEntrySaveError where inferredImpact.requiresConfirmation {
+            throw error.includingInferredImpact(persistedImpact: persistedImpact)
+        }
+        let activeAfter = try ActiveFastAuthority.fetch(in: modelContext)
+        if activeBefore != nil, activeAfter == nil {
             projectionCoordinator.enqueue(.fastEndedOrDeleted)
+        } else {
+            projectionCoordinator.publishHistoryInvalidation()
         }
     }
 
@@ -156,15 +393,12 @@ final class ApplicationCommands {
     ) throws {
         let draft = try hydrationDraft(for: favourite, occurredAt: clock.now)
         let goal = try authoritativeSettingsRecord()?.fastingGoal ?? .default
-        try HydrationEntryService(repository: hydrationRepository(), clock: clock).save(
+        try saveHydration(
             draft,
             replacing: nil,
             goal: goal,
             endingActiveFast: endingActiveFast
         )
-        if endingActiveFast {
-            projectionCoordinator.enqueue(.fastEndedOrDeleted)
-        }
     }
 
     func hydrationDraft(
@@ -225,8 +459,36 @@ final class ApplicationCommands {
         try favouriteStore().delete(id: id)
     }
 
-    func deleteHydration(id: UUID) throws {
-        try hydrationRepository().delete(requiredHydrationRecord(id: id))
+    func deleteHydration(id: UUID, confirmingInferredImpact: Bool = false) throws {
+        let record = try requiredHydrationRecord(id: id)
+        let reference = CaloricBoundaryReference(kind: .hydration, id: id)
+        let inferredImpact = try presentedInferredImpact(
+            resultingEventReference: reference,
+            resultingEventDate: record.occurredAt,
+            resultingEventIsCaloric: false,
+            replacing: reference
+        )
+        let persistedImpact = try hydrationRepository().caloricEventImpact(forDeletion: record)
+        if persistedImpact.requiresConfirmation, !confirmingInferredImpact {
+            let context = CaloricEventConfirmationContext(
+                persistedImpact: persistedImpact,
+                includesInferredInterval: inferredImpact.requiresConfirmation
+            )
+            if persistedImpact.affectsActiveFast {
+                throw HydrationEntrySaveError.confirmationRequiredWithImpact(context)
+            }
+            throw HydrationEntrySaveError.completedConfirmationWithImpact(context)
+        }
+        if inferredImpact.requiresConfirmation, !confirmingInferredImpact {
+            throw HydrationEntrySaveError.inferredConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: .none,
+                    includesInferredInterval: true
+                )
+            )
+        }
+        try hydrationRepository().delete(record)
+        projectionCoordinator.publishHistoryInvalidation()
     }
 
     func updateGoal(_ goal: FastingGoal) throws {
@@ -235,7 +497,16 @@ final class ApplicationCommands {
             projectionCoordinator.enqueue(
                 .activeFastChanged(fast: activeFast, goal: goal, now: clock.now)
             )
+        } else {
+            projectionCoordinator.publishHistoryInvalidation()
         }
+    }
+
+    func updateInferredFastDetectionEnabled(_ enabled: Bool) throws {
+        try settingsStore(
+            simulateFailure: configuration.simulateInferredFastDetectionSaveFailure
+        ).updateInferredFastDetectionEnabled(enabled)
+        projectionCoordinator.enqueue(.inferredFastDetectionChanged(enabled))
     }
 
     func updateHydrationFavourites(water: Int, tea: Int, coffee: Int) throws {
@@ -288,14 +559,16 @@ final class ApplicationCommands {
     private func foodRepository() -> SwiftDataFoodEntryRepository {
         SwiftDataFoodEntryRepository(
             modelContext: modelContext,
-            simulateSaveFailure: configuration.simulateFoodSaveFailure
+            simulateSaveFailure: configuration.simulateFoodSaveFailure,
+            clock: clock
         )
     }
 
     private func hydrationRepository() -> SwiftDataHydrationEntryRepository {
         SwiftDataHydrationEntryRepository(
             modelContext: modelContext,
-            simulateSaveFailure: configuration.simulateDrinkSaveFailure
+            simulateSaveFailure: configuration.simulateDrinkSaveFailure,
+            clock: clock
         )
     }
 
@@ -326,6 +599,138 @@ final class ApplicationCommands {
             throw ApplicationCommandError.recordNotFound
         }
         return record
+    }
+
+    private func presentedInferredImpact(
+        resultingEventReference: CaloricBoundaryReference,
+        resultingEventDate: Date,
+        resultingEventIsCaloric: Bool,
+        replacing reference: CaloricBoundaryReference?
+    ) throws -> PresentedInferredImpact {
+        guard let settings = try authoritativeSettingsRecord(),
+              settings.inferredFastDetectionEnabled
+        else { return .none }
+        let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
+        let fasts = try planner.fasts().map(\.recordedInterval)
+        let before = try InferredFastProjector.project(
+            boundaries: planner.allBoundaries(),
+            recordedFasts: fasts,
+            currentGoal: settings.fastingGoal,
+            enabled: true,
+            now: clock.now,
+            visibleInterval: Date.distantPast ..< Date.distantFuture
+        )
+        let afterBoundaries = try planner.allBoundaries(excluding: reference).adding(
+            resultingEventIsCaloric
+                ? CaloricBoundary(
+                    reference: resultingEventReference,
+                    occurredAt: resultingEventDate,
+                    description: ""
+                )
+                : nil
+        )
+        let after = InferredFastProjector.project(
+            boundaries: afterBoundaries,
+            recordedFasts: fasts,
+            currentGoal: settings.fastingGoal,
+            enabled: true,
+            now: clock.now,
+            visibleInterval: Date.distantPast ..< Date.distantFuture
+        )
+        return PresentedInferredImpact(before: before, after: after)
+    }
+
+    // The expectation captures the presentation identity used to detect a
+    // changed source while intentionally allowing an in-progress end to advance.
+    // swiftlint:disable:next function_body_length function_parameter_count
+    private func revalidatedInferredCandidate(
+        sourceBoundaryReference: CaloricBoundaryReference,
+        expectedStartDate: Date,
+        expectedEndDate: Date,
+        expectedSourceDescription: String?,
+        expectedGoal: FastingGoal?,
+        expectedState: InferredFastState
+    ) throws -> InferredFastInterval {
+        // Resolve the active authority before validating or converting either
+        // inferred state.  A historical save must not bypass the same
+        // zero/one/many integrity rule used by current-start conversion.
+        _ = try ActiveFastAuthority.fetch(in: modelContext)
+        guard let settings = try authoritativeSettingsRecord(),
+              settings.inferredFastDetectionEnabled,
+              expectedGoal == nil || expectedGoal == settings.fastingGoal
+        else { throw InferredFastConversionError.candidateUnavailable }
+
+        let foods = try modelContext.fetch(FetchDescriptor<FoodEntryRecord>())
+        let drinks = try modelContext.fetch(FetchDescriptor<HydrationEntryRecord>())
+        let sourceDescription: String? = switch sourceBoundaryReference.kind {
+        case .food:
+            foods.first(where: { $0.id == sourceBoundaryReference.id })?.foodDescription
+        case .hydration:
+            drinks.first(where: { $0.id == sourceBoundaryReference.id })?.displayName
+        }
+        guard let sourceDescription,
+              expectedSourceDescription == nil || sourceDescription == expectedSourceDescription
+        else { throw InferredFastConversionError.candidateUnavailable }
+        let foodSnapshots = foods.map {
+            FoodBoundarySnapshot(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                description: $0.foodDescription,
+                isCaloric: true
+            )
+        }
+        let hydrationSnapshots = drinks.map {
+            HydrationBoundarySnapshot(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                description: $0.displayName,
+                isCaloric: $0.isCaloric
+            )
+        }
+        guard let sourceBoundary = CaloricBoundaryExtractor.boundaries(
+            food: foodSnapshots,
+            hydration: hydrationSnapshots
+        ).first(where: { $0.reference == sourceBoundaryReference }),
+            sourceBoundary.occurredAt == expectedStartDate
+        else { throw InferredFastConversionError.candidateUnavailable }
+        let recorded = try modelContext.fetch(FetchDescriptor<FastRecord>())
+            .map(\.recordedInterval)
+        let withoutRecordedConflicts = InferredFastProjector.project(
+            boundaries: CaloricBoundaryExtractor.boundaries(
+                food: foodSnapshots,
+                hydration: hydrationSnapshots
+            ),
+            currentGoal: settings.fastingGoal,
+            enabled: true,
+            now: clock.now,
+            visibleInterval: Date.distantPast ..< Date.distantFuture
+        )
+        guard let candidate = withoutRecordedConflicts.first(where: { interval in
+            interval.sourceBoundaryReference == sourceBoundaryReference
+                && interval.startDate == expectedStartDate
+                && (expectedState == .inProgress || interval.endDate == expectedEndDate)
+                && interval.state == expectedState
+        }) else {
+            let hasUnconflictedShape = withoutRecordedConflicts.contains {
+                $0.sourceBoundaryReference == sourceBoundaryReference
+                    && $0.startDate == expectedStartDate
+                    && (expectedState == .inProgress || $0.endDate == expectedEndDate)
+                    && $0.state == expectedState
+            }
+            if hasUnconflictedShape {
+                throw InferredFastConversionError.conflictingRecordedFast
+            }
+            throw InferredFastConversionError.candidateUnavailable
+        }
+
+        guard !FastConflictChecker.hasConflict(
+            proposedStart: candidate.startDate,
+            proposedEnd: candidate.endDate,
+            among: recorded
+        ) else {
+            throw InferredFastConversionError.conflictingRecordedFast
+        }
+        return candidate
     }
 }
 
@@ -369,4 +774,78 @@ private extension ApplicationCommands {
 
 enum ApplicationCommandError: Error {
     case recordNotFound
+}
+
+private extension FoodEntrySaveError {
+    func includingInferredImpact(persistedImpact: CaloricEventImpact) -> Self {
+        switch self {
+        case .confirmationRequired:
+            .confirmationRequiredWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: persistedImpact,
+                    fallbackKind: .active,
+                    includesInferredInterval: true
+                )
+            )
+        case let .confirmationRequiredWithImpact(context):
+            .confirmationRequiredWithImpact(context.includingInferredInterval())
+        case .completedFastConfirmationRequired:
+            .completedConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: persistedImpact,
+                    includesInferredInterval: true
+                )
+            )
+        case let .completedConfirmationWithImpact(context):
+            .completedConfirmationWithImpact(context.includingInferredInterval())
+        case .inferredFastConfirmationRequired:
+            .inferredConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: persistedImpact,
+                    includesInferredInterval: true
+                )
+            )
+        case let .inferredConfirmationWithImpact(context):
+            .inferredConfirmationWithImpact(context.includingInferredInterval())
+        default:
+            self
+        }
+    }
+}
+
+private extension HydrationEntrySaveError {
+    func includingInferredImpact(persistedImpact: CaloricEventImpact) -> Self {
+        switch self {
+        case .confirmationRequired:
+            .confirmationRequiredWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: persistedImpact,
+                    fallbackKind: .active,
+                    includesInferredInterval: true
+                )
+            )
+        case let .confirmationRequiredWithImpact(context):
+            .confirmationRequiredWithImpact(context.includingInferredInterval())
+        case .completedFastConfirmationRequired:
+            .completedConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: persistedImpact,
+                    includesInferredInterval: true
+                )
+            )
+        case let .completedConfirmationWithImpact(context):
+            .completedConfirmationWithImpact(context.includingInferredInterval())
+        case .inferredFastConfirmationRequired:
+            .inferredConfirmationWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: persistedImpact,
+                    includesInferredInterval: true
+                )
+            )
+        case let .inferredConfirmationWithImpact(context):
+            .inferredConfirmationWithImpact(context.includingInferredInterval())
+        default:
+            self
+        }
+    }
 }

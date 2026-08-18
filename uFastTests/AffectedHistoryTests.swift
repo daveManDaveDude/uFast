@@ -108,7 +108,11 @@ final class AffectedHistoryTests: XCTestCase {
         let hydrationFixture = try fixture()
         try SwiftDataHydrationEntryRepository(modelContext: hydrationFixture.context)
             .delete(hydrationFixture.shared)
-        XCTAssertEqual(hydrationFixture.first.reviewState, .confirmed)
+        XCTAssertEqual(hydrationFixture.first.reviewState, .needsReview)
+        XCTAssertEqual(
+            hydrationFixture.first.retainedReviewBoundary,
+            .init(kind: .hydration, id: hydrationFixture.shared.id)
+        )
         XCTAssertEqual(hydrationFixture.second.reviewState, .confirmed)
         XCTAssertTrue(try hydrationFixture.context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
     }
@@ -220,7 +224,11 @@ final class AffectedHistoryTests: XCTestCase {
         )
         XCTAssertEqual(fixture.shared.draft, moved)
         XCTAssertEqual(active.endDate, moved.occurredAt)
-        XCTAssertEqual(fixture.first.reviewState, .confirmed)
+        XCTAssertEqual(fixture.first.reviewState, .needsReview)
+        XCTAssertEqual(
+            fixture.first.retainedReviewBoundary,
+            .init(kind: .hydration, id: fixture.shared.id)
+        )
         XCTAssertEqual(fixture.second.reviewState, .confirmed)
     }
 

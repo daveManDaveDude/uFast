@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 // SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
-// swiftlint:disable trailing_comma
+// swiftlint:disable trailing_comma function_body_length
 enum UITestSeedFixtures {
     static func seedFavouritePopulated(in context: ModelContext, clock: any AppClock) {
         let createdAt = clock.now.addingTimeInterval(-120)
@@ -47,6 +47,26 @@ enum UITestSeedFixtures {
         context.insert(FastRecord(
             startDate: clock.now.addingTimeInterval(-3600),
             goalAtStart: .default
+        ))
+    }
+
+    static func seedInferredFast(in context: ModelContext, clock: any AppClock) {
+        guard let settings = try? context.fetch(FetchDescriptor<AppSettingsRecord>()).first,
+              let firstID = UUID(uuidString: "10200000-0000-0000-0000-000000000001"),
+              let secondID = UUID(uuidString: "10200000-0000-0000-0000-000000000002")
+        else { return }
+        settings.setInferredFastDetectionEnabled(true)
+        let historicalDate = clock.now.addingTimeInterval(-20 * 60 * 60)
+        let currentDate = clock.now.addingTimeInterval(-8 * 60 * 60)
+        context.insert(FoodEntryRecord(
+            id: firstID,
+            draft: .init(description: "Inferred supper", occurredAt: historicalDate),
+            createdAt: historicalDate
+        ))
+        context.insert(FoodEntryRecord(
+            id: secondID,
+            draft: .init(description: "Inferred breakfast", occurredAt: currentDate),
+            createdAt: currentDate
         ))
     }
 
@@ -115,10 +135,96 @@ enum UITestSeedFixtures {
         seedGroupingMixedHydration(in: context, day: day, calendar: calendar)
     }
 
+    static func seedHistoryMidnightSeam(
+        in context: ModelContext,
+        clock: any AppClock,
+        extendsActiveFast: Bool = false
+    ) throws {
+        if try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty {
+            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_GB")
+        guard let london = TimeZone(identifier: "Europe/London") else { return }
+        calendar.timeZone = london
+        let currentDay = calendar.startOfDay(for: clock.now)
+        guard let previousDay = calendar.date(byAdding: .day, value: -1, to: currentDay)
+        else { return }
+        let activeStartDay: Date
+        if extendsActiveFast {
+            guard let extendedStartDay = calendar.date(
+                byAdding: .day,
+                value: -1,
+                to: previousDay
+            ) else { return }
+            activeStartDay = extendedStartDay
+        } else {
+            activeStartDay = previousDay
+        }
+        let completedDay = extendsActiveFast ? activeStartDay : previousDay
+        guard let completedStart = calendar.date(
+            bySettingHour: 10,
+            minute: 6,
+            second: 0,
+            of: completedDay
+        ),
+            let completedEnd = calendar.date(
+                bySettingHour: 18,
+                minute: 0,
+                second: 0,
+                of: completedDay
+            ),
+            let activeStart = calendar.date(
+                bySettingHour: 19,
+                minute: 6,
+                second: 0,
+                of: activeStartDay
+            ),
+            let completedID = UUID(uuidString: "10200000-0000-0000-0000-000000000001"),
+            let activeID = UUID(uuidString: "10200000-0000-0000-0000-000000000002")
+        else { return }
+
+        context.insert(FastRecord(
+            id: completedID,
+            startDate: completedStart,
+            endDate: completedEnd,
+            goalAtStart: .default
+        ))
+        context.insert(FastRecord(
+            id: activeID,
+            startDate: activeStart,
+            goalAtStart: .default
+        ))
+
+        let markers = [
+            (previousDay, 18, 42, "10200000-0000-0000-0000-000000000010"),
+            (previousDay, 23, 48, "10200000-0000-0000-0000-000000000011"),
+            (currentDay, 0, 12, "10200000-0000-0000-0000-000000000012"),
+            (currentDay, 12, 0, "10200000-0000-0000-0000-000000000013"),
+        ]
+        for (day, hour, minute, rawID) in markers {
+            guard let occurredAt = calendar.date(
+                bySettingHour: hour,
+                minute: minute,
+                second: 0,
+                of: day
+            ), let id = UUID(uuidString: rawID)
+            else { continue }
+            context.insert(HydrationEntryRecord(
+                id: id,
+                type: .tea,
+                volumeMillilitres: 300,
+                occurredAt: occurredAt,
+                isCaloric: false,
+                createdAt: occurredAt
+            ))
+        }
+    }
+
     private static func seedGroupingFast(in context: ModelContext, day: Date, calendar: Calendar) {
         guard let fastStart = calendar.date(byAdding: .day, value: -1, to: day),
               let start = calendar.date(bySettingHour: 21, minute: 30, second: 0, of: fastStart),
-              let end = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: day),
+              let end = calendar.date(bySettingHour: 10, minute: 8, second: 0, of: day),
               let id = UUID(uuidString: "39700000-0000-0000-0000-000000000001")
         else { return }
         context.insert(FastRecord(id: id, startDate: start, endDate: end, goalAtStart: .default))

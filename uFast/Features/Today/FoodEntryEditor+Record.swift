@@ -8,7 +8,7 @@ extension FoodEntryEditor {
         initialOccurredAt: Date? = nil,
         allowedRange: Range<Date>? = nil,
         onSave: @escaping (FoodEntryDraft, Bool) throws -> Void,
-        onDelete: (() throws -> Void)?,
+        onDelete: ((Bool) throws -> Void)?,
         onCancel: @escaping () -> Void
     ) {
         self.init(

@@ -40,6 +40,12 @@ struct SettingsView: View {
                             status: controller.liveActivityStatus,
                             availability: liveActivityAvailability
                         )
+                        SettingsInferredFastSection(
+                            isOn: Binding(
+                                get: { controller.inferredFastDetectionEnabled },
+                                set: { controller.setInferredFastDetection(enabled: $0) }
+                            )
+                        )
                         SettingsFavouritesSection(
                             water: $controller.waterAmount,
                             tea: $controller.teaAmount,

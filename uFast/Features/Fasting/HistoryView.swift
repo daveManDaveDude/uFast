@@ -12,6 +12,7 @@ struct HistoryView: View {
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.locale) var locale
     @Environment(\.applicationCommands) var applicationCommands
+    @Environment(\.historyPresentationInvalidation) var historyPresentationInvalidation
     @Environment(\.modelContext) var modelContext
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.timeZone) var timeZone
@@ -40,6 +41,7 @@ struct HistoryView: View {
     @State var motionLoadingEdges: Set<HistoryMotionEdge> = []
     @State var motionFailedEdges: Set<HistoryMotionEdge> = []
     @State var editor: CompletedFastEditorPresentation?
+    @State var inferredConversion: InferredFastConversionPresentation?
     @State var foodEditor: HistoryFoodEditorPresentation?
     @State var hydrationEditor: HistoryHydrationEditorPresentation?
     @State var directHistoricalEntry: DirectHistoricalEntryPresentation?
@@ -80,6 +82,22 @@ struct HistoryView: View {
         historyData?.activeFast
     }
 
+    /// TimelineView re-evaluates this value while History is foregrounded.
+    /// Rebuilding the disposable inferred projection here lets it cross the
+    /// eight-hour threshold and goal cap without a background timer or store
+    /// write. The settled/motion caches remain authoritative for their own
+    /// lifecycle boundaries.
+    var liveHistoryPresentation: HistoryPresentationSnapshot? {
+        guard let historyData else { return historyPresentation }
+        return HistoryPresentationBuilder.build(
+            data: historyData,
+            locale: locale,
+            calendar: calendar,
+            timeZone: timeZone,
+            referenceNow: clock.now
+        )
+    }
+
     init(
         clock: any AppClock = SystemAppClock(),
         isTabSelected: Bool = true,
@@ -94,9 +112,23 @@ struct HistoryView: View {
     func visibleFastItems(at now: Date) -> [HistoryVisibleFastItem] {
         guard let visible = settledVisibleWindow?.interval else { return [] }
         let window = visible.start ..< visible.end
-        return (historyPresentation?.visibleFastItems(activeEndingAt: now) ?? [])
+        return (liveHistoryPresentation?.visibleFastItems(activeEndingAt: now) ?? [])
             .filter { $0.intersects(window) }
             .sorted { $0.startDate < $1.startDate }
+    }
+
+    var motionIntervalsAtCurrentTime: [TemporalRibbonIntervalItem] {
+        let now = clock.now
+        let motion = motionSnapshot?.presentation.ribbonIntervals(activeEndingAt: now)
+            ?? historyPresentation?.intervals(activeEndingAt: now)
+            ?? []
+        guard let live = liveHistoryPresentation else { return motion }
+        let inferred = live.visibleFastItems(activeEndingAt: now)
+            .filter { $0.kind == .inferred }
+        guard !inferred.isEmpty else { return motion }
+        let inferredIDs = Set(inferred.map(\.id))
+        return (motion.filter { !inferredIDs.contains($0.id) } + inferred.map(\.ribbonItem))
+            .sorted { $0.start < $1.start }
     }
 }
 
@@ -106,66 +138,8 @@ extension HistoryView {
             ScrollView {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
                     periodHeader
-                    TemporalDateNavigator(
-                        dates: dateNavigatorDates,
-                        selection: selectedDateBinding(source: .dateChip),
-                        maximumDate: historyDisplayMaximumDay,
-                        readOnlyAfterDate: clock.now,
-                        automaticScrollEnabled: !temporalMovementPhase
-                            .suppressesAutomaticAlignment && !isDateRailMoving,
-                        // Keep the date rail on the settled presentation while
-                        // the lower timeline is moving. The rail still follows
-                        // the selected day after native scrolling settles.
-                        coupledPresentation: nil,
-                        presentationDay: selectedDate,
-                        onDirectScrollPhaseChange: updateDateRailMovement,
-                        onRailSettled: { day in
-                            selectDay(day, source: .dateRailSettlement)
-                        }
-                    )
-                    .padding(.horizontal, UFastTheme.Spacing.standard)
-                    .allowsHitTesting(
-                        !temporalMovementPhase.suppressesAutomaticAlignment && !motionInitialLoading
-                    )
-                    .id(historyInteractionRevision)
-
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        TemporalHistoryCarousel(
-                            dates: historyDates,
-                            selection: selectedDateBinding(source: .carousel),
-                            intervals: historyPresentation?.intervals(activeEndingAt: clock.now) ?? [],
-                            events: historyPresentation?.events ?? [],
-                            motionIntervals: motionSnapshot?.presentation.ribbonIntervals(
-                                activeEndingAt: clock.now
-                            ) ?? historyPresentation?.intervals(activeEndingAt: clock.now) ?? [],
-                            motionEvents: motionSnapshot?.presentation.ribbonEvents
-                                ?? historyPresentation?.events ?? [],
-                            onSelectInterval: openInterval,
-                            onSelectEvent: openEvent,
-                            onSelectEventGroup: { group in
-                                eventGroupDisclosure = group
-                            },
-                            onSelectEmpty: { instant in
-                                beginHistoricalEntry(at: instant)
-                            },
-                            onNavigateDay: navigateDay,
-                            canNavigateForward: canNavigateForward,
-                            allowsRecordActivation: !isFutureSelection,
-                            allowsEmptySelection: !isFutureSelection,
-                            showsTimelineDetails: showsSettledHistoryDetails,
-                            presentationDay: selectedDate,
-                            readOnlyFromDate: clock.now,
-                            onMovementPhaseChange: updateTemporalMovementPhase,
-                            onCoupledPresentationChange: coupledScrollPresentation.handle,
-                            onSettledVisibleWindow: { window in
-                                settledVisibleWindow = window
-                                reloadHistory(in: window.interval)
-                            },
-                            onPrefetchIntentAt: requestMotionExtension
-                        )
-                        .padding(.horizontal, UFastTheme.Spacing.standard)
-                        .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
-                    }
+                    historyDateNavigator
+                    historyTimeline
 
                     motionUnavailableNotice
 
@@ -199,6 +173,10 @@ extension HistoryView {
         .onChange(of: isTabSelected) { _, isSelected in
             guard isSelected else { return }
             resetToCurrentDayIfSelected()
+            refreshHistoryAfterCommittedMutation()
+        }
+        .onChange(of: historyInvalidationRevision) { _, _ in
+            refreshHistoryAfterCommittedMutation()
         }
         .onDisappear {
             interruptTemporalMotion()
@@ -275,6 +253,38 @@ extension HistoryView {
                 onCancel: { editor = nil }
             )
         }
+        .sheet(item: $inferredConversion) { presentation in
+            InferredFastConversionView(
+                presentation: presentation,
+                clock: clock,
+                onConfirm: { interval in
+                    guard let applicationCommands else {
+                        throw ApplicationCommandError.recordNotFound
+                    }
+                    if interval.isInProgress {
+                        _ = try applicationCommands.startInferredFast(
+                            sourceBoundaryReference: interval.sourceBoundaryReference,
+                            expectedStartDate: interval.startDate,
+                            expectedEndDate: interval.endDate,
+                            expectedSourceDescription: interval.sourceDescription,
+                            expectedGoal: interval.goal
+                        )
+                    } else {
+                        _ = try applicationCommands.saveInferredFast(
+                            sourceBoundaryReference: interval.sourceBoundaryReference,
+                            expectedStartDate: interval.startDate,
+                            expectedEndDate: interval.endDate,
+                            expectedSourceDescription: interval.sourceDescription,
+                            expectedGoal: interval.goal
+                        )
+                    }
+                    _ = reloadHistoryAfterMutation()
+                    inferredConversion = nil
+                },
+                onCancel: { inferredConversion = nil },
+                onFailure: { _ = reloadHistoryAfterMutation() }
+            )
+        }
         .sheet(item: $foodEditor) { presentation in
             FoodEntryEditor(
                 snapshot: presentation.record,
@@ -293,9 +303,12 @@ extension HistoryView {
                     reloadHistoryAfterMutation()
                     foodEditor = nil
                 },
-                onDelete: {
+                onDelete: { confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteFood(id: presentation.record.id)
+                    try applicationCommands.deleteFood(
+                        id: presentation.record.id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                     reloadHistoryAfterMutation()
                     foodEditor = nil
                 },
@@ -320,9 +333,12 @@ extension HistoryView {
                     reloadHistoryAfterMutation()
                     hydrationEditor = nil
                 },
-                onDelete: {
+                onDelete: { confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteHydration(id: presentation.record.id)
+                    try applicationCommands.deleteHydration(
+                        id: presentation.record.id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                     reloadHistoryAfterMutation()
                     hydrationEditor = nil
                 },
@@ -394,9 +410,12 @@ extension HistoryView {
                         endingActiveFast: endingActiveFast
                     )
                 },
-                deleteFood: { id in
+                deleteFood: { id, confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteFood(id: id)
+                    try applicationCommands.deleteFood(
+                        id: id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                 },
                 saveHydration: { id, draft, endingActiveFast in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
@@ -407,14 +426,47 @@ extension HistoryView {
                         endingActiveFast: endingActiveFast
                     )
                 },
-                deleteHydration: { id in
+                deleteHydration: { id, confirmingInferredImpact in
                     guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
-                    try applicationCommands.deleteHydration(id: id)
+                    try applicationCommands.deleteHydration(
+                        id: id,
+                        confirmingInferredImpact: confirmingInferredImpact
+                    )
                 },
                 onMutationSucceeded: { original, mutation in
                     refreshGroupSurface(for: original, mutation: mutation)
                 }
             )
         }
+    }
+
+    var historyInvalidationRevision: Int {
+        historyPresentationInvalidation?.revision ?? 0
+    }
+
+    var historyDateNavigator: some View {
+        TemporalDateNavigator(
+            dates: dateNavigatorDates,
+            selection: selectedDateBinding(source: .dateChip),
+            maximumDate: historyDisplayMaximumDay,
+            readOnlyAfterDate: clock.now,
+            showsReadOnlyAppearance: showsFutureReadOnlyAppearance,
+            automaticScrollEnabled: !temporalMovementPhase
+                .suppressesAutomaticAlignment && !isDateRailMoving,
+            // Keep the date rail on the settled presentation while
+            // the lower timeline is moving. The rail still follows
+            // the selected day after native scrolling settles.
+            coupledPresentation: nil,
+            presentationDay: selectedDate,
+            onDirectScrollPhaseChange: updateDateRailMovement,
+            onRailSettled: { day in
+                selectDay(day, source: .dateRailSettlement)
+            }
+        )
+        .padding(.horizontal, UFastTheme.Spacing.standard)
+        .allowsHitTesting(
+            !temporalMovementPhase.suppressesAutomaticAlignment && !motionInitialLoading
+        )
+        .id(historyInteractionRevision)
     }
 }

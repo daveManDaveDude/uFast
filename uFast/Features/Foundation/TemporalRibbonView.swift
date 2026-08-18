@@ -255,16 +255,15 @@ extension TemporalRibbonView {
         policy: TemporalRibbonGeometry,
         isSelectedPage: Bool
     ) -> some View {
-        let segments = TemporalHistoryPresentation.clip(
+        let geometries = TemporalHistoryPresentation.pageGeometry(
             intervals.map { TemporalIntervalInput(id: $0.id, start: $0.start, end: $0.end) },
-            to: window
+            in: window,
+            surfaceWidth: policy.contentWidth
         )
-        return ForEach(segments) { segment in
-            if let item = intervals.first(where: { $0.id == segment.id }) {
-                let startX = policy.contentWidth * segment.startFraction(in: window)
-                let endX = policy.contentWidth * segment.endFraction(in: window)
-                let markWidth = max(endX - startX, 1)
-                let horizontalHitPadding = max((44 - markWidth) / 2, 0)
+        return ForEach(geometries) { geometry in
+            if let item = intervals.first(where: { $0.id == geometry.id }) {
+                let segment = geometry.segment
+                let markWidth = geometry.visualWidth
                 let showsContent = TemporalHistoryPresentation.intervalContinuationShowsContent(
                     isActive: item.kind == .active,
                     continuesBefore: segment.continuesBefore,
@@ -313,7 +312,8 @@ extension TemporalRibbonView {
                             continuationEdgeCover(for: item.kind)
                         }
                     }
-                    .padding(.horizontal, horizontalHitPadding)
+                    .padding(.leading, geometry.leadingHitPadding)
+                    .padding(.trailing, geometry.trailingHitPadding)
                 }
                 .buttonStyle(.plain)
                 .disabled(onSelectInterval == nil)
@@ -323,8 +323,8 @@ extension TemporalRibbonView {
                         : "history.interval.\(item.id.uuidString)"
                 )
                 .offset(
-                    x: startX - horizontalHitPadding,
-                    y: 54 + Double(segment.lane) * (policy.intervalLaneHeight + 6)
+                    x: geometry.visualStartX - geometry.leadingHitPadding,
+                    y: 54 + Double(geometry.lane) * (policy.intervalLaneHeight + 6)
                 )
             }
         }

@@ -21,7 +21,7 @@ protocol TodayFeatureCommanding: AnyObject {
         goal: FastingGoal,
         endingActiveFast: Bool
     ) throws
-    func deleteFood(id: UUID) throws
+    func deleteFood(id: UUID, confirmingInferredImpact: Bool) throws
     func todayAddFavouriteDrink(_ favourite: HydrationFavourite) throws
     func todayAddFavouriteDrink(
         _ favourite: HydrationFavourite,
@@ -33,7 +33,7 @@ protocol TodayFeatureCommanding: AnyObject {
         goal: FastingGoal,
         endingActiveFast: Bool
     ) throws
-    func deleteHydration(id: UUID) throws
+    func deleteHydration(id: UUID, confirmingInferredImpact: Bool) throws
     func todayUpdateAutomaticLiveActivityPreference(
         _ preference: AutomaticLiveActivityPreference,
         projectSystemSurfaces: Bool,
@@ -171,9 +171,9 @@ final class TodayFeatureController {
         )
     }
 
-    func deleteFood(id: UUID) throws {
+    func deleteFood(id: UUID, confirmingInferredImpact: Bool = false) throws {
         guard let commands else { throw ApplicationCommandError.recordNotFound }
-        try commands.deleteFood(id: id)
+        try commands.deleteFood(id: id, confirmingInferredImpact: confirmingInferredImpact)
     }
 
     func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
@@ -201,9 +201,9 @@ final class TodayFeatureController {
         )
     }
 
-    func deleteHydration(id: UUID) throws {
+    func deleteHydration(id: UUID, confirmingInferredImpact: Bool = false) throws {
         guard let commands else { throw ApplicationCommandError.recordNotFound }
-        try commands.deleteHydration(id: id)
+        try commands.deleteHydration(id: id, confirmingInferredImpact: confirmingInferredImpact)
     }
 
     func updateAutomaticPreference(

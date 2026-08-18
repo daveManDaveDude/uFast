@@ -20,6 +20,24 @@ Before editing:
 3. Inspect the relevant existing code, tests, conventions, and current git
    status. Preserve unrelated user changes.
 
+4. Publish a compact live activity beacon before editing and whenever the phase
+   changes. Use the repository helper from the repository root:
+
+   ```text
+   python3 scripts/agentic_activity.py update \\
+     --worker luna --story <story-id> --state working --phase inspect \\
+     --expected-next-evidence "..." --write-scope "story:<story-id>"
+   ```
+
+   Use the states `working`, `waiting_on_tool`, `progressing_silently`,
+   `needs_input`, `blocked`, `errored`, and `completed`. `timeout` is never a
+   state. Include the current phase, active command when applicable, files and
+   artifacts touched, the current hypothesis, and the expected next evidence.
+   For a long compile or test command, publish `waiting_on_tool` before the
+   command and update the beacon after it returns. The helper writes only to
+   `.derived-data/agentic/activity/`, which is generated state and not product
+   or test scope.
+
 Implementation rules:
 
 - Implement only the assigned story. Do not implement the sprint, adjacent
@@ -34,6 +52,21 @@ Implementation rules:
 - If a genuine ambiguity prevents a correct implementation, stop before
   inventing product requirements and hand the ambiguity back to Sol.
 - Do not commit or change branches unless Sol explicitly asks.
+
+Liveness and handoff rules:
+
+- A quiet interval, missing narration, or empty wait result does not mean that
+  you are stalled. Keep the beacon current while reasoning, inspecting files,
+  compiling, or waiting on a tool.
+- If you need a product or authority decision, set `needs_input` and state the
+  exact question in `--expected-next-evidence`; do not silently wait for the
+  parent.
+- If a real blocker or repeated correction failure occurs, set `blocked` or
+  `errored` with the failure class, changed hypothesis, and next evidence before
+  returning the handoff. Do not start a competing worker.
+- Before the final handoff, publish `completed` with phase `handoff`, the
+  result/log paths, and the remaining risks. The handoff remains evidence only;
+  Sol decides acceptance.
 
 Before handing work back, inspect the final diff and status, check for accidental
 scope expansion, explicitly evaluate every acceptance criterion, and run the

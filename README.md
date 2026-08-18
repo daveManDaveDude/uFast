@@ -8,6 +8,10 @@ OW-000 establishes the SwiftUI project shell, three primary destinations,
 SwiftData persistence, deterministic fixtures, test targets and repository
 guidance. Later stories supply user-facing behaviour.
 
+If you want to support uFast's development feel free to buy me a coffee, or better still submit a PR and add a feature! 
+
+https://buymeacoffee.com/krfwgzyvtl
+
 ## Requirements
 
 - macOS with Xcode 26.0 or later in `/Applications/Xcode.app`
@@ -46,9 +50,10 @@ make lint
 
 The app is iPhone-only, targets iOS 26.0, uses bundle ID
 `com.davidmcgrath.uFast`, and is currently versioned from `project.yml` as
-1.0.0 (build 8). The last recorded external release state is historical: build
-5 was submitted for App Review and build 6 was supplied to external TestFlight
-testers on 7 August 2026.
+1.0.0 (build 10). Build 10 was uploaded to App Store Connect on 17 August
+2026 and is attached to the iOS 1.0 version in Prepare for Submission. The
+final Add for Review and Submit for Review actions remain with the release
+owner.
 
 The core tracker has no account, cloud sync, backup, restore, HealthKit,
 notification, analytics or network dependency. The current source also contains

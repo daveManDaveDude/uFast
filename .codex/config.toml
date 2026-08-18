@@ -3,5 +3,12 @@
 
 [agents]
 enabled = true
+# Write-capable sprint workers are sequential. Terra rescue may start only
+# after the current Luna worker has been paused or closed for the same scope.
 max_concurrent_threads_per_session = 1
 interrupt_message = true
+
+# Liveness, escalation, and evidence rules are defined in the project-scoped
+# implement-sprint skill and worker contract. In particular, a timeout is an
+# observation rather than a worker state; do not infer a stalled worker from an
+# empty wait alone.

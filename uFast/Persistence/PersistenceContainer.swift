@@ -102,6 +102,81 @@ enum UFastSchemaV1: VersionedSchema {
 enum UFastSchemaV2: VersionedSchema {
     static let versionIdentifier = Schema.Version(2, 0, 0)
 
+    @Model
+    final class AppSettingsRecord {
+        var id: UUID = UUID()
+        var fastingGoalHours: Int = FastingGoal.default.hours
+        var hasCompletedOnboarding: Bool = false
+        var waterFavouriteMillilitres: Int = 500
+        var teaFavouriteMillilitres: Int = 300
+        var coffeeFavouriteMillilitres: Int = 300
+        var automaticLiveActivityPreferenceRawValue: String = "notAsked"
+
+        init() {}
+    }
+
+    @Model
+    final class FastRecord {
+        var id: UUID = UUID()
+        private(set) var startDate: Date = Date.now
+        private(set) var endDate: Date?
+        private(set) var goalHoursAtStart: Int = FastingGoal.default.hours
+        private(set) var originRaw: String = FastOrigin.recorded.rawValue
+        private(set) var reviewStateRaw: String = FastReviewState.confirmed.rawValue
+        private(set) var wasAdjustedByUser: Bool = false
+        private(set) var hasHistoricalGoal: Bool = true
+        private(set) var startBoundaryKindRaw: String?
+        private(set) var startBoundaryID: UUID?
+        private(set) var endBoundaryKindRaw: String?
+        private(set) var endBoundaryID: UUID?
+
+        init() {}
+    }
+
+    static let models: [any PersistentModel.Type] = [
+        UFastSchemaV2.AppSettingsRecord.self,
+        UFastSchemaV2.FastRecord.self,
+        FoodEntryRecord.self,
+        HydrationEntryRecord.self,
+        HydrationFavouriteRecord.self,
+        UnknownPeriodRecord.self,
+    ]
+}
+
+enum UFastSchemaV3: VersionedSchema {
+    static let versionIdentifier = Schema.Version(3, 0, 0)
+
+    @Model
+    final class FastRecord {
+        var id: UUID = UUID()
+        private(set) var startDate: Date = Date.now
+        private(set) var endDate: Date?
+        private(set) var goalHoursAtStart: Int = FastingGoal.default.hours
+        private(set) var originRaw: String = FastOrigin.recorded.rawValue
+        private(set) var reviewStateRaw: String = FastReviewState.confirmed.rawValue
+        private(set) var wasAdjustedByUser: Bool = false
+        private(set) var hasHistoricalGoal: Bool = true
+        private(set) var startBoundaryKindRaw: String?
+        private(set) var startBoundaryID: UUID?
+        private(set) var endBoundaryKindRaw: String?
+        private(set) var endBoundaryID: UUID?
+
+        init() {}
+    }
+
+    static let models: [any PersistentModel.Type] = [
+        AppSettingsRecord.self,
+        UFastSchemaV3.FastRecord.self,
+        FoodEntryRecord.self,
+        HydrationEntryRecord.self,
+        HydrationFavouriteRecord.self,
+        UnknownPeriodRecord.self,
+    ]
+}
+
+enum UFastSchemaV4: VersionedSchema {
+    static let versionIdentifier = Schema.Version(4, 0, 0)
+
     static let models: [any PersistentModel.Type] = [
         AppSettingsRecord.self,
         FastRecord.self,
@@ -113,14 +188,21 @@ enum UFastSchemaV2: VersionedSchema {
 }
 
 enum UFastMigrationPlan: SchemaMigrationPlan {
-    static let schemas: [any VersionedSchema.Type] = [UFastSchemaV1.self, UFastSchemaV2.self]
+    static let schemas: [any VersionedSchema.Type] = [
+        UFastSchemaV1.self,
+        UFastSchemaV2.self,
+        UFastSchemaV3.self,
+        UFastSchemaV4.self,
+    ]
     static let stages: [MigrationStage] = [
         .lightweight(fromVersion: UFastSchemaV1.self, toVersion: UFastSchemaV2.self),
+        .lightweight(fromVersion: UFastSchemaV2.self, toVersion: UFastSchemaV3.self),
+        .lightweight(fromVersion: UFastSchemaV3.self, toVersion: UFastSchemaV4.self),
     ]
 }
 
 enum PersistenceContainer {
-    static let schema = Schema(versionedSchema: UFastSchemaV2.self)
+    static let schema = Schema(versionedSchema: UFastSchemaV4.self)
 
     static func make(inMemory: Bool = false) throws -> ModelContainer {
         let configuration = configuration(inMemory: inMemory)

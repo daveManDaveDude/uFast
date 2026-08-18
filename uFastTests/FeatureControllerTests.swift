@@ -123,7 +123,7 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         try failIfRequested()
     }
 
-    func deleteFood(id _: UUID) throws {
+    func deleteFood(id _: UUID, confirmingInferredImpact _: Bool) throws {
         try failIfRequested()
     }
 
@@ -140,7 +140,7 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         try failIfRequested()
     }
 
-    func deleteHydration(id _: UUID) throws {
+    func deleteHydration(id _: UUID, confirmingInferredImpact _: Bool) throws {
         try failIfRequested()
     }
 
@@ -174,6 +174,10 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         }
     }
 
+    func settingsUpdateInferredFastDetectionEnabled(_: Bool) throws {
+        try failIfRequested()
+    }
+
     func settingsDeleteAllData() throws {
         try failIfRequested()
     }
@@ -182,5 +186,29 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
         if let error {
             throw error
         }
+    }
+}
+
+@MainActor
+final class SettingsInferredFastFailureTests: XCTestCase {
+    func testSettingsRestoresInferredFastToggleAndReportsSaveFailure() {
+        let commands = FeatureCommandSpy()
+        let controller = SettingsFeatureController()
+        controller.connect(commands: commands)
+        controller.load(SettingsFeatureSnapshot(settings: [
+            AppSettingsSnapshot(
+                fastingGoal: .default,
+                inferredFastDetectionEnabled: false
+            ),
+        ]))
+
+        commands.error = TestFailure.requested
+        controller.setInferredFastDetection(enabled: true)
+
+        XCTAssertFalse(controller.inferredFastDetectionEnabled)
+        XCTAssertEqual(
+            controller.saveError,
+            "Your inferred fast setting couldn’t be saved. Please try again."
+        )
     }
 }

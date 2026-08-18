@@ -1,6 +1,6 @@
 import Foundation
 
-// swiftlint:disable function_body_length function_parameter_count trailing_comma
+// swiftlint:disable file_length function_body_length function_parameter_count trailing_comma opening_brace
 
 struct HistoryPresentationSnapshot: Equatable {
     let window: DateInterval
@@ -28,6 +28,35 @@ struct HistoryMotionIntervalPrimitive: Equatable, Sendable {
     let end: Date
     let kind: TemporalRibbonIntervalItem.Kind
     let isActive: Bool
+    let title: String?
+    let detail: String?
+    let accessibilityLabel: String?
+    let semanticKind: HistoryVisibleFastItem.Kind?
+    let inferredInterval: InferredFastInterval?
+
+    init(
+        id: UUID,
+        start: Date,
+        end: Date,
+        kind: TemporalRibbonIntervalItem.Kind,
+        isActive: Bool,
+        title: String? = nil,
+        detail: String? = nil,
+        accessibilityLabel: String? = nil,
+        semanticKind: HistoryVisibleFastItem.Kind? = nil,
+        inferredInterval: InferredFastInterval? = nil
+    ) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.kind = kind
+        self.isActive = isActive
+        self.title = title
+        self.detail = detail
+        self.accessibilityLabel = accessibilityLabel
+        self.semanticKind = semanticKind
+        self.inferredInterval = inferredInterval
+    }
 }
 
 struct HistoryMotionEventPrimitive: Equatable, Sendable {
@@ -36,12 +65,75 @@ struct HistoryMotionEventPrimitive: Equatable, Sendable {
     let kind: TemporalRibbonEventItem.Kind
 }
 
+struct HistoryMotionInferredContext: Equatable, Sendable {
+    let foodEvents: [FoodBoundarySnapshot]
+    let hydrationEvents: [HydrationBoundarySnapshot]
+    let recordedFasts: [RecordedFastInterval]
+    let currentGoal: FastingGoal
+    let enabled: Bool
+
+    init(
+        foodEvents: [FoodBoundarySnapshot],
+        hydrationEvents: [HydrationBoundarySnapshot] = [],
+        recordedFasts: [RecordedFastInterval],
+        currentGoal: FastingGoal,
+        enabled: Bool
+    ) {
+        self.foodEvents = foodEvents
+        self.hydrationEvents = hydrationEvents
+        self.recordedFasts = recordedFasts
+        self.currentGoal = currentGoal
+        self.enabled = enabled
+    }
+
+    init(data: HistoryDataSlice) {
+        foodEvents = data.foods.map {
+            FoodBoundarySnapshot(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                description: $0.foodDescription,
+                isCaloric: true
+            )
+        }
+        hydrationEvents = data.drinks.map {
+            HydrationBoundarySnapshot(
+                id: $0.id,
+                occurredAt: $0.occurredAt,
+                description: $0.displayName,
+                isCaloric: $0.isCaloric
+            )
+        }
+        recordedFasts = (data.completedFasts + [data.activeFast].compactMap(\.self))
+            .map(\.recordedInterval)
+        currentGoal = data.settings?.fastingGoal ?? .default
+        enabled = data.settings?.inferredFastDetectionEnabled ?? false
+    }
+
+    func project(now: Date, visibleInterval: Range<Date>) -> [InferredFastInterval] {
+        InferredFastProjector.project(
+            boundaries: CaloricBoundaryExtractor.boundaries(
+                food: foodEvents,
+                hydration: hydrationEvents
+            ),
+            recordedFasts: recordedFasts,
+            currentGoal: currentGoal,
+            enabled: enabled,
+            now: now,
+            visibleInterval: visibleInterval
+        )
+    }
+}
+
 struct HistoryMotionPresentation: Equatable, Sendable {
     let window: DateInterval
     let intervals: [HistoryMotionIntervalPrimitive]
     let events: [HistoryMotionEventPrimitive]
+    let inferredContext: HistoryMotionInferredContext?
 
-    init(_ snapshot: HistoryPresentationSnapshot) {
+    init(
+        _ snapshot: HistoryPresentationSnapshot,
+        inferredContext: HistoryMotionInferredContext? = nil
+    ) {
         window = snapshot.window
         intervals = snapshot.fastItems.map {
             HistoryMotionIntervalPrimitive(
@@ -49,36 +141,51 @@ struct HistoryMotionPresentation: Equatable, Sendable {
                 start: $0.startDate,
                 end: $0.endDate,
                 kind: $0.ribbonKind,
-                isActive: $0.kind == .active
+                isActive: $0.kind == .active,
+                title: $0.title,
+                detail: $0.detail,
+                accessibilityLabel: $0.accessibilityLabel,
+                semanticKind: $0.kind,
+                inferredInterval: $0.inferredInterval
             )
         }
         events = snapshot.events.map {
             HistoryMotionEventPrimitive(id: $0.id, occurredAt: $0.occurredAt, kind: $0.kind)
         }
+        self.inferredContext = inferredContext
     }
 
     init(
         window: DateInterval,
         intervals: [HistoryMotionIntervalPrimitive],
-        events: [HistoryMotionEventPrimitive]
+        events: [HistoryMotionEventPrimitive],
+        inferredContext: HistoryMotionInferredContext? = nil
     ) {
         self.window = window
         self.intervals = intervals
         self.events = events
+        self.inferredContext = inferredContext
     }
 
     func ribbonIntervals(activeEndingAt now: Date) -> [TemporalRibbonIntervalItem] {
-        intervals.map { primitive in
-            TemporalRibbonIntervalItem(
-                id: primitive.id,
-                start: primitive.start,
-                end: primitive.isActive ? now : primitive.end,
-                title: primitive.kind == .active ? "Active fast" : "Fast",
-                detail: "",
-                accessibilityLabel: primitive.kind == .active ? "Active fast" : "Fast",
-                kind: primitive.kind
-            )
+        let existing = intervals
+            .filter { inferredContext == nil || $0.semanticKind != .inferred }
+            .compactMap { $0.ribbonItem(activeEndingAt: now) }
+        let projected = inferredContext?.project(
+            now: now,
+            visibleInterval: window.start ..< window.end
+        ).map { HistoryVisibleFastItem.inferred($0).ribbonItem } ?? []
+        return (existing + projected).sorted { $0.start < $1.start }
+    }
+
+    func inferredInterval(for id: UUID, at now: Date) -> InferredFastInterval? {
+        if let context = inferredContext {
+            return context.project(
+                now: now,
+                visibleInterval: window.start ..< window.end
+            ).first { $0.id == id }
         }
+        return intervals.first { $0.id == id }?.currentInferredInterval(at: now)
     }
 
     var ribbonEvents: [TemporalRibbonEventItem] {
@@ -92,6 +199,64 @@ struct HistoryMotionPresentation: Equatable, Sendable {
                 kind: primitive.kind
             )
         }
+    }
+}
+
+private extension HistoryMotionIntervalPrimitive {
+    func ribbonItem(activeEndingAt now: Date) -> TemporalRibbonIntervalItem? {
+        if let inferred = currentInferredInterval(at: now) {
+            return HistoryVisibleFastItem.inferred(inferred).ribbonItem
+        }
+        guard semanticKind != .inferred else { return nil }
+        return TemporalRibbonIntervalItem(
+            id: id,
+            start: start,
+            end: isActive ? now : end,
+            title: title ?? (kind == .active ? "Active fast" : "Fast"),
+            detail: detail ?? "",
+            accessibilityLabel: accessibilityLabel
+                ?? (kind == .active ? "Active fast" : "Fast"),
+            kind: kind
+        )
+    }
+
+    func currentInferredInterval(at now: Date) -> InferredFastInterval? {
+        guard semanticKind == .inferred, let inferredInterval else { return nil }
+        let eligibilityDate = inferredInterval.sourceDate.addingTimeInterval(
+            InferredFastProjector.eligibilityDuration
+        )
+        guard now >= eligibilityDate else { return nil }
+        let cap = inferredInterval.sourceDate.addingTimeInterval(
+            InferredFastProjector.maximumDuration(for: inferredInterval.goal)
+        )
+        let punctuatingBoundaryDate: Date?
+        let punctuatingBoundaryReference: CaloricBoundaryReference?
+        if let nextBoundaryDate = inferredInterval.nextBoundaryDate,
+           nextBoundaryDate <= now,
+           nextBoundaryDate < cap
+        {
+            punctuatingBoundaryDate = nextBoundaryDate
+            punctuatingBoundaryReference = inferredInterval.nextBoundaryReference
+        } else {
+            punctuatingBoundaryDate = nil
+            punctuatingBoundaryReference = nil
+        }
+        let currentEnd = min(punctuatingBoundaryDate ?? now, cap)
+        guard inferredInterval.sourceDate < currentEnd else { return nil }
+        let state: InferredFastState = punctuatingBoundaryDate == nil && now < cap
+            ? .inProgress
+            : .historical
+        return InferredFastInterval(
+            sourceBoundaryReference: inferredInterval.sourceBoundaryReference,
+            sourceDate: inferredInterval.sourceDate,
+            sourceDescription: inferredInterval.sourceDescription,
+            nextBoundaryReference: punctuatingBoundaryReference,
+            nextBoundaryDate: punctuatingBoundaryDate,
+            startDate: inferredInterval.startDate,
+            endDate: currentEnd,
+            goal: inferredInterval.goal,
+            state: state
+        )
     }
 }
 
@@ -169,7 +334,7 @@ enum HistoryPresentationBuilder {
         let window = data.window.start ..< data.window.end
         let boundaries = CaloricBoundaryExtractor.boundaries(
             food: data.foods.map {
-                .init(id: $0.id, occurredAt: $0.occurredAt, description: $0.foodDescription, isCaloric: $0.isCaloric)
+                .init(id: $0.id, occurredAt: $0.occurredAt, description: $0.foodDescription, isCaloric: true)
             },
             hydration: data.drinks.map {
                 .init(id: $0.id, occurredAt: $0.occurredAt, description: $0.displayName, isCaloric: $0.isCaloric)
@@ -193,15 +358,15 @@ enum HistoryPresentationBuilder {
             guard fast.presentationIntegrity == .available,
                   fast.origin == .reconstructed,
                   let end = fast.endDate,
-                  !LegacyFastCompatibility.isExactlyReproducible(
-                      startDate: fast.startDate,
-                      endDate: end,
-                      boundaries: fast.boundaryPair,
-                      caloricBoundaries: boundaries
-                  ),
                   AutomaticFastProjector.intersects(fast.startDate ..< end, window),
                   !recorded.contains(where: { $0.intersects(fast.startDate ..< end) })
             else { return nil }
+            guard data.settings != nil || !LegacyFastCompatibility.isExactlyReproducible(
+                startDate: fast.startDate,
+                endDate: end,
+                boundaries: fast.boundaryPair,
+                caloricBoundaries: boundaries
+            ) else { return nil }
             return .previouslySaved(fast)
         }
         let unavailable = data.completedFasts.compactMap { fast -> HistoryVisibleFastItem? in
@@ -211,20 +376,36 @@ enum HistoryPresentationBuilder {
             else { return nil }
             return .unavailable(fast)
         }
-        let excluded = (data.completedFasts + [data.activeFast].compactMap(\.self))
+        let inferredExclusions = (data.completedFasts + [data.activeFast].compactMap(\.self))
+            .map(\.recordedInterval)
+        let legacyAutomaticExclusions = (data.completedFasts + [data.activeFast].compactMap(\.self))
             .filter { $0.origin == .recorded || $0.presentationIntegrity == .unavailable }
             .map(\.recordedInterval)
-        let automatic = AutomaticFastProjector.project(
-            boundaries: boundaries,
-            visibleInterval: window,
-            excluding: excluded
-        ).compactMap { interval -> HistoryVisibleFastItem? in
-            guard !legacy.contains(where: { $0.intersects(interval.interval) }) else { return nil }
-            return .automatic(interval)
+        let inferred = data.settings.map { settings in
+            InferredFastProjector.project(
+                boundaries: boundaries,
+                recordedFasts: inferredExclusions,
+                currentGoal: settings.fastingGoal,
+                enabled: settings.inferredFastDetectionEnabled,
+                now: referenceNow,
+                visibleInterval: window
+            ).map(HistoryVisibleFastItem.inferred)
+        }
+        let legacyAutomatic: [HistoryVisibleFastItem] = if data.settings == nil {
+            AutomaticFastProjector.project(
+                boundaries: boundaries,
+                visibleInterval: window,
+                excluding: legacyAutomaticExclusions
+            ).compactMap { interval -> HistoryVisibleFastItem? in
+                guard !legacy.contains(where: { $0.intersects(interval.interval) }) else { return nil }
+                return .automatic(interval)
+            }
+        } else {
+            []
         }
         return HistoryPresentationSnapshot(
             window: data.window,
-            fastItems: recorded + active + legacy + unavailable + automatic,
+            fastItems: recorded + active + legacy + unavailable + (inferred ?? legacyAutomatic),
             events: makeEvents(data: data, locale: locale, calendar: calendar, timeZone: timeZone)
         )
     }
@@ -238,11 +419,11 @@ enum HistoryPresentationBuilder {
         let foods = data.foods.map { food in
             let nutrition = nutritionDetail(food.nutrition)
             let detail = ([eventDetail(
-                category: "Food", caloric: food.isCaloric, date: food.occurredAt,
+                category: "Food", caloric: true, date: food.occurredAt,
                 locale: locale, calendar: calendar, timeZone: timeZone
             )] + (nutrition.map { [$0] } ?? [])).joined(separator: " · ")
             let accessibility = ([
-                "\(food.foodDescription), food, \(food.isCaloric ? "caloric" : "non-caloric"), "
+                "\(food.foodDescription), food, caloric, "
                     + formatted(food.occurredAt, locale: locale, calendar: calendar, timeZone: timeZone),
             ] + (nutrition.map { [$0] } ?? [])).joined(separator: ", ")
             return TemporalRibbonEventItem(
@@ -310,36 +491,54 @@ enum HistoryPresentationBuilder {
 }
 
 struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
-    enum Kind: Equatable, Sendable { case recorded, active, automatic, previouslySaved, unavailable }
+    enum Kind: Equatable, Sendable {
+        case recorded
+        case active
+        case automatic
+        case inferred
+        case previouslySaved
+        case unavailable
+    }
 
     let id: UUID
     let startDate: Date
     let endDate: Date
     let kind: Kind
     let fast: HistoryFastSnapshot?
+    let inferredInterval: InferredFastInterval?
 
     static func recorded(_ fast: HistoryFastSnapshot) -> Self {
         Self(
             id: fast.id, startDate: fast.startDate,
-            endDate: fast.endDate ?? fast.startDate, kind: .recorded, fast: fast
+            endDate: fast.endDate ?? fast.startDate, kind: .recorded, fast: fast,
+            inferredInterval: nil
         )
     }
 
     static func active(_ fast: HistoryFastSnapshot, endingAt endDate: Date) -> Self {
-        Self(id: fast.id, startDate: fast.startDate, endDate: endDate, kind: .active, fast: fast)
+        Self(
+            id: fast.id,
+            startDate: fast.startDate,
+            endDate: endDate,
+            kind: .active,
+            fast: fast,
+            inferredInterval: nil
+        )
     }
 
     static func previouslySaved(_ fast: HistoryFastSnapshot) -> Self {
         Self(
             id: fast.id, startDate: fast.startDate,
-            endDate: fast.endDate ?? fast.startDate, kind: .previouslySaved, fast: fast
+            endDate: fast.endDate ?? fast.startDate, kind: .previouslySaved, fast: fast,
+            inferredInterval: nil
         )
     }
 
     static func unavailable(_ fast: HistoryFastSnapshot) -> Self {
         Self(
             id: fast.id, startDate: fast.startDate,
-            endDate: fast.endDate ?? fast.startDate, kind: .unavailable, fast: fast
+            endDate: fast.endDate ?? fast.startDate, kind: .unavailable, fast: fast,
+            inferredInterval: nil
         )
     }
 
@@ -349,13 +548,32 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
             startDate: interval.startDate,
             endDate: interval.endDate,
             kind: .automatic,
-            fast: nil
+            fast: nil,
+            inferredInterval: nil
+        )
+    }
+
+    static func inferred(_ interval: InferredFastInterval) -> Self {
+        Self(
+            id: interval.id,
+            startDate: interval.startDate,
+            endDate: interval.endDate,
+            kind: .inferred,
+            fast: nil,
+            inferredInterval: interval
         )
     }
 
     func ending(at date: Date) -> Self {
         guard kind == .active else { return self }
-        return Self(id: id, startDate: startDate, endDate: date, kind: kind, fast: fast)
+        return Self(
+            id: id,
+            startDate: startDate,
+            endDate: date,
+            kind: kind,
+            fast: fast,
+            inferredInterval: inferredInterval
+        )
     }
 
     func intersects(_ interval: Range<Date>) -> Bool {
@@ -367,7 +585,12 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         case .recorded: "Recorded fast"
         case .active: "Active Fast"
         case .automatic: "Fast"
-        case .previouslySaved: "Previously saved fast"
+        case .inferred where inferredInterval?.isInProgress == true: "Inferred fast in progress"
+        case .inferred: "Inferred fast"
+        case .previouslySaved:
+            fast?.reviewState == .needsReview
+                ? "Previously saved fast · Needs review"
+                : "Previously saved fast"
         case .unavailable: "Saved fast · Details unavailable"
         }
     }
@@ -377,6 +600,7 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         case .recorded: .recorded
         case .active: .active
         case .automatic: .automatic
+        case .inferred: .automatic
         case .previouslySaved, .unavailable: .previouslySaved
         }
     }
@@ -407,6 +631,16 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         if kind == .recorded, let goal = fast?.capturedHistoricalGoal {
             components.append("goal \(goal.hours) hours")
         }
+        if let reviewBoundaryUnavailableDescription {
+            components.append(reviewBoundaryUnavailableDescription)
+        }
+        if kind == .inferred {
+            components.append(
+                inferredInterval?.isInProgress == true
+                    ? "start action available"
+                    : "save action available"
+            )
+        }
         return components.joined(separator: " · ")
     }
 
@@ -428,6 +662,25 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         if kind == .recorded, let goal = fast?.capturedHistoricalGoal {
             components.append("goal \(goal.hours) hours")
         }
+        if let reviewBoundaryUnavailableDescription {
+            components.append(reviewBoundaryUnavailableDescription)
+        }
+        if kind == .inferred {
+            let sourceKind = inferredInterval.map {
+                $0.sourceKind == .hydration ? "drink" : "food"
+            } ?? "food"
+            components.append("source \(sourceKind) \(inferredInterval?.sourceDescription ?? "")")
+            components.append(inferredInterval?.isInProgress == true ? "Start fast available" : "Save fast available")
+        }
         return components.joined(separator: ", ")
+    }
+
+    private var reviewBoundaryUnavailableDescription: String? {
+        guard fast?.reviewState == .needsReview else { return nil }
+        guard let reference = fast?.retainedReviewBoundary else {
+            return "boundary evidence unavailable"
+        }
+        let kind = reference.kind == .hydration ? "drink" : "food"
+        return "former \(kind) boundary unavailable"
     }
 }

@@ -5,6 +5,8 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedOnboarded = false
     var seedSlice3History = false
     var seedHistoryEventGrouping = false
+    var seedHistoryMidnightSeam = false
+    var seedHistoryMidnightSeamExtended = false
     var seedActiveFastStart: Date?
     var seedLiveActivityRecovery = false
     var seedMultipleActiveFasts = false
@@ -13,6 +15,7 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedFavouriteDuplicateName = false
     var seedFavouriteValidation = false
     var seedCaloricFavouriteActiveFast = false
+    var seedInferredFast = false
 
     static let disabled = Self()
 }
@@ -35,6 +38,7 @@ struct AppLaunchConfiguration {
     let liveActivityBuildIdentity: LiveActivityBuildIdentity?
     let simulatePersistenceBootstrapFailure: Bool
     let suppressAutomaticLiveActivityOffer: Bool
+    let startsOnHistory: Bool
 
     static func current() -> Self {
         Self(arguments: ProcessInfo.processInfo.arguments)
@@ -51,6 +55,7 @@ struct AppLaunchConfiguration {
             liveActivityBuildIdentity = LiveActivityBuildIdentity.production()
             simulatePersistenceBootstrapFailure = false
             suppressAutomaticLiveActivityOffer = false
+            startsOnHistory = false
             return
         }
 
@@ -60,6 +65,10 @@ struct AppLaunchConfiguration {
             seedOnboarded: arguments.contains("--seed-onboarded"),
             seedSlice3History: arguments.contains("--seed-slice3-history"),
             seedHistoryEventGrouping: arguments.contains("--seed-history-event-grouping"),
+            seedHistoryMidnightSeam: arguments.contains("--seed-history-midnight-seam"),
+            seedHistoryMidnightSeamExtended: arguments.contains(
+                "--seed-history-midnight-seam-extended"
+            ),
             seedActiveFastStart: Self.date(after: "--seed-active-fast-start", in: arguments),
             seedLiveActivityRecovery: arguments.contains("--seed-live-activity-recovery"),
             seedMultipleActiveFasts: arguments.contains("--seed-multiple-active-fasts"),
@@ -67,7 +76,8 @@ struct AppLaunchConfiguration {
             seedFavouritePopulated: arguments.contains("--seed-favourite-populated"),
             seedFavouriteDuplicateName: arguments.contains("--seed-favourite-duplicate-name"),
             seedFavouriteValidation: arguments.contains("--seed-favourite-validation"),
-            seedCaloricFavouriteActiveFast: arguments.contains("--seed-caloric-favourite-active-fast")
+            seedCaloricFavouriteActiveFast: arguments.contains("--seed-caloric-favourite-active-fast"),
+            seedInferredFast: arguments.contains("--seed-inferred-fast")
         )
         commands = Self.commandConfiguration(from: arguments)
         liveActivityAdapter = Self.liveActivityAdapterConfiguration(from: arguments)
@@ -78,6 +88,7 @@ struct AppLaunchConfiguration {
         suppressAutomaticLiveActivityOffer = arguments.contains(
             "--suppress-automatic-live-activity-offer"
         )
+        startsOnHistory = arguments.contains("--ui-testing-start-history")
     }
 
     private static func commandConfiguration(from arguments: [String]) -> ApplicationCommandConfiguration {
@@ -91,7 +102,13 @@ struct AppLaunchConfiguration {
             simulateLiveActivitySettingsSaveFailure: arguments.contains(
                 "--simulate-live-activity-settings-save-failure"
             ),
-            simulateDeleteAllFailure: arguments.contains("--simulate-delete-all-failure")
+            simulateInferredFastDetectionSaveFailure: arguments.contains(
+                "--simulate-inferred-fast-detection-save-failure"
+            ),
+            simulateDeleteAllFailure: arguments.contains("--simulate-delete-all-failure"),
+            simulateBoundaryReconciliationFailure: arguments.contains(
+                "--simulate-caloric-boundary-reconciliation-failure"
+            )
         )
     }
 

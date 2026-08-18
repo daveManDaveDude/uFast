@@ -75,6 +75,14 @@ struct CompletedFastEditorPresentation: Identifiable {
     let endDate: Date
 }
 
+struct InferredFastConversionPresentation: Identifiable {
+    let interval: InferredFastInterval
+
+    var id: CaloricBoundaryReference {
+        interval.sourceBoundaryReference
+    }
+}
+
 #Preview("History · Empty") {
     HistoryView().modelContainer(PreviewFixtures.modelContainer)
 }

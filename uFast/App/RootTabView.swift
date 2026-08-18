@@ -1,11 +1,15 @@
 import SwiftUI
 
 struct RootTabView: View {
-    @State private var selection = AppDestination.today
+    @State private var selection: AppDestination
     let clock: any AppClock
 
-    init(clock: any AppClock = SystemAppClock()) {
+    init(
+        clock: any AppClock = SystemAppClock(),
+        initialSelection: AppDestination = .today
+    ) {
         self.clock = clock
+        _selection = State(initialValue: initialSelection)
     }
 
     var body: some View {

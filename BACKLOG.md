@@ -6,7 +6,7 @@ direction and working post-MVP order are maintained in `ROADMAP.md`.
 ## 1.0 release boundary
 
 The `codex/release-1.0` baseline includes the existing manual fasting, food,
-hydration, catch-up and History experience, including its tested automatic and
+hydration, catch-up and History experience, including its tested History and
 legacy-history presentation rules. It is local-only and intentionally excludes
 external health data, cloud services and background delivery. The release
 reset decision for disposable pre-release CloudKit data is recorded in D-026.
@@ -165,7 +165,7 @@ The amended contract is in `SLICE_3_9_HISTORY_INTERACTION_POLISH_STORIES.md`.
   two-hour calendar grid rules, and bound/read-only future history. **Done 24
   July 2026.**
 
-## Slice 3.10 — Automatic fast history
+## Slice 3.10 — Legacy automatic fast history
 
 The current-state review, replacement domain contract, migration boundary and
 implementation-ready stories are in
@@ -195,6 +195,21 @@ members open the existing food or drink editor directly; and Edit group, the
 group-manager sheet, pencil controls, manager Done, bulk Delete group and
 returning from an item editor to the manager no longer exist. Add event remains
 bucket-constrained, and individual deletion remains available in each editor.
+
+## Slice 3.12 — Opt-in inferred fast detection
+
+The accepted contract and implementation-ready story are in
+`docs/OW-410_INFERRED_FAST_DETECTION_STORY.md`.
+
+- OW-410 P0 — Detect, present and explicitly convert opt-in inferred fasts.
+  **Implemented in source; focused baseline acceptance passed. OW-411
+  supersedes its food-only boundary wording.**
+
+## Slice 3.13 — Caloric-boundary integrity
+
+- OW-411 P0 — Make every caloric food or drink event end the persisted or
+  inferred fast it enters and reconcile existing local records. **Implemented
+  in source; focused validation recorded 17 August 2026. Sol review pending.**
 
 ## Sprint-ready product refinements
 

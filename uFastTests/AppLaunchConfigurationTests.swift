@@ -2,7 +2,7 @@
 import XCTest
 
 // SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
-// swiftlint:disable trailing_comma
+// swiftlint:disable function_body_length trailing_comma
 final class AppLaunchConfigurationTests: XCTestCase {
     func testParsesEverySupportedUITestOptionIntoTypedConfiguration() {
         let configuration = AppLaunchConfiguration(arguments: [
@@ -18,6 +18,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             "--simulate-food-save-failure", "--simulate-drink-save-failure",
             "--simulate-goal-save-failure",
             "--simulate-live-activity-settings-save-failure",
+            "--simulate-inferred-fast-detection-save-failure",
             "--simulate-delete-all-failure", "--simulate-live-activity-unsupported",
             "--simulate-live-activity-request-failure",
             "--simulate-live-activity-hide-failure",
@@ -47,6 +48,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             simulateDrinkSaveFailure: true,
             simulateGoalSaveFailure: true,
             simulateLiveActivitySettingsSaveFailure: true,
+            simulateInferredFastDetectionSaveFailure: true,
             simulateDeleteAllFailure: true
         ))
         XCTAssertEqual(configuration.liveActivityAdapter, .deterministic(
@@ -70,6 +72,18 @@ final class AppLaunchConfigurationTests: XCTestCase {
         ))
     }
 
+    func testParsesStartOnHistoryOnlyForTheUITestingLaunch() {
+        let uiTesting = AppLaunchConfiguration(arguments: [
+            "uFast", "--ui-testing", "--ui-testing-start-history",
+        ])
+        let production = AppLaunchConfiguration(arguments: [
+            "uFast", "--ui-testing-start-history",
+        ])
+
+        XCTAssertTrue(uiTesting.startsOnHistory)
+        XCTAssertFalse(production.startsOnHistory)
+    }
+
     func testProductionIgnoresFixtureAndFailureArgumentsWithoutUITestingGate() {
         let configuration = AppLaunchConfiguration(arguments: [
             "uFast", "--reset-data", "--seed-onboarded", "--fixed-now", "1234",
@@ -84,6 +98,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.liveActivityAdapter, .activityKit)
         XCTAssertFalse(configuration.simulatePersistenceBootstrapFailure)
         XCTAssertFalse(configuration.suppressAutomaticLiveActivityOffer)
+        XCTAssertFalse(configuration.startsOnHistory)
     }
 
     func testInvalidOrMissingDateValuesAreIgnored() {

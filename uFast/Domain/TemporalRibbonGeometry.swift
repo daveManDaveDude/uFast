@@ -32,6 +32,115 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
     }
 }
 
+extension TemporalIntervalSegment {
+    func pageGeometry(
+        in window: TemporalRibbonWindow,
+        surfaceWidth: Double
+    ) -> TemporalIntervalPageGeometry? {
+        guard surfaceWidth.isFinite, surfaceWidth > 0 else { return nil }
+        let startFraction = startFraction(in: window)
+        let endFraction = endFraction(in: window)
+        guard startFraction.isFinite, endFraction.isFinite,
+              startFraction >= 0, endFraction <= 1,
+              startFraction <= endFraction
+        else { return nil }
+
+        let startX = min(max(startFraction * surfaceWidth, 0), surfaceWidth)
+        let endX = min(max(endFraction * surfaceWidth, 0), surfaceWidth)
+        guard startX.isFinite, endX.isFinite, startX <= endX else { return nil }
+
+        // A sub-pixel fragment still needs a finite, visible shape. Expand it
+        // inward only, keeping both the temporal endpoints and the page bounds
+        // intact. Normal-sized marks retain their exact temporal x positions.
+        let minimumVisualWidth = min(1, surfaceWidth)
+        let visualWidth = endX - startX
+        let visualStartX: Double = if visualWidth >= minimumVisualWidth {
+            startX
+        } else if startX <= 0 {
+            0
+        } else if endX >= surfaceWidth {
+            max(surfaceWidth - minimumVisualWidth, 0)
+        } else {
+            min(
+                max((startX + endX - minimumVisualWidth) / 2, 0),
+                max(surfaceWidth - minimumVisualWidth, 0)
+            )
+        }
+        let boundedVisualStartX = min(max(visualStartX, 0), surfaceWidth)
+        let boundedVisualWidth = min(
+            max(visualWidth, minimumVisualWidth),
+            surfaceWidth - boundedVisualStartX
+        )
+        guard boundedVisualStartX.isFinite, boundedVisualWidth.isFinite,
+              boundedVisualWidth > 0
+        else { return nil }
+
+        let hitPadding = Self.hitPadding(
+            visualStartX: boundedVisualStartX,
+            visualWidth: boundedVisualWidth,
+            surfaceWidth: surfaceWidth
+        )
+        return TemporalIntervalPageGeometry(
+            segment: self,
+            startX: startX,
+            endX: endX,
+            visualStartX: boundedVisualStartX,
+            visualWidth: boundedVisualWidth,
+            leadingHitPadding: hitPadding.leading,
+            trailingHitPadding: hitPadding.trailing
+        )
+    }
+
+    private static func hitPadding(
+        visualStartX: Double,
+        visualWidth: Double,
+        surfaceWidth: Double
+    ) -> (leading: Double, trailing: Double) {
+        let desired = max((44 - visualWidth) / 2, 0)
+        let availableLeading = visualStartX
+        let availableTrailing = max(surfaceWidth - visualStartX - visualWidth, 0)
+        var leading = min(desired, availableLeading)
+        var trailing = min(desired, availableTrailing)
+        let unallocated = max(desired * 2 - leading - trailing, 0)
+        let leadingRemainder = min(unallocated, max(availableLeading - leading, 0))
+        leading += leadingRemainder
+        trailing += min(
+            unallocated - leadingRemainder,
+            max(availableTrailing - trailing, 0)
+        )
+        return (leading, trailing)
+    }
+}
+
+/// A clipped interval's complete page-local rendering geometry. Temporal
+/// endpoints remain on `segment`; x values are derived only for the current
+/// page surface and are guaranteed finite and bounded.
+struct TemporalIntervalPageGeometry: Identifiable, Equatable, Sendable {
+    let segment: TemporalIntervalSegment
+    let startX: Double
+    let endX: Double
+    let visualStartX: Double
+    let visualWidth: Double
+    let leadingHitPadding: Double
+    let trailingHitPadding: Double
+
+    var id: UUID {
+        segment.id
+    }
+
+    var continuesBefore: Bool {
+        segment.continuesBefore
+    }
+
+    var continuesAfter: Bool {
+        segment.continuesAfter
+    }
+
+    var lane: Int {
+        segment.lane
+    }
+}
+
 enum TemporalHistoryPresentation {
     /// Resolves a manual rail only after native scrolling is idle.  Geometry is
     /// already expressed in the visual coordinate space, so this is identical
@@ -187,53 +296,61 @@ enum TemporalHistoryPresentation {
         _ intervals: [TemporalIntervalInput],
         to window: TemporalRibbonWindow
     ) -> [TemporalIntervalSegment] {
-        let visible = intervals.compactMap { input -> TemporalIntervalSegment? in
-            guard input.start < input.end,
-                  input.end > window.interval.start,
-                  input.start < window.interval.end
+        guard window.interval.start < window.interval.end else { return [] }
+
+        let validInputs = intervals.filter { $0.start < $0.end }.sorted {
+            if $0.start != $1.start {
+                return $0.start < $1.start
+            }
+            if $0.end != $1.end {
+                return $0.end < $1.end
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+
+        // Assign lanes from the original half-open intervals, not their page
+        // fragments. A record therefore keeps its lane when a neighbouring
+        // page clips another interval away at the seam.
+        var laneEnds: [Date] = []
+        var laneByID: [UUID: Int] = [:]
+        for input in validInputs {
+            let lane = laneEnds.firstIndex { $0 <= input.start } ?? laneEnds.count
+            if lane == laneEnds.count {
+                laneEnds.append(input.end)
+            } else {
+                laneEnds[lane] = input.end
+            }
+            laneByID[input.id] = lane
+        }
+
+        return validInputs.compactMap { input -> TemporalIntervalSegment? in
+            guard input.end > window.interval.start,
+                  input.start < window.interval.end,
+                  let lane = laneByID[input.id]
             else { return nil }
+            let visibleStart = max(input.start, window.interval.start)
+            let visibleEnd = min(input.end, window.interval.end)
+            guard visibleStart < visibleEnd else { return nil }
             return TemporalIntervalSegment(
                 id: input.id,
                 originalStart: input.start,
                 originalEnd: input.end,
-                visibleStart: max(input.start, window.interval.start),
-                visibleEnd: min(input.end, window.interval.end),
+                visibleStart: visibleStart,
+                visibleEnd: visibleEnd,
                 continuesBefore: input.start < window.interval.start,
                 continuesAfter: input.end > window.interval.end,
-                lane: 0
-            )
-        }
-        .sorted {
-            if $0.originalStart != $1.originalStart {
-                return $0.originalStart < $1.originalStart
-            }
-            if $0.visibleStart == $1.visibleStart {
-                if $0.visibleEnd == $1.visibleEnd {
-                    return $0.id.uuidString < $1.id.uuidString
-                }
-                return $0.visibleEnd < $1.visibleEnd
-            }
-            return $0.visibleStart < $1.visibleStart
-        }
-
-        var laneEnds: [Date] = []
-        return visible.map { segment in
-            let lane = laneEnds.firstIndex { $0 <= segment.visibleStart } ?? laneEnds.count
-            if lane == laneEnds.count {
-                laneEnds.append(segment.visibleEnd)
-            } else {
-                laneEnds[lane] = segment.visibleEnd
-            }
-            return TemporalIntervalSegment(
-                id: segment.id,
-                originalStart: segment.originalStart,
-                originalEnd: segment.originalEnd,
-                visibleStart: segment.visibleStart,
-                visibleEnd: segment.visibleEnd,
-                continuesBefore: segment.continuesBefore,
-                continuesAfter: segment.continuesAfter,
                 lane: lane
             )
+        }
+    }
+
+    static func pageGeometry(
+        _ intervals: [TemporalIntervalInput],
+        in window: TemporalRibbonWindow,
+        surfaceWidth: Double
+    ) -> [TemporalIntervalPageGeometry] {
+        clip(intervals, to: window).compactMap {
+            $0.pageGeometry(in: window, surfaceWidth: surfaceWidth)
         }
     }
 

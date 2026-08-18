@@ -1,0 +1,333 @@
+import Foundation
+@testable import UFastCore
+import XCTest
+
+final class InferredFastProjectionTests: XCTestCase {
+    func testOptInAndExactEightHourThreshold() throws {
+        let source = food(at: 1000, description: "Dinner")
+        let before = Date(timeIntervalSince1970: 1000 + 8 * 60 * 60 - 1)
+        let exact = Date(timeIntervalSince1970: 1000 + 8 * 60 * 60)
+
+        XCTAssertTrue(project(source: source, now: before, enabled: false).isEmpty)
+        XCTAssertTrue(project(source: source, now: before).isEmpty)
+
+        let candidate = try XCTUnwrap(project(source: source, now: exact).first)
+        XCTAssertEqual(candidate.startDate, source.occurredAt)
+        XCTAssertEqual(candidate.endDate, exact)
+        XCTAssertEqual(candidate.state, .inProgress)
+        XCTAssertTrue(candidate.offersStart)
+        XCTAssertFalse(candidate.offersSave)
+    }
+
+    func testNoLaterFoodUsesGoalPlusTwelveHourCapAndBecomesSaveOnlyAtCap() throws {
+        let source = food(at: 10000, description: "Dinner")
+        let goal = try XCTUnwrap(FastingGoal(hours: 12))
+        let current = try XCTUnwrap(project(
+            source: source,
+            now: source.occurredAt.addingTimeInterval(10 * 60 * 60),
+            goal: goal
+        ).first)
+        XCTAssertEqual(current.startDate, source.occurredAt)
+        XCTAssertEqual(
+            current.endDate,
+            source.occurredAt.addingTimeInterval(10 * 60 * 60)
+        )
+        XCTAssertEqual(current.state, .inProgress)
+
+        let capped = try XCTUnwrap(project(
+            source: source,
+            now: source.occurredAt.addingTimeInterval(25 * 60 * 60),
+            goal: goal
+        ).first)
+        XCTAssertEqual(
+            capped.endDate,
+            source.occurredAt.addingTimeInterval(24 * 60 * 60)
+        )
+        XCTAssertEqual(capped.state, .historical)
+        XCTAssertFalse(capped.offersStart)
+        XCTAssertTrue(capped.offersSave)
+    }
+
+    func testRefreshingAnOpenCandidateTracksNowUntilTheGoalPlusTwelveHourCap() throws {
+        let source = food(at: 15000, description: "Dinner")
+        let candidate = try XCTUnwrap(project(
+            source: source,
+            now: source.occurredAt.addingTimeInterval(9 * 60 * 60)
+        ).first)
+        let refreshed = candidate.refreshed(
+            at: source.occurredAt.addingTimeInterval(10 * 60 * 60)
+        )
+        XCTAssertEqual(
+            refreshed.endDate,
+            source.occurredAt.addingTimeInterval(10 * 60 * 60)
+        )
+        XCTAssertTrue(refreshed.offersStart)
+        XCTAssertFalse(refreshed.offersSave)
+
+        let cap = source.occurredAt.addingTimeInterval(
+            InferredFastProjector.maximumDuration(for: candidate.goal)
+        )
+        let capped = candidate.refreshed(at: cap)
+        XCTAssertEqual(capped.endDate, cap)
+        XCTAssertFalse(capped.offersStart)
+        XCTAssertTrue(capped.offersSave)
+        XCTAssertEqual(capped.state, .historical)
+    }
+
+    func testLaterFoodBeforeGoalPlusTwelveHourCapTerminatesIntervalAtFood() throws {
+        let source = food(at: 20000, description: "Dinner")
+        let next = food(at: 20000 + 20 * 60 * 60, description: "Breakfast")
+        let now = next.occurredAt
+
+        let candidate = try XCTUnwrap(InferredFastProjector.project(
+            foodEvents: [source, next],
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        ).first { $0.sourceFoodID == source.id })
+
+        XCTAssertEqual(candidate.endDate, next.occurredAt)
+        XCTAssertEqual(candidate.nextFoodID, next.id)
+        XCTAssertEqual(candidate.nextFoodDate, next.occurredAt)
+        XCTAssertEqual(candidate.state, .historical)
+        XCTAssertTrue(candidate.offersSave)
+    }
+
+    func testNextFoodTerminatesHistoricalIntervalAndShortGapDoesNotQualify() {
+        let source = food(at: 20000, description: "Dinner")
+        let next = food(at: 20000 + 10 * 60 * 60, description: "Breakfast")
+        let historical = InferredFastProjector.project(
+            foodEvents: [source, next],
+            currentGoal: .default,
+            enabled: true,
+            now: next.occurredAt
+        )
+        XCTAssertEqual(historical.count, 1)
+        XCTAssertEqual(historical[0].nextFoodID, next.id)
+        XCTAssertEqual(historical[0].endDate, next.occurredAt)
+        XCTAssertEqual(historical[0].state, .historical)
+
+        let short = food(at: 30000 + 7 * 60 * 60, description: "Snack")
+        XCTAssertTrue(InferredFastProjector.project(
+            foodEvents: [food(at: 30000), short],
+            currentGoal: .default,
+            enabled: true,
+            now: short.occurredAt
+        ).isEmpty)
+    }
+
+    func testSameTimestampFoodSourcesProduceOneDeterministicCandidate() throws {
+        let timestamp = Date(timeIntervalSince1970: 35000)
+        let firstID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+        let secondID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
+        let secondFood = FoodBoundarySnapshot(
+            id: secondID,
+            occurredAt: timestamp,
+            description: "Second food",
+            isCaloric: true
+        )
+        let firstFood = FoodBoundarySnapshot(
+            id: firstID,
+            occurredAt: timestamp,
+            description: "First food",
+            isCaloric: true
+        )
+        let foods = [secondFood, firstFood]
+
+        let candidates = InferredFastProjector.project(
+            foodEvents: foods,
+            currentGoal: .default,
+            enabled: true,
+            now: timestamp.addingTimeInterval(9 * 60 * 60)
+        )
+
+        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates.first?.sourceFoodID, firstID)
+    }
+
+    func testSameTimestampFoodAndHydrationUseStableBoundaryProvenance() throws {
+        let timestamp = Date(timeIntervalSince1970: 36000)
+        let foodID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000011"))
+        let hydrationID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000012"))
+        let food = CaloricBoundary(
+            reference: .init(kind: .food, id: foodID),
+            occurredAt: timestamp,
+            description: "Food"
+        )
+        let hydration = CaloricBoundary(
+            reference: .init(kind: .hydration, id: hydrationID),
+            occurredAt: timestamp,
+            description: "Drink"
+        )
+
+        for boundaries in [[hydration, food], [food, hydration]] {
+            let candidate = try XCTUnwrap(InferredFastProjector.project(
+                boundaries: boundaries,
+                currentGoal: .default,
+                enabled: true,
+                now: timestamp.addingTimeInterval(9 * 60 * 60)
+            ).first)
+            XCTAssertEqual(candidate.sourceBoundaryReference, food.reference)
+        }
+    }
+
+    func testShortFoodGapStaysExcludedAfterLaterFoodHasPassed() {
+        let source = food(at: 50000, description: "Dinner")
+        let next = food(at: 50000 + 7 * 60 * 60, description: "Snack")
+        let now = Date(timeIntervalSince1970: 50000 + 14 * 60 * 60)
+
+        let projections = InferredFastProjector.project(
+            foodEvents: [source, next],
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        )
+
+        XCTAssertFalse(projections.contains { $0.sourceFoodID == source.id })
+        XCTAssertTrue(projections.isEmpty)
+    }
+
+    func testNonCaloricFoodIsNeitherCandidateSourceNorPunctuator() throws {
+        let nonCaloricSource = food(at: 40000, description: "Food with no details", isCaloric: false)
+        let sourceNow = nonCaloricSource.occurredAt.addingTimeInterval(9 * 60 * 60)
+        XCTAssertTrue(project(source: nonCaloricSource, now: sourceNow).isEmpty)
+
+        let caloricSourceID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000001")
+        )
+        let nonCaloricLaterID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000002")
+        )
+        let caloricSource = FoodBoundarySnapshot(
+            id: caloricSourceID,
+            occurredAt: Date(timeIntervalSince1970: 50000),
+            description: "Dinner",
+            isCaloric: true
+        )
+        let nonCaloricLater = FoodBoundarySnapshot(
+            id: nonCaloricLaterID,
+            occurredAt: caloricSource.occurredAt.addingTimeInterval(20 * 60 * 60),
+            description: "Non-caloric snack",
+            isCaloric: false
+        )
+        let now = nonCaloricLater.occurredAt
+        let candidate = try XCTUnwrap(InferredFastProjector.project(
+            foodEvents: [caloricSource, nonCaloricLater],
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        ).first)
+
+        XCTAssertEqual(candidate.sourceFoodID, caloricSource.id)
+        XCTAssertNil(candidate.nextFoodID)
+        XCTAssertEqual(candidate.endDate, now)
+
+        let recorded = RecordedFastInterval(
+            id: UUID(),
+            startDate: caloricSource.occurredAt.addingTimeInterval(60 * 60),
+            endDate: caloricSource.occurredAt.addingTimeInterval(10 * 60 * 60)
+        )
+        XCTAssertTrue(InferredFastProjector.project(
+            foodEvents: [caloricSource, nonCaloricLater],
+            recordedFasts: [recorded],
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        ).isEmpty)
+    }
+
+    func testCaloricHydrationSourcesAndPunctuatesInferredIntervals() throws {
+        let food = food(at: 60000, description: "Dinner")
+        let drinkID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000010"))
+        let drink = HydrationBoundarySnapshot(
+            id: drinkID,
+            occurredAt: food.occurredAt.addingTimeInterval(20 * 60 * 60),
+            description: "Juice",
+            isCaloric: true
+        )
+        let nonCaloricID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000011"))
+        let water = HydrationBoundarySnapshot(
+            id: nonCaloricID,
+            occurredAt: food.occurredAt.addingTimeInterval(22 * 60 * 60),
+            description: "Water",
+            isCaloric: false
+        )
+        let boundaries = CaloricBoundaryExtractor.boundaries(
+            food: [food],
+            hydration: [drink, water]
+        )
+        let now = drink.occurredAt
+
+        let candidate = try XCTUnwrap(InferredFastProjector.project(
+            boundaries: boundaries,
+            currentGoal: .default,
+            enabled: true,
+            now: now
+        ).first { $0.sourceBoundaryReference == CaloricBoundaryReference(kind: .food, id: food.id) })
+        XCTAssertEqual(candidate.nextBoundaryReference, CaloricBoundaryReference(kind: .hydration, id: drinkID))
+        XCTAssertEqual(candidate.nextBoundaryDate, drink.occurredAt)
+
+        let hydrationOnly = try XCTUnwrap(InferredFastProjector.project(
+            boundaries: [CaloricBoundary(
+                reference: CaloricBoundaryReference(kind: .hydration, id: drinkID),
+                occurredAt: drink.occurredAt,
+                description: drink.description
+            )],
+            currentGoal: .default,
+            enabled: true,
+            now: drink.occurredAt.addingTimeInterval(9 * 60 * 60)
+        ).first)
+        XCTAssertEqual(hydrationOnly.sourceKind, .hydration)
+        XCTAssertEqual(hydrationOnly.sourceBoundaryReference.id, drinkID)
+    }
+
+    func testDaylightSavingChangeStillUsesEightAbsoluteHours() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/London"))
+        let sourceDate = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 3, day: 29, hour: 0, minute: 30
+        )))
+        let now = sourceDate.addingTimeInterval(8 * 60 * 60)
+        let candidate = try XCTUnwrap(project(
+            source: FoodBoundarySnapshot(
+                id: UUID(),
+                occurredAt: sourceDate,
+                description: "DST dinner",
+                isCaloric: true
+            ),
+            now: now
+        ).first)
+        XCTAssertEqual(candidate.startDate, sourceDate)
+        XCTAssertEqual(candidate.endDate, now)
+        XCTAssertEqual(candidate.endDate.timeIntervalSince(candidate.startDate), 8 * 60 * 60)
+    }
+
+    private func project(
+        source: FoodBoundarySnapshot,
+        now: Date,
+        enabled: Bool = true,
+        goal: FastingGoal = .default,
+        recorded: [RecordedFastInterval] = []
+    ) -> [InferredFastInterval] {
+        InferredFastProjector.project(
+            foodEvents: [source],
+            recordedFasts: recorded,
+            currentGoal: goal,
+            enabled: enabled,
+            now: now
+        )
+    }
+
+    private func food(
+        at timestamp: TimeInterval,
+        description: String = "Food",
+        isCaloric: Bool = true
+    ) -> FoodBoundarySnapshot {
+        FoodBoundarySnapshot(
+            id: UUID(),
+            occurredAt: Date(timeIntervalSince1970: timestamp),
+            description: description,
+            isCaloric: isCaloric
+        )
+    }
+}

@@ -1,5 +1,7 @@
 import XCTest
 
+// swiftlint:disable function_body_length type_body_length
+
 // swiftlint:disable trailing_comma
 
 final class FastStartUITests: XCTestCase {
@@ -305,6 +307,129 @@ final class FastStartUITests: XCTestCase {
     }
 
     @MainActor
+    func testLegacyActiveFastShowsStoredInvalidDraftAndCanChooseBoundedReplacement() {
+        let app = XCUIApplication()
+        let legacyStart = fixedStart.addingTimeInterval(-48 * 60 * 60)
+        app.launchArguments = londonLaunchArguments(now: fixedStart, resetData: true)
+            + [
+                "--seed-onboarded",
+                "--seed-active-fast-start",
+                String(legacyStart.timeIntervalSince1970),
+            ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        app.buttons["fast.edit-start"].tap()
+
+        XCTAssertTrue(app.navigationBars["Start time"].waitForExistence(timeout: 2))
+        assertDatePicker(
+            in: app,
+            app.datePickers["fast.start-date"],
+            contains: ["13", "2027"]
+        )
+        assertDatePicker(in: app, app.datePickers["fast.start-time"], contains: ["8:00"])
+        XCTAssertTrue(app.staticTexts["fast.start-validation"].exists)
+        XCTAssertEqual(
+            app.staticTexts["fast.start-validation"].label,
+            "Start time must be within the past 36 hours."
+        )
+        XCTAssertFalse(app.buttons["fast.start-confirm"].isEnabled)
+        XCTAssertTrue(app.buttons["fast.start-use-earliest"].exists)
+
+        app.buttons["fast.start-cancel"].tap()
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        assertDateDisplay(app.staticTexts["fast.started"], containsTime: "8:00")
+
+        app.buttons["fast.edit-start"].tap()
+        XCTAssertTrue(app.buttons["fast.start-use-earliest"].waitForExistence(timeout: 2))
+        assertDatePicker(
+            in: app,
+            app.datePickers["fast.start-date"],
+            contains: ["13", "2027"]
+        )
+        assertDatePicker(in: app, app.datePickers["fast.start-time"], contains: ["8:00"])
+        app.buttons["fast.start-use-earliest"].tap()
+
+        XCTAssertTrue(app.buttons["fast.start-confirm"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start-confirm"].isEnabled)
+        assertDatePicker(in: app, app.datePickers["fast.start-time"], contains: ["20:00"])
+        XCTAssertFalse(app.staticTexts["fast.start-validation"].exists)
+        app.buttons["fast.start-confirm"].tap()
+
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.staticTexts["fast.start-validation"].exists)
+        assertDateDisplay(app.staticTexts["fast.started"], containsTime: "20:00")
+
+        app.terminate()
+        app.launchArguments = londonLaunchArguments(now: fixedStart)
+        app.launch()
+
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        assertDateDisplay(app.staticTexts["fast.started"], containsTime: "20:00")
+        app.buttons["fast.edit-start"].tap()
+        XCTAssertTrue(app.navigationBars["Start time"].waitForExistence(timeout: 2))
+        assertDatePicker(in: app, app.datePickers["fast.start-date"], contains: ["13", "2027"])
+        assertDatePicker(in: app, app.datePickers["fast.start-time"], contains: ["20:00"])
+        app.buttons["fast.start-cancel"].tap()
+    }
+
+    @MainActor
+    private func assertDatePicker(
+        in app: XCUIApplication,
+        _ datePicker: XCUIElement,
+        contains expectedComponents: [String],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(datePicker.waitForExistence(timeout: 2), file: file, line: line)
+        let value = displayedValue(of: datePicker)
+        for component in expectedComponents {
+            XCTAssertTrue(
+                value.contains(component),
+                "Expected date picker value \(value) to contain \(component).\n\(app.debugDescription)",
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    @MainActor
+    private func assertDateDisplay(
+        _ element: XCUIElement,
+        containsTime expectedTime: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(element.waitForExistence(timeout: 2), file: file, line: line)
+        let value = displayedValue(of: element)
+        XCTAssertTrue(
+            value.contains("13") && value.contains("2027") && value.contains(expectedTime),
+            "Expected date display value \(value) to contain 13, 2027, and \(expectedTime).",
+            file: file,
+            line: line
+        )
+    }
+
+    @MainActor
+    private func displayedValue(of element: XCUIElement) -> String {
+        let valueCandidates: [XCUIElement] = [element]
+            + element.descendants(matching: .button).allElementsBoundByIndex
+            + element.descendants(matching: .staticText).allElementsBoundByIndex
+
+        for candidate in valueCandidates {
+            if let value = candidate.value as? String, !value.isEmpty {
+                return value
+            }
+        }
+
+        for candidate in valueCandidates where !candidate.label.isEmpty {
+            return candidate.label
+        }
+
+        return ""
+    }
+
+    @MainActor
     private func completeOnboarding(in app: XCUIApplication) {
         let continueButton = app.buttons["goal.continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 2))
@@ -328,5 +453,13 @@ final class FastStartUITests: XCTestCase {
         }
 
         return arguments
+    }
+
+    private func londonLaunchArguments(
+        now: Date,
+        resetData: Bool = false
+    ) -> [String] {
+        fixedLaunchArguments(now: now, resetData: resetData)
+            + ["-AppleLocale", "en_GB", "-NSTimeZone", "Europe/London"]
     }
 }

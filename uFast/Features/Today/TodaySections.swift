@@ -1,6 +1,49 @@
 import SwiftUI
 
 extension TodayGoalView {
+    var caloricFavouriteConfirmationTitle: String {
+        switch caloricFavouriteConfirmationContext.kind {
+        case .active:
+            "This entry is during your recorded fast."
+        case .completed:
+            "This drink updates \(caloricFavouriteConfirmationContext.affectedPersistedFastCount) recorded fast(s)."
+        case .inferred:
+            "This drink updates inferred History."
+        }
+    }
+
+    var caloricFavouriteConfirmationActionTitle: String {
+        switch caloricFavouriteConfirmationContext.kind {
+        case .active:
+            "Save and end fast"
+        case .completed:
+            "Save and update fast"
+        case .inferred:
+            "Save and update History"
+        }
+    }
+
+    var caloricFavouriteConfirmationMessage: String {
+        let time = clock.now.formatted(date: .omitted, time: .shortened)
+        let consequence = switch caloricFavouriteConfirmationContext.kind {
+        case .active:
+            "Saving this caloric drink records it and ends your fast at \(time)."
+        case .completed:
+            "Saving this caloric drink updates "
+                + "\(caloricFavouriteConfirmationContext.affectedPersistedFastCount) recorded fast(s) at \(time)."
+        case .inferred:
+            "Saving this caloric drink refreshes derived inferred History at \(time)."
+        }
+        var details = consequence
+        if caloricFavouriteConfirmationContext.includesReconstructedReview {
+            details += " At least one affected fast is reconstructed and will be marked for review."
+        }
+        if caloricFavouriteConfirmationContext.isCombined {
+            details += " It also refreshes the derived inferred interval."
+        }
+        return details
+    }
+
     func savePendingCaloricFavourite(endingActiveFast: Bool) {
         guard let favourite = caloricFavouritePending else { return }
         do {

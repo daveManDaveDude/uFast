@@ -10,6 +10,7 @@ final class AppSettingsRecord {
     var teaFavouriteMillilitres: Int = 300
     var coffeeFavouriteMillilitres: Int = 300
     var automaticLiveActivityPreferenceRawValue: String = "notAsked"
+    var inferredFastDetectionEnabled: Bool = false
 
     init(
         id: UUID = UUID(),
@@ -18,7 +19,8 @@ final class AppSettingsRecord {
         waterFavouriteMillilitres: Int = 500,
         teaFavouriteMillilitres: Int = 300,
         coffeeFavouriteMillilitres: Int = 300,
-        automaticLiveActivityPreference: AutomaticLiveActivityPreference = .notAsked
+        automaticLiveActivityPreference: AutomaticLiveActivityPreference = .notAsked,
+        inferredFastDetectionEnabled: Bool = false
     ) {
         self.id = id
         fastingGoalHours = fastingGoal.hours
@@ -27,6 +29,7 @@ final class AppSettingsRecord {
         self.teaFavouriteMillilitres = teaFavouriteMillilitres
         self.coffeeFavouriteMillilitres = coffeeFavouriteMillilitres
         automaticLiveActivityPreferenceRawValue = automaticLiveActivityPreference.rawValue
+        self.inferredFastDetectionEnabled = inferredFastDetectionEnabled
     }
 
     var fastingGoal: FastingGoal {
@@ -57,6 +60,10 @@ final class AppSettingsRecord {
         automaticLiveActivityPreferenceRawValue = preference.rawValue
     }
 
+    func setInferredFastDetectionEnabled(_ enabled: Bool) {
+        inferredFastDetectionEnabled = enabled
+    }
+
     var userVisibleSnapshot: AppSettingsUserVisibleSnapshot {
         AppSettingsUserVisibleSnapshot(
             fastingGoalHours: fastingGoalHours,
@@ -64,7 +71,8 @@ final class AppSettingsRecord {
             waterFavouriteMillilitres: waterFavouriteMillilitres,
             teaFavouriteMillilitres: teaFavouriteMillilitres,
             coffeeFavouriteMillilitres: coffeeFavouriteMillilitres,
-            automaticLiveActivityPreferenceRawValue: automaticLiveActivityPreferenceRawValue
+            automaticLiveActivityPreferenceRawValue: automaticLiveActivityPreferenceRawValue,
+            inferredFastDetectionEnabled: inferredFastDetectionEnabled
         )
     }
 
@@ -75,5 +83,6 @@ final class AppSettingsRecord {
         teaFavouriteMillilitres = snapshot.teaFavouriteMillilitres
         coffeeFavouriteMillilitres = snapshot.coffeeFavouriteMillilitres
         automaticLiveActivityPreferenceRawValue = snapshot.automaticLiveActivityPreferenceRawValue
+        inferredFastDetectionEnabled = snapshot.inferredFastDetectionEnabled
     }
 }

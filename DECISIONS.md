@@ -181,7 +181,9 @@ is shown.
 - **Status:** Accepted
 - **Decision:** Start fasts manually in the first slice. A later story may offer
   a non-destructive suggestion based on the latest confirmed caloric event.
-- **Consequence:** No event silently starts or rewrites a fast.
+- **Consequence:** No event silently starts or rewrites a fast. D-033 adds
+  explicit user conversion actions for an inferred candidate; detection alone
+  never creates a persisted fast.
 
 ## D-002 Goal choices
 
@@ -200,10 +202,18 @@ is shown.
 
 ## D-004 Catch-up horizon
 
-- **Status:** Accepted
-- **Decision:** Guide catch-up over seven days; continue to permit older manual entry.
-- **Consequence:** The guided flow stays bounded without blocking explicit older
-  manual entry; D-010 separately limits correction of an active fast.
+- **Status:** Accepted; amended 15 August 2026 by BF-101
+- **Historical decision:** Guide catch-up over seven days; continue to permit
+  older manual entry.
+- **Amended decision:** The guided Catch-up flow remains bounded to seven days.
+  In the separate Start-time journey, both a new manually backdated active fast
+  and an active-fast start correction are limited to the preceding inclusive 36
+  absolute hours. Editing a completed fast from History remains governed by its
+  existing completed-record contract.
+- **Consequence:** The seven-day Catch-up boundary is unchanged. The older
+  manual-entry allowance is superseded for manual active-fast starts, and the
+  shared 36-hour rule is defined with the active-start correction amendment in
+  D-010 and BR-16.
 
 ## D-005 Health data
 
@@ -270,13 +280,19 @@ is shown.
 
 ## D-010 Active-start correction window
 
-- **Status:** Accepted
+- **Status:** Superseded 15 August 2026 by BF-101
 - **Accepted:** 19 July 2026
-- **Decision:** Limit correction of an existing active fast's start to the
-  preceding 24 absolute hours. Continue to permit older starts when explicitly
-  creating a new backdated fast.
-- **Consequence:** Both the editor and domain service enforce the correction
-  window, while manual entry and later catch-up remain separate behaviors.
+- **Historical decision:** Limit correction of an existing active fast's start
+  to the preceding 24 absolute hours, while permitting older starts when
+  explicitly creating a new backdated fast.
+- **Superseding decision:** Use one inclusive 36 absolute-hour window for both
+  manual creation of a new active fast and correction of an existing active
+  fast's start. The exact instant at `AppClock.now - 36 hours` is valid; an
+  older or future instant is rejected. Completed-fast edits from History remain
+  outside this journey.
+- **Consequence:** The service and editor share the 36-hour source and
+  revalidate at save time. Existing active records older than the window remain
+  unchanged until the user explicitly selects a valid replacement.
 
 ## D-011 Conflicting saved fasts
 
@@ -756,3 +772,96 @@ is shown.
   through a tested compatibility path rather than silently deleted. The
   automatic-gap projector becomes the only source for new non-recorded fasting
   history.
+
+## D-033 Opt-in inferred fast detection
+
+- **Status:** Accepted
+- **Accepted:** 16 August 2026
+- **Decision:** Replace D-024's new automatic-gap behavior with an opt-in
+  inferred-fast projection. The setting is off by default for new and migrated
+  installs. When enabled, a caloric food event becomes eligible exactly eight
+  absolute hours after its timestamp; the interval starts at that exact source
+  instant, ends at the first later caloric food event before the source instant
+  plus the current goal duration and 12 absolute hours, or at the current
+  instant while below that maximum, and is capped by that maximum. A later
+  food closes the current inference only when it punctuates before the maximum,
+  while a qualifying historical interval remains available for explicit saving.
+- **Decision:** Inferred intervals are presentation-only and recalculated from
+  local events, the current goal, the opt-in setting and injected time. They do
+  not create a persisted inferred record or cache, and a persisted real fast
+  takes presentation precedence over an overlap.
+- **Decision:** Tapping a historical inferred interval and confirming **Save
+  fast** creates a normal completed recorded fast using the goal current at
+  conversion. Tapping the current inferred interval and confirming **Start
+  fast** creates the one active recorded fast at the source food timestamp.
+  Both actions revalidate source, boundaries, current goal and overlap rules
+  before committing.
+- **Decision:** Only an active recorded fast created by explicit user action
+  participates in the existing Today, WidgetKit and ActivityKit surfaces.
+  Inferred presentation and a saved completed inferred interval never trigger
+  those surfaces.
+- **Decision:** Keep the existing blue/sky visual role for continuity, while
+  using explicit inferred-fast copy and accessibility labels so color is not the
+  only distinction.
+- **Consequence:** D-033 supersedes D-024 for new inferred-fast projections
+  and amends D-001 and BR-22 through BR-25. Existing legacy reconstructed or
+  automatic-history data remains available through its compatibility contract;
+  History's ordinary Add journey remains food/drink entry. D-034 clarifies the
+  candidate lifecycle and active-start boundary.
+
+## D-034 Inferred candidate lifecycle and conversion boundary
+
+- **Status:** Accepted clarification to D-033
+- **Accepted:** 16 August 2026
+- **Decision:** An inferred interval is current/in progress only from its
+  eight-hour eligibility instant until the maximum of the current goal
+  duration plus 12 absolute hours, exclusive of that maximum, when no later
+  caloric food event punctuates it. At the maximum it remains visible as a
+  historical inferred interval with its capped end and offers **Save fast**,
+  not **Start fast**. A goal change recomputes this classification from the
+  authoritative current goal.
+- **Decision:** Historical Save fast persists the exact projected start and
+  end as a normal completed recorded fast. It remains eligible for normal
+  completed-fast validation even when its source is older than the 36-hour
+  active-start backdating boundary. Start fast is available only for the
+  current/in-progress state, which keeps every active conversion within the
+  existing active-start rule.
+- **Decision:** A persisted recorded fast suppresses the entire overlapping
+  inferred candidate. The projection never clips an inferred interval around a
+  real fast and never offers conversion that would bypass overlap validation.
+- **Consequence:** D-034 amends BR-24, BR-45 and BR-46 through BR-52 and makes
+  the source/end timestamps and no-later-food lifecycle testable without adding
+  a new persistence type.
+
+## D-035 Caloric event boundary integrity
+
+- **Status:** Accepted for OW-411 implementation
+- **Accepted:** 17 August 2026
+- **Decision:** A caloric boundary is one shared, framework-independent value
+  representing either an always-caloric food event or hydration explicitly
+  classified as caloric. The earliest boundary strictly after a fast start is
+  authoritative for active completion, completed-fast shortening, reconstructed
+  provenance and inferred source/punctuation. Equal timestamps use the shared
+  kind-and-identifier ordering and half-open interval semantics.
+- **Decision:** Event create, edit, delete and reclassification use one local
+  persistence transaction for the event and every affected persisted-fast
+  change. Active and completed impacts require context-specific confirmation;
+  cancel or failure restores the complete prior snapshot. Removing, moving
+  later or reclassifying a former persisted end never silently lengthens the
+  row. Reconstructed rows whose referenced end is no longer current retain
+  their end, retain the old reference as review evidence and become Needs
+  review.
+- **Decision:** Existing stores run an idempotent, atomic reconciliation pass
+  before settings, widget, Live Activity or feature consumers use them. It may
+  apply the same invariant to legacy rows, including capturing the current goal
+  when an active row is completed. Inferred intervals remain derived and
+  unpersisted; they use the complete caloric food/drink boundary stream.
+- **Decision:** Manual active-start correction and completed-fast create/edit
+  validation query the same authoritative caloric-boundary service and reject
+  proposals that cross a saved boundary. Post-commit History invalidation and
+  active-fast WidgetKit/ActivityKit effects remain downstream of a successful
+  local commit.
+- **Consequence:** D-035 supersedes the food-only source/punctuation wording in
+  D-033/D-034 and OW-410, and amends BR-06 through BR-08, BR-21 through BR-24
+  and BR-45 through BR-52. It does not add inferred persistence, network work,
+  health claims or automatic fast creation.

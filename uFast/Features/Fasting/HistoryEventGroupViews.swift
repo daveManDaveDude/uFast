@@ -69,9 +69,9 @@ struct HistoryEventGroupDisclosure: View {
     let resolveFood: (UUID) -> FoodEntrySnapshot?
     let resolveHydration: (UUID) -> HydrationEntrySnapshot?
     let saveFood: (UUID, FoodEntryDraft, Bool) throws -> Void
-    let deleteFood: (UUID) throws -> Void
+    let deleteFood: (UUID, Bool) throws -> Void
     let saveHydration: (UUID, HydrationEntryDraft, Bool) throws -> Void
-    let deleteHydration: (UUID) throws -> Void
+    let deleteHydration: (UUID, Bool) throws -> Void
     let onMutationSucceeded: (TemporalEventGroup, HistoryEventGroupMutation) -> TemporalEventGroup?
 
     init(
@@ -84,9 +84,9 @@ struct HistoryEventGroupDisclosure: View {
         resolveFood: @escaping (UUID) -> FoodEntrySnapshot?,
         resolveHydration: @escaping (UUID) -> HydrationEntrySnapshot?,
         saveFood: @escaping (UUID, FoodEntryDraft, Bool) throws -> Void,
-        deleteFood: @escaping (UUID) throws -> Void,
+        deleteFood: @escaping (UUID, Bool) throws -> Void,
         saveHydration: @escaping (UUID, HydrationEntryDraft, Bool) throws -> Void,
-        deleteHydration: @escaping (UUID) throws -> Void,
+        deleteHydration: @escaping (UUID, Bool) throws -> Void,
         onMutationSucceeded: @escaping (TemporalEventGroup, HistoryEventGroupMutation) -> TemporalEventGroup?
     ) {
         self.group = group
@@ -176,8 +176,8 @@ struct HistoryEventGroupDisclosure: View {
                         displayedGroup = refreshed
                     }
                 },
-                onDelete: {
-                    try deleteFood(presentation.record.id)
+                onDelete: { confirmingInferredImpact in
+                    try deleteFood(presentation.record.id, confirmingInferredImpact)
                     foodEditor = nil
                     if let refreshed = onMutationSucceeded(
                         displayedGroup,
@@ -208,8 +208,8 @@ struct HistoryEventGroupDisclosure: View {
                         displayedGroup = refreshed
                     }
                 },
-                onDelete: {
-                    try deleteHydration(presentation.record.id)
+                onDelete: { confirmingInferredImpact in
+                    try deleteHydration(presentation.record.id, confirmingInferredImpact)
                     hydrationEditor = nil
                     if let refreshed = onMutationSucceeded(
                         displayedGroup,

@@ -116,6 +116,47 @@ public struct RecordedFastInterval: Equatable, Sendable {
     }
 }
 
+/// Shared absolute-time boundary queries used by inferred presentation,
+/// persisted-fast reconciliation and fast-side validation.
+public enum CaloricBoundaryQuery {
+    public static func earliestBoundary(
+        after startDate: Date,
+        in boundaries: [CaloricBoundary]
+    ) -> CaloricBoundary? {
+        CaloricBoundaryOrdering.sorted(boundaries).first {
+            $0.occurredAt > startDate
+        }
+    }
+
+    public static func earliestBoundary(
+        after startDate: Date,
+        before endDate: Date,
+        in boundaries: [CaloricBoundary]
+    ) -> CaloricBoundary? {
+        earliestBoundary(after: startDate, in: boundaries).flatMap {
+            $0.occurredAt < endDate ? $0 : nil
+        }
+    }
+
+    public static func firstBlockingOpenBoundary(
+        after startDate: Date,
+        in boundaries: [CaloricBoundary]
+    ) -> CaloricBoundary? {
+        earliestBoundary(after: startDate, in: boundaries)
+    }
+
+    public static func firstBlockingEndBoundary(
+        after startDate: Date,
+        proposedEndDate: Date,
+        in boundaries: [CaloricBoundary]
+    ) -> CaloricBoundary? {
+        guard let boundary = earliestBoundary(after: startDate, in: boundaries),
+              proposedEndDate > boundary.occurredAt
+        else { return nil }
+        return boundary
+    }
+}
+
 public enum FastConflictChecker {
     public static func hasConflict(
         proposedStart: Date,

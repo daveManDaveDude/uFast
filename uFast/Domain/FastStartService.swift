@@ -12,13 +12,15 @@ protocol ActiveFastRepository {
 enum FastStartError: Error, Equatable {
     case futureStartTime
     case noActiveFast
-    case startTimeBeyondCorrectionLimit
+    case startTimeBeyondMaximumAge
     case conflict
+    case crossesCaloricBoundary(Date)
 }
 
 @MainActor
 final class FastStartService {
-    static let maximumCorrectionAge: TimeInterval = 24 * 60 * 60
+    /// The inclusive elapsed-time window for both manual starts and active-start corrections.
+    static let maximumStartAge: TimeInterval = 36 * 60 * 60
 
     private let repository: any ActiveFastRepository
     private let clock: any AppClock
@@ -36,9 +38,8 @@ final class FastStartService {
     }
 
     func startFast(at startDate: Date, goal: FastingGoal) throws -> FastRecord {
-        guard startDate <= clock.now else {
-            throw FastStartError.futureStartTime
-        }
+        try validate(startDate: startDate)
+        try validateCaloricBoundary(startDate: startDate)
 
         if let activeFast = try repository.activeFast() {
             return activeFast
@@ -57,12 +58,8 @@ final class FastStartService {
     }
 
     func correctActiveFastStart(to startDate: Date) throws -> FastRecord {
-        guard startDate <= clock.now else {
-            throw FastStartError.futureStartTime
-        }
-        guard startDate >= clock.now.addingTimeInterval(-Self.maximumCorrectionAge) else {
-            throw FastStartError.startTimeBeyondCorrectionLimit
-        }
+        try validate(startDate: startDate)
+        try validateCaloricBoundary(startDate: startDate)
         guard let activeFast = try repository.activeFast() else {
             throw FastStartError.noActiveFast
         }
@@ -85,5 +82,24 @@ final class FastStartService {
             excluding: excludedID,
             among: intervals
         )
+    }
+
+    private func validate(startDate: Date) throws {
+        let now = clock.now
+        guard startDate <= now else {
+            throw FastStartError.futureStartTime
+        }
+        guard startDate >= now.addingTimeInterval(-Self.maximumStartAge) else {
+            throw FastStartError.startTimeBeyondMaximumAge
+        }
+    }
+
+    private func validateCaloricBoundary(startDate: Date) throws {
+        guard let query = repository as? any CaloricBoundaryQuerying,
+              let boundary = try query.savedCaloricBoundaries().first(where: {
+                  $0.occurredAt > startDate
+              })
+        else { return }
+        throw FastStartError.crossesCaloricBoundary(boundary.occurredAt)
     }
 }

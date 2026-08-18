@@ -8,6 +8,13 @@
 **Target:** uFast 1.0.0, build 5 for App Store review; build 6 for current
 external TestFlight testing
 
+**Current state, 18 August 2026:** This historical execution plan is
+superseded for the active submission by `docs/APP_STORE_CONNECT_BUILD_10.md`.
+The current branch records build 10, which was uploaded successfully and is
+attached to App Store Connect iOS 1.0 in **Prepare for Submission**. The
+listing metadata and App Review notes were updated for build 10. **Add for
+Review** and **Submit for Review** remain pending account-owner actions.
+
 **Status update, 7 August 2026:** The release owner reports that build 5 has
 been submitted and is awaiting App Store Connect review. Build 6 has been
 published to TestFlight and external testers have been invited. The detailed

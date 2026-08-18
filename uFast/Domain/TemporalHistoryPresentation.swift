@@ -179,6 +179,10 @@ enum TemporalCarouselMovementPhase: Equatable, Sendable {
     var showsTimelineDetails: Bool {
         self == .settled
     }
+
+    var showsFutureReadOnlyAppearance: Bool {
+        self == .settled
+    }
 }
 
 enum TemporalHorizontalLayoutDirection: Equatable, Sendable {
