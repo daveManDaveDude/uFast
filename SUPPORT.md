@@ -26,3 +26,8 @@ For private support, email <ufast.app@gmail.com>. For public bug reports and
 feature requests, visit <https://github.com/daveManDaveDude/uFast/issues>.
 Please do not include sensitive health information in a public issue unless it
 is necessary to explain the problem.
+
+
+If you want to support uFast's development feel free to buy me a coffee, or better still submit a PR and add a feature! 
+
+https://buymeacoffee.com/krfwgzyvtl
