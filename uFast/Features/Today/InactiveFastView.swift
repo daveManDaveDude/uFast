@@ -1,4 +1,7 @@
 import SwiftUI
+import UFastCore
+
+// swiftlint:disable trailing_comma
 
 struct HydrationEditorPresentation: Identifiable {
     let id = UUID()
@@ -113,23 +116,35 @@ struct FoodEditorPresentation: Identifiable {
 }
 
 #Preview("Today · Empty") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.modelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Mixed timeline") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.todayTimelineModelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 2, drinkCount: 2),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Active fast and timeline") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.activeFastTodayTimelineModelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(
+            foodCount: 2,
+            drinkCount: 2,
+            hasActiveFast: true
+        ),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Long content") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.longTodayTimelineModelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 7, drinkCount: 6),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Persistence error") {
@@ -140,13 +155,85 @@ struct FoodEditorPresentation: Identifiable {
 }
 
 #Preview("Today · Dark") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.todayTimelineModelContainer)
-        .preferredColorScheme(.dark)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 2, drinkCount: 2),
+        clock: InactiveFastPreviewData.clock
+    )
+    .preferredColorScheme(.dark)
 }
 
 #Preview("Today · Accessibility size") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.todayTimelineModelContainer)
-        .environment(\.dynamicTypeSize, .accessibility3)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 2, drinkCount: 2),
+        clock: InactiveFastPreviewData.clock
+    )
+    .environment(\.dynamicTypeSize, .accessibility3)
+}
+
+private enum InactiveFastPreviewData {
+    static let clock = FixedAppClock(now: Date(timeIntervalSince1970: 1_800_000_000))
+
+    static func snapshot(
+        foodCount: Int = 0,
+        drinkCount: Int = 0,
+        hasActiveFast: Bool = false
+    ) -> TodayFeatureSnapshot {
+        let foods = [
+            "Porridge and berries",
+            "Vegetable soup and bread",
+            "Apple and peanut butter",
+            "Rice, tofu and greens",
+            "Yoghurt with seeds",
+            "Tomato pasta",
+            "Banana",
+        ]
+        let drinks = [
+            PreviewDrink(type: .water, name: nil, volume: 500, isCaloric: false),
+            PreviewDrink(type: .tea, name: nil, volume: 300, isCaloric: false),
+            PreviewDrink(type: .custom, name: "Coconut water", volume: 330, isCaloric: true),
+            PreviewDrink(type: .coffee, name: nil, volume: 300, isCaloric: false),
+        ]
+        let now = clock.now
+        return TodayFeatureSnapshot(
+            settings: [AppSettingsSnapshot()],
+            activeFasts: hasActiveFast
+                ? [
+                    ActiveFastSnapshot(
+                        id: UUID(),
+                        startDate: now.addingTimeInterval(-4 * 60 * 60),
+                        endDate: nil
+                    ),
+                ]
+                : [],
+            foodEntries: (0 ..< foodCount).map { index in
+                let occurredAt = now.addingTimeInterval(TimeInterval(-index * 37 * 60))
+                return FoodEntrySnapshot(
+                    id: UUID(),
+                    foodDescription: foods[index % foods.count],
+                    occurredAt: occurredAt,
+                    nutrition: FoodNutrition(energyKilocalories: Double(240 + index * 35)),
+                    isCaloric: true
+                )
+            },
+            hydrationEntries: (0 ..< drinkCount).map { index in
+                let drink = drinks[index % drinks.count]
+                return HydrationEntrySnapshot(
+                    id: UUID(),
+                    drinkType: drink.type,
+                    customName: drink.name,
+                    displayName: drink.name ?? drink.type.displayName,
+                    volumeMillilitres: drink.volume,
+                    occurredAt: now.addingTimeInterval(TimeInterval(-(index * 41 + 12) * 60)),
+                    isCaloric: drink.isCaloric
+                )
+            }
+        )
+    }
+
+    private struct PreviewDrink {
+        let type: HydrationDrinkType
+        let name: String?
+        let volume: Int
+        let isCaloric: Bool
+    }
 }

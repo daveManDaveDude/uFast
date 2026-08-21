@@ -120,6 +120,30 @@ final class CompletedFastServiceTests: XCTestCase {
         XCTAssertEqual(other.endDate, now.addingTimeInterval(-900))
     }
 
+    func testValidationReportsTheExactCaloricBoundaryInstant() throws {
+        let selected = completed(start: -7200, end: -3600)
+        let boundaryDate = now.addingTimeInterval(-5400)
+        let repository = CompletedFastRepositorySpy(fasts: [selected])
+        let boundary = CaloricBoundary(
+            reference: .init(kind: .food, id: UUID()),
+            occurredAt: boundaryDate,
+            description: "Lunch"
+        )
+        repository.caloricBoundaries = [boundary]
+        let service = makeService(repository)
+
+        XCTAssertEqual(
+            try service.validationError(
+                id: selected.id,
+                startDate: now.addingTimeInterval(-7200),
+                endDate: now.addingTimeInterval(-3600)
+            ),
+            .crossesCaloricBoundary(boundaryDate)
+        )
+        XCTAssertEqual(selected.startDate, now.addingTimeInterval(-7200))
+        XCTAssertEqual(selected.endDate, now.addingTimeInterval(-3600))
+    }
+
     func testTouchingBoundaryCanBeSaved() throws {
         let selected = completed(start: -7200, end: -3600)
         let other = completed(start: -1800, end: -900)
@@ -163,6 +187,7 @@ private struct FixedCompletedFastClock: AppClock {
 @MainActor
 private final class CompletedFastRepositorySpy: CompletedFastRepository {
     var fasts: [FastRecord]
+    var caloricBoundaries: [CaloricBoundary] = []
 
     init(fasts: [FastRecord]) {
         self.fasts = fasts
@@ -170,6 +195,10 @@ private final class CompletedFastRepositorySpy: CompletedFastRepository {
 
     func recordedFasts() throws -> [FastRecord] {
         fasts
+    }
+
+    func savedCaloricBoundaries() throws -> [CaloricBoundary] {
+        caloricBoundaries
     }
 
     func updateCompletedFast(

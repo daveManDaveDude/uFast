@@ -1,0 +1,12 @@
+{
+  "protected_root": "uFast/Features",
+  "forbidden_categories": {
+    "swiftdata_import": "import SwiftData",
+    "query": "@Query",
+    "model_context_environment": "@Environment(\\.modelContext)",
+    "model_context": "ModelContext",
+    "fetch_descriptor": "FetchDescriptor",
+    "persistent_record_type": "current SwiftData record type reference (AppSettingsRecord, FastRecord, FoodEntryRecord, HydrationEntryRecord, HydrationFavouriteRecord, or UnknownPeriodRecord)"
+  },
+  "allowlist": []
+}

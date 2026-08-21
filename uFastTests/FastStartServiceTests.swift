@@ -346,6 +346,49 @@ final class FastStartServiceTests: XCTestCase {
     }
 }
 
+extension FastStartServiceTests {
+    func testStartRejectsTheExactLaterCaloricBoundary() throws {
+        let boundaryDate = now.addingTimeInterval(-3600)
+        let repository = ActiveFastRepositorySpy()
+        let boundary = CaloricBoundary(
+            reference: .init(kind: .food, id: UUID()),
+            occurredAt: boundaryDate,
+            description: "Lunch"
+        )
+        repository.caloricBoundaries = [boundary]
+        let service = FastStartService(repository: repository, clock: FixedClock(now: now))
+
+        XCTAssertThrowsError(
+            try service.startFast(at: now.addingTimeInterval(-7200), goal: .default)
+        ) { error in
+            XCTAssertEqual(error as? FastStartError, .crossesCaloricBoundary(boundaryDate))
+        }
+        XCTAssertTrue(repository.savedFasts.isEmpty)
+    }
+
+    func testCorrectedStartRejectsTheExactLaterCaloricBoundary() throws {
+        let originalStart = now.addingTimeInterval(-7200)
+        let boundaryDate = now.addingTimeInterval(-3600)
+        let activeFast = FastRecord(startDate: originalStart, goalAtStart: .default)
+        let repository = ActiveFastRepositorySpy(savedFasts: [activeFast])
+        let boundary = CaloricBoundary(
+            reference: .init(kind: .hydration, id: UUID()),
+            occurredAt: boundaryDate,
+            description: "Juice"
+        )
+        repository.caloricBoundaries = [boundary]
+        let service = FastStartService(repository: repository, clock: FixedClock(now: now))
+
+        XCTAssertThrowsError(
+            try service.correctActiveFastStart(to: originalStart)
+        ) { error in
+            XCTAssertEqual(error as? FastStartError, .crossesCaloricBoundary(boundaryDate))
+        }
+        XCTAssertEqual(activeFast.startDate, originalStart)
+        XCTAssertTrue(repository.updatedStartDates.isEmpty)
+    }
+}
+
 private struct FixedClock: AppClock {
     let now: Date
 }
@@ -361,6 +404,7 @@ private final class MutableClock: AppClock, @unchecked Sendable {
 @MainActor
 private final class ActiveFastRepositorySpy: ActiveFastRepository {
     var savedFasts: [FastRecord]
+    var caloricBoundaries: [CaloricBoundary] = []
     var updatedStartDates: [Date] = []
     var saveError: Error?
 
@@ -374,6 +418,10 @@ private final class ActiveFastRepositorySpy: ActiveFastRepository {
 
     func recordedFasts() throws -> [FastRecord] {
         savedFasts
+    }
+
+    func savedCaloricBoundaries() throws -> [CaloricBoundary] {
+        caloricBoundaries
     }
 
     func saveNewActiveFast(_ fast: FastRecord) throws {

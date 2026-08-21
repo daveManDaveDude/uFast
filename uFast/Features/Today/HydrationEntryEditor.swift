@@ -1,4 +1,5 @@
 import SwiftUI
+import UFastCore
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
 // swiftlint:disable line_length statement_position
@@ -26,14 +27,6 @@ struct HydrationEntryEditor: View {
     let onSave: (HydrationEntryDraft, Bool) throws -> Void
     let onDelete: ((Bool) throws -> Void)?
     let onCancel: () -> Void
-
-    init(record: HydrationEntryRecord?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: ((Bool) throws -> Void)?, onCancel: @escaping () -> Void) {
-        self.init(
-            snapshot: record.map(HydrationEntrySnapshot.init), clock: clock,
-            activeFastStart: activeFastStart, initialDraft: initialDraft,
-            allowedRange: allowedRange, onSave: onSave, onDelete: onDelete, onCancel: onCancel
-        )
-    }
 
     init(snapshot record: HydrationEntrySnapshot?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: ((Bool) throws -> Void)?, onCancel: @escaping () -> Void) {
         self.record = record; self.clock = clock; self.activeFastStart = activeFastStart
@@ -150,15 +143,14 @@ struct HydrationEntryEditor: View {
     private func save() {
         guard let draft = validDraft else { return }
         do { try onSave(draft, false) }
-        catch let HydrationEntrySaveError.confirmationRequiredWithImpact(context) { showConfirmation(context, draft: draft) }
-        catch let HydrationEntrySaveError.completedConfirmationWithImpact(context) { showConfirmation(context, draft: draft) }
-        catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) { showConfirmation(context, draft: draft) }
-        catch HydrationEntrySaveError.confirmationRequired { showConfirmation(.init(fallbackKind: .active), draft: draft) }
-        catch HydrationEntrySaveError.completedFastConfirmationRequired { showConfirmation(.init(fallbackKind: .completed), draft: draft) }
-        catch HydrationEntrySaveError.inferredFastConfirmationRequired { showConfirmation(.init(fallbackKind: .inferred), draft: draft) }
-        catch HydrationEntrySaveError.eventAtActiveFastStart { saveError = "Choose a time after the fast started, or change the fast start time." }
-        catch HydrationEntrySaveError.fastConflict { saveError = "This fast overlaps another recorded fast. Correct the fast before saving." }
-        catch { saveError = "Your drink couldn’t be saved. Please try again." }
+        catch let error as HydrationEntrySaveError {
+            switch error.presentation {
+            case let .confirmation(context): showConfirmation(context, draft: draft)
+            case .eventAtActiveFastStart: saveError = "Choose a time after the fast started, or change the fast start time."
+            case .fastConflict: saveError = "This fast overlaps another recorded fast. Correct the fast before saving."
+            case .saveFailure: saveError = "Your drink couldn’t be saved. Please try again."
+            }
+        } catch { saveError = "Your drink couldn’t be saved. Please try again." }
     }
 
     private func saveEndingFast() {
@@ -226,12 +218,12 @@ struct HydrationEntryEditor: View {
     private func delete() {
         do {
             try onDelete?(false)
-        } catch let HydrationEntrySaveError.confirmationRequiredWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let HydrationEntrySaveError.completedConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
+        } catch let error as HydrationEntrySaveError {
+            if case let .confirmation(context) = error.presentation {
+                showConfirmation(context, pendingDeletion: true)
+            } else {
+                saveError = "Your drink couldn’t be deleted. Please try again."
+            }
         } catch {
             saveError = "Your drink couldn’t be deleted. Please try again."
         }

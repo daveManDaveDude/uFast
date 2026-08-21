@@ -1,20 +1,27 @@
 import Foundation
 import SwiftData
 
-enum HydrationEntryPersistenceError: Error { case simulatedSaveFailure }
+enum HydrationEntryPersistenceError: Error {
+    case simulatedSaveFailure
+    case duplicateRecord
+}
 
 @MainActor
-protocol HydrationEntryRepository {
+protocol HydrationEntryRepository: CaloricBoundaryQuerying {
     func activeFast() throws -> FastRecord?
-    func recordedFasts() throws -> [FastRecord]
-    func create(_ draft: HydrationEntryDraft, at creationDate: Date) throws -> HydrationEntryRecord
     func create(
         _ draft: HydrationEntryDraft,
         at creationDate: Date,
         ending activeFast: FastRecord,
         goal: FastingGoal
     ) throws -> HydrationEntryRecord
-    func update(_ record: HydrationEntryRecord, with draft: HydrationEntryDraft, at updateDate: Date) throws
+    func create(
+        _ draft: HydrationEntryDraft,
+        at creationDate: Date,
+        ending activeFast: FastRecord,
+        goal: FastingGoal,
+        recordID: UUID?
+    ) throws -> HydrationEntryRecord
     func update(
         _ record: HydrationEntryRecord,
         with draft: HydrationEntryDraft,
@@ -22,22 +29,89 @@ protocol HydrationEntryRepository {
         ending activeFast: FastRecord,
         goal: FastingGoal
     ) throws
-    func delete(_ record: HydrationEntryRecord) throws
+    func caloricEventImpact(
+        for draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?
+    ) throws -> CaloricEventImpact
+    func caloricEventImpact(
+        for draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?,
+        recordID: UUID?
+    ) throws -> CaloricEventImpact
+    func saveCaloricEvent(
+        _ draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?,
+        goal: FastingGoal
+    ) throws
+    func saveCaloricEvent(
+        _ draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?,
+        goal: FastingGoal,
+        recordID: UUID?
+    ) throws
+}
+
+extension HydrationEntryRepository {
+    func caloricEventImpact(
+        for draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?
+    ) throws -> CaloricEventImpact {
+        try caloricEventImpact(for: draft, replacing: record, recordID: nil)
+    }
+
+    func create(
+        _ draft: HydrationEntryDraft,
+        at creationDate: Date,
+        ending activeFast: FastRecord,
+        goal: FastingGoal,
+        recordID _: UUID?
+    ) throws -> HydrationEntryRecord {
+        try create(draft, at: creationDate, ending: activeFast, goal: goal)
+    }
+
+    func caloricEventImpact(
+        for draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?,
+        recordID _: UUID?
+    ) throws -> CaloricEventImpact {
+        try caloricEventImpact(for: draft, replacing: record)
+    }
+
+    func saveCaloricEvent(
+        _ draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?,
+        goal: FastingGoal,
+        recordID _: UUID?
+    ) throws {
+        try saveCaloricEvent(draft, replacing: record, goal: goal)
+    }
+
+    func saveCaloricEvent(
+        _ draft: HydrationEntryDraft,
+        replacing record: HydrationEntryRecord?,
+        goal: FastingGoal
+    ) throws {
+        try saveCaloricEvent(draft, replacing: record, goal: goal, recordID: nil)
+    }
 }
 
 @MainActor
-final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, CaloricHydrationRepository {
+// swiftlint:disable:next type_body_length
+final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
     private let clock: any AppClock
+    private let observationSink: BoundaryQueryObservationSink
 
     init(
         modelContext: ModelContext,
         simulateSaveFailure: Bool = false,
-        clock: any AppClock = SystemAppClock()
+        clock: any AppClock = SystemAppClock(),
+        observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink()
     ) {
         self.modelContext = modelContext
         self.clock = clock
+        self.observationSink = observationSink
         transaction = PersistenceTransaction(
             modelContext: modelContext,
             saveAction: simulateSaveFailure ? {
@@ -80,7 +154,23 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
         ending activeFast: FastRecord,
         goal: FastingGoal
     ) throws -> HydrationEntryRecord {
-        let record = makeRecord(draft, creationDate)
+        try create(
+            draft,
+            at: creationDate,
+            ending: activeFast,
+            goal: goal,
+            recordID: nil
+        )
+    }
+
+    func create(
+        _ draft: HydrationEntryDraft,
+        at creationDate: Date,
+        ending activeFast: FastRecord,
+        goal: FastingGoal,
+        recordID: UUID?
+    ) throws -> HydrationEntryRecord {
+        let record = makeRecord(draft, creationDate, id: recordID)
         _ = activeFast
         try saveCaloricEvent(
             draft,
@@ -111,30 +201,72 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
         try ActiveFastAuthority.fetch(in: modelContext)
     }
 
-    func recordedFasts() throws -> [FastRecord] {
-        try modelContext.fetch(FetchDescriptor<FastRecord>())
+    func earliestCaloricBoundary(after startDate: Date) throws -> CaloricBoundary? {
+        let query = SwiftDataCaloricBoundaryQueryAdapter(
+            modelContext: modelContext,
+            observationSink: observationSink
+        )
+        let food = try query.earliestFood(after: startDate).first.map {
+            CaloricBoundary(
+                reference: .init(kind: .food, id: $0.id),
+                occurredAt: $0.occurredAt,
+                description: $0.foodDescription
+            )
+        }
+        let hydration = try query.earliestCaloricHydration(after: startDate).first.map {
+            CaloricBoundary(
+                reference: .init(kind: .hydration, id: $0.id),
+                occurredAt: $0.occurredAt,
+                description: $0.displayName
+            )
+        }
+        return CaloricBoundaryOrdering.sorted([food, hydration].compactMap(\.self)).first
+    }
+
+    func firstCaloricBoundary(in interval: Range<Date>) throws -> CaloricBoundary? {
+        let query = SwiftDataCaloricBoundaryQueryAdapter(
+            modelContext: modelContext,
+            observationSink: observationSink
+        )
+        let food = try query.firstFood(in: interval).first.map {
+            CaloricBoundary(
+                reference: .init(kind: .food, id: $0.id),
+                occurredAt: $0.occurredAt,
+                description: $0.foodDescription
+            )
+        }
+        let hydration = try query.firstCaloricHydration(in: interval).first.map {
+            CaloricBoundary(
+                reference: .init(kind: .hydration, id: $0.id),
+                occurredAt: $0.occurredAt,
+                description: $0.displayName
+            )
+        }
+        return CaloricBoundaryOrdering.sorted([food, hydration].compactMap(\.self)).first
     }
 
     func delete(_ record: HydrationEntryRecord) throws {
         let oldReference = CaloricBoundaryReference(kind: .hydration, id: record.id)
         let oldOccurredAt = record.occurredAt
         let oldIsCaloric = record.isCaloric
-        let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
-        let resulting = try planner.allBoundaries(excluding: oldReference)
-        let fasts = try planner.fasts()
-        let snapshots = planner.snapshots(for: fasts)
-        modelContext.delete(record)
-        _ = planner.apply(
-            CaloricBoundaryMutation(
+        let planner = CaloricBoundaryPersistencePlanner(
+            modelContext: modelContext,
+            observationSink: observationSink
+        )
+        let bounded = try planner.boundedMutation(
+            for: CaloricBoundaryMutation(
                 oldReference: oldReference,
                 oldOccurredAt: oldOccurredAt,
                 oldIsCaloric: oldIsCaloric,
                 newBoundary: nil,
-                resultingBoundaries: resulting
+                resultingBoundaries: []
             ),
-            to: fasts,
             currentGoal: .default
         )
+        let fasts = bounded.fasts
+        let snapshots = planner.snapshots(for: fasts)
+        modelContext.delete(record)
+        _ = planner.apply(bounded.mutation, to: fasts, currentGoal: .default)
         try transaction.save {
             for fast in fasts {
                 snapshots[fast.id]?.restore(fast)
@@ -144,27 +276,40 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
 
     func caloricEventImpact(forDeletion record: HydrationEntryRecord) throws -> CaloricEventImpact {
         let oldReference = CaloricBoundaryReference(kind: .hydration, id: record.id)
-        let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
-        let mutation = try CaloricBoundaryMutation(
-            oldReference: oldReference,
-            oldOccurredAt: record.occurredAt,
-            oldIsCaloric: record.isCaloric,
-            newBoundary: nil,
-            resultingBoundaries: planner.allBoundaries(excluding: oldReference)
+        let planner = CaloricBoundaryPersistencePlanner(
+            modelContext: modelContext,
+            observationSink: observationSink
         )
-        return try planner.impact(for: mutation, fasts: planner.fasts())
+        let bounded = try planner.boundedMutation(
+            for: CaloricBoundaryMutation(
+                oldReference: oldReference,
+                oldOccurredAt: record.occurredAt,
+                oldIsCaloric: record.isCaloric,
+                newBoundary: nil,
+                resultingBoundaries: []
+            ),
+            currentGoal: .default
+        )
+        return planner.impact(for: bounded.mutation, fasts: bounded.fasts)
     }
 
     func savedCaloricBoundaries() throws -> [CaloricBoundary] {
-        try CaloricBoundaryPersistencePlanner(modelContext: modelContext).allBoundaries()
+        try CaloricBoundaryPersistencePlanner(
+            modelContext: modelContext,
+            observationSink: observationSink
+        ).allBoundaries()
     }
 
     func caloricEventImpact(
         for draft: HydrationEntryDraft,
-        replacing record: HydrationEntryRecord?
+        replacing record: HydrationEntryRecord?,
+        recordID: UUID? = nil
     ) throws -> CaloricEventImpact {
         let oldReference = record.map { CaloricBoundaryReference(kind: .hydration, id: $0.id) }
-        let reference = oldReference ?? CaloricBoundaryReference(kind: .hydration, id: UUID())
+        let reference = oldReference ?? CaloricBoundaryReference(
+            kind: .hydration,
+            id: recordID ?? UUID()
+        )
         let newBoundary = draft.isCaloric
             ? CaloricBoundary(
                 reference: reference,
@@ -172,25 +317,32 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
                 description: draft.customName ?? draft.type.displayName
             )
             : nil
-        let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
-        let mutation = try CaloricBoundaryMutation(
-            oldReference: oldReference,
-            oldOccurredAt: record?.occurredAt,
-            oldIsCaloric: record?.isCaloric ?? false,
-            newBoundary: newBoundary,
-            resultingBoundaries: planner.allBoundaries(excluding: oldReference).adding(newBoundary)
+        let planner = CaloricBoundaryPersistencePlanner(
+            modelContext: modelContext,
+            observationSink: observationSink
         )
-        return try planner.impact(for: mutation, fasts: planner.fasts())
+        let bounded = try planner.boundedMutation(
+            for: CaloricBoundaryMutation(
+                oldReference: oldReference,
+                oldOccurredAt: record?.occurredAt,
+                oldIsCaloric: record?.isCaloric ?? false,
+                newBoundary: newBoundary,
+                resultingBoundaries: []
+            ),
+            currentGoal: .default
+        )
+        return planner.impact(for: bounded.mutation, fasts: bounded.fasts)
     }
 
     func saveCaloricEvent(
         _ draft: HydrationEntryDraft,
         replacing record: HydrationEntryRecord?,
-        goal: FastingGoal
+        goal: FastingGoal,
+        recordID: UUID? = nil
     ) throws {
         let now = clock.now
         let createdRecord = record == nil
-            ? makeRecord(draft, now)
+            ? makeRecord(draft, now, id: recordID)
             : nil
         try saveCaloricEvent(
             draft,
@@ -220,12 +372,22 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
                 description: draft.customName ?? draft.type.displayName
             )
             : nil
-        let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
-        let resulting = try planner.allBoundaries(excluding: oldReference).adding(newBoundary)
-        let fasts = try planner.fasts()
+        let planner = CaloricBoundaryPersistencePlanner(
+            modelContext: modelContext,
+            observationSink: observationSink
+        )
+        let bounded = try planner.boundedMutation(
+            for: CaloricBoundaryMutation(
+                oldReference: oldReference,
+                oldOccurredAt: record?.occurredAt,
+                oldIsCaloric: record?.isCaloric ?? false,
+                newBoundary: newBoundary,
+                resultingBoundaries: []
+            ),
+            currentGoal: goal
+        )
+        let fasts = bounded.fasts
         let snapshots = planner.snapshots(for: fasts)
-        let oldOccurredAt = record?.occurredAt
-        let oldIsCaloric = record?.isCaloric ?? false
         let oldDraft = record?.draft
         let oldUpdatedAt = record?.updatedAt
         if let record {
@@ -233,17 +395,7 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
         } else if let createdRecord {
             modelContext.insert(createdRecord)
         }
-        _ = planner.apply(
-            CaloricBoundaryMutation(
-                oldReference: oldReference,
-                oldOccurredAt: oldOccurredAt,
-                oldIsCaloric: oldIsCaloric,
-                newBoundary: newBoundary,
-                resultingBoundaries: resulting
-            ),
-            to: fasts,
-            currentGoal: goal
-        )
+        _ = planner.apply(bounded.mutation, to: fasts, currentGoal: goal)
         try transaction.save {
             if let record, let oldDraft, let oldUpdatedAt {
                 record.update(from: oldDraft, at: oldUpdatedAt)
@@ -256,9 +408,11 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository, Caloric
 
     private func makeRecord(
         _ draft: HydrationEntryDraft,
-        _ createdAt: Date
+        _ createdAt: Date,
+        id: UUID? = nil
     ) -> HydrationEntryRecord {
         HydrationEntryRecord(
+            id: id ?? UUID(),
             type: draft.type,
             customName: draft.customName,
             volumeMillilitres: draft.volumeMillilitres,

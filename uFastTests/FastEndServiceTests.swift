@@ -177,6 +177,7 @@ private final class MutableClock: AppClock, @unchecked Sendable {
 @MainActor
 private final class FastEndRepositorySpy: ActiveFastRepository {
     var fasts: [FastRecord]
+    var caloricBoundaries: [CaloricBoundary] = []
     var completions: [(Date, FastingGoal)] = []
     var saveError: Error?
 
@@ -190,6 +191,10 @@ private final class FastEndRepositorySpy: ActiveFastRepository {
 
     func recordedFasts() throws -> [FastRecord] {
         fasts
+    }
+
+    func savedCaloricBoundaries() throws -> [CaloricBoundary] {
+        caloricBoundaries
     }
 
     func saveNewActiveFast(_ fast: FastRecord) throws {

@@ -865,3 +865,30 @@ is shown.
   D-033/D-034 and OW-410, and amends BR-06 through BR-08, BR-21 through BR-24
   and BR-45 through BR-52. It does not add inferred persistence, network work,
   health claims or automatic fast creation.
+
+## D-036 Local source-bound verification for solo development
+
+- **Status:** Accepted
+- **Accepted:** 20 August 2026
+- **Decision:** uFast's required engineering and release gates run locally. As
+  the sole developer, David performs the focused, unit, build, lint, analyzer,
+  release-configuration and source-frozen UI gates on the development Mac.
+  GitHub Actions may be used later as independent clean-machine evidence, but
+  it is not a required acceptance or release authority.
+- **Decision:** Verification evidence is bound to a deterministic content-based
+  source-freeze identity covering the relevant tracked and untracked product,
+  test, project, script and configuration inputs. It also records the current
+  commit and clean/dirty state. The same content identity remains comparable
+  when an accepted working tree is subsequently committed.
+- **Decision:** A real upload requires a clean committed tree and matching
+  source-bound release/UI evidence. During an uncommitted implementation sprint,
+  the gate may produce candidate evidence for the frozen working tree but must
+  not describe it as upload-authorised.
+- **Decision:** The upload workflow increments the build number only after its
+  preflight gate passes. If archive, export or upload fails, it restores the
+  exact pre-run project file when the script's own increment is the only change;
+  a successful upload retains the increment. Concurrent or unrelated source
+  changes cause the workflow to stop rather than overwrite them.
+- **Consequence:** MNT-001 is not required for the post-MVP maintainability
+  sprint. Local automation must be truthful, fail closed and preserve durable
+  evidence; a green message that skipped a required input is a defect.

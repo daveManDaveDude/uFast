@@ -84,9 +84,11 @@ struct InferredFastConversionPresentation: Identifiable {
 }
 
 #Preview("History · Empty") {
-    HistoryView().modelContainer(PreviewFixtures.modelContainer)
+    HistoryFeatureHost(clock: SystemAppClock(), isTabSelected: true, onSelectToday: {})
+        .modelContainer(PreviewFixtures.modelContainer)
 }
 
 #Preview("History · Populated") {
-    HistoryView().modelContainer(PreviewFixtures.completedFastModelContainer)
+    HistoryFeatureHost(clock: SystemAppClock(), isTabSelected: true, onSelectToday: {})
+        .modelContainer(PreviewFixtures.completedFastModelContainer)
 }

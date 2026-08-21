@@ -367,13 +367,6 @@ actor SwiftDataHistoryMotionRangeLoader {
         self.container = container
     }
 
-    func merge(
-        _ chunks: [HistoryMotionChunk],
-        window: DateInterval
-    ) -> HistoryMotionPresentation? {
-        SwiftDataHistoryDataProvider.mergeMotionChunks(chunks, window: window)
-    }
-
     func load(
         coverage: HistoryMotionCoverage,
         calendar: Calendar,

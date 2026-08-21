@@ -42,7 +42,7 @@ struct RootTabView: View {
         case .settings:
             SettingsFeatureHost()
         case .history:
-            HistoryView(
+            HistoryFeatureHost(
                 clock: clock,
                 isTabSelected: selection == .history,
                 onSelectToday: { selection = .today }

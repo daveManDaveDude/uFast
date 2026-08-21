@@ -16,6 +16,8 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedFavouriteValidation = false
     var seedCaloricFavouriteActiveFast = false
     var seedInferredFast = false
+    var seedTodayMultiYear = false
+    var seedCaloricBoundaryMultiYear = false
 
     static let disabled = Self()
 }
@@ -77,7 +79,11 @@ struct AppLaunchConfiguration {
             seedFavouriteDuplicateName: arguments.contains("--seed-favourite-duplicate-name"),
             seedFavouriteValidation: arguments.contains("--seed-favourite-validation"),
             seedCaloricFavouriteActiveFast: arguments.contains("--seed-caloric-favourite-active-fast"),
-            seedInferredFast: arguments.contains("--seed-inferred-fast")
+            seedInferredFast: arguments.contains("--seed-inferred-fast"),
+            seedTodayMultiYear: arguments.contains("--seed-today-multi-year"),
+            seedCaloricBoundaryMultiYear: arguments.contains(
+                "--seed-caloric-boundary-multi-year"
+            )
         )
         commands = Self.commandConfiguration(from: arguments)
         liveActivityAdapter = Self.liveActivityAdapterConfiguration(from: arguments)

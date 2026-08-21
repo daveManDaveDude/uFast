@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable large_tuple line_length opening_brace statement_position
+// swiftlint:disable large_tuple line_length opening_brace statement_position trailing_comma
 
 struct SettingsView: View {
     @Environment(\.applicationCommands) private var applicationCommands
@@ -282,12 +282,26 @@ struct FavouriteAmountTextField: UIViewRepresentable {
 }
 
 #Preview("Settings") {
-    SettingsFeatureHost()
-        .modelContainer(PreviewFixtures.modelContainer)
+    SettingsView(snapshot: SettingsViewPreviewData.snapshot)
 }
 
 #Preview("Settings · Accessibility") {
-    SettingsFeatureHost()
-        .modelContainer(PreviewFixtures.modelContainer)
+    SettingsView(snapshot: SettingsViewPreviewData.snapshot)
         .environment(\.dynamicTypeSize, .accessibility3)
+}
+
+private enum SettingsViewPreviewData {
+    static let snapshot = SettingsFeatureSnapshot(
+        settings: [AppSettingsSnapshot()],
+        hydrationFavourites: [
+            HydrationFavouriteSnapshot(
+                id: UUID(),
+                name: "Sparkling water",
+                volumeMillilitres: 500,
+                isCaloric: false,
+                createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+                updatedAt: Date(timeIntervalSince1970: 1_800_000_000)
+            ),
+        ]
+    )
 }

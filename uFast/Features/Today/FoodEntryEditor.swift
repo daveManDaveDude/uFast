@@ -254,22 +254,17 @@ struct FoodEntryEditor: View {
         do {
             try onSave(draft, false)
             saveError = nil
-        } catch let FoodEntrySaveError.confirmationRequiredWithImpact(context) {
-            showConfirmation(context, draft: draft)
-        } catch let FoodEntrySaveError.completedConfirmationWithImpact(context) {
-            showConfirmation(context, draft: draft)
-        } catch let FoodEntrySaveError.inferredConfirmationWithImpact(context) {
-            showConfirmation(context, draft: draft)
-        } catch FoodEntrySaveError.confirmationRequired {
-            showConfirmation(.init(fallbackKind: .active), draft: draft)
-        } catch FoodEntrySaveError.completedFastConfirmationRequired {
-            showConfirmation(.init(fallbackKind: .completed), draft: draft)
-        } catch FoodEntrySaveError.inferredFastConfirmationRequired {
-            showConfirmation(.init(fallbackKind: .inferred), draft: draft)
-        } catch FoodEntrySaveError.eventAtActiveFastStart {
-            saveError = "Choose a time after the fast started, or change the fast start time."
-        } catch FoodEntrySaveError.fastConflict {
-            saveError = "This fast overlaps another recorded fast. Correct the fast before saving."
+        } catch let error as FoodEntrySaveError {
+            switch error.presentation {
+            case let .confirmation(context):
+                showConfirmation(context, draft: draft)
+            case .eventAtActiveFastStart:
+                saveError = "Choose a time after the fast started, or change the fast start time."
+            case .fastConflict:
+                saveError = "This fast overlaps another recorded fast. Correct the fast before saving."
+            case .saveFailure:
+                saveError = "Your food event couldn’t be saved. Please try again."
+            }
         } catch {
             saveError = "Your food event couldn’t be saved. Please try again."
         }
@@ -303,12 +298,12 @@ struct FoodEntryEditor: View {
         do {
             try onDelete?(false)
             saveError = nil
-        } catch let FoodEntrySaveError.confirmationRequiredWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let FoodEntrySaveError.completedConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let FoodEntrySaveError.inferredConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
+        } catch let error as FoodEntrySaveError {
+            if case let .confirmation(context) = error.presentation {
+                showConfirmation(context, pendingDeletion: true)
+            } else {
+                saveError = "Your food event couldn’t be deleted. Please try again."
+            }
         } catch {
             saveError = "Your food event couldn’t be deleted. Please try again."
         }

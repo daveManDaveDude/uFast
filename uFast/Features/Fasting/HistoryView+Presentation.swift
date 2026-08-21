@@ -3,6 +3,30 @@ import SwiftUI
 // swiftlint:disable file_length opening_brace
 
 extension HistoryView {
+    var historyInvalidationRevision: Int {
+        historyPresentationInvalidation?.revision ?? 0
+    }
+
+    var historyDateNavigator: some View {
+        TemporalDateNavigator(
+            dates: dateNavigatorDates,
+            selection: selectedDateBinding(source: .dateChip),
+            maximumDate: historyDisplayMaximumDay,
+            readOnlyAfterDate: clock.now,
+            showsReadOnlyAppearance: showsFutureReadOnlyAppearance,
+            automaticScrollEnabled: !temporalMovementPhase.suppressesAutomaticAlignment && !isDateRailMoving,
+            coupledPresentation: nil,
+            presentationDay: selectedDate,
+            onDirectScrollPhaseChange: updateDateRailMovement,
+            onRailSettled: { day in selectDay(day, source: .dateRailSettlement) }
+        )
+        .padding(.horizontal, UFastTheme.Spacing.standard)
+        .allowsHitTesting(
+            !temporalMovementPhase.suppressesAutomaticAlignment && !motionInitialLoading
+        )
+        .id(historyInteractionRevision)
+    }
+
     @ViewBuilder
     var motionUnavailableNotice: some View {
         if motionSnapshot == nil {
@@ -14,7 +38,7 @@ extension HistoryView {
                     .font(.subheadline)
                     .foregroundStyle(UFastTheme.secondaryText)
                 Button("Try again") {
-                    _ = ensureMotionRunway(around: selectedDate)
+                    _ = model.ensureMotionRunway(around: selectedDate)
                 }
                 .buttonStyle(UFastSecondaryButtonStyle())
                 .accessibilityIdentifier("history.motion-retry")
@@ -30,11 +54,7 @@ extension HistoryView {
                     .foregroundStyle(UFastTheme.secondaryText)
                 Spacer()
                 Button("Retry") {
-                    let failed = motionFailedEdges
-                    motionFailedEdges.removeAll()
-                    for edge in failed {
-                        requestMotionExtension(edge)
-                    }
+                    model.retryFailedMotionExtensions()
                 }
                 .buttonStyle(UFastSecondaryButtonStyle())
                 .accessibilityIdentifier("history.motion-extension-retry")
@@ -298,17 +318,17 @@ extension HistoryView {
         // untouched.  Carousel settlement stays on the already loaded runway.
         if source != .carousel,
            !(motionSnapshot?.coverage.contains(change.day, calendar: calendar) ?? false),
-           !ensureMotionRunway(around: change.day)
+           !model.ensureMotionRunway(around: change.day)
         {
             return
         }
-        selectedDate = change.day
+        model.setSelectedDate(change.day)
         if let window = TemporalHistoryPresentation.ribbonWindow(
             containing: change.day,
             calendar: calendar
         ) {
             settledVisibleWindow = window
-            reloadHistory(in: window.interval)
+            _ = model.reloadHistory(in: window.interval)
         }
         if source != .carousel || temporalMovementPhase == .settled {
             ensureHistoryDayCoverage(around: change.day)
@@ -354,7 +374,7 @@ extension HistoryView {
     func ensureHistoryDayCoverage(around date: Date) {
         // Retained name for the existing motion coordination call sites.  The
         // HS-101 coordinator owns both the loaded dates and projection.
-        ensureMotionRunway(around: date)
+        _ = model.ensureMotionRunway(around: date)
     }
 
     func resetToCurrentDayIfSelected() {
@@ -422,7 +442,7 @@ extension HistoryView {
                 calendar: calendar
             )?.interval
         else { return nil }
-        reloadHistoryAfterMutation(in: visibleInterval)
+        _ = model.reloadHistoryAfterMutation(in: visibleInterval)
         var presentationCalendar = calendar
         presentationCalendar.timeZone = timeZone
         let groups = TemporalEventGrouping.project(
@@ -541,9 +561,9 @@ extension HistoryView {
                 onCoupledPresentationChange: coupledScrollPresentation.handle,
                 onSettledVisibleWindow: { window in
                     settledVisibleWindow = window
-                    reloadHistory(in: window.interval)
+                    _ = model.reloadHistory(in: window.interval)
                 },
-                onPrefetchIntentAt: requestMotionExtension
+                onPrefetchIntentAt: model.requestMotionExtension
             )
             .padding(.horizontal, UFastTheme.Spacing.standard)
             .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)

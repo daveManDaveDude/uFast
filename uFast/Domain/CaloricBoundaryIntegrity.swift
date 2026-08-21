@@ -111,38 +111,29 @@ enum CaloricBoundaryImpactAnalyzer {
     }
 }
 
-/// Optional repository capability. Existing pure services remain usable with
-/// lightweight spies, while SwiftData-backed commands use the authoritative
-/// event stream for every boundary-sensitive mutation.
+/// Required repository dependency for every boundary-sensitive mutation.
+/// Keeping this requirement in the repository contract makes omission a
+/// compile-time error instead of silently skipping an integrity check.
 @MainActor
 protocol CaloricBoundaryQuerying {
     func savedCaloricBoundaries() throws -> [CaloricBoundary]
+    func earliestCaloricBoundary(after startDate: Date) throws -> CaloricBoundary?
+    func firstCaloricBoundary(in interval: Range<Date>) throws -> CaloricBoundary?
 }
 
-@MainActor
-protocol CaloricBoundaryAwareFoodEntryRepository: CaloricBoundaryQuerying {
-    func caloricEventImpact(
-        for draft: FoodEntryDraft,
-        replacing record: FoodEntryRecord?
-    ) throws -> CaloricEventImpact
-    func caloricEventImpact(forDeletion record: FoodEntryRecord) throws -> CaloricEventImpact
-    func saveCaloricEvent(
-        _ draft: FoodEntryDraft,
-        replacing record: FoodEntryRecord?,
-        goal: FastingGoal
-    ) throws
-}
+extension CaloricBoundaryQuerying {
+    func earliestCaloricBoundary(after startDate: Date) throws -> CaloricBoundary? {
+        try CaloricBoundaryQuery.earliestBoundary(
+            after: startDate,
+            in: savedCaloricBoundaries()
+        )
+    }
 
-@MainActor
-protocol CaloricHydrationRepository: CaloricBoundaryQuerying {
-    func caloricEventImpact(
-        for draft: HydrationEntryDraft,
-        replacing record: HydrationEntryRecord?
-    ) throws -> CaloricEventImpact
-    func caloricEventImpact(forDeletion record: HydrationEntryRecord) throws -> CaloricEventImpact
-    func saveCaloricEvent(
-        _ draft: HydrationEntryDraft,
-        replacing record: HydrationEntryRecord?,
-        goal: FastingGoal
-    ) throws
+    func firstCaloricBoundary(in interval: Range<Date>) throws -> CaloricBoundary? {
+        try CaloricBoundaryQuery.earliestBoundary(
+            after: interval.lowerBound,
+            before: interval.upperBound,
+            in: savedCaloricBoundaries()
+        )
+    }
 }

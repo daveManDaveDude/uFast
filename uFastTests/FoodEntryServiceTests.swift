@@ -16,7 +16,13 @@ final class FoodEntryServiceTests: XCTestCase {
                 goal: .default
             )
         ) { error in
-            XCTAssertEqual(error as? FoodEntrySaveError, .confirmationRequired)
+            guard case let .confirmationRequiredWithImpact(context) = error as? FoodEntrySaveError else {
+                return XCTFail("Expected active boundary impact, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .active)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         XCTAssertTrue(fixture.fast.isActive)
         XCTAssertTrue(try foodEntries(in: fixture.container).isEmpty)

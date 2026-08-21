@@ -5,8 +5,9 @@ SCHEME := uFast
 DERIVED_DATA := .derived-data
 SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
 UI_TEST_WORKERS ?= 4
+CODE_SIGNING_ALLOWED ?= NO
 
-.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight lint analyze format verify-local-only verify-release-versions verify-ui-result verify-ui-verifier verify-agentic-config clean
+.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight release-gate verify-release-gate lint analyze format verify-local-only verify-release-versions verify-ui-result verify-ui-verifier verify-agentic-config verify-architecture clean
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -20,7 +21,7 @@ build: project
 		-scheme "$(SCHEME)" \
 		-destination 'generic/platform=iOS Simulator' \
 		-derivedDataPath "$(DERIVED_DATA)" \
-		CODE_SIGNING_ALLOWED=NO \
+		CODE_SIGNING_ALLOWED="$(CODE_SIGNING_ALLOWED)" \
 		build
 
 deploy-iphone:
@@ -31,6 +32,14 @@ deploy-iphones:
 
 testflight:
 	./scripts/upload_testflight.sh
+
+release-gate:
+	UI_XCRESULT="$(UI_XCRESULT)" python3 scripts/release_gate.py
+
+verify-release-gate:
+	python3 scripts/verify_entitlements.py --self-test
+	python3 scripts/release_gate.py --self-test
+	./scripts/upload_testflight.sh --self-test
 
 test: test-unit test-ui
 
@@ -53,7 +62,7 @@ test-unit: project
 test-ui: project
 	DEVELOPER_DIR="$(DEVELOPER_DIR)" PROJECT="$(PROJECT)" SCHEME="$(SCHEME)" DERIVED_DATA="$(DERIVED_DATA)" SIMULATOR='$(SIMULATOR)' UI_TEST_WORKERS="$(UI_TEST_WORKERS)" UI_RESULTS_DIR="$(UI_RESULTS_DIR)" UI_RESULT_BUNDLE="$(UI_RESULT_BUNDLE)" UI_TEST_LOG="$(UI_TEST_LOG)" SOURCE_FREEZE_ID="$(SOURCE_FREEZE_ID)" zsh scripts/run_ui_tests.sh
 
-lint:
+lint: verify-architecture
 	./scripts/count_swift_sources.sh "SwiftFormat" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests
 	swiftformat UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests --lint --cache ignore
 	./scripts/count_swift_sources.sh "SwiftLint" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests
@@ -80,6 +89,10 @@ verify-agentic-config:
 	python3 scripts/verify_agentic_config.py
 	zsh -n scripts/run_ui_tests.sh
 	zsh scripts/run_ui_tests.sh --self-test
+
+verify-architecture:
+	python3 scripts/check_feature_architecture.py --self-test
+	python3 scripts/check_feature_architecture.py
 
 format:
 	./scripts/count_swift_sources.sh "SwiftFormat" UFastCore UFastCoreTests uFast LockScreenShared LockScreenPrototype LockScreenWidget uFastTests uFastUITests
