@@ -133,15 +133,20 @@ final class SettingsFeatureController {
     var coffeeAmount = "300"
 
     @ObservationIgnored private weak var commands: (any SettingsFeatureCommanding)?
+    @ObservationIgnored private var textResolver = AppTextResolver()
     @ObservationIgnored private var outcomeRevision = 0
 
     func connect(commands: (any SettingsFeatureCommanding)?) {
         self.commands = commands
     }
 
+    func setTextResolver(_ resolver: AppTextResolver) {
+        textResolver = resolver
+    }
+
     func load(_ snapshot: SettingsFeatureSnapshot) {
         if snapshot.settings.count > 1 {
-            saveError = "Your local settings conflict. Nothing was changed."
+            saveError = textResolver(.settingsConflictError)
         }
         guard snapshot.settings.count == 1, let settings = snapshot.settings.first else { return }
         selection = settings.fastingGoal
@@ -161,7 +166,7 @@ final class SettingsFeatureController {
             saveError = nil
         } catch {
             inferredFastDetectionEnabled = previousValue
-            saveError = "Your inferred fast setting couldn’t be saved. Please try again."
+            saveError = textResolver(.settingsInferredSaveError)
         }
     }
 
@@ -173,7 +178,7 @@ final class SettingsFeatureController {
             saveError = nil
         } catch {
             selection = previousGoal
-            saveError = "Your goal couldn’t be saved. Please try again."
+            saveError = textResolver(.settingsGoalSaveError)
         }
     }
 
@@ -193,14 +198,16 @@ final class SettingsFeatureController {
             ) { [weak self] outcome in
                 guard let self, revision == outcomeRevision else { return }
                 if let result = outcome.liveActivityResult {
-                    liveActivityStatus = ActiveFastLiveActivityStatusCopy.message(for: result)
+                    liveActivityStatus = ActiveFastLiveActivityStatus.status(for: result).map {
+                        textResolver(.liveActivityStatus($0))
+                    }
                 }
                 onOutcome()
             }
             liveActivityStatus = nil
         } catch {
             automaticallyShowLiveActivities = previousPreference == .enabled
-            liveActivityStatus = AutomaticLiveActivityCopy.settingsSaveFailure
+            liveActivityStatus = textResolver(.settingsLiveActivitySaveError)
         }
     }
 
@@ -215,7 +222,7 @@ final class SettingsFeatureController {
             waterAmount = String(previous.water)
             teaAmount = String(previous.tea)
             coffeeAmount = String(previous.coffee)
-            saveError = "Your drink favourites couldn’t be saved. Please try again."
+            saveError = textResolver(.settingsFavouritesSaveError)
         }
     }
 
@@ -225,7 +232,7 @@ final class SettingsFeatureController {
             try commands.settingsDeleteAllData()
             deleteError = nil
         } catch {
-            deleteError = "Your data couldn’t be deleted. Please try again."
+            deleteError = textResolver(.settingsDeleteError)
         }
     }
 

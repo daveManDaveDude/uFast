@@ -1,5 +1,9 @@
 # Post-MVP maintainability sprint — MNT-002 through MNT-008 feasibility
 
+> **Repository classification: Completed.** This MNT-100 predecessor is
+> retained as historical evidence. See the [document index](DOCUMENT_INDEX.md)
+> for the current authority map and active sprint.
+
 **Sprint:** MNT-100  
 **Status:** Ready — Sol readiness gate passed 20 August 2026  
 **Prepared:** 20 August 2026  

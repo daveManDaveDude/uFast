@@ -9,6 +9,7 @@ struct HydrationEditorPresentation: Identifiable {
 }
 
 struct InactiveFastView: View {
+    @Environment(\.appTextResolver) private var textResolver
     let goal: FastingGoal
     let target: String
     let fastRecorded: Bool
@@ -22,11 +23,11 @@ struct InactiveFastView: View {
             VStack(spacing: UFastTheme.Spacing.generous) {
                 HStack(spacing: UFastTheme.Spacing.standard) {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        Text("Ready when you are")
+                        Text(textResolver(.inactiveReady))
                             .font(.uFastDisplay(.title))
                             .foregroundStyle(UFastTheme.primary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("No fast is running.")
+                        Text(textResolver(.inactiveNoFast))
                             .foregroundStyle(UFastTheme.secondaryText)
                             .accessibilityIdentifier("fast.inactive-state")
                     }
@@ -36,17 +37,20 @@ struct InactiveFastView: View {
                 }
 
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                    UFastSectionHeading("Your next target", eyebrow: "\(goal.hours)-hour goal")
+                    UFastSectionHeading(
+                        textResolver(.inactiveNextTarget),
+                        eyebrow: textResolver(.inactiveGoalEyebrow(hours: goal.hours))
+                    )
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("If started now")
+                            Text(textResolver(.inactiveStartedNow))
                                 .font(.caption)
                                 .foregroundStyle(UFastTheme.secondaryText)
                             Text(target)
                                 .font(.uFastDisplay(.title2))
                                 .foregroundStyle(UFastTheme.primary)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityLabel("Target if started now")
+                                .accessibilityLabel(textResolver(.inactiveTargetLabel))
                                 .accessibilityValue(target)
                                 .accessibilityIdentifier("fast.preview-target")
                         }
@@ -56,7 +60,7 @@ struct InactiveFastView: View {
                             .foregroundStyle(UFastTheme.apricot)
                             .accessibilityHidden(true)
                     }
-                    Text("Your fasting goal is \(goal.hours) hours.")
+                    Text(textResolver(.inactiveGoal(hours: goal.hours)))
                         .font(.subheadline)
                         .foregroundStyle(UFastTheme.secondaryText)
                 }
@@ -64,7 +68,7 @@ struct InactiveFastView: View {
                 .uFastCard(accent: UFastTheme.sky)
 
                 if fastRecorded {
-                    Label("Fast recorded.", systemImage: "checkmark.circle")
+                    Label(textResolver(.fastRecorded), systemImage: "checkmark.circle")
                         .font(.headline)
                         .foregroundStyle(UFastTheme.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,11 +85,14 @@ struct InactiveFastView: View {
                 }
 
                 VStack(spacing: UFastTheme.Spacing.standard) {
-                    Button(startError == nil ? "Start fast" : "Try again", action: onStart)
-                        .buttonStyle(UFastPrimaryButtonStyle())
-                        .accessibilityIdentifier("fast.start")
+                    Button(
+                        startError == nil ? textResolver(.startFast) : textResolver(.tryAgain),
+                        action: onStart
+                    )
+                    .buttonStyle(UFastPrimaryButtonStyle())
+                    .accessibilityIdentifier("fast.start")
 
-                    Button("Start at a past time", action: onStartPast)
+                    Button(textResolver(.startAtPastTime), action: onStartPast)
                         .buttonStyle(UFastSecondaryButtonStyle())
                         .accessibilityIdentifier("fast.start-past")
                 }
@@ -150,7 +157,7 @@ struct FoodEditorPresentation: Identifiable {
 #Preview("Today · Persistence error") {
     TodayGoalView(
         clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow),
-        previewTimelineError: "Your timeline couldn’t be loaded. Please try again."
+        previewTimelineFailure: .snapshotUnavailable
     )
 }
 

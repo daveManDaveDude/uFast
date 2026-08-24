@@ -42,7 +42,7 @@ final class TodayMultiYearUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["drink.total"].waitForExistence(timeout: 5), app.debugDescription)
 
         app.terminate()
-        app.launchArguments.removeAll { $0 == "--reset-data" }
+        app.launchArguments = launchArguments(resetData: false)
         app.launch()
         XCTAssertTrue(app.staticTexts["Fresh lunch"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.staticTexts["Today breakfast"].waitForExistence(timeout: 5), app.debugDescription)
@@ -53,19 +53,17 @@ final class TodayMultiYearUITests: XCTestCase {
     @MainActor
     private func launch(resetData: Bool) -> XCUIApplication {
         let app = XCUIApplication()
-        // swiftformat:disable trailingCommas
-        app.launchArguments = [
-            "--ui-testing",
-            "--seed-onboarded",
-            "--seed-today-multi-year",
-            "--fixed-now",
-            String(now.timeIntervalSince1970)
-        ]
-        // swiftformat:enable trailingCommas
-        if resetData {
-            app.launchArguments.append("--reset-data")
-        }
+        app.launchArguments = launchArguments(resetData: resetData)
         app.launch()
         return app
+    }
+
+    private func launchArguments(resetData: Bool) -> [String] {
+        UITestLaunchConfiguration(
+            resetData: resetData,
+            seedOnboarded: true,
+            fixedNow: now,
+            seedTodayMultiYear: true
+        ).arguments
     }
 }

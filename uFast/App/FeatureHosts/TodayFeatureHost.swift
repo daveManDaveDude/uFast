@@ -20,7 +20,7 @@ struct TodayFeatureHost: View {
                 hydrationEntries: []
             ),
             clock: clock,
-            previewTimelineError: dataProvider?.errorMessage
+            previewTimelineFailure: dataProvider?.failure
         )
         .environment(\.calendar, effectiveCalendar)
         .environment(\.timeZone, effectiveCalendar.timeZone)

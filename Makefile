@@ -7,7 +7,7 @@ SIMULATOR ?= platform=iOS Simulator,name=iPhone 17 Pro
 UI_TEST_WORKERS ?= 4
 CODE_SIGNING_ALLOWED ?= NO
 
-.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight release-gate verify-release-gate lint analyze format verify-local-only verify-release-versions verify-ui-result verify-ui-verifier verify-agentic-config verify-architecture clean
+.PHONY: bootstrap project build deploy-iphone deploy-iphones test test-unit test-ui testflight release-gate verify-release-gate lint analyze format verify-local-only verify-diagnostics verify-document-index verify-binary-evidence verify-release-versions verify-ui-result verify-ui-verifier verify-agentic-config verify-architecture clean
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -73,6 +73,18 @@ analyze:
 
 verify-local-only:
 	./scripts/verify_local_only_release.sh
+
+verify-diagnostics:
+	python3 scripts/check_diagnostic_privacy.py --self-test
+	python3 scripts/check_diagnostic_privacy.py
+
+verify-document-index:
+	python3 scripts/check_document_index.py --self-test
+	python3 scripts/check_document_index.py
+
+verify-binary-evidence:
+	python3 scripts/check_tracked_binary_evidence.py --self-test
+	python3 scripts/check_tracked_binary_evidence.py
 
 verify-release-versions: project
 	./scripts/verify_release_versions.sh

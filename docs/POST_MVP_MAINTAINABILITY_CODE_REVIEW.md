@@ -1,5 +1,9 @@
 # uFast post-MVP maintainability code review
 
+> **Repository classification: Historical review evidence.** This review
+> remains the source record for follow-up planning; it is not a current
+> implementation authority. See the [document index](DOCUMENT_INDEX.md).
+
 **Review date:** 19 August 2026  
 **Reviewed revision:** `4bcee9a8f50f47331dea108235f13cbd4b562ef1`  
 **Reviewed release:** `1.0.0` build `10`  

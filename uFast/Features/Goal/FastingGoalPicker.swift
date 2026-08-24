@@ -3,6 +3,7 @@ import SwiftUI
 struct FastingGoalPicker: View {
     @Binding var selection: FastingGoal
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.appTextResolver) private var textResolver
 
     private var columns: [GridItem] {
         let count = dynamicTypeSize.isAccessibilitySize ? 2 : 3
@@ -14,11 +15,11 @@ struct FastingGoalPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-            Text("\(selection.hours) hours selected")
+            Text(textResolver(.goalSelectionSummary(hours: selection.hours)))
                 .font(.caption)
                 .foregroundStyle(UFastTheme.secondaryText)
-                .accessibilityLabel("Fasting goal")
-                .accessibilityValue("\(selection.hours) hours")
+                .accessibilityLabel(textResolver(.goalAccessibilityLabel))
+                .accessibilityValue(textResolver(.goalHours(hours: selection.hours)))
                 .accessibilityIdentifier("goal.picker")
 
             LazyVGrid(columns: columns, spacing: UFastTheme.Spacing.compact) {
@@ -31,7 +32,7 @@ struct FastingGoalPicker: View {
                         HStack(spacing: 6) {
                             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                                 .accessibilityHidden(true)
-                            Text("\(goal.hours) hr")
+                            Text(textResolver(.goalOption(hours: goal.hours)))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
@@ -53,7 +54,7 @@ struct FastingGoalPicker: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(goal.hours) hours")
+                    .accessibilityLabel(textResolver(.goalHours(hours: goal.hours)))
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                     .accessibilityIdentifier("goal.option.\(goal.hours)")
                 }

@@ -10,9 +10,14 @@ final class WidgetProjectionSupportTests: XCTestCase {
     func testNoActiveFastClearsProjectionAndReloads() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let events = LaunchProjectionEventLog()
+        let diagnostics = RecordingDiagnosticEventSink()
         let store = LaunchProjectionStoreSpy(projection: makeProjection(), events: events)
         let reloader = LaunchProjectionReloaderSpy(events: events)
-        let coordinator = ActiveFastProjectionCoordinator(store: store, reloader: reloader)
+        let coordinator = ActiveFastProjectionCoordinator(
+            store: store,
+            reloader: reloader,
+            diagnosticSink: diagnostics
+        )
 
         WidgetProjectionSupport.synchronize(
             in: container,
@@ -23,6 +28,7 @@ final class WidgetProjectionSupportTests: XCTestCase {
         XCTAssertNil(try store.read())
         XCTAssertEqual(reloader.reloadCount, 1)
         XCTAssertEqual(events.values, ["clear", "reload"])
+        XCTAssertTrue(diagnostics.events.isEmpty)
         XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<FastRecord>()).isEmpty)
     }
 
@@ -43,9 +49,14 @@ final class WidgetProjectionSupportTests: XCTestCase {
         let originalID = fast.id
         let originalStart = fast.startDate
         let events = LaunchProjectionEventLog()
+        let diagnostics = RecordingDiagnosticEventSink()
         let store = LaunchProjectionStoreSpy(events: events)
         let reloader = LaunchProjectionReloaderSpy(events: events)
-        let coordinator = ActiveFastProjectionCoordinator(store: store, reloader: reloader)
+        let coordinator = ActiveFastProjectionCoordinator(
+            store: store,
+            reloader: reloader,
+            diagnosticSink: diagnostics
+        )
 
         WidgetProjectionSupport.synchronize(
             in: container,
@@ -59,6 +70,7 @@ final class WidgetProjectionSupportTests: XCTestCase {
         XCTAssertEqual(projection.goalHours, 16)
         XCTAssertEqual(reloader.reloadCount, 1)
         XCTAssertEqual(events.values, ["write", "reload"])
+        XCTAssertTrue(diagnostics.events.isEmpty)
         XCTAssertTrue(fast.isActive)
         XCTAssertFalse(context.hasChanges)
     }
@@ -106,21 +118,29 @@ final class WidgetProjectionSupportTests: XCTestCase {
     func testAmbiguousAuthorityUsesInvalidationWhenClearFails() throws {
         let container = try containerWithTwoActiveFasts()
         let events = LaunchProjectionEventLog()
+        let diagnostics = RecordingDiagnosticEventSink()
         let store = LaunchProjectionStoreSpy(projection: makeProjection(), events: events)
         store.shouldFailClear = true
         let reloader = LaunchProjectionReloaderSpy(events: events)
-        let coordinator = ActiveFastProjectionCoordinator(store: store, reloader: reloader)
+        let coordinator = ActiveFastProjectionCoordinator(
+            store: store,
+            reloader: reloader,
+            diagnosticSink: diagnostics
+        )
 
         WidgetProjectionSupport.synchronize(
             in: container,
             now: now,
-            projectionCoordinator: coordinator
+            projectionCoordinator: coordinator,
+            diagnosticSink: diagnostics
         )
 
         XCTAssertTrue(store.isInvalidated)
         XCTAssertNil(try store.read())
         XCTAssertEqual(reloader.reloadCount, 1)
         XCTAssertEqual(events.values, ["clear", "invalidate", "reload"])
+        XCTAssertEqual(diagnostics.events.map(\.outcome), [.authorityConflict, .clearFailed])
+        XCTAssertEqual(diagnostics.events[0].countBucket, .multiple)
         XCTAssertEqual(try container.mainContext.fetch(FetchDescriptor<FastRecord>()).count, 2)
     }
 
@@ -132,22 +152,30 @@ final class WidgetProjectionSupportTests: XCTestCase {
             .map { ($0.id, $0.startDate, $0.endDate) }
         let oldProjection = makeProjection()
         let events = LaunchProjectionEventLog()
+        let diagnostics = RecordingDiagnosticEventSink()
         let store = LaunchProjectionStoreSpy(projection: oldProjection, events: events)
         store.shouldFailClear = true
         store.shouldFailInvalidation = true
         let reloader = LaunchProjectionReloaderSpy(events: events)
-        let coordinator = ActiveFastProjectionCoordinator(store: store, reloader: reloader)
+        let coordinator = ActiveFastProjectionCoordinator(
+            store: store,
+            reloader: reloader,
+            diagnosticSink: diagnostics
+        )
 
         WidgetProjectionSupport.synchronize(
             in: container,
             now: now,
-            projectionCoordinator: coordinator
+            projectionCoordinator: coordinator,
+            diagnosticSink: diagnostics
         )
 
         XCTAssertFalse(store.isInvalidated)
         XCTAssertEqual(store.projection, oldProjection)
         XCTAssertEqual(reloader.reloadCount, 0)
         XCTAssertEqual(events.values, ["clear", "invalidate"])
+        XCTAssertEqual(diagnostics.events.map(\.outcome), [.authorityConflict, .clearFailed])
+        XCTAssertEqual(diagnostics.events[0].countBucket, .multiple)
         let persistedRecords = try context.fetch(FetchDescriptor<FastRecord>())
             .sorted { $0.id.uuidString < $1.id.uuidString }
             .map { ($0.id, $0.startDate, $0.endDate) }
@@ -172,6 +200,7 @@ final class WidgetProjectionSupportTests: XCTestCase {
         try context.save()
         let oldProjection = makeProjection()
         let events = LaunchProjectionEventLog()
+        let diagnostics = RecordingDiagnosticEventSink()
         let store = LaunchProjectionStoreSpy(projection: oldProjection, events: events)
         let reloader = LaunchProjectionReloaderSpy(events: events)
         let coordinator = ActiveFastProjectionCoordinator(store: store, reloader: reloader)
@@ -179,13 +208,56 @@ final class WidgetProjectionSupportTests: XCTestCase {
         WidgetProjectionSupport.synchronize(
             in: container,
             now: now,
-            projectionCoordinator: coordinator
+            projectionCoordinator: coordinator,
+            diagnosticSink: diagnostics
         )
 
         XCTAssertEqual(store.projection, oldProjection)
         XCTAssertEqual(reloader.reloadCount, 0)
         XCTAssertTrue(events.values.isEmpty)
+        XCTAssertEqual(diagnostics.events.map(\.outcome), [.authorityConflict])
+        XCTAssertEqual(diagnostics.events[0].countBucket, .multiple)
         XCTAssertTrue(fast.isActive)
+    }
+
+    func testUnavailableContainerReportsTypedFailureWithoutCreatingCoordinator() {
+        let diagnostics = RecordingDiagnosticEventSink()
+
+        XCTAssertNil(
+            WidgetProjectionSupport.coordinator(
+                containerURL: nil,
+                diagnosticSink: diagnostics
+            )
+        )
+
+        XCTAssertEqual(diagnostics.events.map(\.subsystem), [.widgetProjection])
+        XCTAssertEqual(diagnostics.events.map(\.outcome), [.containerUnavailable])
+        XCTAssertEqual(diagnostics.count, 1)
+    }
+
+    func testPublishFailureReportsTypedFailureAndDoesNotReload() {
+        let events = LaunchProjectionEventLog()
+        let diagnostics = RecordingDiagnosticEventSink()
+        let store = LaunchProjectionStoreSpy(events: events)
+        let reloader = LaunchProjectionReloaderSpy(events: events)
+        store.shouldFailWrite = true
+        let coordinator = ActiveFastProjectionCoordinator(
+            store: store,
+            reloader: reloader,
+            diagnosticSink: diagnostics
+        )
+
+        WidgetProjectionSupport.publish(
+            FastRecord(startDate: now.addingTimeInterval(-60 * 60), goalAtStart: .default),
+            goal: .default,
+            now: now,
+            projectionCoordinator: coordinator,
+            diagnosticSink: diagnostics
+        )
+
+        XCTAssertEqual(diagnostics.events.map(\.outcome), [.publishFailed])
+        XCTAssertEqual(reloader.reloadCount, 0)
+        XCTAssertEqual(events.values, ["write"])
     }
 
     func testFailedPersistenceBeforeSynchronizationLeavesProjectionUnchanged() throws {
@@ -249,6 +321,7 @@ final class WidgetProjectionSupportTests: XCTestCase {
 private final class LaunchProjectionStoreSpy: ActiveFastProjectionStore, @unchecked Sendable {
     var projection: ActiveFastWidgetProjection?
     var shouldFailClear = false
+    var shouldFailWrite = false
     var shouldFailInvalidation = false
     var isInvalidated = false
     private let events: LaunchProjectionEventLog?
@@ -267,6 +340,9 @@ private final class LaunchProjectionStoreSpy: ActiveFastProjectionStore, @unchec
 
     func write(_ projection: ActiveFastWidgetProjection) throws {
         events?.values.append("write")
+        if shouldFailWrite {
+            throw ActiveFastWidgetProjectionError.unreadable
+        }
         self.projection = projection
         isInvalidated = false
     }

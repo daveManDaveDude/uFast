@@ -204,13 +204,21 @@ enum UFastMigrationPlan: SchemaMigrationPlan {
 enum PersistenceContainer {
     static let schema = Schema(versionedSchema: UFastSchemaV4.self)
 
-    static func make(inMemory: Bool = false) throws -> ModelContainer {
+    static func make(
+        inMemory: Bool = false,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+    ) throws -> ModelContainer {
         let configuration = configuration(inMemory: inMemory)
-        return try ModelContainer(
-            for: schema,
-            migrationPlan: UFastMigrationPlan.self,
-            configurations: [configuration]
-        )
+        do {
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: UFastMigrationPlan.self,
+                configurations: [configuration]
+            )
+        } catch {
+            recordMigrationFailure(to: diagnosticSink)
+            throw PersistenceBootstrapError.migrationFailed(error)
+        }
     }
 
     static func configuration(inMemory: Bool = false) -> ModelConfiguration {
@@ -221,16 +229,35 @@ enum PersistenceContainer {
         )
     }
 
-    static func make(storeURL: URL) throws -> ModelContainer {
+    static func make(
+        storeURL: URL,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+    ) throws -> ModelContainer {
         let configuration = ModelConfiguration(
             schema: schema,
             url: storeURL,
             cloudKitDatabase: .none
         )
-        return try ModelContainer(
-            for: schema,
-            migrationPlan: UFastMigrationPlan.self,
-            configurations: [configuration]
-        )
+        do {
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: UFastMigrationPlan.self,
+                configurations: [configuration]
+            )
+        } catch {
+            recordMigrationFailure(to: diagnosticSink)
+            throw PersistenceBootstrapError.migrationFailed(error)
+        }
+    }
+
+    private static func recordMigrationFailure(to sink: any DiagnosticEventSink) {
+        guard let event = DiagnosticEvent(
+            subsystem: .persistence,
+            outcome: .migrationFailed,
+            severity: .error
+        ) else {
+            return
+        }
+        sink.record(event)
     }
 }

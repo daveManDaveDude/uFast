@@ -78,7 +78,7 @@ final class HistoryEventGroupingUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Edit drink"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.buttons["drink.type"].value as? String, "Custom")
         XCTAssertEqual(app.textFields["drink.name"].value as? String, "Juice")
-        XCTAssertTrue(app.buttons["Caloric"].exists)
+        XCTAssertTrue(app.buttons["drink.classification.caloric"].exists)
         app.navigationBars["Edit drink"].buttons["Cancel"].tap()
     }
 
@@ -139,8 +139,7 @@ final class HistoryEventGroupingUITests: XCTestCase {
     func testFailedFoodAndDrinkSavesKeepDraftAndCommittedGroupUnchanged() {
         let foodApp = launchHistory(additionalArguments: [
             "-AppleLocale", "en_GB",
-            "--simulate-food-save-failure",
-        ])
+        ], simulateFoodSaveFailure: true)
         foodApp.tabBars.buttons["History"].tap()
         foodApp.buttons[foodGroupMarkerIdentifier].tap()
         tapMember(foodMemberID, in: foodApp)
@@ -152,8 +151,7 @@ final class HistoryEventGroupingUITests: XCTestCase {
 
         let drinkApp = launchHistory(additionalArguments: [
             "-AppleLocale", "en_GB",
-            "--simulate-drink-save-failure",
-        ])
+        ], simulateDrinkSaveFailure: true)
         drinkApp.tabBars.buttons["History"].tap()
         openGroupDisclosure(in: drinkApp)
         tapMember(secondDrinkMemberID, in: drinkApp)
@@ -190,7 +188,7 @@ final class HistoryEventGroupingUITests: XCTestCase {
         openGroupDisclosure(in: app)
         tapMember(secondDrinkMemberID, in: app)
 
-        let caloricChoice = app.buttons["Caloric"]
+        let caloricChoice = app.buttons["drink.classification.caloric"]
         XCTAssertTrue(caloricChoice.waitForExistence(timeout: 3), app.debugDescription)
         caloricChoice.tap()
         app.buttons["drink.editor.save"].tap()
@@ -221,11 +219,14 @@ final class HistoryEventGroupingUITests: XCTestCase {
         threeMemberGroup.tap()
         tapMember(secondDrinkMemberID, in: app)
         app.buttons["drink.delete"].tap()
-        app.alerts["Delete this drink?"].buttons["Delete"].tap()
+        app.alerts.firstMatch.descendants(matching: .any)
+            .matching(identifier: "drink.delete.confirm").firstMatch.tap()
 
         XCTAssertTrue(app.otherElements["history.event-group.disclosure"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.buttons[groupMarkerIdentifier].value as? String, "2")
-        XCTAssertTrue(app.buttons[drinkMemberID].exists)
+        let disclosure = app.otherElements["history.event-group.disclosure"]
+        let remainingDrink = disclosure.buttons[drinkMemberID]
+        XCTAssertTrue(remainingDrink.waitForExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor
@@ -235,7 +236,8 @@ final class HistoryEventGroupingUITests: XCTestCase {
         openGroupDisclosure(in: app)
         tapMember(secondDrinkMemberID, in: app)
         app.buttons["drink.delete"].tap()
-        app.alerts["Delete this drink?"].buttons["Delete"].tap()
+        app.alerts.firstMatch.descendants(matching: .any)
+            .matching(identifier: "drink.delete.confirm").firstMatch.tap()
 
         XCTAssertTrue(app.otherElements["history.event-group.disclosure"].waitForNonExistence(timeout: 3))
         XCTAssertTrue(app.buttons[groupMarkerIdentifier].waitForNonExistence(timeout: 3))
@@ -391,15 +393,19 @@ final class HistoryEventGroupingUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchHistory(additionalArguments: [String]) -> XCUIApplication {
+    private func launchHistory(
+        additionalArguments: [String],
+        simulateFoodSaveFailure: Bool = false,
+        simulateDrinkSaveFailure: Bool = false
+    ) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--seed-history-event-grouping",
-            "--fixed-now",
-            String(now.timeIntervalSince1970),
-        ] + additionalArguments
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            fixedNow: now,
+            seedHistoryEventGrouping: true,
+            simulateFoodSaveFailure: simulateFoodSaveFailure,
+            simulateDrinkSaveFailure: simulateDrinkSaveFailure
+        ).arguments + additionalArguments
         app.launch()
         return app
     }

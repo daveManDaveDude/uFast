@@ -114,26 +114,3 @@ enum AutomaticLiveActivityPolicy {
         return .eligible
     }
 }
-
-enum AutomaticLiveActivityCopy {
-    static let title = "See your fast at a glance?"
-    static let showAutomatically = "Show Automatically"
-    static let notNow = "Not Now"
-    static let message =
-        "uFast can automatically show elapsed time, goal progress and target on the "
-            + "Lock Screen and Dynamic Island when you start a fast. Each Live Activity "
-            + "stays active for up to 8 hours. If your fast continues, uFast can show a "
-            + "new one the next time you open the app. You can hide it or turn this off "
-            + "at any time in Settings."
-    static let settingsSupportingCopy =
-        "Show elapsed time, goal progress and target on the Lock Screen and Dynamic "
-            + "Island when a fast starts. Each Live Activity stays active for up to 8 "
-            + "hours. If your fast is still active, uFast can show a new one the next "
-            + "time you open the app."
-    static let settingsExplanation =
-        "Turn this off to hide the current Live Activity and prevent new ones. You can "
-            + "also choose Hide for this fast without changing the setting for future "
-            + "fasts."
-    static let settingsSaveFailure =
-        "Your Live Activities setting couldn’t be saved. Please try again."
-}

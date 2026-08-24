@@ -70,23 +70,6 @@ enum FoodEntryValidationError: Error, Equatable {
     case beforeToday
     case futureTime
     case outsideSelectedRange
-
-    var message: String {
-        switch self {
-        case .emptyDescription:
-            "Enter what you ate."
-        case .descriptionTooLong:
-            "Keep the description to 200 characters or fewer."
-        case .invalidNutrition:
-            "Enter each detail as a number from 0 to 1,000,000."
-        case .beforeToday:
-            "Choose a time from today."
-        case .futureTime:
-            "Choose a time that isn’t in the future."
-        case .outsideSelectedRange:
-            "Choose a time within the selected catch-up days."
-        }
-    }
 }
 
 enum FoodEntryValidator {

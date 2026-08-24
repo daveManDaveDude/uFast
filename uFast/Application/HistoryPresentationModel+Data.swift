@@ -25,7 +25,8 @@ extension HistoryPresentationModel {
                 locale: locale,
                 calendar: calendar,
                 timeZone: timeZone,
-                referenceNow: referenceNow
+                referenceNow: referenceNow,
+                textResolver: textResolver
             )
             let createdAt = SortDescriptor<HydrationFavouriteRecord>(\.createdAt)
             let creationOrder = SortDescriptor<HydrationFavouriteRecord>(\.creationOrder)
@@ -40,7 +41,7 @@ extension HistoryPresentationModel {
             return false
         }
         historyDataRevision += 1
-        if motionSnapshot == nil {
+        if motionSnapshot == nil, !initialLoadFailed {
             _ = ensureMotionRunway(around: selectedDate)
         } else if refreshMotion {
             refreshLoadedMotionChunks()
@@ -49,6 +50,7 @@ extension HistoryPresentationModel {
     }
 
     @discardableResult
+    // swiftlint:disable:next function_body_length
     func refreshHistoryAfterCommittedMutation(in window: DateInterval? = nil) -> Bool {
         guard let requestedWindow = window ?? TemporalHistoryPresentation.calendarDayWindow(
             containing: selectedDate,
@@ -71,7 +73,8 @@ extension HistoryPresentationModel {
             calendar: calendar,
             timeZone: timeZone,
             referenceNow: referenceNow,
-            nextGeneration: nextGeneration
+            nextGeneration: nextGeneration,
+            textResolver: textResolver
         )
         guard HistoryProjectionRefreshBoundary.refresh(
             state: &projectionState,

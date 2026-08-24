@@ -459,6 +459,7 @@ final class ApplicationCommandsTests: XCTestCase {
             }
             XCTAssertEqual(context.kind, .inferred)
             XCTAssertEqual(context.affectedPersistedFastCount, 0)
+            XCTAssertFalse(context.includesReconstructedReview)
             XCTAssertTrue(context.includesInferredInterval)
         }
         XCTAssertTrue(source.isCaloric)
@@ -503,17 +504,25 @@ final class ApplicationCommandsTests: XCTestCase {
             goal: .default,
             endingActiveFast: false
         )) { error in
-            guard case .inferredConfirmationWithImpact = error as? FoodEntrySaveError else {
+            guard case let .inferredConfirmationWithImpact(context) = error as? FoodEntrySaveError else {
                 return XCTFail("Expected inferred impact confirmation, got \(error)")
             }
+            XCTAssertEqual(context.kind, .inferred)
+            XCTAssertEqual(context.affectedPersistedFastCount, 0)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertTrue(context.includesInferredInterval)
         }
         XCTAssertEqual(source.occurredAt, now.addingTimeInterval(-10 * 60 * 60))
         XCTAssertFalse(context.hasChanges)
 
         XCTAssertThrowsError(try commands.deleteFood(id: source.id)) { error in
-            guard case .inferredConfirmationWithImpact = error as? FoodEntrySaveError else {
+            guard case let .inferredConfirmationWithImpact(context) = error as? FoodEntrySaveError else {
                 return XCTFail("Expected inferred impact confirmation, got \(error)")
             }
+            XCTAssertEqual(context.kind, .inferred)
+            XCTAssertEqual(context.affectedPersistedFastCount, 0)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertTrue(context.includesInferredInterval)
         }
         XCTAssertNotNil(try context.fetch(FetchDescriptor<FoodEntryRecord>()).first)
         XCTAssertFalse(context.hasChanges)
@@ -729,7 +738,13 @@ final class ApplicationCommandsTests: XCTestCase {
             goal: .default,
             endingActiveFast: false
         )) { error in
-            XCTAssertTrue(error is FoodEntrySaveError)
+            guard case let .confirmationRequiredWithImpact(context) = error as? FoodEntrySaveError else {
+                return XCTFail("Expected active boundary impact, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .active)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         try commands.saveFood(
             draft,
@@ -804,7 +819,13 @@ final class ApplicationCommandsTests: XCTestCase {
             goal: .default,
             endingActiveFast: false
         )) { error in
-            XCTAssertTrue(error is HydrationEntrySaveError)
+            guard case let .confirmationRequiredWithImpact(context) = error as? HydrationEntrySaveError else {
+                return XCTFail("Expected active boundary impact, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .active)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         try commands.saveHydration(
             draft,
@@ -869,6 +890,7 @@ final class ApplicationCommandsTests: XCTestCase {
             XCTAssertEqual(context.kind, .completed)
             XCTAssertEqual(context.affectedPersistedFastCount, 1)
             XCTAssertTrue(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 2)
         XCTAssertEqual(fast.reviewState, .confirmed)
@@ -928,6 +950,7 @@ final class ApplicationCommandsTests: XCTestCase {
             XCTAssertEqual(context.kind, .completed)
             XCTAssertEqual(context.affectedPersistedFastCount, 1)
             XCTAssertTrue(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         XCTAssertNotNil(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).first)
         XCTAssertEqual(fast.endDate, end)

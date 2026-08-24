@@ -11,17 +11,15 @@ struct VisibleFastHistoryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
             Text(item.title).font(.headline).foregroundStyle(UFastTheme.primary)
-            Text(item.kind == .active
-                ? ActiveElapsedTimeFormatter.string(from: item.endDate.timeIntervalSince(item.startDate))
-                : ElapsedTimeFormatter.string(from: item.endDate.timeIntervalSince(item.startDate)))
+            Text(durationText)
                 .font(.uFastDisplay(.title2)).foregroundStyle(UFastTheme.primary)
             Divider()
             if item.kind == .active {
-                fact("Started", item.startDate)
+                fact(item.textContext.textResolver(.fastingCopy(.started)), item.startDate)
             } else {
                 HStack(alignment: .top, spacing: UFastTheme.Spacing.standard) {
-                    fact("Started", item.startDate)
-                    fact("Ended", item.endDate)
+                    fact(item.textContext.textResolver(.fastingCopy(.started)), item.startDate)
+                    fact(item.textContext.textResolver(.fastingCopy(.endHeader)), item.endDate)
                 }
             }
         }
@@ -35,22 +33,55 @@ struct VisibleFastHistoryRow: View {
             return item.accessibilityLabel
         }
 
-        let duration = ActiveElapsedTimeFormatter.string(
-            from: item.endDate.timeIntervalSince(item.startDate)
+        let duration = HistoryTextFormatting.activeAccessibility(
+            seconds: item.endDate.timeIntervalSince(item.startDate),
+            resolver: item.textContext.textResolver
         )
         return [
             item.title,
-            "start \(item.startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
-            "duration \(duration)",
-            "currently active",
-        ].joined(separator: ", ")
+            item.textContext.textResolver(
+                .historyFastComponent(
+                    kind: .start,
+                    value: HistoryTextFormatting.dateTime(
+                        item.startDate,
+                        calendar: item.textContext.calendar,
+                        locale: item.textContext.locale,
+                        timeZone: item.textContext.timeZone
+                    )
+                )
+            ),
+            item.textContext.textResolver(.historyFastComponent(kind: .duration, value: duration)),
+            item.textContext.textResolver(.historyCopy(.currentlyActive)),
+        ].joined(
+            separator: item.textContext.textResolver(.historyCopy(.separatorComma))
+                + item.textContext.textResolver(.historyCopy(.separatorSpace))
+        )
+    }
+
+    var durationText: String {
+        item.kind == .active
+            ? HistoryTextFormatting.activeDisplay(
+                seconds: item.endDate.timeIntervalSince(item.startDate),
+                resolver: item.textContext.textResolver
+            )
+            : HistoryTextFormatting.duration(
+                seconds: item.endDate.timeIntervalSince(item.startDate),
+                resolver: item.textContext.textResolver
+            )
     }
 
     func fact(_ label: String, _ date: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.caption).foregroundStyle(UFastTheme.secondaryText)
-            Text(date.formatted(.dateTime.month(.abbreviated).day().hour().minute()))
-                .font(.subheadline.weight(.semibold)).foregroundStyle(UFastTheme.primary)
+            Text(
+                HistoryTextFormatting.dateTime(
+                    date,
+                    calendar: item.textContext.calendar,
+                    locale: item.textContext.locale,
+                    timeZone: item.textContext.timeZone
+                )
+            )
+            .font(.subheadline.weight(.semibold)).foregroundStyle(UFastTheme.primary)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 }

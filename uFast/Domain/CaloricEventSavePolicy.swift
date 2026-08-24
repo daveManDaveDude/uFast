@@ -81,11 +81,8 @@ enum CaloricEventSavePolicy {
 }
 
 enum FoodEntrySaveError: Error, Equatable {
-    case confirmationRequired
     case confirmationRequiredWithImpact(CaloricEventConfirmationContext)
-    case completedFastConfirmationRequired
     case completedConfirmationWithImpact(CaloricEventConfirmationContext)
-    case inferredFastConfirmationRequired
     case inferredConfirmationWithImpact(CaloricEventConfirmationContext)
     case eventAtActiveFastStart
     case fastConflict

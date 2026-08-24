@@ -27,10 +27,6 @@ struct HydrationFavouriteSnapshot: Equatable, Identifiable, Sendable {
         self.creationOrder = creationOrder
     }
 
-    var classification: String {
-        isCaloric ? "Caloric" : "Non-caloric"
-    }
-
     var hydrationFavourite: HydrationFavourite {
         HydrationFavourite(
             id: id,

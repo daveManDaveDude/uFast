@@ -9,6 +9,7 @@ struct HistoryMotionExtensionRequest {
     let expectedCoverage: HistoryMotionCoverage
     let existingChunks: [HistoryMotionChunk]
     let referenceNow: Date
+    let isRetry: Bool
 }
 
 struct HistoryMotionExtensionApplication {

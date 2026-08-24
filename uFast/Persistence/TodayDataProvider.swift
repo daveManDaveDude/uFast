@@ -18,20 +18,22 @@ struct TodayCalendarInterval: Equatable {
     }
 }
 
+enum TodayDataProviderFailure: Equatable {
+    case snapshotUnavailable
+}
+
 /// Application-facing Today persistence seam. SwiftData records are converted
 /// to immutable feature snapshots before they cross into the presentation tree.
 @MainActor
 @Observable
 final class SwiftDataTodayDataProvider {
-    static let snapshotLoadErrorMessage = "Your timeline couldn’t be loaded. Please try again."
-
     private let modelContext: ModelContext
     private let clock: any AppClock
     private nonisolated(unsafe) var saveObserver: NSObjectProtocol?
 
     private(set) var calendar: Calendar
     private(set) var dayInterval: TodayCalendarInterval
-    private(set) var errorMessage: String?
+    private(set) var failure: TodayDataProviderFailure?
     private(set) var snapshot = TodayFeatureSnapshot(
         settings: [],
         activeFasts: [],
@@ -92,11 +94,11 @@ final class SwiftDataTodayDataProvider {
             self.calendar = calendar
             dayInterval = nextInterval
             snapshot = loadedSnapshot
-            errorMessage = nil
+            failure = nil
         } catch {
             // Adopt the requested temporal identity so a later parameterless
             // refresh uses the correct calendar day. Clear the timeline and
-            // expose the existing Today error copy, while preserving the last
+            // expose a semantic failure state, while preserving the last
             // known authoritative state for fast, settings and favourite controls.
             self.calendar = calendar
             dayInterval = nextInterval
@@ -107,7 +109,7 @@ final class SwiftDataTodayDataProvider {
                 hydrationEntries: [],
                 hydrationFavourites: snapshot.hydrationFavourites
             )
-            errorMessage = Self.snapshotLoadErrorMessage
+            failure = .snapshotUnavailable
         }
     }
 

@@ -34,7 +34,8 @@ enum LockScreenFastPresentation: Equatable, Sendable {
         now: Date,
         privacyState: LockScreenPrivacyState,
         locale: Locale = .autoupdatingCurrent,
-        timeZone: TimeZone = .autoupdatingCurrent
+        timeZone: TimeZone = .autoupdatingCurrent,
+        textResolver: SystemSurfaceTextResolver? = nil
     ) -> Self {
         let projection: ActiveFastWidgetProjection
 
@@ -62,27 +63,40 @@ enum LockScreenFastPresentation: Equatable, Sendable {
                 now: now,
                 privacyState: privacyState,
                 locale: locale,
-                timeZone: timeZone
+                timeZone: timeZone,
+                textResolver: textResolver
             )
         )
     }
 
+    // swiftlint:disable:next function_parameter_count
     private static func activePresentation(
         projection: ActiveFastWidgetProjection,
         now: Date,
         privacyState: LockScreenPrivacyState,
         locale: Locale,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        textResolver: SystemSurfaceTextResolver?
     ) -> LockScreenActivePresentation {
+        let textResolver = textResolver ?? SystemSurfaceTextResolver(locale: locale)
         let elapsed = now.timeIntervalSince(projection.startDate)
         let goalDuration = projection.targetDate.timeIntervalSince(projection.startDate)
         let progress = min(max(elapsed / goalDuration, 0), 1)
         let percentage = Int((progress * 100).rounded(.down))
         let elapsedAccessibilityValue = LockScreenElapsedFormatter.accessibilityString(
             from: elapsed,
-            privacyState: privacyState
+            privacyState: privacyState,
+            resolver: textResolver
         )
-        let progressAccessibilityValue = "\(percentage) percent of \(projection.goalHours)-hour goal"
+        let progressAccessibilityValue = textResolver(
+            .progress(percent: percentage, goalHours: projection.goalHours)
+        )
+        let accessibilitySummary = textResolver(
+            .lockSummary(
+                elapsed: elapsedAccessibilityValue,
+                progress: progressAccessibilityValue
+            )
+        )
 
         return LockScreenActivePresentation(
             startDate: projection.startDate,
@@ -95,8 +109,7 @@ enum LockScreenFastPresentation: Equatable, Sendable {
             progress: progress,
             progressPercentage: percentage,
             progressAccessibilityValue: progressAccessibilityValue,
-            accessibilitySummary: "uFast, elapsed \(elapsedAccessibilityValue), "
-                + "\(progressAccessibilityValue). Opens uFast.",
+            accessibilitySummary: accessibilitySummary,
             targetText: privacyState == .authenticated
                 ? LockScreenTargetFormatter.string(
                     from: projection.targetDate,
@@ -130,20 +143,19 @@ enum LockScreenElapsedFormatter {
 
     static func accessibilityString(
         from duration: TimeInterval,
-        privacyState: LockScreenPrivacyState
+        privacyState: LockScreenPrivacyState,
+        resolver: SystemSurfaceTextResolver = .init()
     ) -> String {
         let completedSeconds = max(Int(duration), 0)
         let hours = completedSeconds / (60 * 60)
         let minutes = completedSeconds % (60 * 60) / 60
-        var components = [component(hours, singular: "hour", plural: "hours")]
-        components.append(component(minutes, singular: "minute", plural: "minutes"))
+        var components = [resolver(.duration(value: hours, unit: .hour))]
+        components.append(resolver(.duration(value: minutes, unit: .minute)))
 
         if privacyState == .authenticated {
             components.append(
-                component(
-                    completedSeconds % 60,
-                    singular: "second",
-                    plural: "seconds"
+                resolver(
+                    .duration(value: completedSeconds % 60, unit: .second)
                 )
             )
         }
@@ -153,14 +165,6 @@ enum LockScreenElapsedFormatter {
 
     private static func twoDigits(_ value: Int) -> String {
         String(format: "%02d", value)
-    }
-
-    private static func component(
-        _ value: Int,
-        singular: String,
-        plural: String
-    ) -> String {
-        "\(value) \(value == 1 ? singular : plural)"
     }
 }
 

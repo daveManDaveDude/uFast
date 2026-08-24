@@ -30,44 +30,54 @@ extension HistoryView {
     @ViewBuilder
     var motionUnavailableNotice: some View {
         if motionSnapshot == nil {
-            VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                Text("History temporarily unavailable")
-                    .font(.headline)
-                    .foregroundStyle(UFastTheme.primary)
-                Text("Your saved records are still safe on this iPhone. Try loading this runway again.")
-                    .font(.subheadline)
-                    .foregroundStyle(UFastTheme.secondaryText)
-                Button("Try again") {
-                    _ = model.ensureMotionRunway(around: selectedDate)
+            VStack {
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+                    Text(textResolver(.historyCopy(.motionUnavailableTitle)))
+                        .font(.headline)
+                        .foregroundStyle(UFastTheme.primary)
+                    Text(textResolver(.historyCopy(.motionUnavailableMessage)))
+                        .font(.subheadline)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                    Button(textResolver(.historyCopy(.retry))) {
+                        _ = model.ensureMotionRunway(around: selectedDate)
+                    }
+                    .buttonStyle(UFastSecondaryButtonStyle())
+                    .accessibilityIdentifier("history.motion-retry")
                 }
-                .buttonStyle(UFastSecondaryButtonStyle())
-                .accessibilityIdentifier("history.motion-retry")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .uFastCard()
+                .padding(.horizontal, UFastTheme.Spacing.standard)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("history.motion-unavailable")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .uFastCard()
-            .padding(.horizontal, UFastTheme.Spacing.standard)
-            .accessibilityIdentifier("history.motion-unavailable")
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("history.retry")
         } else if !motionFailedEdges.isEmpty {
-            HStack(spacing: UFastTheme.Spacing.compact) {
-                Text("More history is still available to load.")
-                    .font(.subheadline)
-                    .foregroundStyle(UFastTheme.secondaryText)
-                Spacer()
-                Button("Retry") {
-                    model.retryFailedMotionExtensions()
+            VStack {
+                HStack(spacing: UFastTheme.Spacing.compact) {
+                    Text(textResolver(.historyCopy(.motionExtensionMessage)))
+                        .font(.subheadline)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                    Spacer()
+                    Button(textResolver(.historyCopy(.extensionRetry))) {
+                        model.retryFailedMotionExtensions()
+                    }
+                    .buttonStyle(UFastSecondaryButtonStyle())
+                    .accessibilityIdentifier("history.motion-extension-retry")
                 }
-                .buttonStyle(UFastSecondaryButtonStyle())
-                .accessibilityIdentifier("history.motion-extension-retry")
+                .padding(.horizontal, UFastTheme.Spacing.standard)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("history.motion-extension-unavailable")
             }
-            .padding(.horizontal, UFastTheme.Spacing.standard)
-            .accessibilityIdentifier("history.motion-extension-unavailable")
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("history.extension-retry")
         }
     }
 
     var periodHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("HISTORY")
+                Text(textResolver(.historyCopy(.eyebrow)))
                     .font(.caption.weight(.semibold))
                     .tracking(1.2)
                     .foregroundStyle(UFastTheme.secondaryText)
@@ -77,18 +87,21 @@ extension HistoryView {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                "History, \(historyDayPresentation.settledDay.formatted(.dateTime.month(.wide).year()))"
+                textResolver(.historyCopy(.title))
+                    + textResolver(.historyCopy(.separatorComma))
+                    + textResolver(.historyCopy(.separatorSpace))
+                    + historyDayPresentation.settledDay.formatted(.dateTime.month(.wide).year())
             )
             .accessibilityIdentifier("history.month-heading")
             Spacer()
             Button { isCalendarPresented = true } label: {
-                Label("Choose date", systemImage: "calendar")
+                Label(textResolver(.historyCopy(.chooseDate)), systemImage: "calendar")
                     .labelStyle(.iconOnly)
                     .font(.title2)
                     .frame(width: 48, height: 48)
             }
             .buttonStyle(.bordered)
-            .accessibilityLabel("Choose a date")
+            .accessibilityLabel(textResolver(.historyCopy(.chooseDateLabel)))
             .accessibilityIdentifier("history.choose-date")
         }
         .padding(.horizontal, UFastTheme.Spacing.standard)
@@ -180,7 +193,7 @@ extension HistoryView {
             Group {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        Label("Add at selected time", systemImage: "plus.circle")
+                        Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus.circle")
                             .fixedSize(horizontal: false, vertical: true)
                         Text(defaultHistoricalInstant, format: .dateTime.hour().minute())
                             .font(.subheadline.monospacedDigit())
@@ -188,7 +201,7 @@ extension HistoryView {
                     }
                 } else {
                     HStack {
-                        Label("Add at selected time", systemImage: "plus.circle")
+                        Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus.circle")
                         Spacer()
                         Text(defaultHistoricalInstant, format: .dateTime.hour().minute())
                             .font(.subheadline.monospacedDigit())
@@ -201,7 +214,7 @@ extension HistoryView {
         .buttonStyle(UFastSecondaryButtonStyle())
         .disabled(!temporalMovementPhase.allowsTimelineInteraction)
         .padding(.horizontal, UFastTheme.Spacing.standard)
-        .accessibilityHint("Opens native date and time controls before choosing food or drink.")
+        .accessibilityHint(textResolver(.historyCopy(.addAtSelectedTimeHint)))
         .accessibilityIdentifier("history.add-at-selected-time")
     }
 
@@ -211,14 +224,14 @@ extension HistoryView {
         if visibleFastItems.isEmpty {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                    Text("HISTORY")
+                    Text(textResolver(.historyCopy(.eyebrow)))
                         .font(.caption.weight(.semibold))
                         .tracking(1.2)
                         .foregroundStyle(UFastTheme.secondaryText)
-                    Text("No completed fasts")
+                    Text(textResolver(.historyCopy(.emptyTitle)))
                         .font(.headline)
                         .foregroundStyle(UFastTheme.primary)
-                    Text("Completed fasts will appear here.")
+                    Text(textResolver(.historyCopy(.emptyMessage)))
                         .font(.body)
                         .foregroundStyle(UFastTheme.secondaryText)
                 }
@@ -229,9 +242,9 @@ extension HistoryView {
                 .accessibilityIdentifier("history.empty")
             } else {
                 UFastIllustratedInformationCard(
-                    title: "No completed fasts",
-                    eyebrow: "Fasts in this view",
-                    message: "Completed fasts will appear here."
+                    title: textResolver(.historyCopy(.emptyTitle)),
+                    eyebrow: textResolver(.historyCopy(.emptyEyebrow)),
+                    message: textResolver(.historyCopy(.emptyMessage))
                 ) {
                     FastingBotanicalArtwork()
                 }
@@ -239,8 +252,11 @@ extension HistoryView {
                 .accessibilityIdentifier("history.empty")
             }
         } else {
-            UFastSectionHeading("Fasts in this view", eyebrow: "Details")
-                .padding(.horizontal, UFastTheme.Spacing.standard)
+            UFastSectionHeading(
+                textResolver(.historyCopy(.fastsInView)),
+                eyebrow: textResolver(.historyCopy(.detailsEyebrow))
+            )
+            .padding(.horizontal, UFastTheme.Spacing.standard)
             LazyVStack(spacing: 12) {
                 ForEach(visibleFastItems) { item in
                     Button { openVisibleFast(item) } label: {
@@ -265,14 +281,14 @@ extension HistoryView {
 
     var futureReadOnlyNotice: some View {
         Label(
-            "Future day · History is read only",
+            textResolver(.historyCopy(.futureReadOnly)),
             systemImage: "calendar.badge.clock"
         )
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(UFastTheme.secondaryText)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, UFastTheme.Spacing.standard)
-        .accessibilityHint("Return to a completed day to add or repair history.")
+        .accessibilityHint(textResolver(.historyCopy(.futureReadOnlyHint)))
         .accessibilityIdentifier("history.future-read-only")
     }
 
@@ -301,8 +317,6 @@ extension HistoryView {
         if source != .carousel {
             if temporalMovementPhase != .settled || isDateRailMoving {
                 interruptTemporalMotion()
-            } else {
-                coupledScrollPresentation.handle(.end)
             }
         }
         var coordinator = TemporalDaySelectionCoordinator(
@@ -354,10 +368,7 @@ extension HistoryView {
     func interruptTemporalMotion() {
         guard temporalMovementPhase != .settled
             || isDateRailMoving
-            || coupledScrollPresentation.preview != nil
-            || coupledScrollPresentation.isReconciling
         else { return }
-        coupledScrollPresentation.handle(.end)
         temporalMovementPhase = .settled
         isDateRailMoving = false
         historyInteractionRevision += 1
@@ -366,9 +377,6 @@ extension HistoryView {
 
     func updateDateRailMovement(_ isMoving: Bool) {
         isDateRailMoving = isMoving
-        if isMoving {
-            coupledScrollPresentation.handle(.end)
-        }
     }
 
     func ensureHistoryDayCoverage(around date: Date) {
@@ -533,40 +541,44 @@ extension HistoryView {
 
 extension HistoryView {
     var historyTimeline: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
-            TemporalHistoryCarousel(
-                dates: historyDates,
-                selection: selectedDateBinding(source: .carousel),
-                intervals: liveHistoryPresentation?.intervals(activeEndingAt: clock.now) ?? [],
-                events: liveHistoryPresentation?.events ?? [],
-                motionIntervals: motionIntervalsAtCurrentTime,
-                motionEvents: motionSnapshot?.presentation.ribbonEvents
-                    ?? historyPresentation?.events ?? [],
-                onSelectInterval: openInterval,
-                onSelectEvent: openEvent,
-                onSelectEventGroup: { group in
-                    eventGroupDisclosure = group
-                },
-                onSelectEmpty: { instant in
-                    beginHistoricalEntry(at: instant)
-                },
-                onNavigateDay: navigateDay,
-                canNavigateForward: canNavigateForward,
-                allowsRecordActivation: !isFutureSelection,
-                allowsEmptySelection: !isFutureSelection,
-                showsTimelineDetails: showsSettledHistoryDetails,
-                presentationDay: selectedDate,
-                readOnlyFromDate: clock.now,
-                onMovementPhaseChange: updateTemporalMovementPhase,
-                onCoupledPresentationChange: coupledScrollPresentation.handle,
-                onSettledVisibleWindow: { window in
-                    settledVisibleWindow = window
-                    _ = model.reloadHistory(in: window.interval)
-                },
-                onPrefetchIntentAt: model.requestMotionExtension
-            )
-            .padding(.horizontal, UFastTheme.Spacing.standard)
-            .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
-        }
+        TemporalHistoryCarousel(
+            dates: historyDates,
+            selection: selectedDateBinding(source: .carousel),
+            intervals: liveHistoryPresentation?.intervals(activeEndingAt: clock.now) ?? [],
+            events: liveHistoryPresentation?.events ?? [],
+            motionIntervals: motionIntervalsAtCurrentTime,
+            motionEvents: motionSnapshot?.presentation.ribbonEvents
+                ?? historyPresentation?.events ?? [],
+            onSelectInterval: openInterval,
+            onSelectEvent: openEvent,
+            onSelectEventGroup: { group in
+                eventGroupDisclosure = group
+            },
+            onSelectEmpty: { instant in
+                beginHistoricalEntry(at: instant)
+            },
+            onNavigateDay: navigateDay,
+            canNavigateForward: canNavigateForward,
+            allowsRecordActivation: !isFutureSelection,
+            allowsEmptySelection: !isFutureSelection,
+            showsTimelineDetails: showsSettledHistoryDetails,
+            presentationDay: selectedDate,
+            readOnlyFromDate: clock.now,
+            onMovementPhaseChange: updateTemporalMovementPhase,
+            // The date rail intentionally remains on the settled day
+            // during lower-carousel motion, so there is no coupled
+            // preview consumer. Avoid publishing unused geometry frames
+            // into History view state.
+            onCoupledPresentationChange: { _ in },
+            onSettledVisibleWindow: { window in
+                settledVisibleWindow = window
+                _ = model.reloadHistory(in: window.interval)
+            },
+            onPrefetchIntentAt: model.requestMotionExtension
+        )
+        .padding(.horizontal, UFastTheme.Spacing.standard)
+        .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("history.carousel")
     }
 }

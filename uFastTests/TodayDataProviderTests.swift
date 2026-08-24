@@ -212,7 +212,7 @@ final class TodayDataProviderTests: XCTestCase {
         XCTAssertEqual(provider.snapshot.settings.map(\.id), [authorities.settingsID])
         XCTAssertEqual(provider.snapshot.activeFasts.map(\.id), [authorities.activeFastID])
         XCTAssertEqual(provider.snapshot.hydrationFavourites.map(\.id), [authorities.favouriteID])
-        XCTAssertEqual(provider.errorMessage, SwiftDataTodayDataProvider.snapshotLoadErrorMessage)
+        XCTAssertEqual(provider.failure, .snapshotUnavailable)
 
         provider.refresh()
 
@@ -221,7 +221,7 @@ final class TodayDataProviderTests: XCTestCase {
             ["London recovery meal", "Existing meal"]
         )
         XCTAssertEqual(provider.snapshot.hydrationEntries.count, 1)
-        XCTAssertNil(provider.errorMessage)
+        XCTAssertNil(provider.failure)
     }
 
     func testMultiYearFixtureContainsOnlyTodayRecordsInProviderSnapshot() throws {

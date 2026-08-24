@@ -14,10 +14,33 @@ enum ActiveFastAuthority {
     }
 
     @MainActor
-    static func fetch(in modelContext: ModelContext) throws -> FastRecord? {
+    static func fetch(
+        in modelContext: ModelContext,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+    ) throws -> FastRecord? {
         let records = try modelContext.fetch(
             FetchDescriptor<FastRecord>(predicate: #Predicate { $0.endDate == nil })
         )
-        return try resolve(records)
+        do {
+            return try resolve(records)
+        } catch let ActiveFastIntegrityError.multipleActiveFasts(count) {
+            recordAuthorityConflict(count: count, to: diagnosticSink)
+            throw ActiveFastIntegrityError.multipleActiveFasts(count: count)
+        }
+    }
+
+    private static func recordAuthorityConflict(
+        count: Int,
+        to sink: any DiagnosticEventSink
+    ) {
+        guard let event = DiagnosticEvent(
+            subsystem: .persistence,
+            outcome: .authorityConflict,
+            severity: .error,
+            countBucket: DiagnosticCountBucket(count: count)
+        ) else {
+            return
+        }
+        sink.record(event)
     }
 }

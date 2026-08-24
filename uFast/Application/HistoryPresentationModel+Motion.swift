@@ -22,7 +22,8 @@ extension HistoryPresentationModel {
         let coverage = HistoryMotionCoverage.initial(
             centeredOn: target,
             maximumDate: historyDisplayMaximumDay,
-            calendar: calendar
+            calendar: calendar,
+            configuration: motionConfiguration
         )
         let generation = prepareInitialMotionLoad(target: target)
         let expectedCalendar = calendar
@@ -30,7 +31,9 @@ extension HistoryPresentationModel {
         initialTask = Task { [weak self] in
             do {
                 guard let self else { return }
-                let chunk = try await loadChunk(coverage, expectedCalendar, referenceNow)
+                let chunk = try await loadChunk(
+                    coverage, expectedCalendar, referenceNow, textResolver
+                )
                 guard !Task.isCancelled else { return }
                 applyInitial(
                     chunk,
@@ -59,7 +62,8 @@ extension HistoryPresentationModel {
                 let chunk = try await loadChunk(
                     request.chunkCoverage,
                     request.calendar,
-                    request.referenceNow
+                    request.referenceNow,
+                    textResolver
                 )
                 guard let mergedWindow = request.coverage.visualWindow(calendar: request.calendar),
                       let merged = await mergeChunks(request.existingChunks + [chunk], mergedWindow),
@@ -79,13 +83,16 @@ extension HistoryPresentationModel {
                 guard !Task.isCancelled else { return }
                 self?.applyMotionExtensionFailure(
                     edge: request.edge,
-                    generation: request.generation
+                    generation: request.generation,
+                    isRetry: request.isRetry
                 )
             }
         }
     }
 
     func prepareInitialMotionLoad(target: Date) -> Int {
+        let isRetry = initialLoadAttempted
+        initialLoadAttempted = true
         motionInitialLoading = true
         motionPendingTarget = target
         if motionPriorSnapshot == nil {
@@ -98,6 +105,7 @@ extension HistoryPresentationModel {
             motionPriorSelectedDate = selectedDate
         }
         motionGeneration += 1
+        initialLoadRetryByGeneration[motionGeneration] = isRetry
         return motionGeneration
     }
 
@@ -125,13 +133,15 @@ extension HistoryPresentationModel {
               let coverage = current.coverage.extended(
                   toward: edge,
                   maximumDate: historyDisplayMaximumDay,
-                  calendar: calendar
+                  calendar: calendar,
+                  configuration: motionConfiguration
               ),
               let chunkCoverage = motionChunkCoverage(
                   for: edge,
                   coverage: coverage,
                   current: current
               ) else { return nil }
+        let isRetry = motionFailedEdges.contains(edge)
         motionLoadingEdges.insert(edge)
         publishMotionLoadingState()
         return HistoryMotionExtensionRequest(
@@ -142,7 +152,8 @@ extension HistoryPresentationModel {
             calendar: calendar,
             expectedCoverage: current.coverage,
             existingChunks: motionChunks,
-            referenceNow: referenceNow
+            referenceNow: referenceNow,
+            isRetry: isRetry
         )
     }
 
@@ -183,9 +194,11 @@ extension HistoryPresentationModel {
         generation: Int,
         expectedCalendar: Calendar
     ) {
+        initialLoadRetryByGeneration.removeValue(forKey: generation)
         guard motionGeneration == generation,
               calendar.identifier == expectedCalendar.identifier,
               calendar.timeZone.identifier == expectedCalendar.timeZone.identifier else { return }
+        initialLoadFailed = false
         motionChunks.removeAll()
         installMotionChunks(
             [chunk],
@@ -235,6 +248,9 @@ extension HistoryPresentationModel {
 
     func applyInitialFailure(generation: Int) {
         guard motionGeneration == generation else { return }
+        let isRetry = initialLoadRetryByGeneration.removeValue(forKey: generation) ?? true
+        recordHistoryFailure(.initialLoadFailed, isRetry: isRetry)
+        initialLoadFailed = true
         motionInitialLoading = false
         motionPendingTarget = nil
         motionPendingEnvironmentRebuild = false
@@ -276,9 +292,14 @@ extension HistoryPresentationModel {
         extensionTasks[application.edge] = nil
     }
 
-    func applyMotionExtensionFailure(edge: HistoryMotionEdge, generation: Int) {
+    func applyMotionExtensionFailure(
+        edge: HistoryMotionEdge,
+        generation: Int,
+        isRetry: Bool = false
+    ) {
         defer { extensionTasks[edge] = nil }
         guard motionSnapshot?.generation == generation else { return }
+        recordHistoryFailure(.extensionLoadFailed, isRetry: isRetry)
         motionLoadingEdges.remove(edge)
         motionFailedEdges.insert(edge)
         publishMotionLoadingState()
@@ -336,7 +357,8 @@ extension HistoryPresentationModel {
                     let chunk = try await loadChunk(
                         oldChunk.coverage,
                         expectedCalendar,
-                        referenceNow
+                        referenceNow,
+                        textResolver
                     )
                     refreshed.append(chunk)
                 }
@@ -407,5 +429,17 @@ extension HistoryPresentationModel {
             precedingState: motionState(.preceding),
             followingState: motionState(.following)
         )
+    }
+
+    private func recordHistoryFailure(_ outcome: DiagnosticOutcome, isRetry: Bool) {
+        guard let event = DiagnosticEvent(
+            subsystem: .history,
+            outcome: outcome,
+            severity: .error,
+            isRetry: isRetry
+        ) else {
+            return
+        }
+        diagnosticSink.record(event)
     }
 }

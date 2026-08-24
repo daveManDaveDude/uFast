@@ -2,44 +2,41 @@ import SwiftUI
 
 extension TodayGoalView {
     var caloricFavouriteConfirmationTitle: String {
-        switch caloricFavouriteConfirmationContext.kind {
-        case .active:
-            "This entry is during your recorded fast."
-        case .completed:
-            "This drink updates \(caloricFavouriteConfirmationContext.affectedPersistedFastCount) recorded fast(s)."
-        case .inferred:
-            "This drink updates inferred History."
-        }
+        textResolver(
+            .confirmationTitle(
+                caloricFavouriteConfirmationContext.kind,
+                noun: .drink,
+                count: max(1, caloricFavouriteConfirmationContext.affectedPersistedFastCount)
+            )
+        )
     }
 
     var caloricFavouriteConfirmationActionTitle: String {
-        switch caloricFavouriteConfirmationContext.kind {
-        case .active:
-            "Save and end fast"
-        case .completed:
-            "Save and update fast"
-        case .inferred:
-            "Save and update History"
-        }
+        textResolver(
+            .confirmationAction(
+                .saving,
+                kind: caloricFavouriteConfirmationContext.kind,
+                noun: .drink
+            )
+        )
     }
 
     var caloricFavouriteConfirmationMessage: String {
         let time = clock.now.formatted(date: .omitted, time: .shortened)
-        let consequence = switch caloricFavouriteConfirmationContext.kind {
-        case .active:
-            "Saving this caloric drink records it and ends your fast at \(time)."
-        case .completed:
-            "Saving this caloric drink updates "
-                + "\(caloricFavouriteConfirmationContext.affectedPersistedFastCount) recorded fast(s) at \(time)."
-        case .inferred:
-            "Saving this caloric drink refreshes derived inferred History at \(time)."
-        }
-        var details = consequence
+        var details = textResolver(
+            .confirmationMessage(
+                action: .saving,
+                kind: caloricFavouriteConfirmationContext.kind,
+                noun: .drink,
+                count: max(1, caloricFavouriteConfirmationContext.affectedPersistedFastCount),
+                time: time
+            )
+        )
         if caloricFavouriteConfirmationContext.includesReconstructedReview {
-            details += " At least one affected fast is reconstructed and will be marked for review."
+            details += " " + textResolver(.reconstructedReviewDetail)
         }
         if caloricFavouriteConfirmationContext.isCombined {
-            details += " It also refreshes the derived inferred interval."
+            details += " " + textResolver(.inferredIntervalDetail)
         }
         return details
     }
@@ -49,12 +46,17 @@ extension TodayGoalView {
         do {
             try controller.addFavouriteDrink(favourite, endingActiveFast: endingActiveFast)
             caloricFavouriteSaveError = nil
-            drinkAnnouncement = "\(favourite.displayName), \(favourite.volumeMillilitres) millilitres, added."
+            drinkAnnouncement = textResolver(
+                .drinkAddedAnnouncement(
+                    name: localizedFavouriteName(favourite),
+                    volumeMillilitres: favourite.volumeMillilitres
+                )
+            )
             caloricFavouritePending = nil
             isCaloricFavouriteConfirmationPresented = false
         } catch {
             isCaloricFavouriteConfirmationPresented = false
-            caloricFavouriteSaveError = "Your drink and fast couldn’t be saved. Please try again."
+            caloricFavouriteSaveError = textResolver(.drinkCombinedSaveError)
         }
     }
 
@@ -106,26 +108,23 @@ extension TodayGoalView {
     var liveActivitySection: some View {
         if liveActivityCoordinator != nil {
             VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                UFastSectionHeading("Live Activity")
-                Text(
-                    "Show this active interval on the Lock Screen and Dynamic Island for up to "
-                        + "8 hours. Your recorded interval continues if the activity ends."
-                )
-                .font(.subheadline)
-                .foregroundStyle(UFastTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+                UFastSectionHeading(textResolver(.liveActivityHeading))
+                Text(textResolver(.liveActivityTodayDescription))
+                    .font(.subheadline)
+                    .foregroundStyle(UFastTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 switch liveActivityControlState {
                 case .hide:
-                    Button("Hide for this fast", action: hideLiveActivity)
+                    Button(textResolver(.liveActivityHide), action: hideLiveActivity)
                         .buttonStyle(UFastSecondaryButtonStyle())
                         .disabled(isLiveActivityActionInFlight)
                         .accessibilityIdentifier("fast.live-activity.hide")
                 case .show, .showAgain:
                     Button(
                         liveActivityControlState == .show
-                            ? "Show Live Activity"
-                            : "Show Live Activity again",
+                            ? textResolver(.liveActivityShow)
+                            : textResolver(.liveActivityShowAgain),
                         action: { isLiveActivityDisclosurePresented = true }
                     )
                     .buttonStyle(UFastSecondaryButtonStyle())
@@ -156,7 +155,7 @@ extension TodayGoalView {
                 foodEditor = FoodEditorPresentation(record: nil)
             } label: {
                 HStack {
-                    Label("Log food", systemImage: "fork.knife")
+                    Label(textResolver(.todayFoodAdd), systemImage: "fork.knife")
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.bold))
@@ -172,7 +171,7 @@ extension TodayGoalView {
                 isDrinkSheetPresented = true
             } label: {
                 HStack {
-                    Label("Add drink", systemImage: "drop")
+                    Label(textResolver(.todayDrinkAdd), systemImage: "drop")
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.bold))
@@ -189,7 +188,7 @@ extension TodayGoalView {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("drink.caloric-favourite.save-error")
 
-                    Button("Try adding drink again") {
+                    Button(textResolver(.todayDrinkRetry)) {
                         savePendingCaloricFavourite(endingActiveFast: true)
                     }
                     .buttonStyle(UFastSecondaryButtonStyle())
@@ -199,31 +198,31 @@ extension TodayGoalView {
             }
 
             HStack {
-                Text("Fluids today")
+                Text(textResolver(.todayFluids))
                     .font(.headline)
                     .foregroundStyle(UFastTheme.primary)
                 Spacer()
-                Text("\(TodayTimeline.fluidTotal(timelineEntries)) ml")
+                Text(textResolver(.todayFluidTotal(TodayTimeline.fluidTotal(timelineEntries))))
                     .foregroundStyle(UFastTheme.primary)
                     .accessibilityIdentifier("drink.total")
             }
             .uFastCard()
 
-            if let previewTimelineError {
-                Label(previewTimelineError, systemImage: "exclamationmark.circle")
+            if let timelineFailureMessage {
+                Label(timelineFailureMessage, systemImage: "exclamationmark.circle")
                     .foregroundStyle(UFastTheme.error)
                     .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
                     .uFastCard()
                     .accessibilityIdentifier("timeline.error")
             } else if timelineEntries.isEmpty {
-                Text("Food and drinks you add today will appear here.")
+                Text(textResolver(.todayTimelineEmpty))
                     .foregroundStyle(UFastTheme.secondaryText)
                     .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
                     .uFastCard()
                     .accessibilityIdentifier("timeline.empty")
             } else {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                    UFastSectionHeading("Today timeline")
+                    UFastSectionHeading(textResolver(.todayTimelineHeading))
                     ForEach(timelineEntries) { entry in
                         Button { openTimelineEntry(entry) } label: {
                             HStack(alignment: .top, spacing: UFastTheme.Spacing.standard) {
@@ -255,10 +254,14 @@ extension TodayGoalView {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(timelineAccessibilityLabel(entry))
                         .accessibilityValue(
-                            "\(timelineDetail(entry)), "
-                                + entry.occurredAt.formatted(date: .omitted, time: .shortened)
+                            textResolver(
+                                .todayTimelineAccessibilityValue(
+                                    detail: timelineDetail(entry),
+                                    time: entry.occurredAt.formatted(date: .omitted, time: .shortened)
+                                )
+                            )
                         )
-                        .accessibilityHint("Opens this event for editing.")
+                        .accessibilityHint(textResolver(.todayTimelineEditHint))
                         .accessibilityIdentifier("timeline.entry.\(entry.id.uuidString)")
 
                         if entry.id != timelineEntries.last?.id {

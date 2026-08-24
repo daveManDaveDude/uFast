@@ -411,7 +411,7 @@ follows:
    that the local fast ended and never causes an automatic restart.
 4. OW-L102 remains the durable long-duration surface, and ActivityKit remains an
    optional projection rather than a dependency of the manual tracker.
-5. `ROADMAP.md`, `BACKLOG.md`, `DOMAIN_RULES.md` and the legacy OW-106 status all
+5. `docs/ROADMAP.md`, `BACKLOG.md`, `DOMAIN_RULES.md` and the legacy OW-106 status all
    point to the accepted decision and OW-L105 contract.
 6. No ActivityKit production code is added by this decision story itself.
 

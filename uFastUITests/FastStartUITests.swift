@@ -100,11 +100,10 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testActiveFastElapsedSecondsCountUpWhileTodayIsVisible() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--suppress-automatic-live-activity-offer",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            suppressAutomaticLiveActivityOffer: true
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start"].tap()
@@ -133,11 +132,10 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testStartFastPersistsAcrossRelaunch() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--suppress-automatic-live-activity-offer",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            suppressAutomaticLiveActivityOffer: true
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
 
@@ -150,7 +148,7 @@ final class FastStartUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["fast.target"].exists)
 
         app.terminate()
-        app.launchArguments = ["--ui-testing"]
+        app.launchArguments = UITestLaunchConfiguration().arguments
         app.launch()
 
         XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
@@ -161,12 +159,11 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testSaveFailureKeepsInactiveStateAndOffersRetry() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--simulate-fast-save-failure",
-            "--suppress-automatic-live-activity-offer",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            suppressAutomaticLiveActivityOffer: true,
+            simulateFastSaveFailure: true
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
 
@@ -180,11 +177,10 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testInactivePastStartEditorCanBeCancelledWithoutStartingFast() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--suppress-automatic-live-activity-offer",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            suppressAutomaticLiveActivityOffer: true
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
 
@@ -204,11 +200,10 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testPastStartConfirmationPersistsAcrossRelaunch() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--suppress-automatic-live-activity-offer",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            suppressAutomaticLiveActivityOffer: true
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
@@ -218,7 +213,7 @@ final class FastStartUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
         app.terminate()
-        app.launchArguments = ["--ui-testing"]
+        app.launchArguments = UITestLaunchConfiguration().arguments
         app.launch()
         XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["fast.edit-start"].exists)
@@ -227,12 +222,11 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testPastStartSaveFailureKeepsEditorSelectionAvailableForRetry() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--simulate-fast-save-failure",
-            "--suppress-automatic-live-activity-offer",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            suppressAutomaticLiveActivityOffer: true,
+            simulateFastSaveFailure: true
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
@@ -253,14 +247,12 @@ final class FastStartUITests: XCTestCase {
     func testPastStartEditorPreventsSelectingAFutureTime() {
         let app = XCUIApplication()
         let startOfToday = Calendar.current.startOfDay(for: Date())
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--suppress-automatic-live-activity-offer",
-        ]
-        app.launchArguments.append("--fixed-now")
-        app.launchArguments.append(String(startOfToday.timeIntervalSince1970))
-        app.launchArguments.append(contentsOf: ["-AppleLocale", "en_GB"])
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            fixedNow: startOfToday,
+            suppressAutomaticLiveActivityOffer: true,
+            appleLocale: "en_GB"
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
@@ -279,11 +271,10 @@ final class FastStartUITests: XCTestCase {
     @MainActor
     func testActiveFastEditorUsesSaveActionAndCancellationKeepsPresentation() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--suppress-automatic-live-activity-offer",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            suppressAutomaticLiveActivityOffer: true
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start"].tap()
@@ -310,12 +301,15 @@ final class FastStartUITests: XCTestCase {
     func testLegacyActiveFastShowsStoredInvalidDraftAndCanChooseBoundedReplacement() {
         let app = XCUIApplication()
         let legacyStart = fixedStart.addingTimeInterval(-48 * 60 * 60)
-        app.launchArguments = londonLaunchArguments(now: fixedStart, resetData: true)
-            + [
-                "--seed-onboarded",
-                "--seed-active-fast-start",
-                String(legacyStart.timeIntervalSince1970),
-            ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            seedOnboarded: true,
+            fixedNow: fixedStart,
+            seedActiveFastStart: legacyStart,
+            suppressAutomaticLiveActivityOffer: true,
+            appleLocale: "en_GB",
+            timeZone: "Europe/London"
+        ).arguments
         app.launch()
 
         XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
@@ -439,27 +433,28 @@ final class FastStartUITests: XCTestCase {
 
     private func fixedLaunchArguments(
         now: Date,
-        resetData: Bool = false
+        resetData: Bool = false,
+        appleLocale: String? = nil,
+        timeZone: String? = nil
     ) -> [String] {
-        var arguments = [
-            "--ui-testing",
-            "--fixed-now",
-            String(now.timeIntervalSince1970),
-            "--suppress-automatic-live-activity-offer",
-        ]
-
-        if resetData {
-            arguments.append("--reset-data")
-        }
-
-        return arguments
+        UITestLaunchConfiguration(
+            resetData: resetData,
+            fixedNow: now,
+            suppressAutomaticLiveActivityOffer: true,
+            appleLocale: appleLocale,
+            timeZone: timeZone
+        ).arguments
     }
 
     private func londonLaunchArguments(
         now: Date,
         resetData: Bool = false
     ) -> [String] {
-        fixedLaunchArguments(now: now, resetData: resetData)
-            + ["-AppleLocale", "en_GB", "-NSTimeZone", "Europe/London"]
+        fixedLaunchArguments(
+            now: now,
+            resetData: resetData,
+            appleLocale: "en_GB",
+            timeZone: "Europe/London"
+        )
     }
 }

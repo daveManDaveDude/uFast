@@ -102,16 +102,19 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     private let transaction: PersistenceTransaction
     private let clock: any AppClock
     private let observationSink: BoundaryQueryObservationSink
+    private let diagnosticSink: any DiagnosticEventSink
 
     init(
         modelContext: ModelContext,
         simulateSaveFailure: Bool = false,
         clock: any AppClock = SystemAppClock(),
-        observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink()
+        observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink(),
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
     ) {
         self.modelContext = modelContext
         self.clock = clock
         self.observationSink = observationSink
+        self.diagnosticSink = diagnosticSink
         transaction = PersistenceTransaction(
             modelContext: modelContext,
             saveAction: simulateSaveFailure ? {
@@ -198,7 +201,7 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
     }
 
     func activeFast() throws -> FastRecord? {
-        try ActiveFastAuthority.fetch(in: modelContext)
+        try ActiveFastAuthority.fetch(in: modelContext, diagnosticSink: diagnosticSink)
     }
 
     func earliestCaloricBoundary(after startDate: Date) throws -> CaloricBoundary? {
@@ -267,7 +270,7 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
         let snapshots = planner.snapshots(for: fasts)
         modelContext.delete(record)
         _ = planner.apply(bounded.mutation, to: fasts, currentGoal: .default)
-        try transaction.save {
+        try saveTransaction {
             for fast in fasts {
                 snapshots[fast.id]?.restore(fast)
             }
@@ -396,7 +399,7 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
             modelContext.insert(createdRecord)
         }
         _ = planner.apply(bounded.mutation, to: fasts, currentGoal: goal)
-        try transaction.save {
+        try saveTransaction {
             if let record, let oldDraft, let oldUpdatedAt {
                 record.update(from: oldDraft, at: oldUpdatedAt)
             }
@@ -420,5 +423,16 @@ final class SwiftDataHydrationEntryRepository: HydrationEntryRepository {
             isCaloric: draft.isCaloric,
             createdAt: createdAt
         )
+    }
+}
+
+private extension SwiftDataHydrationEntryRepository {
+    func saveTransaction(recovering recovery: @escaping () -> Void = {}) throws {
+        do {
+            try transaction.save(recovering: recovery)
+        } catch {
+            PersistenceTransactionDiagnostics.recordFailure(to: diagnosticSink)
+            throw error
+        }
     }
 }

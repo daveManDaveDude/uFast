@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TemporalDateNavigator: View {
     @Environment(\.calendar) var calendar
+    @Environment(\.appTextResolver) var textResolver
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.locale) var locale
     @Environment(\.layoutDirection) var layoutDirection
@@ -119,7 +120,7 @@ struct TemporalDateNavigator: View {
             navigatorWidth = width
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Date navigator")
+        .accessibilityLabel(textResolver(.historyCopy(.dateNavigator)))
         .accessibilityIdentifier("temporal.date-navigator")
     }
 }
@@ -158,7 +159,11 @@ extension TemporalDateNavigator {
         .opacity(isSelectable ? (showsReadOnlyStyle ? 0.78 : 1) : 0.45)
         .accessibilityLabel(fullDate(date))
         .accessibilityValue(accessibilityValue)
-        .accessibilityHint(isReadOnly ? "Future day, history is read only." : "")
+        .accessibilityHint(
+            isReadOnly
+                ? textResolver(.historyCopy(.futureDayHint))
+                : textResolver(.historyCopy(.empty))
+        )
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("temporal.date.\(date.timeIntervalSince1970)")
         .id(date)
@@ -240,19 +245,16 @@ extension TemporalDateNavigator {
         isSelectable: Bool,
         isReadOnly: Bool
     ) -> String {
-        if isSelected, isReadOnly {
-            "Selected, Future date, Read only"
-        } else if isSelected {
-            "Selected"
-        } else if isReadOnly {
-            "Future date, Read only"
-        } else if isInRange {
-            "In selected range"
-        } else if isSelectable {
-            ""
-        } else {
-            "Future date"
-        }
+        textResolver(
+            .historyCopy(
+                .dateChipState(
+                    selected: isSelected,
+                    future: isReadOnly,
+                    inRange: isInRange,
+                    selectable: isSelectable
+                )
+            )
+        )
     }
 
     func coupledFollower(_ preview: TemporalDaySpaceProgress) -> some View {

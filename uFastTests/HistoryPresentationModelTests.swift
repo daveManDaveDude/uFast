@@ -4,6 +4,40 @@ import XCTest
 
 @MainActor
 final class HistoryPresentationModelTests: XCTestCase {
+    func testFailedInitialLoadWaitsForExplicitRetryAfterOrdinaryReload() async throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let clock = FixedAppClock(now: now)
+        let gate = DeferredHistoryChunkGate()
+        let model = makeModel(
+            container: container,
+            clock: clock,
+            calendar: utcCalendar,
+            gate: gate
+        )
+
+        XCTAssertFalse(model.ensureMotionRunway(around: now))
+        await gate.waitForRequestCount(1)
+        await gate.failRequest(at: 0)
+        await waitUntil { !model.motionInitialLoading }
+
+        XCTAssertNil(model.motionSnapshot)
+        XCTAssertTrue(model.reloadHistory())
+        for _ in 0 ..< 10 {
+            await Task.yield()
+        }
+        let requestCountAfterReload = await gate.requestCount()
+        XCTAssertEqual(requestCountAfterReload, 1)
+        XCTAssertNil(model.motionSnapshot)
+
+        XCTAssertFalse(model.ensureMotionRunway(around: now))
+        await gate.waitForRequestCount(2)
+        await gate.resumeRequest(at: 1)
+        await waitUntil { model.motionSnapshot != nil && !model.motionInitialLoading }
+
+        XCTAssertNotNil(model.motionSnapshot)
+    }
+
     func testReplacingInitialLoadCancelsObsoleteTaskAndKeepsNewestGeneration() async throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let now = Date(timeIntervalSince1970: 2_000_000_000)
@@ -16,7 +50,7 @@ final class HistoryPresentationModelTests: XCTestCase {
             calendar: calendar,
             locale: Locale(identifier: "en_GB"),
             timeZone: .gmt,
-            loadChunk: { coverage, calendar, _ in
+            loadChunk: { coverage, calendar, _, _ in
                 try await gate.load(coverage: coverage, calendar: calendar)
             },
             mergeChunks: { chunks, window in
@@ -51,7 +85,7 @@ final class HistoryPresentationModelTests: XCTestCase {
             clock: clock,
             calendar: calendar,
             timeZone: .gmt,
-            loadChunk: { coverage, calendar, _ in
+            loadChunk: { coverage, calendar, _, _ in
                 try await gate.load(coverage: coverage, calendar: calendar)
             }
         )
@@ -178,7 +212,7 @@ final class HistoryPresentationModelTests: XCTestCase {
             calendar: calendar,
             locale: Locale(identifier: "en_GB"),
             timeZone: .gmt,
-            loadChunk: { coverage, calendar, _ in
+            loadChunk: { coverage, calendar, _, _ in
                 try await gate.load(coverage: coverage, calendar: calendar)
             },
             mergeChunks: { chunks, window in
@@ -255,6 +289,10 @@ private actor DeferredHistoryChunkGate {
         while requests.count < count {
             await Task.yield()
         }
+    }
+
+    func requestCount() -> Int {
+        requests.count
     }
 
     func resumeRequest(at index: Int) {

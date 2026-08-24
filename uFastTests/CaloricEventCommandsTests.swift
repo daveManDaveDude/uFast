@@ -50,29 +50,53 @@ final class CaloricEventCommandsTests: XCTestCase {
         XCTAssertFalse(context.hasChanges)
     }
 
-    func testPresentationCategorySharesCopyWithoutWeakeningExactDomainEquality() {
-        let active = CaloricEventConfirmationContext(
-            persistedImpact: CaloricEventImpact(
-                activeFastIDs: [UUID()],
-                completedFastIDs: [],
-                reconstructedFastIDs: [],
-                reconstructedReviewIDs: []
-            )
+    func testConfirmationErrorsDistinguishEachAssociatedContextField() {
+        let activeFastID = UUID()
+        let active = makeConfirmationContext(activeFastIDs: [activeFastID])
+        let differentKind = makeConfirmationContext(completedFastIDs: [UUID()])
+        let differentAffectedPersistedFastCount = makeConfirmationContext(
+            activeFastIDs: [activeFastID, UUID()]
         )
-        let completed = CaloricEventConfirmationContext(
-            persistedImpact: CaloricEventImpact(
-                activeFastIDs: [],
-                completedFastIDs: [UUID()],
-                reconstructedFastIDs: [],
-                reconstructedReviewIDs: [UUID()]
-            ),
+        let differentReconstructedReview = makeConfirmationContext(
+            activeFastIDs: [activeFastID],
+            reconstructedReviewIDs: [activeFastID]
+        )
+        let differentInferredInterval = makeConfirmationContext(
+            activeFastIDs: [activeFastID],
             includesInferredInterval: true
         )
+
+        let foodError: (CaloricEventConfirmationContext) -> FoodEntrySaveError = {
+            .confirmationRequiredWithImpact($0)
+        }
+        let hydrationError: (CaloricEventConfirmationContext) -> HydrationEntrySaveError = {
+            .confirmationRequiredWithImpact($0)
+        }
+
+        XCTAssertNotEqual(foodError(active), foodError(differentKind))
+        XCTAssertNotEqual(hydrationError(active), hydrationError(differentKind))
+        XCTAssertNotEqual(
+            foodError(active),
+            foodError(differentAffectedPersistedFastCount)
+        )
+        XCTAssertNotEqual(
+            hydrationError(active),
+            hydrationError(differentAffectedPersistedFastCount)
+        )
+        XCTAssertNotEqual(foodError(active), foodError(differentReconstructedReview))
+        XCTAssertNotEqual(hydrationError(active), hydrationError(differentReconstructedReview))
+        XCTAssertNotEqual(foodError(active), foodError(differentInferredInterval))
+        XCTAssertNotEqual(hydrationError(active), hydrationError(differentInferredInterval))
+    }
+
+    func testPresentationCategoryGroupsSameContextWithoutWeakeningExactEquality() {
+        let active = makeConfirmationContext(activeFastIDs: [UUID()])
+        let differentFoodError = FoodEntrySaveError.confirmationRequiredWithImpact(
+            makeConfirmationContext(activeFastIDs: [UUID(), UUID()])
+        )
         let foodError = FoodEntrySaveError.confirmationRequiredWithImpact(active)
-        let differentFoodError = FoodEntrySaveError.confirmationRequiredWithImpact(completed)
         let hydrationError = HydrationEntrySaveError.confirmationRequiredWithImpact(active)
 
-        XCTAssertNotEqual(foodError, differentFoodError)
         XCTAssertEqual(
             foodError.presentation,
             CaloricEventErrorPresentation.confirmation(active)
@@ -81,6 +105,25 @@ final class CaloricEventCommandsTests: XCTestCase {
             hydrationError.presentation,
             CaloricEventErrorPresentation.confirmation(active)
         )
+        XCTAssertEqual(foodError.presentation, hydrationError.presentation)
         XCTAssertNotEqual(foodError.presentation, differentFoodError.presentation)
     }
+}
+
+private func makeConfirmationContext(
+    activeFastIDs: [UUID] = [],
+    completedFastIDs: [UUID] = [],
+    reconstructedFastIDs: [UUID] = [],
+    reconstructedReviewIDs: [UUID] = [],
+    includesInferredInterval: Bool = false
+) -> CaloricEventConfirmationContext {
+    CaloricEventConfirmationContext(
+        persistedImpact: CaloricEventImpact(
+            activeFastIDs: activeFastIDs,
+            completedFastIDs: completedFastIDs,
+            reconstructedFastIDs: reconstructedFastIDs,
+            reconstructedReviewIDs: reconstructedReviewIDs
+        ),
+        includesInferredInterval: includesInferredInterval
+    )
 }

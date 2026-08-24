@@ -2,7 +2,7 @@ import SwiftUI
 
 extension HistoryView {
     var historyBody: some View {
-        ScreenLayout(title: "History", identifier: "history") {
+        ScreenLayout(title: textResolver(.historyCopy(.title)), identifier: "history") {
             ScrollView {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
                     periodHeader
@@ -83,18 +83,18 @@ extension HistoryView {
     private var calendarSheet: some View {
         NavigationStack {
             DatePicker(
-                "Choose a date",
+                textResolver(.historyCopy(.chooseDateLabel)),
                 selection: selectedDateBinding(source: .datePicker),
                 in: ...clock.now,
                 displayedComponents: .date
             )
             .datePickerStyle(.graphical)
             .padding()
-            .navigationTitle("Choose a date")
+            .navigationTitle(textResolver(.historyCopy(.chooseDateSheetTitle)))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { isCalendarPresented = false }
+                    Button(textResolver(.historyCopy(.done))) { isCalendarPresented = false }
                 }
             }
         }

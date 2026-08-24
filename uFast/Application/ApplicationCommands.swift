@@ -26,12 +26,14 @@ enum InferredFastConversionError: Error, Equatable {
 }
 
 @MainActor
+// swiftlint:disable:next type_body_length
 final class ApplicationCommands {
     let modelContext: ModelContext
     let clock: any AppClock
     let projectionCoordinator: PostCommitProjectionCoordinator
     let configuration: ApplicationCommandConfiguration
     let observationSink: BoundaryQueryObservationSink
+    let diagnosticSink: any DiagnosticEventSink
     private let caloricEventCommands: CaloricEventCommands
 
     var historyPresentationInvalidation: HistoryPresentationInvalidation {
@@ -44,6 +46,7 @@ final class ApplicationCommands {
         projectionCoordinator: PostCommitProjectionCoordinator,
         configuration: ApplicationCommandConfiguration = .init(),
         observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink(),
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
         recordIDProvider: @escaping () -> UUID = { UUID() }
     ) {
         self.modelContext = modelContext
@@ -51,12 +54,14 @@ final class ApplicationCommands {
         self.projectionCoordinator = projectionCoordinator
         self.configuration = configuration
         self.observationSink = observationSink
+        self.diagnosticSink = diagnosticSink
         caloricEventCommands = CaloricEventCommands(
             modelContext: modelContext,
             clock: clock,
             projectionCoordinator: projectionCoordinator,
             configuration: configuration,
             observationSink: observationSink,
+            diagnosticSink: diagnosticSink,
             recordIDProvider: recordIDProvider
         )
     }
@@ -285,7 +290,10 @@ final class ApplicationCommands {
 
     func updateGoal(_ goal: FastingGoal) throws {
         try settingsStore(simulateFailure: configuration.simulateGoalSaveFailure).updateGoal(goal)
-        if let activeFast = try? ActiveFastAuthority.fetch(in: modelContext) {
+        if let activeFast = try? ActiveFastAuthority.fetch(
+            in: modelContext,
+            diagnosticSink: diagnosticSink
+        ) {
             projectionCoordinator.enqueue(
                 .activeFastChanged(fast: activeFast, goal: goal, now: clock.now)
             )
@@ -330,7 +338,8 @@ final class ApplicationCommands {
         SwiftDataActiveFastRepository(
             modelContext: modelContext,
             simulateSaveFailure: configuration.simulateFastSaveFailure,
-            observationSink: observationSink
+            observationSink: observationSink,
+            diagnosticSink: diagnosticSink
         )
     }
 
@@ -338,14 +347,16 @@ final class ApplicationCommands {
         SwiftDataActiveFastRepository(
             modelContext: modelContext,
             simulateSaveFailure: configuration.simulateFastHistoryFailure,
-            observationSink: observationSink
+            observationSink: observationSink,
+            diagnosticSink: diagnosticSink
         )
     }
 
     private func settingsStore(simulateFailure: Bool = false) -> SwiftDataSettingsStore {
         SwiftDataSettingsStore(
             modelContext: modelContext,
-            simulateSaveFailure: simulateFailure
+            simulateSaveFailure: simulateFailure,
+            diagnosticSink: diagnosticSink
         )
     }
 }
@@ -354,7 +365,8 @@ extension ApplicationCommands {
     func deleteAllData() throws {
         try AppDataDeletionService.deleteEverything(
             in: modelContext,
-            simulateFailure: configuration.simulateDeleteAllFailure
+            simulateFailure: configuration.simulateDeleteAllFailure,
+            diagnosticSink: diagnosticSink
         )
         projectionCoordinator.enqueue(.allDataDeleted)
     }
@@ -364,7 +376,8 @@ private extension ApplicationCommands {
     func favouriteStore() -> SwiftDataHydrationFavouriteStore {
         SwiftDataHydrationFavouriteStore(
             modelContext: modelContext,
-            simulateSaveFailure: configuration.simulateFavouriteSaveFailure
+            simulateSaveFailure: configuration.simulateFavouriteSaveFailure,
+            diagnosticSink: diagnosticSink
         )
     }
 

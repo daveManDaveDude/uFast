@@ -18,6 +18,7 @@ final class CaloricEventCommands {
     private let projectionCoordinator: PostCommitProjectionCoordinator
     private let configuration: ApplicationCommandConfiguration
     private let observationSink: BoundaryQueryObservationSink
+    private let diagnosticSink: any DiagnosticEventSink
     private let recordIDProvider: () -> UUID
     private let impactPresenter: CaloricEventImpactPresenter
     private var pendingFoodRecordProposal: PendingFoodRecordProposal?
@@ -29,6 +30,7 @@ final class CaloricEventCommands {
         projectionCoordinator: PostCommitProjectionCoordinator,
         configuration: ApplicationCommandConfiguration,
         observationSink: BoundaryQueryObservationSink,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
         recordIDProvider: @escaping () -> UUID
     ) {
         self.modelContext = modelContext
@@ -36,11 +38,13 @@ final class CaloricEventCommands {
         self.projectionCoordinator = projectionCoordinator
         self.configuration = configuration
         self.observationSink = observationSink
+        self.diagnosticSink = diagnosticSink
         self.recordIDProvider = recordIDProvider
         impactPresenter = CaloricEventImpactPresenter(
             modelContext: modelContext,
             clock: clock,
-            observationSink: observationSink
+            observationSink: observationSink,
+            diagnosticSink: diagnosticSink
         )
     }
 
@@ -68,7 +72,10 @@ final class CaloricEventCommands {
                 .init(persistedImpact: .none, includesInferredInterval: true)
             )
         }
-        let activeBefore = try ActiveFastAuthority.fetch(in: modelContext)
+        let activeBefore = try ActiveFastAuthority.fetch(
+            in: modelContext,
+            diagnosticSink: diagnosticSink
+        )
         do {
             try FoodEntryService(repository: foodRepository(), clock: clock).save(
                 draft,
@@ -81,7 +88,7 @@ final class CaloricEventCommands {
                 pendingFoodRecordProposal = nil
             }
         } catch let error as FoodEntrySaveError where inferredImpact.requiresConfirmation {
-            throw error.includingInferredImpact(persistedImpact: persistedImpact)
+            throw error.includingInferredImpact()
         }
         try publishAfterMutation(activeBefore: activeBefore)
     }
@@ -139,7 +146,10 @@ final class CaloricEventCommands {
                 .init(persistedImpact: .none, includesInferredInterval: true)
             )
         }
-        let activeBefore = try ActiveFastAuthority.fetch(in: modelContext)
+        let activeBefore = try ActiveFastAuthority.fetch(
+            in: modelContext,
+            diagnosticSink: diagnosticSink
+        )
         do {
             try HydrationEntryService(repository: hydrationRepository(), clock: clock).save(
                 draft,
@@ -152,7 +162,7 @@ final class CaloricEventCommands {
                 pendingHydrationRecordProposal = nil
             }
         } catch let error as HydrationEntrySaveError where inferredImpact.requiresConfirmation {
-            throw error.includingInferredImpact(persistedImpact: persistedImpact)
+            throw error.includingInferredImpact()
         }
         try publishAfterMutation(activeBefore: activeBefore)
     }
@@ -187,7 +197,10 @@ final class CaloricEventCommands {
     }
 
     private func publishAfterMutation(activeBefore: FastRecord?) throws {
-        let activeAfter = try ActiveFastAuthority.fetch(in: modelContext)
+        let activeAfter = try ActiveFastAuthority.fetch(
+            in: modelContext,
+            diagnosticSink: diagnosticSink
+        )
         if activeBefore != nil, activeAfter == nil {
             projectionCoordinator.enqueue(.fastEndedOrDeleted)
         } else {
@@ -232,7 +245,8 @@ final class CaloricEventCommands {
             modelContext: modelContext,
             simulateSaveFailure: configuration.simulateFoodSaveFailure,
             clock: clock,
-            observationSink: observationSink
+            observationSink: observationSink,
+            diagnosticSink: diagnosticSink
         )
     }
 
@@ -241,7 +255,8 @@ final class CaloricEventCommands {
             modelContext: modelContext,
             simulateSaveFailure: configuration.simulateDrinkSaveFailure,
             clock: clock,
-            observationSink: observationSink
+            observationSink: observationSink,
+            diagnosticSink: diagnosticSink
         )
     }
 
@@ -283,28 +298,12 @@ final class CaloricEventCommands {
 }
 
 private extension FoodEntrySaveError {
-    func includingInferredImpact(persistedImpact: CaloricEventImpact) -> Self {
+    func includingInferredImpact() -> Self {
         switch self {
-        case .confirmationRequired:
-            .confirmationRequiredWithImpact(.init(
-                persistedImpact: persistedImpact,
-                fallbackKind: .active,
-                includesInferredInterval: true
-            ))
         case let .confirmationRequiredWithImpact(context):
             .confirmationRequiredWithImpact(context.includingInferredInterval())
-        case .completedFastConfirmationRequired:
-            .completedConfirmationWithImpact(.init(
-                persistedImpact: persistedImpact,
-                includesInferredInterval: true
-            ))
         case let .completedConfirmationWithImpact(context):
             .completedConfirmationWithImpact(context.includingInferredInterval())
-        case .inferredFastConfirmationRequired:
-            .inferredConfirmationWithImpact(.init(
-                persistedImpact: persistedImpact,
-                includesInferredInterval: true
-            ))
         case let .inferredConfirmationWithImpact(context):
             .inferredConfirmationWithImpact(context.includingInferredInterval())
         default:
@@ -314,28 +313,12 @@ private extension FoodEntrySaveError {
 }
 
 private extension HydrationEntrySaveError {
-    func includingInferredImpact(persistedImpact: CaloricEventImpact) -> Self {
+    func includingInferredImpact() -> Self {
         switch self {
-        case .confirmationRequired:
-            .confirmationRequiredWithImpact(.init(
-                persistedImpact: persistedImpact,
-                fallbackKind: .active,
-                includesInferredInterval: true
-            ))
         case let .confirmationRequiredWithImpact(context):
             .confirmationRequiredWithImpact(context.includingInferredInterval())
-        case .completedFastConfirmationRequired:
-            .completedConfirmationWithImpact(.init(
-                persistedImpact: persistedImpact,
-                includesInferredInterval: true
-            ))
         case let .completedConfirmationWithImpact(context):
             .completedConfirmationWithImpact(context.includingInferredInterval())
-        case .inferredFastConfirmationRequired:
-            .inferredConfirmationWithImpact(.init(
-                persistedImpact: persistedImpact,
-                includesInferredInterval: true
-            ))
         case let .inferredConfirmationWithImpact(context):
             .inferredConfirmationWithImpact(context.includingInferredInterval())
         default:

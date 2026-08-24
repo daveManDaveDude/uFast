@@ -39,6 +39,7 @@ targets:
       - path: LockScreenShared
     resources:
       - path: uFast/SupportingFiles/PrivacyInfo.xcprivacy
+      - path: uFast/Resources/Localizable.xcstrings
     dependencies:
       - target: UFastCore
       - target: uFastLockScreenWidget
@@ -81,9 +82,16 @@ targets:
     dependencies:
       - target: uFast
       - target: UFastCore
+      - target: uFastLockScreenWidget
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@loader_path/../uFast\\ Lock\\ Screen\\ Widget.appex"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "$(BUILT_PRODUCTS_DIR)/uFast\\ Lock\\ Screen\\ Widget.appex/uFast\\ Lock\\ Screen\\ Widget.debug.dylib"
         PRODUCT_BUNDLE_IDENTIFIER: com.davidmcgrath.uFastTests
   UFastCoreTests:
     type: bundle.unit-test
@@ -118,6 +126,7 @@ targets:
       - path: LockScreenShared
     resources:
       - path: LockScreenWidget/Widget/FastingBotanical.png
+      - path: uFast/Resources/Localizable.xcstrings
     settings:
       base:
         APPLICATION_EXTENSION_API_ONLY: true

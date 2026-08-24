@@ -43,11 +43,31 @@ struct HistoryProjectionRefreshRequest {
     let timeZone: TimeZone
     let referenceNow: Date
     let nextGeneration: Int
+    let textResolver: AppTextResolver
+
+    init(
+        window: DateInterval,
+        locale: Locale,
+        calendar: Calendar,
+        timeZone: TimeZone,
+        referenceNow: Date,
+        nextGeneration: Int,
+        textResolver: AppTextResolver = .init()
+    ) {
+        self.window = window
+        self.locale = locale
+        self.calendar = calendar
+        self.timeZone = timeZone
+        self.referenceNow = referenceNow
+        self.nextGeneration = nextGeneration
+        self.textResolver = textResolver
+    }
 }
 
 @MainActor
 enum HistoryProjectionRefreshBoundary {
     @discardableResult
+    // swiftlint:disable:next function_body_length
     static func refresh(
         state: inout HistoryProjectionState,
         source: any HistoryProjectionDataSource,
@@ -57,7 +77,8 @@ enum HistoryProjectionRefreshBoundary {
             let data = try source.fetchSettled(window: request.window)
             let presentation = HistoryPresentationBuilder.build(
                 data: data, locale: request.locale, calendar: request.calendar,
-                timeZone: request.timeZone, referenceNow: request.referenceNow
+                timeZone: request.timeZone, referenceNow: request.referenceNow,
+                textResolver: request.textResolver
             )
             var refreshedChunks: [HistoryMotionChunk] = []
             var refreshedSnapshot: HistoryMotionSnapshot?
@@ -75,7 +96,8 @@ enum HistoryProjectionRefreshBoundary {
                         locale: request.calendar.locale ?? Locale(identifier: "en_GB"),
                         calendar: request.calendar,
                         timeZone: request.calendar.timeZone,
-                        referenceNow: request.referenceNow
+                        referenceNow: request.referenceNow,
+                        textResolver: request.textResolver
                     )
                     return HistoryMotionChunk(
                         coverage: chunk.coverage,

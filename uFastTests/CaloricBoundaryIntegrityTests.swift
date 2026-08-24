@@ -18,7 +18,6 @@ final class CaloricBoundaryIntegrityTests: XCTestCase {
             clock: FixedAppClock(now: end)
         )
         let draft = FoodEntryDraft(description: "Lunch", occurredAt: eventDate)
-
         XCTAssertThrowsError(try service.save(draft, replacing: nil, goal: .default)) {
             guard case let .completedConfirmationWithImpact(context) = $0 as? FoodEntrySaveError else {
                 return XCTFail("Expected completed boundary impact, got \($0)")
@@ -26,10 +25,10 @@ final class CaloricBoundaryIntegrityTests: XCTestCase {
             XCTAssertEqual(context.kind, .completed)
             XCTAssertEqual(context.affectedPersistedFastCount, 1)
             XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<FoodEntryRecord>()).isEmpty)
         XCTAssertEqual(fast.endDate, end)
-
         try service.save(draft, replacing: nil, goal: .default, endingActiveFast: true)
         XCTAssertEqual(fast.endDate, eventDate)
         XCTAssertEqual(try container.mainContext.fetch(FetchDescriptor<FoodEntryRecord>()).count, 1)
@@ -61,6 +60,7 @@ final class CaloricBoundaryIntegrityTests: XCTestCase {
             XCTAssertEqual(context.kind, .completed)
             XCTAssertEqual(context.affectedPersistedFastCount, 1)
             XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         try service.save(draft, replacing: nil, goal: .default, endingActiveFast: true)
         XCTAssertEqual(fast.endDate, eventDate)

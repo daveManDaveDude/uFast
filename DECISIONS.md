@@ -14,7 +14,7 @@ is shown.
   calm fasting and health-data trends, then AI-assisted food entry from text
   and photos. Assisted entry must cover Apple Intelligence-capable and older
   supported iPhones while manual entry remains available everywhere.
-- **Consequence:** `ROADMAP.md` becomes the current product roadmap and
+- **Consequence:** `docs/ROADMAP.md` becomes the current product roadmap and
   `BACKLOG.md` remains the delivery ledger for the original slices. Each new
   milestone requires its own implementation-ready stories plus product,
   privacy, accessibility, persistence and App Review decisions. Health and AI
@@ -892,3 +892,60 @@ is shown.
 - **Consequence:** MNT-001 is not required for the post-MVP maintainability
   sprint. Local automation must be truthful, fail closed and preserve durable
   evidence; a green message that skipped a required input is a defect.
+
+## D-037 Local diagnostic privacy and vocabulary
+
+- **Status:** Accepted
+- **Accepted:** 22 August 2026
+- **Decision:** Diagnostics use unified local `OSLog` only. There is no
+  analytics SDK, network transport, remote upload, background delivery or
+  account identifier. App and widget processes own separate process-local
+  adapters; they share only sendable event/value types. The default no-op sink
+  is used by tests and previews, and diagnostic observation is synchronous,
+  non-throwing and non-authoritative.
+- **Decision:** The closed event vocabulary is exactly:
+  `persistence` (`storeOpenFailed`, `migrationFailed`, `authorityConflict`),
+  `command` (`commitFailed`, `rollbackApplied`,
+  `postCommitProjectionFailed`), `history` (`initialLoadFailed`,
+  `extensionLoadFailed`), `widgetProjection` (`containerUnavailable`,
+  `authorityConflict`, `publishFailed`, `clearFailed`) and `liveActivity`
+  (`unavailable`, `authorityConflict`, `requestFailed`, `updateFailed`,
+  `endFailed`). No free-form subsystem or outcome is accepted.
+- **Decision:** Every event contains only `subsystem`, `outcome` and
+  `severity`. Optional `appVersion`, `buildNumber` and `schemaVersion` values
+  are controlled by the typed internal declarations
+  `DiagnosticAppVersion.current` (`1.0.0`), `DiagnosticBuildNumber.current`
+  (`10`) and `DiagnosticSchemaVersion.current` (`1`). These values mirror the
+  declared app bundle/build and diagnostic schema source; arbitrary strings,
+  timestamp-like numbers and undeclared future values cannot cross the typed
+  boundary. A new value requires an explicit source declaration and tests.
+  `countBucket` (`zero`, `one`, `multiple`) is permitted only for
+  persistence/widgetProjection/liveActivity `authorityConflict`; `isRetry` is
+  permitted only for command, History and `liveActivity` outcomes listed below;
+  and `isForeground` is permitted only for `liveActivity` outcomes listed below.
+  There is no generic metadata map.
+
+  | Subsystem/outcome | Permitted optional event metadata |
+  | --- | --- |
+  | persistence/storeOpenFailed, migrationFailed | none |
+  | persistence/authorityConflict | `countBucket` |
+  | command/commitFailed, rollbackApplied, postCommitProjectionFailed | `isRetry` |
+  | history/initialLoadFailed, extensionLoadFailed | `isRetry` |
+  | widgetProjection/containerUnavailable, publishFailed, clearFailed | none |
+  | widgetProjection/authorityConflict | `countBucket` |
+  | liveActivity/unavailable | `isForeground` |
+  | liveActivity/authorityConflict | `countBucket` |
+  | liveActivity/requestFailed, updateFailed, endFailed | `isRetry`, `isForeground` |
+
+- **Decision:** User-entered text, food or drink/favourite names, nutrition,
+  Health data, notes, full UUIDs, full timestamps, serialized records, store
+  paths and raw underlying error descriptions are prohibited. Expected
+  cancellation, success, ordinary empty/no-data states, History motion,
+  geometry, prefetch progress and projection timer/update ticks emit nothing.
+  One event is permitted per failed operation attempt.
+- **Consequence:** The typed event boundary rejects undocumented outcomes and
+  fields during construction and decoding. Recording is an in-memory test
+  sink only; no diagnostic sink may persist data, perform network work, block
+  an operation or decide operation authority. A user-triggered diagnostic
+  export requires a later decision defining preview, redaction, retention and
+  cancellation semantics.

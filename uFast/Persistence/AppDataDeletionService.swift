@@ -8,7 +8,8 @@ enum AppDataDeletionService {
     @MainActor
     static func deleteEverything(
         in context: ModelContext,
-        simulateFailure: Bool = false
+        simulateFailure: Bool = false,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
     ) throws {
         let saveAction: PersistenceTransaction.Save? = simulateFailure ? {
             throw AppDataDeletionError.simulated
@@ -23,6 +24,11 @@ enum AppDataDeletionService {
         try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
         try LegacyHistoryDeletion.deleteSchemaOnlyRecords(in: context)
-        try transaction.save()
+        do {
+            try transaction.save()
+        } catch {
+            PersistenceTransactionDiagnostics.recordFailure(to: diagnosticSink)
+            throw error
+        }
     }
 }

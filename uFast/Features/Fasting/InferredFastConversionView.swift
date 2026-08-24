@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct InferredFastConversionView: View {
+    @Environment(\.appTextResolver) private var textResolver
+    @Environment(\.calendar) private var calendar
+    @Environment(\.locale) private var locale
+    @Environment(\.timeZone) private var timeZone
     let presentation: InferredFastConversionPresentation
     let clock: any AppClock
     let onConfirm: (InferredFastInterval) throws -> Void
@@ -14,22 +18,28 @@ struct InferredFastConversionView: View {
     }
 
     private var actionTitle: String {
-        interval.isInProgress ? "Start fast" : "Save fast"
+        interval.isInProgress
+            ? textResolver(.startFast)
+            : textResolver(.fastingCopy(.save))
     }
 
     private var title: String {
-        interval.isInProgress ? "Inferred fast in progress" : "Inferred fast"
+        interval.isInProgress
+            ? textResolver(.fastingCopy(.inferredInProgressTitle))
+            : textResolver(.fastingCopy(.inferredTitle))
     }
 
     private var explanation: String {
         interval.isInProgress
-            ? "This will start a real active fast from the source event time."
-            : "This will save one completed fast using the interval shown above."
+            ? textResolver(.fastingCopy(.inferredStartExplanation))
+            : textResolver(.fastingCopy(.inferredSaveExplanation))
     }
 
     private var duration: String {
-        ElapsedTimeFormatter.string(
-            from: interval.endDate.timeIntervalSince(interval.startDate)
+        HistoryTextFormatting.duration(
+            from: interval.startDate,
+            to: interval.endDate,
+            resolver: textResolver
         )
     }
 
@@ -51,18 +61,32 @@ struct InferredFastConversionView: View {
                         .accessibilityIdentifier("history.inferred.confirmation")
                     }
 
-                    Section("Source caloric event") {
+                    Section(textResolver(.fastingCopy(.sourceCaloricEvent))) {
                         LabeledContent(
-                            interval.sourceKind == .food ? "Food" : "Drink",
+                            interval.sourceKind == .food
+                                ? textResolver(.fastingCopy(.sourceFood))
+                                : textResolver(.fastingCopy(.sourceDrink)),
                             value: interval.sourceDescription
                         )
-                        LabeledContent("Started", value: interval.startDate.formatted(
-                            .dateTime.month(.abbreviated).day().hour().minute()
-                        ))
-                        LabeledContent("Ends", value: interval.endDate.formatted(
-                            .dateTime.month(.abbreviated).day().hour().minute()
-                        ))
-                        LabeledContent("Duration") {
+                        LabeledContent(
+                            textResolver(.fastingCopy(.startedLabel)),
+                            value: HistoryTextFormatting.dateTime(
+                                interval.startDate,
+                                calendar: calendar,
+                                locale: locale,
+                                timeZone: timeZone
+                            )
+                        )
+                        LabeledContent(
+                            textResolver(.fastingCopy(.endsLabel)),
+                            value: HistoryTextFormatting.dateTime(
+                                interval.endDate,
+                                calendar: calendar,
+                                locale: locale,
+                                timeZone: timeZone
+                            )
+                        )
+                        LabeledContent(textResolver(.fastingCopy(.durationLabel))) {
                             Text(duration)
                                 .accessibilityIdentifier("history.inferred.duration")
                         }
@@ -93,7 +117,7 @@ struct InferredFastConversionView: View {
                 .background(UFastTheme.canvas)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel", action: onCancel)
+                        Button(textResolver(.cancel), action: onCancel)
                             .accessibilityIdentifier("history.inferred.cancel")
                     }
                 }
@@ -114,13 +138,13 @@ struct InferredFastConversionView: View {
     private func errorDescription(for error: Error) -> String {
         switch error {
         case InferredFastConversionError.candidateUnavailable:
-            "This inferred fast is no longer available. History was refreshed."
+            textResolver(.fastingCopy(.inferredUnavailableError))
         case InferredFastConversionError.conflictingRecordedFast:
-            "This interval conflicts with a recorded fast and was not saved."
+            textResolver(.fastingCopy(.inferredConflictError))
         case InferredFastConversionError.activeFastAlreadyExists:
-            "An active fast already exists, so this inferred fast was not started."
+            textResolver(.fastingCopy(.inferredActiveFastError))
         default:
-            "This fast could not be saved. Your local records were unchanged."
+            textResolver(.fastingCopy(.inferredSaveError))
         }
     }
 }

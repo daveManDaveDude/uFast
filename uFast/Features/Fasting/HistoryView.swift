@@ -5,6 +5,7 @@ struct HistoryView: View {
     static let futureRailContextDayCount = 4
 
     @Environment(\.calendar) var calendar
+    @Environment(\.appTextResolver) var textResolver
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.locale) var locale
     @Environment(\.applicationCommands) var applicationCommands
@@ -21,7 +22,6 @@ struct HistoryView: View {
     @State var eventGroupDisclosure: TemporalEventGroup?
     @State var isCalendarPresented = false
     @State var temporalMovementPhase = TemporalCarouselMovementPhase.settled
-    @State var coupledScrollPresentation = TemporalCoupledScrollPresentation()
     @State var historyInteractionRevision = 0
     @State var isDateRailMoving = false
     @State var settledVisibleWindow: TemporalRibbonWindow?
@@ -79,10 +79,19 @@ struct HistoryView: View {
     }
 
     var liveHistoryPresentation: HistoryPresentationSnapshot? {
+        // Geometry updates can invalidate History while the carousel is in
+        // motion. Rebuilding the complete localized presentation during those
+        // updates can make native deceleration miss a frame even though moving
+        // pages render from `motionSnapshot` and settled details are hidden.
+        // Resume the live projection at rest so inferred-fast timing remains
+        // current without putting that work on the scroll path.
+        guard temporalMovementPhase == .settled, !isDateRailMoving else {
+            return historyPresentation
+        }
         guard let historyData else { return historyPresentation }
         return HistoryPresentationBuilder.build(
             data: historyData, locale: locale, calendar: calendar,
-            timeZone: timeZone, referenceNow: clock.now
+            timeZone: timeZone, referenceNow: clock.now, textResolver: textResolver
         )
     }
 

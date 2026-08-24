@@ -12,14 +12,17 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundary
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
     private let observationSink: BoundaryQueryObservationSink
+    private let diagnosticSink: any DiagnosticEventSink
 
     init(
         modelContext: ModelContext,
         simulateSaveFailure: Bool = false,
-        observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink()
+        observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink(),
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
     ) {
         self.modelContext = modelContext
         self.observationSink = observationSink
+        self.diagnosticSink = diagnosticSink
         transaction = PersistenceTransaction(
             modelContext: modelContext,
             saveAction: simulateSaveFailure ? {
@@ -29,7 +32,7 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundary
     }
 
     func activeFast() throws -> FastRecord? {
-        try ActiveFastAuthority.fetch(in: modelContext)
+        try ActiveFastAuthority.fetch(in: modelContext, diagnosticSink: diagnosticSink)
     }
 
     func recordedFasts() throws -> [FastRecord] {
@@ -104,13 +107,13 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundary
 
     func saveNewActiveFast(_ fast: FastRecord) throws {
         modelContext.insert(fast)
-        try transaction.save()
+        try saveTransaction()
     }
 
     func updateStartDate(of fast: FastRecord, to startDate: Date) throws {
         let originalStartDate = fast.startDate
         fast.correctStartDate(to: startDate)
-        try transaction.save {
+        try saveTransaction {
             fast.correctStartDate(to: originalStartDate)
         }
     }
@@ -124,7 +127,7 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundary
             throw FastRecordIntegrityError.invalidHistoricalGoal(rawHours: fast.goalHoursAtStart)
         }
         fast.complete(at: endDate, goal: goal)
-        try transaction.save {
+        try saveTransaction {
             fast.restoreActive(goal: originalGoal)
         }
     }
@@ -156,7 +159,7 @@ extension SwiftDataActiveFastRepository: CompletedFastRepository {
             throw ActiveFastPersistenceError.completedFastNotFound
         }
         fast.correctBoundaries(startDate: startDate, endDate: endDate)
-        try transaction.save {
+        try saveTransaction {
             fast.correctBoundaries(startDate: originalStartDate, endDate: originalEndDate)
         }
         return fast
@@ -179,13 +182,24 @@ extension SwiftDataActiveFastRepository: CompletedFastRepository {
         }
 
         modelContext.delete(fast)
-        try transaction.save()
+        try saveTransaction()
     }
 }
 
 extension SwiftDataActiveFastRepository: CompletedFastCreationRepository {
     func saveCompletedFast(_ fast: FastRecord) throws {
         modelContext.insert(fast)
-        try transaction.save()
+        try saveTransaction()
+    }
+}
+
+private extension SwiftDataActiveFastRepository {
+    func saveTransaction(recovering recovery: @escaping () -> Void = {}) throws {
+        do {
+            try transaction.save(recovering: recovery)
+        } catch {
+            PersistenceTransactionDiagnostics.recordFailure(to: diagnosticSink)
+            throw error
+        }
     }
 }

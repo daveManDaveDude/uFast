@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct EndTimeEditor: View {
+    @Environment(\.appTextResolver) private var textResolver
     let startDate: Date
     let clock: any AppClock
     let onConfirm: (Date) throws -> Void
@@ -25,10 +26,10 @@ struct EndTimeEditor: View {
 
     private var validationMessage: String? {
         if selectedEndDate <= startDate {
-            return "End time must be after the start time."
+            return textResolver(.fastingCopy(.endBeforeStart))
         }
         if selectedEndDate > clock.now {
-            return "End time can’t be in the future."
+            return textResolver(.fastingCopy(.endFuture))
         }
         return nil
     }
@@ -38,8 +39,11 @@ struct EndTimeEditor: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        UFastSectionHeading("When did this fast end?", eyebrow: "End time")
-                        Text("The end must be after the recorded start and no later than now.")
+                        UFastSectionHeading(
+                            textResolver(.fastingCopy(.endHeading)),
+                            eyebrow: textResolver(.fastingCopy(.endTimeTitle))
+                        )
+                        Text(textResolver(.fastingCopy(.endDescription)))
                             .font(.subheadline)
                             .foregroundStyle(UFastTheme.secondaryText)
                     }
@@ -48,14 +52,14 @@ struct EndTimeEditor: View {
 
                 Section {
                     DatePicker(
-                        "Date",
+                        textResolver(.date),
                         selection: $selectedEndDate,
                         displayedComponents: .date
                     )
                     .accessibilityIdentifier("fast.end-date")
 
                     DatePicker(
-                        "Time",
+                        textResolver(.time),
                         selection: $selectedEndDate,
                         displayedComponents: .hourAndMinute
                     )
@@ -78,19 +82,19 @@ struct EndTimeEditor: View {
                     }
                 }
             }
-            .navigationTitle("End time")
+            .navigationTitle(textResolver(.fastingCopy(.endTimeTitle)))
             .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)
             .background(UFastTheme.canvas)
             .tint(UFastTheme.action)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button(textResolver(.cancel), action: onCancel)
                         .accessibilityIdentifier("fast.end-cancel")
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("End fast") {
+                    Button(textResolver(.fastingCopy(.endFast))) {
                         confirm()
                     }
                     .disabled(validationMessage != nil)
@@ -109,7 +113,7 @@ struct EndTimeEditor: View {
             try onConfirm(selectedEndDate)
             saveError = nil
         } catch {
-            saveError = "Your end time couldn’t be saved. Please try again."
+            saveError = textResolver(.fastingCopy(.endSaveError))
         }
     }
 }

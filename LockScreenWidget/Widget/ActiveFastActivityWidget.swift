@@ -1,7 +1,50 @@
+import Foundation
 import SwiftUI
 import WidgetKit
 
+// swiftlint:disable file_length
+
 struct UFastActiveFastActivityWidget: Widget {
+    static func compactLeadingContent() -> some View {
+        EmptyView()
+    }
+
+    static func compactTrailingContent(
+        contentState: ActiveFastActivityAttributes.ContentState,
+        textResolver: SystemSurfaceTextResolver = .init(),
+        now: Date = .now
+    ) -> some View {
+        ActiveFastActivityCircularProgressView(
+            contentState: contentState,
+            textResolver: textResolver,
+            now: now
+        )
+    }
+
+    static func minimalContent(
+        contentState: ActiveFastActivityAttributes.ContentState,
+        textResolver: SystemSurfaceTextResolver = .init(),
+        now: Date = .now
+    ) -> some View {
+        ActiveFastActivityCircularProgressView(
+            contentState: contentState,
+            textResolver: textResolver,
+            now: now
+        )
+    }
+
+    static func expandedContent(
+        contentState: ActiveFastActivityAttributes.ContentState,
+        textResolver: SystemSurfaceTextResolver = .init(),
+        now: Date = .now
+    ) -> some View {
+        ActiveFastActivityCircularProgressView(
+            contentState: contentState,
+            textResolver: textResolver,
+            now: now
+        )
+    }
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ActiveFastActivityAttributes.self) { context in
             ActiveFastActivityLockScreenView(context: context)
@@ -10,17 +53,17 @@ struct UFastActiveFastActivityWidget: Widget {
             DynamicIsland(
                 expanded: {
                     DynamicIslandExpandedRegion(.center) {
-                        ActiveFastActivityCircularProgressView(contentState: context.state)
+                        Self.expandedContent(contentState: context.state)
                             .widgetURL(ActiveFastActivityRoute.currentFastURL)
                     }
                 },
-                compactLeading: { EmptyView() },
+                compactLeading: { Self.compactLeadingContent() },
                 compactTrailing: {
-                    ActiveFastActivityCircularProgressView(contentState: context.state)
+                    Self.compactTrailingContent(contentState: context.state)
                         .widgetURL(ActiveFastActivityRoute.currentFastURL)
                 },
                 minimal: {
-                    ActiveFastActivityCircularProgressView(contentState: context.state)
+                    Self.minimalContent(contentState: context.state)
                         .widgetURL(ActiveFastActivityRoute.currentFastURL)
                 }
             )
@@ -34,6 +77,8 @@ private struct ActiveFastActivityLockScreenView: View {
     @Environment(\.redactionReasons) private var redactionReasons
     let context: ActivityViewContext<ActiveFastActivityAttributes>
 
+    private let copy = SystemSurfaceTextResolver()
+
     private var privacyState: ActiveFastActivityPrivacyState {
         .make(isPrivacyRedacted: redactionReasons.contains(.privacy))
     }
@@ -43,7 +88,8 @@ private struct ActiveFastActivityLockScreenView: View {
             attributes: context.attributes,
             contentState: context.state,
             now: .now,
-            privacyState: privacyState
+            privacyState: privacyState,
+            textResolver: copy
         )
     }
 
@@ -57,7 +103,7 @@ private struct ActiveFastActivityLockScreenView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ActiveFastActivityBrandMark()
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Elapsed")
+                    Text(verbatim: copy(.elapsed))
                         .font(.caption)
                         .foregroundStyle(palette.secondaryText)
                     ActiveFastActivityTimerView(contentState: context.state)
@@ -80,13 +126,15 @@ private struct ActiveFastActivityLockScreenView: View {
             return nil
         }
 
-        let reached = presentation.hasReachedGoal ? ", Goal time reached" : ""
         // Text(date, style: .timer) is resolved by the system and remains
         // current while the app and extension are suspended. Keep ordinary
         // sampled projection fields out of this accessibility representation.
-        return Text(
-            "Elapsed \(Text(context.state.startDate, style: .timer)), "
-                + "\(goal), target \(target)\(reached). Opens uFast."
+        return ActiveFastActivityAccessibility.value(
+            startDate: context.state.startDate,
+            goal: goal,
+            target: target,
+            hasReachedGoal: presentation.hasReachedGoal,
+            resolver: copy
         )
     }
 
@@ -95,14 +143,14 @@ private struct ActiveFastActivityLockScreenView: View {
             if let visibleAccessibilityValue {
                 visualContent
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(Text("uFast"))
+                    .accessibilityLabel(Text(verbatim: copy(.brand)))
                     .accessibilityValue(visibleAccessibilityValue)
             } else {
                 // Invalid or privacy-redacted content fails closed to the
                 // identity-only summary and does not expose child semantics.
                 visualContent
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(Text("uFast. Opens uFast."))
+                    .accessibilityLabel(Text(verbatim: copy(.identitySummary)))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -114,6 +162,8 @@ private struct ActiveFastActivityTimerView: View {
     @Environment(\.colorScheme) private var colorScheme
     let contentState: ActiveFastActivityAttributes.ContentState
 
+    private let copy = SystemSurfaceTextResolver()
+
     var body: some View {
         Text(contentState.startDate, style: .timer)
             .monospacedDigit()
@@ -121,19 +171,33 @@ private struct ActiveFastActivityTimerView: View {
             .minimumScaleFactor(0.65)
             .foregroundStyle(ActiveFastActivityPalette(colorScheme: colorScheme).primary)
             .privacySensitive()
-            .accessibilityLabel("Elapsed")
+            .accessibilityLabel(Text(verbatim: copy(.elapsed)))
     }
 }
 
 private struct ActiveFastActivityCircularProgressView: View {
     @Environment(\.colorScheme) private var colorScheme
     let contentState: ActiveFastActivityAttributes.ContentState
+    let now: Date
+
+    private let copy: SystemSurfaceTextResolver
+
+    init(
+        contentState: ActiveFastActivityAttributes.ContentState,
+        textResolver: SystemSurfaceTextResolver = .init(),
+        now: Date = .now
+    ) {
+        self.contentState = contentState
+        self.now = now
+        copy = textResolver
+    }
 
     var body: some View {
         let presentation = ActiveFastActivityPresentation.make(
             attributes: ActiveFastActivityAttributes(activeRecordIdentifier: UUID()),
             contentState: contentState,
-            now: .now
+            now: now,
+            textResolver: copy
         )
 
         let palette = ActiveFastActivityPalette(colorScheme: colorScheme)
@@ -156,11 +220,12 @@ private struct ActiveFastActivityCircularProgressView: View {
         .frame(width: 22, height: 22)
         .privacySensitive()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("uFast"))
+        .accessibilityLabel(Text(verbatim: copy(.brand)))
         .accessibilityValue(
             ActiveFastActivityAccessibility.value(
                 startDate: contentState.startDate,
-                goal: presentation.stableGoalText
+                goal: presentation.stableGoalText,
+                resolver: copy
             )
         )
     }
@@ -169,6 +234,8 @@ private struct ActiveFastActivityCircularProgressView: View {
 private struct ActiveFastActivityDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
     let contentState: ActiveFastActivityAttributes.ContentState
+
+    private let copy = SystemSurfaceTextResolver()
 
     var body: some View {
         let palette = ActiveFastActivityPalette(colorScheme: colorScheme)
@@ -195,13 +262,13 @@ private struct ActiveFastActivityDetailView: View {
                 if let target = presentation.targetText {
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(presentation.stableGoalText ?? "")
+                            Text(verbatim: presentation.stableGoalText ?? copy(.goal(hours: contentState.goalHours)))
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
                             Spacer(minLength: 4)
-                            Text("Target \(target)")
+                            Text(verbatim: copy(.target(value: target)))
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(1)
@@ -209,12 +276,12 @@ private struct ActiveFastActivityDetailView: View {
                         }
 
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(presentation.stableGoalText ?? "")
+                            Text(verbatim: presentation.stableGoalText ?? copy(.goal(hours: contentState.goalHours)))
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(1)
                             Spacer(minLength: 4)
-                            Text("Target \(target)")
+                            Text(verbatim: copy(.target(value: target)))
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(1)
@@ -222,12 +289,12 @@ private struct ActiveFastActivityDetailView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(presentation.stableGoalText ?? "")
+                            Text(verbatim: presentation.stableGoalText ?? copy(.goal(hours: contentState.goalHours)))
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.8)
-                            Text("Target \(target)")
+                            Text(verbatim: copy(.target(value: target)))
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
                                 .lineLimit(1)
@@ -236,13 +303,13 @@ private struct ActiveFastActivityDetailView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(presentation.stableGoalText ?? "")
+                    Text(verbatim: presentation.stableGoalText ?? copy(.goal(hours: contentState.goalHours)))
                         .font(.caption2)
                         .foregroundStyle(palette.secondaryText)
                 }
             }
             if presentation.hasReachedGoal {
-                Text("Goal time reached")
+                Text(verbatim: copy(.goalReached))
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(palette.primary)
                     .lineLimit(1)
@@ -251,13 +318,14 @@ private struct ActiveFastActivityDetailView: View {
         }
         .privacySensitive()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("uFast"))
+        .accessibilityLabel(Text(verbatim: copy(.brand)))
         .accessibilityValue(
             ActiveFastActivityAccessibility.value(
                 startDate: contentState.startDate,
                 goal: presentation.stableGoalText,
                 target: presentation.targetText,
-                hasReachedGoal: presentation.hasReachedGoal
+                hasReachedGoal: presentation.hasReachedGoal,
+                resolver: copy
             )
         )
     }
@@ -268,16 +336,35 @@ private enum ActiveFastActivityAccessibility {
         startDate: Date,
         goal: String?,
         target: String? = nil,
-        hasReachedGoal: Bool = false
+        hasReachedGoal: Bool = false,
+        resolver: SystemSurfaceTextResolver = .init()
     ) -> Text {
-        guard let goal else { return Text("Opens uFast.") }
-
-        let targetCopy = target.map { ", target \($0)" } ?? ""
-        let reachedCopy = hasReachedGoal ? ", Goal time reached" : ""
-        return Text(
-            "Elapsed \(Text(startDate, style: .timer)), "
-                + "\(goal)\(targetCopy)\(reachedCopy). Opens uFast."
+        let content = SystemSurfacePresentationContent.activity(
+            layout: .expanded,
+            goal: goal,
+            target: target,
+            hasReachedGoal: hasReachedGoal,
+            resolver: resolver
         )
+        guard goal != nil else { return Text(verbatim: content.opensSuffix) }
+
+        var value = Text(verbatim: content.elapsedPrefix)
+            + Text(startDate, style: .timer)
+        if let target {
+            // Text composition is required to preserve the system timer segment.
+            // swiftlint:disable:next shorthand_operator
+            value = value + Text(
+                verbatim: content.detail
+            )
+        } else {
+            // swiftlint:disable:next shorthand_operator
+            value = value + Text(verbatim: content.goalOnlyDetail)
+        }
+        if hasReachedGoal {
+            // swiftlint:disable:next shorthand_operator
+            value = value + Text(verbatim: content.goalReachedSuffix)
+        }
+        return value + Text(verbatim: content.opensSuffix)
     }
 }
 
@@ -334,6 +421,8 @@ private struct ActiveFastActivityBrandMark: View {
     @Environment(\.colorScheme) private var colorScheme
     let compact: Bool
 
+    private let copy = SystemSurfaceTextResolver()
+
     init(compact: Bool = false) {
         self.compact = compact
     }
@@ -341,21 +430,21 @@ private struct ActiveFastActivityBrandMark: View {
     var body: some View {
         Group {
             if compact {
-                Text("uF")
+                Text(verbatim: copy(.compactBrand))
                     .font(.caption.weight(.semibold))
             } else {
                 HStack(spacing: 8) {
                     Image(systemName: "leaf.fill")
                         .font(.headline)
                         .accessibilityHidden(true)
-                    Text("uFast")
+                    Text(verbatim: copy(.brand))
                         .font(.headline.weight(.semibold))
                 }
             }
         }
         .foregroundStyle(ActiveFastActivityPalette(colorScheme: colorScheme).primary)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("uFast")
+        .accessibilityLabel(Text(verbatim: copy(.brand)))
     }
 }
 

@@ -13,10 +13,16 @@ extension ApplicationCommands {
         expectedGoal: FastingGoal?,
         expectedState: InferredFastState
     ) throws -> InferredFastInterval {
-        _ = try ActiveFastAuthority.fetch(in: modelContext)
+        _ = try ActiveFastAuthority.fetch(
+            in: modelContext,
+            diagnosticSink: diagnosticSink
+        )
         let settings: AppSettingsRecord?
         do {
-            settings = try SwiftDataSettingsStore(modelContext: modelContext).authoritativeRecord()
+            settings = try SwiftDataSettingsStore(
+                modelContext: modelContext,
+                diagnosticSink: diagnosticSink
+            ).authoritativeRecord()
         } catch let error as SettingsStoreError {
             switch error {
             case .conflictingAuthorities:

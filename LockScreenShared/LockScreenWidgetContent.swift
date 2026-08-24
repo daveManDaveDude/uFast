@@ -15,12 +15,14 @@ enum LockScreenWidgetContent: Equatable, Sendable {
 
     static func make(
         projectionResult: Result<ActiveFastWidgetProjection?, Error>,
-        now: Date
+        now: Date,
+        textResolver: SystemSurfaceTextResolver? = nil
     ) -> Self {
         switch LockScreenFastPresentation.make(
             projectionResult: projectionResult,
             now: now,
-            privacyState: .protected
+            privacyState: .protected,
+            textResolver: textResolver
         ) {
         case let .active(presentation):
             .active(

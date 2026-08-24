@@ -1,4 +1,3 @@
-import OSLog
 import SwiftUI
 import WidgetKit
 
@@ -8,22 +7,28 @@ struct UFastLockScreenEntry: TimelineEntry {
 }
 
 struct UFastLockScreenProvider: TimelineProvider {
-    private let logger = Logger(
-        subsystem: "com.davidmcgrath.uFast",
-        category: "LockScreenWidget"
-    )
+    private let containerURL: URL?
+    private let diagnosticSink: any DiagnosticEventSink
+
+    init(
+        containerURL: URL? = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: ActiveFastProjectionFileStore.appGroupIdentifier
+        ),
+        diagnosticSink: any DiagnosticEventSink = WidgetDiagnosticEventLogSink()
+    ) {
+        self.containerURL = containerURL
+        self.diagnosticSink = diagnosticSink
+    }
 
     func placeholder(in _: Context) -> UFastLockScreenEntry {
         UFastLockScreenEntry(date: .now, projectionResult: .success(nil))
     }
 
     func getSnapshot(in _: Context, completion: @escaping (UFastLockScreenEntry) -> Void) {
-        logger.notice("Widget snapshot requested")
         completion(makeEntry())
     }
 
     func getTimeline(in _: Context, completion: @escaping (Timeline<UFastLockScreenEntry>) -> Void) {
-        logger.notice("Widget timeline requested")
         let entry = makeEntry()
         let schedule = LockScreenWidgetTimelineSchedule.make(
             projectionResult: entry.projectionResult,
@@ -43,38 +48,41 @@ struct UFastLockScreenProvider: TimelineProvider {
     private func makeEntry() -> UFastLockScreenEntry {
         let result: Result<ActiveFastWidgetProjection?, Error>
         do {
-            guard let containerURL = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: ActiveFastProjectionFileStore.appGroupIdentifier
-            ) else {
-                logger.error("Widget App Group container unavailable")
+            guard let containerURL else {
+                record(.containerUnavailable)
                 throw ActiveFastWidgetProjectionError.unreadable
             }
             result = try .success(ActiveFastProjectionFileStore(containerURL: containerURL).read())
-            logger.notice("Widget projection read: \(resultSummary(result), privacy: .public)")
             if case let .success(projection?) = result {
                 do {
                     try projection.validate(now: .now)
-                    logger.notice("Widget projection validation passed")
-                } catch {
-                    logger.error("Widget projection validation failed: \(String(describing: error), privacy: .public)")
-                }
+                } catch { /* The closed vocabulary has no validation outcome. */ }
             }
         } catch {
-            logger.error("Widget projection read failed: \(String(describing: error), privacy: .public)")
             result = .failure(error)
         }
         return UFastLockScreenEntry(date: .now, projectionResult: result)
     }
 
-    private func resultSummary(_ result: Result<ActiveFastWidgetProjection?, Error>) -> String {
-        switch result {
-        case let .success(projection?):
-            "active \(projection.activeRecordIdentifier.uuidString)"
-        case .success:
-            "none"
-        case .failure:
-            "failure"
+    // The provider context is supplied by WidgetKit and cannot be constructed
+    // in a unit test; this keeps the projection read boundary deterministic.
+    // swiftlint:disable:next unused_declaration
+    func makeEntryForTesting() -> UFastLockScreenEntry {
+        makeEntry()
+    }
+
+    /// The provider read path has no exact closed-vocabulary outcome for a
+    /// corrupt or invalid projection; those failures remain fail-closed and
+    /// silent. Container absence is the one exact permitted failure here.
+    private func record(_ outcome: DiagnosticOutcome) {
+        guard let event = DiagnosticEvent(
+            subsystem: .widgetProjection,
+            outcome: outcome,
+            severity: .error
+        ) else {
+            return
         }
+        diagnosticSink.record(event)
     }
 }
 
@@ -82,10 +90,21 @@ struct UFastLockScreenWidgetView: View {
     @Environment(\.colorSchemeContrast) private var contrast
     let entry: UFastLockScreenEntry
 
+    private let copy: SystemSurfaceTextResolver
+
+    init(
+        entry: UFastLockScreenEntry,
+        textResolver: SystemSurfaceTextResolver = .init()
+    ) {
+        self.entry = entry
+        copy = textResolver
+    }
+
     private var content: LockScreenWidgetContent {
         .make(
             projectionResult: entry.projectionResult,
-            now: entry.date
+            now: entry.date,
+            textResolver: copy
         )
     }
 
@@ -101,20 +120,24 @@ struct UFastLockScreenWidgetView: View {
     }
 
     private func activeView(_ active: LockScreenWidgetActiveContent) -> some View {
+        let rendered = SystemSurfacePresentationContent.accessoryWidget(
+            active: active,
+            resolver: copy
+        )
         // Accessory rectangular is only about 67 points tall on the Lock
         // Screen. Keep the label and protected elapsed value on one row so the
         // progress track remains inside the family bounds at the largest
         // practical system text size.
-        VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text("uFast")
+                Text(verbatim: rendered.visibleText[0])
                     .font(.caption2.weight(.semibold))
                 Spacer()
-                Text(verbatim: "\(active.progressPercentage)%")
+                Text(verbatim: rendered.visibleText[1])
                     .font(.caption2.monospacedDigit())
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("Elapsed")
+                Text(verbatim: rendered.visibleText[2])
                     .font(.caption2)
                 Text(active.elapsedText)
                     .font(.headline.monospacedDigit())
@@ -148,13 +171,13 @@ struct UFastLockScreenWidgetView: View {
 
     private var unavailableView: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("uFast").font(.caption.weight(.semibold))
-            Text("No active fast").font(.headline)
-            Text("Open uFast").font(.caption)
+            Text(verbatim: copy(.brand)).font(.caption.weight(.semibold))
+            Text(verbatim: copy(.noActiveFast)).font(.headline)
+            Text(verbatim: copy(.open)).font(.caption)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("uFast. No active fast. Opens uFast.")
+        .accessibilityLabel(Text(verbatim: copy(.unavailableSummary)))
     }
 }
 
@@ -163,8 +186,8 @@ struct UFastLockScreenWidget: Widget {
         StaticConfiguration(kind: ActiveFastProjectionFileStore.widgetKind, provider: UFastLockScreenProvider()) {
             UFastLockScreenWidgetView(entry: $0)
         }
-        .configurationDisplayName("Active fast")
-        .description("Shows elapsed time for your active uFast record.")
+        .configurationDisplayName(SystemSurfaceText.widgetActiveFast.resource)
+        .description(SystemSurfaceText.widgetActiveFastDescription.resource)
         .supportedFamilies([.accessoryRectangular])
     }
 }

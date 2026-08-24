@@ -370,7 +370,8 @@ actor SwiftDataHistoryMotionRangeLoader {
     func load(
         coverage: HistoryMotionCoverage,
         calendar: Calendar,
-        referenceNow: Date
+        referenceNow: Date,
+        textResolver: AppTextResolver = .init()
     ) async throws -> HistoryMotionChunk {
         let context = ModelContext(container)
         guard let window = coverage.visualWindow(calendar: calendar) else {
@@ -383,7 +384,8 @@ actor SwiftDataHistoryMotionRangeLoader {
             locale: calendar.locale ?? Locale(identifier: "en_GB"),
             calendar: calendar,
             timeZone: calendar.timeZone,
-            referenceNow: referenceNow
+            referenceNow: referenceNow,
+            textResolver: textResolver
         )
         return HistoryMotionChunk(
             coverage: coverage,

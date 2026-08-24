@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TemporalHistoryCarousel: View {
     @Environment(\.calendar) var calendar
+    @Environment(\.appTextResolver) var textResolver
     @Environment(\.layoutDirection) var layoutDirection
     @Environment(\.scenePhase) var scenePhase
 
@@ -162,9 +163,11 @@ struct TemporalHistoryCarousel: View {
                 guard newPhase != .active else { return }
                 setMovementPhase(.settled)
             }
-            .accessibilityLabel("History day carousel")
+            .accessibilityLabel(textResolver(.historyCopy(.carouselLabel)))
             .accessibilityValue(
-                movementPhase == .settled ? "Settled" : "Moving"
+                movementPhase == .settled
+                    ? textResolver(.historyCopy(.carouselSettled))
+                    : textResolver(.historyCopy(.carouselMoving))
             )
             .accessibilityIdentifier("history.day-carousel")
 
@@ -193,17 +196,16 @@ struct TemporalHistoryCarousel: View {
                         && movementPhase.showsTimelineDetails,
                     showsVisualRibbon: false,
                     windowOverride: settledVisibleWindow,
-                    emptySemanticMessage: "No recorded items in this time window.",
                     futureReadOnlyFrom: futureReadOnlyFromDate
                 )
                 .allowsHitTesting(movementPhase == .settled && allowsRecordActivation)
                 .accessibilityHidden(movementPhase != .settled)
             }
         }
-        .accessibilityAction(named: "Previous day") {
+        .accessibilityAction(named: textResolver(.historyCopy(.previousDay))) {
             onNavigateDay(-1)
         }
-        .accessibilityAction(named: "Next day") {
+        .accessibilityAction(named: textResolver(.historyCopy(.nextDay))) {
             guard canNavigateForward else { return }
             onNavigateDay(1)
         }
@@ -217,6 +219,8 @@ struct TemporalHistoryCarousel: View {
                 break
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("history.selected-date")
     }
 }
 
@@ -239,14 +243,19 @@ extension TemporalHistoryCarousel {
                 dayPresentation.visualDay.formatted(
                     .dateTime.weekday(.abbreviated).day().month(.abbreviated)
                 ),
-                eyebrow: "Selected day"
+                eyebrow: textResolver(.historyCopy(.selectedDay))
             )
-            .accessibilityLabel("Selected day, \(settledDayText)")
+            .accessibilityLabel(
+                textResolver(.historyCopy(.selectedDay))
+                    + textResolver(.historyCopy(.separatorComma))
+                    + textResolver(.historyCopy(.separatorSpace))
+                    + settledDayText
+            )
             .accessibilityIdentifier("history.selected-date")
-            .accessibilityAction(named: "Previous day") {
+            .accessibilityAction(named: textResolver(.historyCopy(.previousDay))) {
                 onNavigateDay(-1)
             }
-            .accessibilityAction(named: "Next day") {
+            .accessibilityAction(named: textResolver(.historyCopy(.nextDay))) {
                 guard canNavigateForward else { return }
                 onNavigateDay(1)
             }
@@ -268,7 +277,7 @@ extension TemporalHistoryCarousel {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Previous day")
+            .accessibilityLabel(textResolver(.historyCopy(.previousDay)))
             .accessibilityIdentifier("history.previous-day")
             Button {
                 onNavigateDay(1)
@@ -278,7 +287,7 @@ extension TemporalHistoryCarousel {
             }
             .buttonStyle(.plain)
             .disabled(!canNavigateForward)
-            .accessibilityLabel("Next day")
+            .accessibilityLabel(textResolver(.historyCopy(.nextDay)))
             .accessibilityIdentifier("history.next-day")
         }
     }

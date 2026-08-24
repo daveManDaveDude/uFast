@@ -9,12 +9,16 @@ enum AppDestination: String, CaseIterable, Identifiable {
         self
     }
 
-    var title: String {
+    var text: AppText {
         switch self {
-        case .today: "Today"
-        case .history: "History"
-        case .settings: "Settings"
+        case .today: .tabToday
+        case .history: .tabHistory
+        case .settings: .tabSettings
         }
+    }
+
+    var title: String {
+        String(localized: text.resource)
     }
 
     var systemImage: String {

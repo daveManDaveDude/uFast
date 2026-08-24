@@ -6,14 +6,12 @@ final class NavigationShellUITests: XCTestCase {
     @MainActor
     func testMultipleActiveFastsShowIntegrityErrorWithoutChoosingOne() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--seed-onboarded",
-            "--seed-multiple-active-fasts",
-            "--fixed-now",
-            "1800000000",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            seedOnboarded: true,
+            fixedNow: Date(timeIntervalSince1970: 1_800_000_000),
+            seedMultipleActiveFasts: true
+        ).arguments
         app.launch()
 
         let error = app.staticTexts["today.data-integrity-error"]
@@ -26,16 +24,14 @@ final class NavigationShellUITests: XCTestCase {
     @MainActor
     func testUnknownFastProvenanceIsExplicitlyUnavailable() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--seed-onboarded",
-            "--seed-unknown-provenance",
-            "--fixed-now",
-            "1800000000",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            seedOnboarded: true,
+            fixedNow: Date(timeIntervalSince1970: 1_800_000_000),
+            seedUnknownProvenance: true
+        ).arguments
         app.launch()
-        app.tabBars.buttons["History"].tap()
+        app.tabBars.buttons["tab.history"].tap()
 
         let unavailable = app.staticTexts["Saved fast · Details unavailable"]
         XCTAssertTrue(unavailable.waitForExistence(timeout: 5), app.debugDescription)
@@ -46,10 +42,9 @@ final class NavigationShellUITests: XCTestCase {
     @MainActor
     func testPersistenceBootstrapFailureShowsNonDestructiveUnavailableState() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--simulate-persistence-bootstrap-failure",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            simulatePersistenceBootstrapFailure: true
+        ).arguments
         app.launch()
 
         let title = app.staticTexts["persistence.unavailable.title"]
@@ -66,7 +61,7 @@ final class NavigationShellUITests: XCTestCase {
     @MainActor
     func testThreePrimaryDestinationsAreReachable() {
         let app = XCUIApplication()
-        app.launchArguments.append(contentsOf: ["--ui-testing", "--reset-data"])
+        app.launchArguments = UITestLaunchConfiguration(resetData: true).arguments
         app.launch()
         completeOnboardingIfNeeded(in: app)
 
@@ -85,7 +80,13 @@ final class NavigationShellUITests: XCTestCase {
 
     @MainActor
     private func assertDestination(_ name: String, in app: XCUIApplication) {
-        app.tabBars.buttons[name].tap()
+        let tabIdentifier: String = switch name {
+        case "Today": "tab.today"
+        case "History": "tab.history"
+        case "Settings": "tab.settings"
+        default: fatalError("Unexpected destination: \(name)")
+        }
+        app.tabBars.buttons[tabIdentifier].tap()
         let identifier = "screen-title.\(name.lowercased())"
         let title = app.staticTexts[identifier]
 

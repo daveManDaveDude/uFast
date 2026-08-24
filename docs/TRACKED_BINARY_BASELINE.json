@@ -1,0 +1,297 @@
+{
+  "schema_version": 1,
+  "source_commit": "7c45dbfaca644845645bb3f76811ebb62cdf1876",
+  "minimum_bytes": 1048576,
+  "files": [
+    {
+      "path": "artifacts/recordings/slice-3-8/ow-380-fast-coupling.mp4",
+      "bytes": 20333589,
+      "sha256": "b56cb55f2ff14a4078ec74b54f6e787d1471ca0ba8862036a5877568696b0234"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/accessible-add-alternative-en-US-dark-AXXXL.jpeg",
+      "bytes": 70271,
+      "sha256": "941a3e9a902d1338eccef160b843d2b40d26e8d5d76586ee0c0869ae81f1fae6"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/empty-timeline-confirmation-en-GB.jpeg",
+      "bytes": 57259,
+      "sha256": "6da10e12b147aa91a7826c14d7f887a6b8b3295b001f564a00dc4789f5705efc"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/failed-food-save-retains-draft-en-GB.jpeg",
+      "bytes": 66146,
+      "sha256": "5371a9120d60d95d01b6ac4b9c3122795f393e111f2a22dcd4d00f9e3689d675"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/historical-food-editor-stored-time-en-GB.jpeg",
+      "bytes": 62456,
+      "sha256": "356afeafae5506fa6ba280c0ae1dd8ef0550cc9cca1e26cea371a87b39e60f6c"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/history-en-US-dark-AXXXL.jpeg",
+      "bytes": 78896,
+      "sha256": "1e47e9d6f73758f7cf7b452fe363b78b0a06a7b9c0a86b9fa2da6c3dafd66ee7"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/history-neutral-empty-year-boundary-en-GB.jpeg",
+      "bytes": 75646,
+      "sha256": "41ac2c5f5375392eb1996fc16ac4c7077ed2d107ea65c3dcd324d94cadfefeb7"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/history-overview-en-GB-light.jpeg",
+      "bytes": 77711,
+      "sha256": "5ba5c5c2030e684c0d3fcc22fcb106a506907298720d375009bd7741be8880ee"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/history-populated-events-en-GB-light.jpeg",
+      "bytes": 103051,
+      "sha256": "9da2c3227557442018902063de9f6b1e2f52e94c6d512f79004da1ce559ad666"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/proposal-atomic-save-failure-en-GB.jpeg",
+      "bytes": 87676,
+      "sha256": "b0dec041c6d87a61d5daf748a058adfd6409d780b2bb463116ae52d5fdad92d8"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/reconstructed-confirmed-adjusted-en-GB.jpeg",
+      "bytes": 90895,
+      "sha256": "840af67a5e3052a948aa4f2e85ee8753f3020fb99a9c6920e411c0c98ec59405"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-6/suggested-fast-needs-review-en-GB.jpeg",
+      "bytes": 80694,
+      "sha256": "51a298454418a5e2a136f42dd5be9e31305c34a490094f31744a859bf5d76d2e"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/A5A138C1-9BA2-4EE2-AB8C-7C242962A60E.png",
+      "bytes": 312081,
+      "sha256": "0edcebee4297ffdc09b14e77ff30bd46128a04312e4db021d55f0249479d2ab6"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/ADD04C4D-6640-4FCE-8362-3DAAFAE70C01.png",
+      "bytes": 251620,
+      "sha256": "85c4b164e405f4b191a7a57ccf443fd31882a746e3d71a03cafdadfa320b8a59"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/DBE18FFE-2F86-4896-B6B6-F9AA71B418B0.png",
+      "bytes": 251296,
+      "sha256": "e668e4fa6b4dc2b5771686b8887675ce8ffb3487bf5abbfe1afe07b8e50045fe"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/dark-en-US-accessibility/4C491368-E657-417B-B1E4-AC55BFDCD135.png",
+      "bytes": 328372,
+      "sha256": "d88e2e60f636bf2e4ae49791cae8208eb15697a81fe67edb0f98c9cd36c89f5a"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/dark-en-US-accessibility/manifest.json",
+      "bytes": 755,
+      "sha256": "53848f94cdbee6aa1deefde5accaf717521253828dc09ff0c41a1528536705a5"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/explicit-appearance/1C6DBE4C-C464-4AA1-A76E-5E8161D2007C.png",
+      "bytes": 309578,
+      "sha256": "82325355172f09aaaa5768cfc414e7af5e65ef91221e255b402df4e98da3fd0e"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/explicit-appearance/7A30E7CF-AAF0-4797-9185-8ADCBF145300.png",
+      "bytes": 251132,
+      "sha256": "72d644799eb222410e9752a00420103c0706fd5167c2ff5fbf6371275d457544"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/explicit-appearance/DA9EA624-C754-43CE-8B65-E4FF6EFCEC67.png",
+      "bytes": 251452,
+      "sha256": "cb7f60dc457635205f2c9fd27ea7e8136944998f9b7307029f3226bdf11f246f"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/explicit-appearance/manifest.json",
+      "bytes": 2191,
+      "sha256": "442ff2319360c6cf100e31730962cee427c52e2b629d72208d1135deeeb2da0a"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/final-accessibility-layout/3DC16705-11EA-4ECC-BBCD-16D3C8978FC5.png",
+      "bytes": 303953,
+      "sha256": "d5b24144dd013194d2f32775c7e67507ecc7aed0621549572fda27a28fdb5978"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/final-accessibility-layout/manifest.json",
+      "bytes": 754,
+      "sha256": "e447e99394b2c7abb908a87fdbd5fedf4152ce11e1155c87d33e68ebc618b2c4"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/final-dark-en-US-accessibility/28C4C0EA-5FED-475E-B40A-4A905F1EF356.png",
+      "bytes": 377519,
+      "sha256": "50db34e62cdb0ee6e8ab552d9e285c3db821a7a2802ccfebed799b1d40e506a7"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/final-dark-en-US-accessibility/manifest.json",
+      "bytes": 755,
+      "sha256": "f142d8921d5626287e28108a5166f21a84838dc3e88d037902895e76fe163988"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/light-en-GB/40E7D4A5-F82B-4103-801A-4EDD7784DE8C.png",
+      "bytes": 314646,
+      "sha256": "c17857dfbaf6c275cef47d5a62f091642249465a2d34fe1ea1859466d4a05916"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/light-en-GB/DAD77A7B-0042-49CF-9C6F-3738509B5D0E.png",
+      "bytes": 313370,
+      "sha256": "10df5c4289f3cb6df20acba50993cd27f5efb1b8a8b202163b9fc906f48e648f"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/light-en-GB/manifest.json",
+      "bytes": 1438,
+      "sha256": "4a5bcefb4ab8572931872713db0f7f78017b17ac84e45311ef893404a00c7989"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-7/manifest.json",
+      "bytes": 2191,
+      "sha256": "8a061c6b946172063ff34bd9446202858cced569a1fc338ade205c9f82b497bd"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-8/26-hour-continuous-strip.png",
+      "bytes": 351369,
+      "sha256": "7763463c3b5e23fb3a0a286ef99aa63cd69634826a4d7e14237b107b47207590"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-8/26-hour-flush-settled.png",
+      "bytes": 359432,
+      "sha256": "9ea9c6ae471e71c73ecd47412b63ea2b92c976032abc6bbf4ef5817e7950cf7e"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-8/accessibility-xxxl-reduce-motion-increased-contrast-en-us.png",
+      "bytes": 385153,
+      "sha256": "d21c9e21f45c6a467d0a06f1cfac0cd8504323f7228b4fc31be712b6b53b9ccb"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-8/centered-today-settled.png",
+      "bytes": 362461,
+      "sha256": "a5550f818b3540812aac05ea348948250d0aced75cfae371eb34455f96fa4cda"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-8/dark-en-gb-settled.png",
+      "bytes": 311959,
+      "sha256": "ae21f6e4b4a988766c800f55888f3169eb98409a58c0c6e418ceca6c7d97a019"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-8/future-read-only-settled.png",
+      "bytes": 351555,
+      "sha256": "921cd46c260da7f4af5d15058ef3571f8cb597b012932f38865f737a575647b1"
+    },
+    {
+      "path": "artifacts/screenshots/slice-3-8/rtl-ar-settled.png",
+      "bytes": 381207,
+      "sha256": "484b3626c5fac9983d148024a654ebd932b336f6460d78a7809279de94e21726"
+    },
+    {
+      "path": "docs/OW_LOCK_SCREEN_STORIES.docx",
+      "bytes": 1427078,
+      "sha256": "ca0a989ff027bdf3d4ed2db9f24711340ec174031afdffffd056c1fc2a81d7a9"
+    },
+    {
+      "path": "docs/Open_Window_Product_Vision_Storyboard.pdf",
+      "bytes": 1348001,
+      "sha256": "97516ff02211bf76c4c53f2f0ebe4662665305ab67d58242c8affe94d79fc448"
+    },
+    {
+      "path": "docs/images/ow-lock-screen-locked-unlocked-concept.png",
+      "bytes": 1612268,
+      "sha256": "98f343633e0868d0940f41679d8ae67c2ec6aafb47aae3995783b19d74792e6a"
+    },
+    {
+      "path": "images/ChatGPT Image Jul 18, 2026 at 11_09_35 AM.png",
+      "bytes": 1310653,
+      "sha256": "953eb7428a72a0283e313e541313ff8780ef81834d6719fdd8431af192cf9df9"
+    },
+    {
+      "path": "images/ChatGPT Image Jul 18, 2026 at 11_09_41 AM.png",
+      "bytes": 1323616,
+      "sha256": "fcb7a13c659718046d2cc2836cfa4bd5b690bbe99c30339f0831b3668d341f38"
+    },
+    {
+      "path": "images/ChatGPT Image Jul 18, 2026 at 11_09_46 AM.png",
+      "bytes": 1305939,
+      "sha256": "90706cf04c410d0506f8c1f2830201088b28b5247b7c58c550bc780f5692294d"
+    },
+    {
+      "path": "images/ChatGPT Image Jul 18, 2026 at 11_09_53 AM.png",
+      "bytes": 1277819,
+      "sha256": "21c63ce77691b84e7d4b0301cca20b8d443e6871d74e7666ee73fbd5722b2524"
+    },
+    {
+      "path": "images/ChatGPT Image Jul 18, 2026 at 11_09_59 AM.png",
+      "bytes": 1347182,
+      "sha256": "d3caf470aeaec8a405313b3a17ae79a115e277b51e070f82316d6e0cc532716e"
+    },
+    {
+      "path": "images/ChatGPT Image Jul 18, 2026 at 11_10_05 AM.png",
+      "bytes": 1458277,
+      "sha256": "05407badc5a7c4abadf1ceaec77922cc121480f9d1c4f59337684dc535bcf56e"
+    },
+    {
+      "path": "images/slice-3-5-concepts/family-a-calendar-day-rail/journey-board-v2.png",
+      "bytes": 1779918,
+      "sha256": "7b05c662abae41ddb5193b73077b2df71ed89f7927d979f4be4e8dd3ee2c0f72"
+    },
+    {
+      "path": "images/slice-3-5-concepts/family-a-calendar-day-rail/journey-board.png",
+      "bytes": 1585562,
+      "sha256": "654dcdda070a406e79e17468b68ee23de8f6e4dc52a6bfc0cc5262af5d7ade81"
+    },
+    {
+      "path": "images/slice-3-5-concepts/family-b-seven-day-columns/journey-board-v2.png",
+      "bytes": 1653772,
+      "sha256": "a787073a45f5d585f2854d4c92a4167aebed3523a5aa70b2875f6150caf02987"
+    },
+    {
+      "path": "images/slice-3-5-concepts/family-b-seven-day-columns/journey-board.png",
+      "bytes": 1677970,
+      "sha256": "d6500fad10a7ed081e7bac102eaecac2f870c6e327291945765aa2cf03226684"
+    },
+    {
+      "path": "images/slice-3-5-concepts/family-c-temporal-ribbon/journey-board-v2.png",
+      "bytes": 1721850,
+      "sha256": "08b445638c6b76426a5917f7b850192e59d6f793481f3689d74d64a6e163bfdc"
+    },
+    {
+      "path": "images/slice-3-5-concepts/family-c-temporal-ribbon/journey-board.png",
+      "bytes": 1641243,
+      "sha256": "02da5591669d3dcf0665c80c2e2b8917bb6c3416824cc638f87dc0bc16f0df0a"
+    },
+    {
+      "path": "images/slice-3-concepts/00-history-entry.png",
+      "bytes": 1114404,
+      "sha256": "228aeba76447d7e12e3cbf83640d355e48a224e176c21770a5d9790fe615e562"
+    },
+    {
+      "path": "images/slice-3-concepts/02-past-day-entry.png",
+      "bytes": 1057205,
+      "sha256": "006ab39cc12a378914fde2f78f67bce1dce99b3375e9f6e9f8f0040ce3aca40e"
+    },
+    {
+      "path": "images/slice-3-concepts/03-review-proposals.png",
+      "bytes": 1236176,
+      "sha256": "b6c14c2166ed59a53cb04734bc001796da51c222f60f41a02d0fee184f2c3f7e"
+    },
+    {
+      "path": "images/slice-3-concepts/04-review-changed-history.png",
+      "bytes": 1286599,
+      "sha256": "7bafa226a91a0521e4ee0665e2a296662bdec3f60a0774fecd08fda74a83d224"
+    },
+    {
+      "path": "uFast/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png",
+      "bytes": 1493080,
+      "sha256": "90e97e39c173bda7b1b9d44923ba261100e94b29bf8569e34a4a1ae41498c7fd"
+    },
+    {
+      "path": "uFast/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+      "bytes": 1465818,
+      "sha256": "1eccec9118df0f469ed727c3d977f1db9433b91f8c1a2fb538841de7147b197b"
+    },
+    {
+      "path": "uFast/Resources/Assets.xcassets/FastingBotanicalThumbnail.imageset/FastingBotanicalThumbnail.png",
+      "bytes": 1075991,
+      "sha256": "946c0616e083630b4f5125f67861801867bf8f45504fd283e1a2b091cc3714b3"
+    }
+  ]
+}

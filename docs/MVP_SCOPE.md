@@ -1,7 +1,7 @@
 # MVP scope
 
 **Status:** delivered 1.0 release boundary. This document is retained as the
-historical scope contract for 1.0; post-MVP priorities are in `ROADMAP.md`.
+historical scope contract for 1.0; post-MVP priorities are in `docs/ROADMAP.md`.
 
 ## In
 
@@ -27,7 +27,7 @@ historical scope contract for 1.0; post-MVP priorities are in `ROADMAP.md`.
 
 The items below are out of **1.0**, not permanently rejected. Lock Screen,
 backup/restore, Apple Health, stats and assisted food entry now have a phased
-post-MVP direction in `ROADMAP.md`.
+post-MVP direction in `docs/ROADMAP.md`.
 
 - Photo food capture.
 - AI food interpretation or generated nutrition.

@@ -16,11 +16,8 @@ final class ActiveFastPresentationTests: XCTestCase {
             now: now
         )
 
+        XCTAssertEqual(presentation.elapsedDuration, 6 * 60 * 60)
         XCTAssertEqual(presentation.elapsedText, "06:00:00")
-        XCTAssertEqual(
-            presentation.elapsedAccessibilityText,
-            "6 hours 0 minutes 0 seconds"
-        )
         XCTAssertEqual(presentation.targetDate, startDate.addingTimeInterval(12 * 60 * 60))
         XCTAssertEqual(presentation.progress, 0.5)
         XCTAssertEqual(presentation.progressPercentage, 50)
@@ -39,20 +36,33 @@ final class ActiveFastPresentationTests: XCTestCase {
             now: startDate.addingTimeInterval(59)
         )
 
+        XCTAssertEqual(presentation.elapsedDuration, 59)
         XCTAssertEqual(presentation.elapsedText, "00:00:59")
-        XCTAssertEqual(presentation.elapsedAccessibilityText, "59 seconds")
         XCTAssertEqual(presentation.progress, 59 / TimeInterval(8 * 60 * 60), accuracy: 0.000_001)
         XCTAssertEqual(presentation.progressPercentage, 0)
     }
 
     func testElapsedFormatterTruncatesToCompletedWholeMinutes() {
-        XCTAssertEqual(ElapsedTimeFormatter.string(from: 60), "1 minute")
-        XCTAssertEqual(ElapsedTimeFormatter.string(from: 3659), "1 hour")
+        let resolve = AppTextResolver()
         XCTAssertEqual(
-            ElapsedTimeFormatter.string(from: 26 * 60 * 60 + 3 * 60 + 59),
+            HistoryTextFormatting.duration(seconds: 60, resolver: resolve),
+            "1 minute"
+        )
+        XCTAssertEqual(
+            HistoryTextFormatting.duration(seconds: 3659, resolver: resolve),
+            "1 hour"
+        )
+        XCTAssertEqual(
+            HistoryTextFormatting.duration(
+                seconds: 26 * 60 * 60 + 3 * 60 + 59,
+                resolver: resolve
+            ),
             "1 day 2 hours 3 minutes"
         )
-        XCTAssertEqual(ElapsedTimeFormatter.string(from: 48 * 60 * 60), "2 days")
+        XCTAssertEqual(
+            HistoryTextFormatting.duration(seconds: 48 * 60 * 60, resolver: resolve),
+            "2 days"
+        )
     }
 
     func testActiveElapsedFormatterShowsCompletedSeconds() {
@@ -61,7 +71,10 @@ final class ActiveFastPresentationTests: XCTestCase {
         XCTAssertEqual(ActiveElapsedTimeFormatter.string(from: 3661.9), "01:01:01")
         XCTAssertEqual(ActiveElapsedTimeFormatter.string(from: 97200), "1d 03:00:00")
         XCTAssertEqual(
-            ActiveElapsedTimeFormatter.accessibilityString(from: 97200),
+            HistoryTextFormatting.activeAccessibility(
+                seconds: 97200,
+                resolver: AppTextResolver()
+            ),
             "1 day 3 hours 0 minutes 0 seconds"
         )
     }
@@ -97,7 +110,6 @@ final class ActiveFastPresentationTests: XCTestCase {
         )
 
         XCTAssertNil(presentation.elapsedText)
-        XCTAssertNil(presentation.elapsedAccessibilityText)
         XCTAssertEqual(presentation.progress, 0)
         XCTAssertEqual(presentation.progressPercentage, 0)
         XCTAssertFalse(presentation.hasReachedGoal)

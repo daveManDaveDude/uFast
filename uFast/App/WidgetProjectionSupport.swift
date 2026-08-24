@@ -1,5 +1,4 @@
 import Foundation
-import OSLog
 import SwiftData
 import WidgetKit
 
@@ -15,24 +14,20 @@ struct WidgetTimelineReloader: ActiveFastProjectionReloading {
 }
 
 enum WidgetProjectionSupport {
-    private static let logger = Logger(
-        subsystem: "com.davidmcgrath.uFast",
-        category: "WidgetProjection"
-    )
-
-    static func coordinator() -> ActiveFastProjectionCoordinator? {
-        guard let containerURL = FileManager.default.containerURL(
+    static func coordinator(
+        containerURL: URL? = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: ActiveFastProjectionFileStore.appGroupIdentifier
-        ) else {
-            logger.error(
-                "App Group container unavailable: \(ActiveFastProjectionFileStore.appGroupIdentifier, privacy: .public)"
-            )
+        ),
+        diagnosticSink: any DiagnosticEventSink = AppDiagnosticEventLogSink()
+    ) -> ActiveFastProjectionCoordinator? {
+        guard let containerURL else {
+            record(.containerUnavailable, to: diagnosticSink)
             return nil
         }
-        logger.notice("Using widget projection container")
         return ActiveFastProjectionCoordinator(
             store: ActiveFastProjectionFileStore(containerURL: containerURL),
-            reloader: WidgetTimelineReloader()
+            reloader: WidgetTimelineReloader(),
+            diagnosticSink: diagnosticSink
         )
     }
 
@@ -40,10 +35,10 @@ enum WidgetProjectionSupport {
         _ fast: FastRecord,
         goal: FastingGoal,
         now: Date = .now,
-        projectionCoordinator: ActiveFastProjectionCoordinator? = nil
+        projectionCoordinator: ActiveFastProjectionCoordinator? = nil,
+        diagnosticSink: any DiagnosticEventSink = AppDiagnosticEventLogSink()
     ) {
-        logger.notice("Publishing active fast projection")
-        (projectionCoordinator ?? coordinator())?.publish(
+        (projectionCoordinator ?? coordinator(diagnosticSink: diagnosticSink))?.publish(
             activeRecordIdentifier: fast.id,
             startDate: fast.startDate,
             goalHours: goal.hours,
@@ -55,41 +50,66 @@ enum WidgetProjectionSupport {
     static func synchronize(
         in container: ModelContainer,
         now: Date,
-        projectionCoordinator: ActiveFastProjectionCoordinator? = nil
+        projectionCoordinator: ActiveFastProjectionCoordinator? = nil,
+        diagnosticSink: any DiagnosticEventSink = AppDiagnosticEventLogSink()
     ) {
         let context = container.mainContext
+        let coordinator = projectionCoordinator ?? coordinator(diagnosticSink: diagnosticSink)
         let activeFast: FastRecord?
         do {
             activeFast = try ActiveFastAuthority.fetch(in: context)
+        } catch let ActiveFastIntegrityError.multipleActiveFasts(count) {
+            record(.authorityConflict, countBucket: DiagnosticCountBucket(count: count), to: diagnosticSink)
+            coordinator?.clear()
+            return
         } catch {
-            logger.error("Active fast authority is ambiguous; clearing widget projection")
-            clear(projectionCoordinator: projectionCoordinator)
+            record(.authorityConflict, to: diagnosticSink)
+            coordinator?.clear()
             return
         }
         guard let activeFast else {
-            clear(projectionCoordinator: projectionCoordinator)
+            coordinator?.clear()
             return
         }
         let goal: FastingGoal
         do {
             goal = try SwiftDataSettingsStore(modelContext: context)
                 .authoritativeRecord()?.fastingGoal ?? .default
+        } catch let SettingsStoreError.conflictingAuthorities(count) {
+            record(.authorityConflict, countBucket: DiagnosticCountBucket(count: count), to: diagnosticSink)
+            return
         } catch {
-            logger.error("Settings authority is ambiguous; widget projection unchanged")
+            record(.authorityConflict, to: diagnosticSink)
             return
         }
-        publish(
-            activeFast,
-            goal: goal,
-            now: now,
-            projectionCoordinator: projectionCoordinator
+        coordinator?.publish(
+            activeRecordIdentifier: activeFast.id,
+            startDate: activeFast.startDate,
+            goalHours: goal.hours,
+            generatedAt: now
         )
     }
 
     static func clear(
-        projectionCoordinator: ActiveFastProjectionCoordinator? = nil
+        projectionCoordinator: ActiveFastProjectionCoordinator? = nil,
+        diagnosticSink: any DiagnosticEventSink = AppDiagnosticEventLogSink()
     ) {
-        logger.debug("Clearing active fast projection")
-        (projectionCoordinator ?? coordinator())?.clear()
+        (projectionCoordinator ?? coordinator(diagnosticSink: diagnosticSink))?.clear()
+    }
+
+    private static func record(
+        _ outcome: DiagnosticOutcome,
+        countBucket: DiagnosticCountBucket? = nil,
+        to sink: any DiagnosticEventSink
+    ) {
+        guard let event = DiagnosticEvent(
+            subsystem: .widgetProjection,
+            outcome: outcome,
+            severity: .error,
+            countBucket: countBucket
+        ) else {
+            return
+        }
+        sink.record(event)
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TemporalRibbonView: View {
     @Environment(\.calendar) var calendar
+    @Environment(\.appTextResolver) var textResolver
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.locale) var locale
     @Environment(\.layoutDirection) var layoutDirection
@@ -29,7 +30,7 @@ struct TemporalRibbonView: View {
     var hidesVisualEventAccessibility = false
     var isSelectedPage = true
     var windowOverride: TemporalRibbonWindow?
-    var emptySemanticMessage = "No recorded items for this date."
+    var emptySemanticMessage: String?
     var futureReadOnlyFrom: Date?
 
     var window: TemporalRibbonWindow? {
@@ -48,7 +49,7 @@ struct TemporalRibbonView: View {
                         selectedDate.formatted(
                             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
                         ),
-                        eyebrow: "Selected day"
+                        eyebrow: textResolver(.historyCopy(.selectedDay))
                     )
                     .accessibilityIdentifier("\(accessibilityIdentifierPrefix).selected-date")
                     Spacer()
@@ -60,7 +61,7 @@ struct TemporalRibbonView: View {
                                 .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Previous day")
+                        .accessibilityLabel(textResolver(.historyCopy(.previousDay)))
                         .accessibilityIdentifier("\(accessibilityIdentifierPrefix).previous-day")
                         Button {
                             onNavigateDay?(1)
@@ -70,7 +71,7 @@ struct TemporalRibbonView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(!canNavigateForward)
-                        .accessibilityLabel("Next day")
+                        .accessibilityLabel(textResolver(.historyCopy(.nextDay)))
                         .accessibilityIdentifier("\(accessibilityIdentifierPrefix).next-day")
                     }
                 }
@@ -80,10 +81,10 @@ struct TemporalRibbonView: View {
                 ribbonContent(window)
             }
         }
-        .accessibilityAction(named: "Previous day") {
+        .accessibilityAction(named: textResolver(.historyCopy(.previousDay))) {
             onNavigateDay?(-1)
         }
-        .accessibilityAction(named: "Next day") {
+        .accessibilityAction(named: textResolver(.historyCopy(.nextDay))) {
             guard canNavigateForward else { return }
             onNavigateDay?(1)
         }

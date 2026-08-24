@@ -178,20 +178,11 @@ final class FastEndUITests: XCTestCase {
         resetData: Bool = false,
         simulateSaveFailure: Bool = false
     ) -> [String] {
-        var arguments = [
-            "--ui-testing",
-            "--fixed-now",
-            String(now.timeIntervalSince1970),
-            "--suppress-automatic-live-activity-offer",
-        ]
-
-        if resetData {
-            arguments.append("--reset-data")
-        }
-        if simulateSaveFailure {
-            arguments.append("--simulate-fast-save-failure")
-        }
-
-        return arguments
+        UITestLaunchConfiguration(
+            resetData: resetData,
+            fixedNow: now,
+            suppressAutomaticLiveActivityOffer: true,
+            simulateFastSaveFailure: simulateSaveFailure
+        ).arguments
     }
 }

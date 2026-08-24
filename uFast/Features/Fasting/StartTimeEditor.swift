@@ -1,16 +1,17 @@
 import SwiftUI
 
 struct StartTimeEditor: View {
+    @Environment(\.appTextResolver) private var textResolver
     enum Mode {
         case create
         case correct
 
-        var confirmationTitle: String {
+        func confirmationTitle(using resolver: AppTextResolver) -> String {
             switch self {
             case .create:
-                "Start fast"
+                resolver(.startFast)
             case .correct:
-                "Save"
+                resolver(.fastingCopy(.save))
             }
         }
     }
@@ -84,7 +85,8 @@ struct StartTimeEditor: View {
             for: selectedStartDate,
             now: clock.now,
             hasConflict: hasConflict(selectedStartDate),
-            existingError: validationError
+            existingError: validationError,
+            textResolver: textResolver
         )
     }
 
@@ -92,16 +94,17 @@ struct StartTimeEditor: View {
         for selectedStartDate: Date,
         now: Date,
         hasConflict: Bool,
-        existingError: String? = nil
+        existingError: String? = nil,
+        textResolver: AppTextResolver = .init()
     ) -> String? {
         if selectedStartDate > now {
-            return "Start time can’t be in the future."
+            return textResolver(.fastingCopy(.startFuture))
         }
         if selectedStartDate < now.addingTimeInterval(-FastStartService.maximumStartAge) {
-            return "Start time must be within the past 36 hours."
+            return textResolver(.fastingCopy(.startTooOld))
         }
         if hasConflict {
-            return "This fast overlaps another recorded fast."
+            return textResolver(.fastingCopy(.overlapError))
         }
         return existingError
     }
@@ -117,13 +120,15 @@ struct StartTimeEditor: View {
                 Section {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
                         UFastSectionHeading(
-                            mode == .create ? "When did this fast start?" : "Correct the recorded start",
-                            eyebrow: "Start time"
+                            mode == .create
+                                ? textResolver(.fastingCopy(.startCreateHeading))
+                                : textResolver(.fastingCopy(.startCorrectHeading)),
+                            eyebrow: textResolver(.fastingCopy(.startEyebrow))
                         )
                         Text(
                             mode == .create
-                                ? "Choose the date and time you intend to record."
-                                : "Corrections are available for the preceding 36 hours."
+                                ? textResolver(.fastingCopy(.startCreateDescription))
+                                : textResolver(.fastingCopy(.startCorrectDescription))
                         )
                         .font(.subheadline)
                         .foregroundStyle(UFastTheme.secondaryText)
@@ -133,7 +138,7 @@ struct StartTimeEditor: View {
 
                 if isShowingLegacyDraft {
                     Section {
-                        Button("Use earliest valid start") {
+                        Button(textResolver(.fastingCopy(.useEarliestValidStart))) {
                             isShowingLegacyDraft = false
                             selectedStartDate = earliestAllowedStartDate
                             validationError = nil
@@ -141,14 +146,14 @@ struct StartTimeEditor: View {
                         }
                         .accessibilityIdentifier("fast.start-use-earliest")
                     } footer: {
-                        Text("The stored start is older than the preceding 36 hours. Choose a new start to replace it.")
+                        Text(textResolver(.fastingCopy(.legacyStartFooter)))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
                 Section {
                     DatePicker(
-                        "Date",
+                        textResolver(.date),
                         selection: $selectedStartDate,
                         in: allowedStartRange,
                         displayedComponents: .date
@@ -156,7 +161,7 @@ struct StartTimeEditor: View {
                     .accessibilityIdentifier("fast.start-date")
 
                     DatePicker(
-                        "Time",
+                        textResolver(.time),
                         selection: $selectedStartDate,
                         in: allowedStartRange,
                         displayedComponents: .hourAndMinute
@@ -178,7 +183,7 @@ struct StartTimeEditor: View {
                     }
                 }
             }
-            .navigationTitle("Start time")
+            .navigationTitle(textResolver(.fastingCopy(.startTimeTitle)))
             .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)
             .background(UFastTheme.canvas)
@@ -192,12 +197,12 @@ struct StartTimeEditor: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button(textResolver(.cancel), action: onCancel)
                         .accessibilityIdentifier("fast.start-cancel")
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(mode.confirmationTitle) {
+                    Button(mode.confirmationTitle(using: textResolver)) {
                         confirm()
                     }
                     .disabled(isInvalidStart)
@@ -227,27 +232,35 @@ struct StartTimeEditor: View {
         } catch let error as FastStartError {
             switch error {
             case .futureStartTime:
-                validationError = "Start time can’t be in the future."
+                validationError = textResolver(.fastingCopy(.startFuture))
                 saveError = nil
             case .startTimeBeyondMaximumAge:
-                validationError = "Start time must be within the past 36 hours."
+                validationError = textResolver(.fastingCopy(.startTooOld))
                 saveError = nil
             case .conflict:
-                validationError = "This fast overlaps another recorded fast."
+                validationError = textResolver(.fastingCopy(.overlapError))
                 saveError = nil
             case let .crossesCaloricBoundary(date):
-                validationError = Self.caloricBoundaryMessage(for: date)
+                validationError = Self.caloricBoundaryMessage(for: date, textResolver: textResolver)
                 saveError = nil
             case .noActiveFast:
-                saveError = "Your start time couldn’t be saved. Please try again."
+                saveError = textResolver(.fastingCopy(.startSaveError))
             }
         } catch {
-            saveError = "Your start time couldn’t be saved. Please try again."
+            saveError = textResolver(.fastingCopy(.startSaveError))
         }
     }
 
-    static func caloricBoundaryMessage(for date: Date) -> String {
-        "Start after the caloric event at \(date.formatted(date: .omitted, time: .shortened))."
+    static func caloricBoundaryMessage(
+        for date: Date,
+        textResolver: AppTextResolver = .init()
+    ) -> String {
+        textResolver(
+            .fastingValidation(
+                .startBoundary,
+                value: date.formatted(date: .omitted, time: .shortened)
+            )
+        )
     }
 }
 

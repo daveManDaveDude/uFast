@@ -10,6 +10,7 @@ struct DirectHistoricalEntryView: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
     @Environment(\.timeZone) private var timeZone
+    @Environment(\.appTextResolver) private var textResolver
     @State private var stage: Stage = .confirmation
     @State private var selectedInstant: Date
 
@@ -100,21 +101,21 @@ struct DirectHistoricalEntryView: View {
     private var confirmation: some View {
         NavigationStack {
             Form {
-                Section("Selected date and time") {
+                Section(textResolver(.historySelectedDateAndTime)) {
                     Text(summary)
                         .font(.headline)
                         .foregroundStyle(UFastTheme.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("history.add.summary")
                     DatePicker(
-                        "Date",
+                        textResolver(.date),
                         selection: $selectedInstant,
                         in: pickerRange,
                         displayedComponents: .date
                     )
                     .accessibilityIdentifier("history.add.date")
                     DatePicker(
-                        "Time",
+                        textResolver(.time),
                         selection: $selectedInstant,
                         in: pickerRange,
                         displayedComponents: .hourAndMinute
@@ -126,7 +127,7 @@ struct DirectHistoricalEntryView: View {
                     Button {
                         stage = .food
                     } label: {
-                        Label("Food", systemImage: "fork.knife")
+                        Label(textResolver(.historyFood), systemImage: "fork.knife")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                     .accessibilityIdentifier("history.add.food")
@@ -134,21 +135,21 @@ struct DirectHistoricalEntryView: View {
                     Button {
                         stage = .drinkChoice
                     } label: {
-                        Label("Drink", systemImage: "drop")
+                        Label(textResolver(.historyDrink), systemImage: "drop")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                     .accessibilityIdentifier("history.add.drink")
                 } footer: {
-                    Text("Nothing is recorded until you save the full editor.")
+                    Text(textResolver(.historyNothingRecorded))
                 }
             }
             .scrollContentBackground(.hidden)
             .background(UFastTheme.canvas)
-            .navigationTitle("Add to history")
+            .navigationTitle(textResolver(.historyAddTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onClose)
+                    Button(textResolver(.cancel), action: onClose)
                         .accessibilityIdentifier("history.add.cancel")
                 }
             }

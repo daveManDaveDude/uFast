@@ -16,7 +16,7 @@ Start by reading, in full:
 - `DOMAIN_RULES.md`, especially BR-03, BR-12, BR-15, BR-28 and BR-33 through
   BR-36
 - `DECISIONS.md`, especially D-007, D-009, D-025, D-027, D-028 and D-029
-- `ROADMAP.md`
+- `docs/ROADMAP.md`
 - `BACKLOG.md`
 - `docs/OW_LOCK_SCREEN_STORIES.md`, especially the completed OW-L101 through
   OW-L103 contracts, OW-L104 and the complete OW-L105 contract

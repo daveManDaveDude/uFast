@@ -37,6 +37,19 @@ baseline therefore requires an explicit reviewed architecture edit.
 - `UFastCore` owns Foundation-only values, clocks, validation primitives,
   conflict checks and pure automatic-fast projections. It must not import
   SwiftUI, SwiftData, WidgetKit, ActivityKit or UIKit.
+- Local diagnostics follow accepted D-037. The metadata-only
+  `DiagnosticEvent`, closed subsystem/outcome vocabulary and synchronous
+  `DiagnosticEventSink` live at the shared widget boundary so the app and
+  widget targets can compile the same sendable values without sharing a sink.
+  App and widget OSLog adapters are separate process-local implementations;
+  persistence, command, History and Live Activity paths remain uninstrumented
+  until their bounded stories. The allowed optional fields are exactly
+  `appVersion`, `buildNumber`, `schemaVersion`, `countBucket`, `isRetry` and
+  `isForeground`, with the per-outcome matrix and prohibited content in D-037;
+  the version fields are typed declarations of the current bundle/build and
+  diagnostic schema values, not arbitrary strings. Unknown, timestamp-like or
+  undeclared version values are rejected during construction and decoding. No
+  generic metadata dictionary, persistence or network transport is allowed.
 - Feature views render immutable snapshots and dispatch application commands.
   They do not query persistent stores or publish optional system surfaces.
 - Application and persistence adapters map SwiftData records to `UFastCore`

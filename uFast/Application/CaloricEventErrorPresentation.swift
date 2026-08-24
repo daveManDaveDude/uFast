@@ -12,12 +12,6 @@ extension FoodEntrySaveError {
              let .completedConfirmationWithImpact(context),
              let .inferredConfirmationWithImpact(context):
             .confirmation(context)
-        case .confirmationRequired:
-            .confirmation(.init(fallbackKind: .active))
-        case .completedFastConfirmationRequired:
-            .confirmation(.init(fallbackKind: .completed))
-        case .inferredFastConfirmationRequired:
-            .confirmation(.init(fallbackKind: .inferred))
         case .eventAtActiveFastStart:
             .eventAtActiveFastStart
         case .fastConflict:
@@ -33,12 +27,6 @@ extension HydrationEntrySaveError {
              let .completedConfirmationWithImpact(context),
              let .inferredConfirmationWithImpact(context):
             .confirmation(context)
-        case .confirmationRequired:
-            .confirmation(.init(fallbackKind: .active))
-        case .completedFastConfirmationRequired:
-            .confirmation(.init(fallbackKind: .completed))
-        case .inferredFastConfirmationRequired:
-            .confirmation(.init(fallbackKind: .inferred))
         case .eventAtActiveFastStart:
             .eventAtActiveFastStart
         case .fastConflict:

@@ -80,7 +80,7 @@ extension TemporalRibbonView {
                     id: group.members.first?.reference.id ?? UUID(),
                     semanticID: "group-\(group.id.stableValue)",
                     date: group.bucket.start,
-                    title: group.summaryTitle,
+                    title: groupTitle(group),
                     detail: groupDetail(group),
                     accessibilityLabel: groupAccessibilityLabel(group),
                     symbol: eventSymbol(category: group.presentationCategory),
@@ -97,13 +97,38 @@ extension TemporalRibbonView {
         }
     }
 
+    func groupTitle(_ group: TemporalEventGroup) -> String {
+        let family: AppText.HistoryEventFamily = group.family == .food ? .food : .drink
+        if let title = group.commonMemberTitle {
+            return textResolver(
+                .historyGroupMemberTitle(title: title, count: group.count)
+            )
+        }
+        return textResolver(.historyGroupTitle(count: group.count, family: family))
+    }
+
     func groupDetail(_ group: TemporalEventGroup) -> String {
-        "\(timeText(group.bucket.start))–\(timeText(group.bucket.end)) · \(group.classificationSummary)"
+        timeText(group.bucket.start)
+            + textResolver(.historyCopy(.separatorRange))
+            + timeText(group.bucket.end)
+            + textResolver(.historyCopy(.separatorSpace))
+            + textResolver(.historyCopy(.separatorMiddleDot))
+            + textResolver(.historyCopy(.separatorSpace))
+            + textResolver(.historyGroupClassification(group.presentationCategory))
     }
 
     func groupAccessibilityLabel(_ group: TemporalEventGroup) -> String {
-        "\(group.count) \(group.family.pluralName), \(timeText(group.bucket.start)) to "
-            + "\(timeText(group.bucket.end)), \(group.classificationSummary.lowercased())"
+        textResolver(
+            .historyGroupAccessibility(
+                count: group.count,
+                family: group.family == .food ? .food : .drink,
+                start: timeText(group.bucket.start),
+                end: timeText(group.bucket.end),
+                classification: textResolver(
+                    .historyGroupClassification(group.presentationCategory)
+                ).lowercased()
+            )
+        )
     }
 
     func timeText(_ date: Date) -> String {
@@ -227,10 +252,15 @@ extension TemporalRibbonView {
         markWidth: Double
     ) -> String {
         guard item.kind == .active else { return item.title }
-        guard markWidth >= 180 else { return "Active Fast" }
-        let elapsed = ActiveElapsedTimeFormatter.string(
-            from: item.end.timeIntervalSince(item.start)
+        guard markWidth >= 180 else {
+            return textResolver(.historyCopy(.activeFast))
+        }
+        let elapsed = HistoryTextFormatting.activeDisplay(
+            seconds: item.end.timeIntervalSince(item.start),
+            resolver: textResolver
         )
-        return "Active Fast \(elapsed)"
+        return textResolver(.historyCopy(.activeFast))
+            + textResolver(.historyCopy(.separatorSpace))
+            + elapsed
     }
 }

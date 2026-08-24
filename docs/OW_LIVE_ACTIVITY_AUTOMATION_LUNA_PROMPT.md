@@ -11,7 +11,7 @@ Start by reading, in full:
 - `MVP_SCOPE.md`
 - `DOMAIN_RULES.md`, especially BR-33 through BR-40
 - `DECISIONS.md`, especially D-028, D-029 and D-030
-- `ROADMAP.md`
+- `docs/ROADMAP.md`
 - `BACKLOG.md`
 - `docs/OW_LOCK_SCREEN_STORIES.md` for the delivered OW-L101 through OW-L105
   baseline

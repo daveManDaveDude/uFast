@@ -14,16 +14,26 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            ForEach(AppDestination.allCases) { destination in
-                Tab(
-                    destination.title,
-                    systemImage: destination.systemImage,
-                    value: destination
-                ) {
-                    destinationView(destination)
-                }
-                .accessibilityIdentifier(destination.accessibilityIdentifier)
+            Tab(value: .today) {
+                destinationView(.today)
+            } label: {
+                tabLabel(.today)
             }
+            .accessibilityIdentifier(AppDestination.today.accessibilityIdentifier)
+
+            Tab(value: .history) {
+                destinationView(.history)
+            } label: {
+                tabLabel(.history)
+            }
+            .accessibilityIdentifier(AppDestination.history.accessibilityIdentifier)
+
+            Tab(value: .settings) {
+                destinationView(.settings)
+            } label: {
+                tabLabel(.settings)
+            }
+            .accessibilityIdentifier(AppDestination.settings.accessibilityIdentifier)
         }
         .tint(UFastTheme.action)
         .toolbarBackground(UFastTheme.canvas, for: .tabBar)
@@ -48,6 +58,10 @@ struct RootTabView: View {
                 onSelectToday: { selection = .today }
             )
         }
+    }
+
+    private func tabLabel(_ destination: AppDestination) -> some View {
+        Label(destination.title, systemImage: destination.systemImage)
     }
 }
 

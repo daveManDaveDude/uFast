@@ -29,15 +29,18 @@ final class CaloricEventImpactPresenter {
     private let modelContext: ModelContext
     private let clock: any AppClock
     private let observationSink: BoundaryQueryObservationSink
+    private let diagnosticSink: any DiagnosticEventSink
 
     init(
         modelContext: ModelContext,
         clock: any AppClock,
-        observationSink: BoundaryQueryObservationSink
+        observationSink: BoundaryQueryObservationSink,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
     ) {
         self.modelContext = modelContext
         self.clock = clock
         self.observationSink = observationSink
+        self.diagnosticSink = diagnosticSink
     }
 
     // swiftlint:disable:next function_body_length cyclomatic_complexity
@@ -162,7 +165,10 @@ final class CaloricEventImpactPresenter {
 
     private func settingsRecord() throws -> AppSettingsRecord? {
         do {
-            return try SwiftDataSettingsStore(modelContext: modelContext).authoritativeRecord()
+            return try SwiftDataSettingsStore(
+                modelContext: modelContext,
+                diagnosticSink: diagnosticSink
+            ).authoritativeRecord()
         } catch let error as SettingsStoreError {
             switch error {
             case .conflictingAuthorities:
