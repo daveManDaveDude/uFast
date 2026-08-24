@@ -17,12 +17,12 @@ final class FastingGoalUITests: XCTestCase {
 
         selectGoal(16, in: app)
         app.buttons["goal.continue"].tap()
-        XCTAssertTrue(app.tabBars.buttons["tab.settings"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 2))
 
         app.terminate()
         app.launchArguments = launchArguments()
         app.launch()
-        app.tabBars.buttons["tab.settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
 
         XCTAssertTrue(app.buttons["goal.option.16"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["goal.option.16"].isSelected)
@@ -34,11 +34,11 @@ final class FastingGoalUITests: XCTestCase {
         app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
-        app.tabBars.buttons["tab.settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
 
         selectGoal(8, in: app)
 
-        app.tabBars.buttons["tab.today"].tap()
+        app.tabBars.buttons["Today"].tap()
         XCTAssertTrue(app.staticTexts["Your fasting goal is 8 hours."].waitForExistence(timeout: 2))
     }
 
@@ -55,7 +55,7 @@ final class FastingGoalUITests: XCTestCase {
         let continueButton = app.buttons["goal.continue"]
         XCTAssertTrue(continueButton.isHittable)
         continueButton.tap()
-        XCTAssertTrue(app.tabBars.buttons["tab.today"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 2))
     }
 
     @MainActor
@@ -89,12 +89,12 @@ final class FastingGoalUITests: XCTestCase {
         XCTAssertTrue(continueButton.isHittable, app.debugDescription)
         continueButton.tap()
 
-        let todayTab = app.tabBars.buttons["tab.today"]
+        let todayTab = app.tabBars.buttons["Today"]
         XCTAssertTrue(todayTab.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.scrollViews["today.content"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.buttons["fast.start"].waitForExistence(timeout: 5), app.debugDescription)
 
-        let settingsTab = app.tabBars.buttons["tab.settings"]
+        let settingsTab = app.tabBars.buttons["Settings"]
         XCTAssertTrue(settingsTab.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(settingsTab.isHittable, app.debugDescription)
         settingsTab.tap()
@@ -143,7 +143,7 @@ final class FastingGoalUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["goal.save-error"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["goal.option.16"].isSelected)
         XCTAssertTrue(app.buttons["goal.continue"].isHittable)
-        XCTAssertFalse(app.tabBars.buttons["tab.today"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Today"].exists)
     }
 
     @MainActor
@@ -152,12 +152,12 @@ final class FastingGoalUITests: XCTestCase {
         app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
-        XCTAssertTrue(app.tabBars.buttons["tab.settings"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 2))
 
         app.terminate()
         app.launchArguments = launchArguments(simulateGoalSaveFailure: true)
         app.launch()
-        app.tabBars.buttons["tab.settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
         let sixteenHours = app.buttons["goal.option.16"]
         XCTAssertTrue(sixteenHours.waitForExistence(timeout: 2))
         if !sixteenHours.isHittable {
@@ -178,7 +178,7 @@ final class FastingGoalUITests: XCTestCase {
         app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
-        app.tabBars.buttons["tab.settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
 
         let deleteAll = app.buttons["settings.data.delete-all"]
         for _ in 0 ..< 4 where !deleteAll.isHittable {
@@ -194,7 +194,7 @@ final class FastingGoalUITests: XCTestCase {
         let finalAlert = app.alerts["Permanently delete everything?"]
         XCTAssertTrue(finalAlert.waitForExistence(timeout: 2))
         finalAlert.buttons["Cancel"].tap()
-        XCTAssertTrue(app.tabBars.buttons["tab.settings"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Settings"].exists)
 
         deleteAll.tap()
         XCTAssertTrue(firstAlert.waitForExistence(timeout: 2))
@@ -211,7 +211,7 @@ final class FastingGoalUITests: XCTestCase {
         app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
-        app.tabBars.buttons["tab.settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
 
         let privacyLink = app.buttons["settings.privacy-safety"]
         if !privacyLink.isHittable {
@@ -233,7 +233,7 @@ final class FastingGoalUITests: XCTestCase {
         app.launchArguments = launchArguments(resetData: true, simulateDeleteAllFailure: true)
         app.launch()
         app.buttons["goal.continue"].tap()
-        app.tabBars.buttons["tab.settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
 
         let deleteAll = app.buttons["settings.data.delete-all"]
         for _ in 0 ..< 4 where !deleteAll.isHittable {
@@ -243,7 +243,7 @@ final class FastingGoalUITests: XCTestCase {
         app.alerts["Delete all uFast data?"].buttons["Continue"].tap()
         app.alerts["Permanently delete everything?"].buttons["Delete everything"].tap()
 
-        XCTAssertTrue(app.tabBars.buttons["tab.settings"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Settings"].exists)
         let finalAlert = app.alerts["Permanently delete everything?"]
         XCTAssertTrue(finalAlert.waitForNonExistence(timeout: 5), app.debugDescription)
         app.scrollViews.firstMatch.swipeUp()

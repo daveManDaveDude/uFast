@@ -582,6 +582,18 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testCarouselDoesNotRepublishEquivalentMotionAtFingerLift() {
+        XCTAssertFalse(TemporalCarouselMovementPhase.userDriven
+            .requiresPresentationUpdate(to: .decelerating))
+        XCTAssertFalse(TemporalCarouselMovementPhase.decelerating
+            .requiresPresentationUpdate(to: .aligning))
+        XCTAssertTrue(TemporalCarouselMovementPhase.userDriven
+            .requiresPresentationUpdate(to: .settled))
+        XCTAssertTrue(TemporalCarouselMovementPhase.settled
+            .requiresPresentationUpdate(to: .programmatic))
+    }
+
+    @MainActor
     func testFutureAdjacentMotionKeepsTimelineAppearanceWhileActionsStayGated() {
         let moving = TemporalHistoryCarousel.timelineInteractionState(
             movementPhase: .decelerating,

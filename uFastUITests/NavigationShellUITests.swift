@@ -31,7 +31,7 @@ final class NavigationShellUITests: XCTestCase {
             seedUnknownProvenance: true
         ).arguments
         app.launch()
-        app.tabBars.buttons["tab.history"].tap()
+        app.tabBars.buttons["History"].tap()
 
         let unavailable = app.staticTexts["Saved fast · Details unavailable"]
         XCTAssertTrue(unavailable.waitForExistence(timeout: 5), app.debugDescription)
@@ -80,13 +80,7 @@ final class NavigationShellUITests: XCTestCase {
 
     @MainActor
     private func assertDestination(_ name: String, in app: XCUIApplication) {
-        let tabIdentifier: String = switch name {
-        case "Today": "tab.today"
-        case "History": "tab.history"
-        case "Settings": "tab.settings"
-        default: fatalError("Unexpected destination: \(name)")
-        }
-        app.tabBars.buttons[tabIdentifier].tap()
+        app.tabBars.buttons[name].tap()
         let identifier = "screen-title.\(name.lowercased())"
         let title = app.staticTexts[identifier]
 

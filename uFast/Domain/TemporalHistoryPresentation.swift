@@ -168,6 +168,20 @@ enum TemporalCarouselMovementPhase: Equatable, Sendable {
     case aligning
     case programmatic
 
+    var isContinuousLowerMotion: Bool {
+        switch self {
+        case .userDriven, .decelerating, .aligning:
+            true
+        case .settled, .programmatic:
+            false
+        }
+    }
+
+    func requiresPresentationUpdate(to newPhase: Self) -> Bool {
+        guard self != newPhase else { return false }
+        return !isContinuousLowerMotion || !newPhase.isContinuousLowerMotion
+    }
+
     var suppressesAutomaticAlignment: Bool {
         self != .settled
     }

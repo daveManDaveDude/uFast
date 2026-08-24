@@ -401,7 +401,7 @@ extension TemporalHistoryCarousel {
     }
 
     func setMovementPhase(_ newPhase: TemporalCarouselMovementPhase) {
-        guard newPhase != movementPhase else { return }
+        guard movementPhase.requiresPresentationUpdate(to: newPhase) else { return }
         movementPhase = newPhase
         if newPhase == .settled {
             if let geometry = geometrySnapshot.geometry {
