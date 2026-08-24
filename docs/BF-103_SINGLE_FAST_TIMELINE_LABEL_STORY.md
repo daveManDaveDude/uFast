@@ -67,12 +67,10 @@ movement phase, scroll direction, viewport centre, exact-versus-motion source,
 or whether the fragment is currently onscreen.
 
 Continuation fragments retain the same bar colour, stroke, lane, identity and
-seam treatment, but do not repeat the fasting glyph or text. Existing
-continuation-edge decoration may remain where it communicates continuation;
-it is not a second fasting glyph or label. Existing width-aware truncation may
-still apply within the owner fragment, and a continuation-only viewport may
-show the unlabelled continuous bar while the settled semantic panel supplies
-the complete fast description.
+seam treatment, but render no fasting glyph, text or continuation-edge marker.
+Existing width-aware truncation may still apply within the owner fragment, and
+a continuation-only viewport may show the unlabelled continuous bar while the
+settled semantic panel supplies the complete fast description.
 
 This changes presentation only. It does not split, merge, move, shorten,
 lengthen, infer, persist or reclassify a fast.
@@ -111,7 +109,8 @@ lengthen, infer, persist or reclassify a fast.
 
 - A fast from 21:00 through 08:40 is drawn continuously across midnight with
   one fasting glyph and one text label on its 21:00 start fragment. The
-  post-midnight fragment has no duplicate fasting glyph or label.
+  post-midnight fragment has no duplicate fasting glyph, label or continuation
+  marker.
 - Slow movement, deceleration, native alignment and settlement do not move,
   duplicate, hide and recreate, or otherwise transfer the label between page
   fragments.
@@ -145,7 +144,8 @@ lengthen, infer, persist or reclassify a fast.
    Given the BF-102 21:00-to-08:40 Europe/London fixture, when both sides of
    midnight are visible, then both fragments retain one identity, lane, colour
    and complementary seam geometry while only the start fragment contains the
-   fasting glyph and label.
+   fasting glyph and label; the continuation fragment contains no continuation
+   marker.
 
 3. **Ownership is motion-invariant**  
    Given the same interval through tracking, deceleration, lower alignment,

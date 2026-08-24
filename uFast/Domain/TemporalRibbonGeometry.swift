@@ -384,10 +384,6 @@ enum TemporalHistoryPresentation {
         }
     }
 
-    static func intervalContinuationShowsMarkers(isActive: Bool) -> Bool {
-        !isActive
-    }
-
     static func chronological(_ values: [TemporalEventOrderingValue]) -> [TemporalEventOrderingValue] {
         values.sorted {
             if $0.occurredAt == $1.occurredAt {

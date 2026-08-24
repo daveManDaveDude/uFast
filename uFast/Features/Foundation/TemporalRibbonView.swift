@@ -267,17 +267,10 @@ extension TemporalRibbonView {
                     visibleWidth: markWidth
                 )
                 let showsContent = contentLayout != .none
-                let showsContinuationMarkers = TemporalHistoryPresentation
-                    .intervalContinuationShowsMarkers(isActive: item.kind == .active)
-                    && contentLayout != .compact
                 Button {
                     onSelectInterval?(item.id)
                 } label: {
                     HStack(spacing: contentLayout == .compact ? 2 : 4) {
-                        if showsContinuationMarkers, segment.continuesBefore, markWidth >= 60 {
-                            Image(systemName: "chevron.left.2")
-                                .accessibilityHidden(true)
-                        }
                         if showsContent {
                             HStack(spacing: contentLayout == .compact ? 2 : 4) {
                                 Image(systemName: intervalSymbol(item.kind))
@@ -295,10 +288,6 @@ extension TemporalRibbonView {
                             // enclosing button still represents the full bar hit area.
                             .accessibilityElement(children: .ignore)
                             .accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
-                        }
-                        if showsContinuationMarkers, segment.continuesAfter, markWidth >= 60 {
-                            Image(systemName: "chevron.right.2")
-                                .accessibilityHidden(true)
                         }
                     }
                     .font(

@@ -361,7 +361,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         )
     }
 
-    func testLiveIntervalContinuationKeepsAdjacentPageBackgroundSeamless() throws {
+    func testLiveIntervalContinuationKeepsAdjacentPageBackgroundSeamlessAndContentFree() throws {
         let calendar = try londonCalendar()
         let start = try date(2026, 7, 21, 21, calendar: calendar)
         let end = try date(2026, 7, 22, 8, calendar: calendar)
@@ -382,8 +382,13 @@ final class TemporalHistoryPresentationTests: XCTestCase {
 
         XCTAssertTrue(startSegment.ownsVisualContent(in: startDay))
         XCTAssertFalse(continuationSegment.ownsVisualContent(in: continuationDay))
-        XCTAssertFalse(TemporalHistoryPresentation.intervalContinuationShowsMarkers(isActive: true))
-        XCTAssertTrue(TemporalHistoryPresentation.intervalContinuationShowsMarkers(isActive: false))
+        XCTAssertEqual(
+            continuationSegment.visualContentLayout(
+                in: continuationDay,
+                visibleWidth: 440
+            ),
+            .none
+        )
     }
 
     func testVisualContentOwnerIsUniqueAcrossAdjacentAndMultiDayFragments() throws {
