@@ -2,6 +2,8 @@ import XCTest
 
 private enum HistoryTemporalIdentifiers {
     static let activeFast = "history.active-fast.10200000-0000-0000-0000-000000000002"
+    static let activeFastVisualContent = "history.active-fast-content.10200000-0000-0000-0000-000000000002"
+    static let activeFastDetail = "history.fast.10200000-0000-0000-0000-000000000002"
     static let noonMarker = "history.visual-event.10200000-0000-0000-0000-000000000013"
 }
 
@@ -9,6 +11,7 @@ extension HistoryUITests {
     struct SettledSeamState {
         let activeFrame: CGRect
         let activeLabel: String
+        let visualOwnerLabelCount: Int
         let selectedDateLabel: String
         let noonMarkerVisible: Bool
         let noonMarkerFrameIntersectsCarousel: Bool
@@ -21,8 +24,11 @@ extension HistoryUITests {
     ) -> SettledSeamState? {
         let carousel = app.scrollViews["history.day-carousel"]
         let selectedDate = app.staticTexts["history.selected-date"]
+        let semanticPanel = app.otherElements["history.event-info-panel"]
+        let activeFastDetail = semanticPanel.buttons[HistoryTemporalIdentifiers.activeFastDetail]
         guard carousel.waitForExistence(timeout: 5),
               selectedDate.waitForExistence(timeout: 5),
+              semanticPanel.waitForExistence(timeout: 5),
               waitForSettledHistory(
                   selectedDate: selectedDate,
                   carousel: carousel,
@@ -32,8 +38,19 @@ extension HistoryUITests {
                   in: app,
                   carousel: carousel,
                   identifier: HistoryTemporalIdentifiers.activeFast
-              )
+              ),
+              activeFastDetail.waitForExistence(timeout: 5)
         else { return nil }
+        let activeFastVisualContent = app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "identifier == %@",
+                HistoryTemporalIdentifiers.activeFastVisualContent
+            )
+        )
+        let visibleActiveFastVisualContent = Self.visibleElements(
+            in: activeFastVisualContent,
+            boundedBy: carousel
+        )
         let noonMarker = visibleNoonElement(
             in: app,
             carousel: carousel,
@@ -41,7 +58,8 @@ extension HistoryUITests {
         )
         return SettledSeamState(
             activeFrame: activeFast.frame,
-            activeLabel: activeFast.label,
+            activeLabel: activeFastDetail.label,
+            visualOwnerLabelCount: visibleActiveFastVisualContent.count,
             selectedDateLabel: selectedDate.label,
             noonMarkerVisible: noonMarker != nil,
             noonMarkerFrameIntersectsCarousel: noonMarker.map {
@@ -58,9 +76,8 @@ extension HistoryUITests {
     ) -> XCUIElement? {
         let candidates = app.buttons.matching(
             NSPredicate(
-                format: "identifier == %@ AND label BEGINSWITH %@",
-                identifier,
-                "Active Fast"
+                format: "identifier == %@",
+                identifier
             )
         )
         let expectation = XCTNSPredicateExpectation(
@@ -98,15 +115,19 @@ extension HistoryUITests {
         in query: XCUIElementQuery,
         boundedBy container: XCUIElement
     ) -> XCUIElement? {
-        for index in 0 ..< query.count {
-            let candidate = query.element(boundBy: index)
-            let frame = candidate.frame
-            guard candidate.exists,
-                  isVisibleFrame(frame, boundedBy: container.frame)
-            else { continue }
-            return candidate
-        }
-        return nil
+        visibleElements(in: query, boundedBy: container).first
+    }
+
+    @MainActor
+    static func visibleElements(
+        in query: XCUIElementQuery,
+        boundedBy container: XCUIElement
+    ) -> [XCUIElement] {
+        (0 ..< query.count)
+            .map { query.element(boundBy: $0) }
+            .filter {
+                $0.exists && isVisibleFrame($0.frame, boundedBy: container.frame)
+            }
     }
 
     static func isVisibleFrame(_ candidate: CGRect, boundedBy container: CGRect) -> Bool {
@@ -117,7 +138,11 @@ extension HistoryUITests {
               candidate.width > 0, candidate.height > 0,
               container.width > 0, container.height > 0
         else { return false }
-        return candidate.intersects(container)
+        let visibilityTolerance = 0.5
+        return candidate.minX >= container.minX - visibilityTolerance
+            && candidate.maxX <= container.maxX + visibilityTolerance
+            && candidate.minY >= container.minY - visibilityTolerance
+            && candidate.maxY <= container.maxY + visibilityTolerance
     }
 
     @MainActor
@@ -138,6 +163,17 @@ extension HistoryUITests {
             return nil
         }
         return Self.visibleElement(in: candidates, boundedBy: carousel)
+    }
+
+    @MainActor
+    func visibleActiveFastVisualContent(
+        in app: XCUIApplication,
+        carousel: XCUIElement
+    ) -> [XCUIElement] {
+        let candidates = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "history.active-fast-content.")
+        )
+        return Self.visibleElements(in: candidates, boundedBy: carousel)
     }
 
     @MainActor

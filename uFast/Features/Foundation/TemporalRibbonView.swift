@@ -28,7 +28,6 @@ struct TemporalRibbonView: View {
     var showsVisualRibbon = true
     var includesSemanticItems = true
     var hidesVisualEventAccessibility = false
-    var isSelectedPage = true
     var windowOverride: TemporalRibbonWindow?
     var emptySemanticMessage: String?
     var futureReadOnlyFrom: Date?
@@ -169,8 +168,7 @@ extension TemporalRibbonView {
                 )
                 intervalMarks(
                     window: window,
-                    policy: policy,
-                    isSelectedPage: isSelectedPage
+                    policy: policy
                 )
                 .accessibilityHidden(true)
                 eventMarks(
@@ -253,8 +251,7 @@ extension TemporalRibbonView {
 
     func intervalMarks(
         window: TemporalRibbonWindow,
-        policy: TemporalRibbonGeometry,
-        isSelectedPage: Bool
+        policy: TemporalRibbonGeometry
     ) -> some View {
         let geometries = TemporalHistoryPresentation.pageGeometry(
             intervals.map { TemporalIntervalInput(id: $0.id, start: $0.start, end: $0.end) },
@@ -265,37 +262,52 @@ extension TemporalRibbonView {
             if let item = intervals.first(where: { $0.id == geometry.id }) {
                 let segment = geometry.segment
                 let markWidth = geometry.visualWidth
-                let showsContent = TemporalHistoryPresentation.intervalContinuationShowsContent(
-                    isActive: item.kind == .active,
-                    continuesBefore: segment.continuesBefore,
-                    continuesAfter: segment.continuesAfter,
-                    isSelectedPage: isSelectedPage
+                let contentLayout = segment.visualContentLayout(
+                    in: window,
+                    visibleWidth: markWidth
                 )
+                let showsContent = contentLayout != .none
                 let showsContinuationMarkers = TemporalHistoryPresentation
                     .intervalContinuationShowsMarkers(isActive: item.kind == .active)
+                    && contentLayout != .compact
                 Button {
                     onSelectInterval?(item.id)
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: contentLayout == .compact ? 2 : 4) {
                         if showsContinuationMarkers, segment.continuesBefore, markWidth >= 60 {
                             Image(systemName: "chevron.left.2")
                                 .accessibilityHidden(true)
                         }
                         if showsContent {
-                            Image(systemName: intervalSymbol(item.kind))
-                                .accessibilityHidden(true)
-                            if markWidth >= 84 {
-                                Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
+                            HStack(spacing: contentLayout == .compact ? 2 : 4) {
+                                Image(systemName: intervalSymbol(item.kind))
+                                    .accessibilityHidden(true)
+                                if contentLayout == .compact {
+                                    Text(compactIntervalTitle(item))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
+                                        .allowsTightening(true)
+                                } else {
+                                    Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
+                                }
                             }
+                            // This identifies only the visible glyph/text region; the
+                            // enclosing button still represents the full bar hit area.
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
                         }
                         if showsContinuationMarkers, segment.continuesAfter, markWidth >= 60 {
                             Image(systemName: "chevron.right.2")
                                 .accessibilityHidden(true)
                         }
                     }
-                    .font(.caption.weight(.semibold))
+                    .font(
+                        contentLayout == .compact
+                            ? .caption2.weight(.semibold)
+                            : .caption.weight(.semibold)
+                    )
                     .foregroundStyle(intervalForeground(item.kind))
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, contentLayout == .compact ? 2 : 8)
                     .frame(width: markWidth, height: max(44, policy.intervalLaneHeight), alignment: .leading)
                     .background(intervalColour(item.kind))
                     .clipShape(intervalMarkShape(for: segment, visibleWidth: markWidth))
@@ -329,6 +341,17 @@ extension TemporalRibbonView {
                 )
             }
         }
+    }
+
+    func intervalVisualContentIdentifier(for item: TemporalRibbonIntervalItem) -> String {
+        let prefix = item.kind == .active
+            ? "history.active-fast-content"
+            : "history.interval-content"
+        return "\(prefix).\(item.id.uuidString)"
+    }
+
+    func compactIntervalTitle(_: TemporalRibbonIntervalItem) -> String {
+        textResolver(.historyCopy(.fast))
     }
 
     func intervalMarkShape(

@@ -334,11 +334,6 @@ extension TemporalHistoryCarousel {
             usesContinuousSurface: true,
             includesSemanticItems: false,
             hidesVisualEventAccessibility: true,
-            // A moving page should retain the same complete interval
-            // treatment as the settled page instead of dropping active-fast
-            // labels at the page seam. At rest, preserve the selected-page
-            // continuation rule used by the settled design.
-            isSelectedPage: isSelected || movementPhase != .settled,
             windowOverride: TemporalHistoryPresentation.calendarDayWindow(
                 containing: date,
                 calendar: calendar

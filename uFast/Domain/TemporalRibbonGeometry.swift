@@ -30,9 +30,39 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
     ) -> Double {
         min(max(visibleWidth / 2, 0), preferredRadius)
     }
+
+    static func intervalContentLayout(for visibleWidth: Double) -> TemporalIntervalContentLayout {
+        guard visibleWidth.isFinite, visibleWidth >= 36 else { return .none }
+        return visibleWidth >= 84 ? .regular : .compact
+    }
+}
+
+enum TemporalIntervalContentLayout: Equatable, Sendable {
+    case none
+    case compact
+    case regular
 }
 
 extension TemporalIntervalSegment {
+    /// The page containing the original start is the only visual content
+    /// owner for this interval. Page ownership is half-open so an interval
+    /// starting exactly at local midnight belongs to the day being entered.
+    func ownsVisualContent(in window: TemporalRibbonWindow) -> Bool {
+        let pageInterval = window.selectedDayInterval
+        return pageInterval.start <= originalStart
+            && originalStart < pageInterval.end
+    }
+
+    /// Chooses a bounded label treatment only after ownership is established.
+    /// A continuation never gains content merely because its fragment is wider.
+    func visualContentLayout(
+        in window: TemporalRibbonWindow,
+        visibleWidth: Double
+    ) -> TemporalIntervalContentLayout {
+        guard ownsVisualContent(in: window) else { return .none }
+        return TemporalRibbonGeometry.intervalContentLayout(for: visibleWidth)
+    }
+
     func pageGeometry(
         in window: TemporalRibbonWindow,
         surfaceWidth: Double
@@ -352,15 +382,6 @@ enum TemporalHistoryPresentation {
         clip(intervals, to: window).compactMap {
             $0.pageGeometry(in: window, surfaceWidth: surfaceWidth)
         }
-    }
-
-    static func intervalContinuationShowsContent(
-        isActive: Bool,
-        continuesBefore: Bool,
-        continuesAfter: Bool = false,
-        isSelectedPage: Bool
-    ) -> Bool {
-        !isActive || isSelectedPage || continuesBefore || continuesAfter
     }
 
     static func intervalContinuationShowsMarkers(isActive: Bool) -> Bool {
