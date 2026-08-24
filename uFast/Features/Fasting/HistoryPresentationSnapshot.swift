@@ -2,10 +2,42 @@ import Foundation
 
 // swiftlint:disable file_length function_body_length function_parameter_count trailing_comma opening_brace
 
+struct HistoryTextContext: Equatable, Sendable {
+    let locale: Locale
+    let calendar: Calendar
+    let timeZone: TimeZone
+    let textResolver: AppTextResolver
+
+    init(
+        locale: Locale = .current,
+        calendar: Calendar = .current,
+        timeZone: TimeZone = .current,
+        textResolver: AppTextResolver = .init()
+    ) {
+        self.locale = locale
+        self.calendar = calendar
+        self.timeZone = timeZone
+        self.textResolver = textResolver
+    }
+}
+
 struct HistoryPresentationSnapshot: Equatable {
     let window: DateInterval
     let fastItems: [HistoryVisibleFastItem]
     let events: [TemporalRibbonEventItem]
+    let textContext: HistoryTextContext
+
+    init(
+        window: DateInterval,
+        fastItems: [HistoryVisibleFastItem],
+        events: [TemporalRibbonEventItem],
+        textContext: HistoryTextContext = .init()
+    ) {
+        self.window = window
+        self.fastItems = fastItems
+        self.events = events
+        self.textContext = textContext
+    }
 
     func intervals(activeEndingAt now: Date) -> [TemporalRibbonIntervalItem] {
         fastItems.map { item in
@@ -129,6 +161,7 @@ struct HistoryMotionPresentation: Equatable, Sendable {
     let intervals: [HistoryMotionIntervalPrimitive]
     let events: [HistoryMotionEventPrimitive]
     let inferredContext: HistoryMotionInferredContext?
+    let textContext: HistoryTextContext
 
     init(
         _ snapshot: HistoryPresentationSnapshot,
@@ -153,28 +186,31 @@ struct HistoryMotionPresentation: Equatable, Sendable {
             HistoryMotionEventPrimitive(id: $0.id, occurredAt: $0.occurredAt, kind: $0.kind)
         }
         self.inferredContext = inferredContext
+        textContext = snapshot.textContext
     }
 
     init(
         window: DateInterval,
         intervals: [HistoryMotionIntervalPrimitive],
         events: [HistoryMotionEventPrimitive],
-        inferredContext: HistoryMotionInferredContext? = nil
+        inferredContext: HistoryMotionInferredContext? = nil,
+        textContext: HistoryTextContext = .init()
     ) {
         self.window = window
         self.intervals = intervals
         self.events = events
         self.inferredContext = inferredContext
+        self.textContext = textContext
     }
 
     func ribbonIntervals(activeEndingAt now: Date) -> [TemporalRibbonIntervalItem] {
         let existing = intervals
             .filter { inferredContext == nil || $0.semanticKind != .inferred }
-            .compactMap { $0.ribbonItem(activeEndingAt: now) }
+            .compactMap { $0.ribbonItem(activeEndingAt: now, textContext: textContext) }
         let projected = inferredContext?.project(
             now: now,
             visibleInterval: window.start ..< window.end
-        ).map { HistoryVisibleFastItem.inferred($0).ribbonItem } ?? []
+        ).map { HistoryVisibleFastItem.inferred($0, textContext: textContext).ribbonItem } ?? []
         return (existing + projected).sorted { $0.start < $1.start }
     }
 
@@ -193,9 +229,13 @@ struct HistoryMotionPresentation: Equatable, Sendable {
             TemporalRibbonEventItem(
                 id: primitive.id,
                 occurredAt: primitive.occurredAt,
-                title: primitive.kind == .food ? "Food" : "Drink",
+                title: textContext.textResolver(
+                    .historyCopy(primitive.kind == .food ? .eventFood : .eventDrink)
+                ),
                 detail: "",
-                accessibilityLabel: primitive.kind == .food ? "Food event" : "Drink event",
+                accessibilityLabel: textContext.textResolver(
+                    .historyMotionEvent(kind: primitive.kind == .food ? .food : .drink)
+                ),
                 kind: primitive.kind
             )
         }
@@ -203,19 +243,26 @@ struct HistoryMotionPresentation: Equatable, Sendable {
 }
 
 private extension HistoryMotionIntervalPrimitive {
-    func ribbonItem(activeEndingAt now: Date) -> TemporalRibbonIntervalItem? {
+    func ribbonItem(
+        activeEndingAt now: Date,
+        textContext: HistoryTextContext
+    ) -> TemporalRibbonIntervalItem? {
         if let inferred = currentInferredInterval(at: now) {
-            return HistoryVisibleFastItem.inferred(inferred).ribbonItem
+            return HistoryVisibleFastItem.inferred(inferred, textContext: textContext).ribbonItem
         }
         guard semanticKind != .inferred else { return nil }
         return TemporalRibbonIntervalItem(
             id: id,
             start: start,
             end: isActive ? now : end,
-            title: title ?? (kind == .active ? "Active fast" : "Fast"),
+            title: title ?? textContext.textResolver(
+                .historyFastTitle(kind: kind == .active ? .active : .automatic, needsReview: false)
+            ),
             detail: detail ?? "",
             accessibilityLabel: accessibilityLabel
-                ?? (kind == .active ? "Active fast" : "Fast"),
+                ?? textContext.textResolver(
+                    .historyFastTitle(kind: kind == .active ? .active : .automatic, needsReview: false)
+                ),
             kind: kind
         )
     }
@@ -266,6 +313,7 @@ struct HistoryPresentationKey: Equatable {
     let calendarIdentifier: Calendar.Identifier
     let timeZoneIdentifier: String
     let activeFastIntersectsWindow: Bool
+    let pseudolocalizationEnabled: Bool
 }
 
 @MainActor
@@ -279,7 +327,8 @@ final class HistoryPresentationCache {
         locale: Locale,
         calendar: Calendar,
         timeZone: TimeZone,
-        referenceNow: Date
+        referenceNow: Date,
+        textResolver: AppTextResolver = .init()
     ) -> HistoryPresentationSnapshot {
         let newKey = HistoryPresentationKey(
             data: data,
@@ -289,7 +338,8 @@ final class HistoryPresentationCache {
             activeFastIntersectsWindow: activeFastIntersectsWindow(
                 in: data,
                 at: referenceNow
-            )
+            ),
+            pseudolocalizationEnabled: textResolver.pseudolocalizationEnabled
         )
         if key == newKey, let snapshot {
             return snapshot
@@ -299,7 +349,8 @@ final class HistoryPresentationCache {
             locale: locale,
             calendar: calendar,
             timeZone: timeZone,
-            referenceNow: referenceNow
+            referenceNow: referenceNow,
+            textResolver: textResolver
         )
         key = newKey
         snapshot = built
@@ -329,8 +380,15 @@ enum HistoryPresentationBuilder {
         locale: Locale,
         calendar: Calendar,
         timeZone: TimeZone,
-        referenceNow: Date
+        referenceNow: Date,
+        textResolver: AppTextResolver = .init()
     ) -> HistoryPresentationSnapshot {
+        let textContext = HistoryTextContext(
+            locale: locale,
+            calendar: calendar,
+            timeZone: timeZone,
+            textResolver: textResolver
+        )
         let window = data.window.start ..< data.window.end
         let boundaries = CaloricBoundaryExtractor.boundaries(
             food: data.foods.map {
@@ -346,13 +404,13 @@ enum HistoryPresentationBuilder {
                   let end = fast.endDate,
                   AutomaticFastProjector.intersects(fast.startDate ..< end, window)
             else { return nil }
-            return .recorded(fast)
+            return .recorded(fast, textContext: textContext)
         }
         let active = data.activeFast.flatMap { fast -> HistoryVisibleFastItem? in
             guard fast.startDate < referenceNow,
                   AutomaticFastProjector.intersects(fast.startDate ..< referenceNow, window)
             else { return nil }
-            return .active(fast, endingAt: referenceNow)
+            return .active(fast, endingAt: referenceNow, textContext: textContext)
         }.map { [$0] } ?? []
         let legacy = data.completedFasts.compactMap { fast -> HistoryVisibleFastItem? in
             guard fast.presentationIntegrity == .available,
@@ -367,14 +425,14 @@ enum HistoryPresentationBuilder {
                 boundaries: fast.boundaryPair,
                 caloricBoundaries: boundaries
             ) else { return nil }
-            return .previouslySaved(fast)
+            return .previouslySaved(fast, textContext: textContext)
         }
         let unavailable = data.completedFasts.compactMap { fast -> HistoryVisibleFastItem? in
             guard fast.presentationIntegrity == .unavailable,
                   let end = fast.endDate,
                   AutomaticFastProjector.intersects(fast.startDate ..< end, window)
             else { return nil }
-            return .unavailable(fast)
+            return .unavailable(fast, textContext: textContext)
         }
         let inferredExclusions = (data.completedFasts + [data.activeFast].compactMap(\.self))
             .map(\.recordedInterval)
@@ -389,7 +447,7 @@ enum HistoryPresentationBuilder {
                 enabled: settings.inferredFastDetectionEnabled,
                 now: referenceNow,
                 visibleInterval: window
-            ).map(HistoryVisibleFastItem.inferred)
+            ).map { HistoryVisibleFastItem.inferred($0, textContext: textContext) }
         }
         let legacyAutomatic: [HistoryVisibleFastItem] = if data.settings == nil {
             AutomaticFastProjector.project(
@@ -398,7 +456,7 @@ enum HistoryPresentationBuilder {
                 excluding: legacyAutomaticExclusions
             ).compactMap { interval -> HistoryVisibleFastItem? in
                 guard !legacy.contains(where: { $0.intersects(interval.interval) }) else { return nil }
-                return .automatic(interval)
+                return .automatic(interval, textContext: textContext)
             }
         } else {
             []
@@ -406,7 +464,14 @@ enum HistoryPresentationBuilder {
         return HistoryPresentationSnapshot(
             window: data.window,
             fastItems: recorded + active + legacy + unavailable + (inferred ?? legacyAutomatic),
-            events: makeEvents(data: data, locale: locale, calendar: calendar, timeZone: timeZone)
+            events: makeEvents(
+                data: data,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone,
+                textResolver: textResolver
+            ),
+            textContext: textContext
         )
     }
 
@@ -414,18 +479,32 @@ enum HistoryPresentationBuilder {
         data: HistoryDataSlice,
         locale: Locale,
         calendar: Calendar,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        textResolver: AppTextResolver
     ) -> [TemporalRibbonEventItem] {
         let foods = data.foods.map { food in
-            let nutrition = nutritionDetail(food.nutrition)
-            let detail = ([eventDetail(
-                category: "Food", caloric: true, date: food.occurredAt,
-                locale: locale, calendar: calendar, timeZone: timeZone
-            )] + (nutrition.map { [$0] } ?? [])).joined(separator: " · ")
-            let accessibility = ([
-                "\(food.foodDescription), food, caloric, "
-                    + formatted(food.occurredAt, locale: locale, calendar: calendar, timeZone: timeZone),
-            ] + (nutrition.map { [$0] } ?? [])).joined(separator: ", ")
+            let formattedDate = formatted(
+                food.occurredAt, locale: locale, calendar: calendar, timeZone: timeZone
+            )
+            let nutrition = nutritionDetail(
+                food.nutrition,
+                textResolver: textResolver,
+                locale: locale
+            )
+            let detailParts = [
+                textResolver(.historyEventDetail(kind: .food, date: formattedDate)),
+                nutrition,
+            ].compactMap(\.self)
+            let detail = detailParts.joined(
+                separator: " \(textResolver(.historyCopy(.separatorMiddleDot))) "
+            )
+            let accessibilityParts = [
+                textResolver(.historyFoodAccessibility(description: food.foodDescription, date: formattedDate)),
+                nutrition,
+            ].compactMap(\.self)
+            let accessibility = accessibilityParts.joined(
+                separator: "\(textResolver(.historyCopy(.separatorComma))) "
+            )
             return TemporalRibbonEventItem(
                 id: food.id, occurredAt: food.occurredAt, title: food.foodDescription,
                 detail: detail, accessibilityLabel: accessibility, kind: .food
@@ -435,43 +514,59 @@ enum HistoryPresentationBuilder {
             let formattedDate = formatted(
                 drink.occurredAt, locale: locale, calendar: calendar, timeZone: timeZone
             )
+            let kind: AppText.HistoryEventKind = drink.isCaloric ? .caloricDrink : .nonCaloricDrink
+            let detail = [
+                textResolver(.historyVolume(value: drink.volumeMillilitres)),
+                textResolver(.historyEventDetail(kind: kind, date: formattedDate)),
+            ].joined(
+                separator: textResolver(.historyCopy(.separatorSpace))
+                    + textResolver(.historyCopy(.separatorMiddleDot))
+                    + textResolver(.historyCopy(.separatorSpace))
+            )
             return TemporalRibbonEventItem(
                 id: drink.id,
                 occurredAt: drink.occurredAt,
                 title: drink.displayName,
-                detail: "\(drink.volumeMillilitres) ml · "
-                    + "\(drink.isCaloric ? "Caloric drink" : "Non-caloric drink") · \(formattedDate)",
-                accessibilityLabel: "\(drink.displayName), \(drink.volumeMillilitres) millilitres, "
-                    + "\(drink.isCaloric ? "caloric drink" : "non-caloric drink"), \(formattedDate)",
+                detail: detail,
+                accessibilityLabel: textResolver(
+                    .historyEventAccessibility(
+                        kind: kind,
+                        name: drink.displayName,
+                        volumeMillilitres: drink.volumeMillilitres,
+                        date: formattedDate
+                    )
+                ),
                 kind: drink.isCaloric ? .caloricDrink : .nonCaloricDrink
             )
         }
         return foods + drinks
     }
 
-    private static func eventDetail(
-        category: String,
-        caloric: Bool,
-        date: Date,
-        locale: Locale,
-        calendar: Calendar,
-        timeZone: TimeZone
-    ) -> String {
-        "\(category) · \(caloric ? "Caloric" : "Non-caloric") · "
-            + formatted(date, locale: locale, calendar: calendar, timeZone: timeZone)
-    }
-
-    private static func nutritionDetail(_ nutrition: FoodNutrition) -> String? {
-        let values: [(String, Double?)] = [
-            ("Energy", nutrition.energyKilocalories), ("Protein", nutrition.proteinGrams),
-            ("Carbohydrate", nutrition.carbohydrateGrams), ("Fat", nutrition.fatGrams),
-            ("Fibre", nutrition.fibreGrams), ("Sugar", nutrition.sugarGrams), ("Salt", nutrition.saltGrams),
+    private static func nutritionDetail(
+        _ nutrition: FoodNutrition,
+        textResolver: AppTextResolver,
+        locale: Locale
+    ) -> String? {
+        let values: [(AppText.FoodNutritionField, Double?)] = [
+            (.energy, nutrition.energyKilocalories), (.protein, nutrition.proteinGrams),
+            (.carbohydrate, nutrition.carbohydrateGrams), (.fat, nutrition.fatGrams),
+            (.fibre, nutrition.fibreGrams), (.sugar, nutrition.sugarGrams), (.salt, nutrition.saltGrams),
         ]
         let parts = values.compactMap { label, value -> String? in
             guard let value else { return nil }
-            return "\(label) \(value.formatted()) \(label == "Energy" ? "kcal" : "g")"
+            let unit: AppText.FoodNutritionUnit = label == .energy ? .kilocalories : .grams
+            return [
+                textResolver(.foodNutritionField(label)),
+                value.formatted(.number.locale(locale)),
+                textResolver(.foodNutritionUnit(unit)),
+            ].joined(separator: textResolver(.historyCopy(.separatorSpace)))
         }
-        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+        return parts.isEmpty
+            ? nil
+            : parts.joined(
+                separator: textResolver(.historyCopy(.separatorComma))
+                    + textResolver(.historyCopy(.separatorSpace))
+            )
     }
 
     private static func formatted(
@@ -506,61 +601,87 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
     let kind: Kind
     let fast: HistoryFastSnapshot?
     let inferredInterval: InferredFastInterval?
+    let textContext: HistoryTextContext
 
-    static func recorded(_ fast: HistoryFastSnapshot) -> Self {
+    static func recorded(
+        _ fast: HistoryFastSnapshot,
+        textContext: HistoryTextContext = .init()
+    ) -> Self {
         Self(
             id: fast.id, startDate: fast.startDate,
             endDate: fast.endDate ?? fast.startDate, kind: .recorded, fast: fast,
-            inferredInterval: nil
+            inferredInterval: nil,
+            textContext: textContext
         )
     }
 
-    static func active(_ fast: HistoryFastSnapshot, endingAt endDate: Date) -> Self {
+    static func active(
+        _ fast: HistoryFastSnapshot,
+        endingAt endDate: Date,
+        textContext: HistoryTextContext = .init()
+    ) -> Self {
         Self(
             id: fast.id,
             startDate: fast.startDate,
             endDate: endDate,
             kind: .active,
             fast: fast,
-            inferredInterval: nil
+            inferredInterval: nil,
+            textContext: textContext
         )
     }
 
-    static func previouslySaved(_ fast: HistoryFastSnapshot) -> Self {
+    static func previouslySaved(
+        _ fast: HistoryFastSnapshot,
+        textContext: HistoryTextContext = .init()
+    ) -> Self {
         Self(
             id: fast.id, startDate: fast.startDate,
             endDate: fast.endDate ?? fast.startDate, kind: .previouslySaved, fast: fast,
-            inferredInterval: nil
+            inferredInterval: nil,
+            textContext: textContext
         )
     }
 
-    static func unavailable(_ fast: HistoryFastSnapshot) -> Self {
+    static func unavailable(
+        _ fast: HistoryFastSnapshot,
+        textContext: HistoryTextContext = .init()
+    ) -> Self {
         Self(
             id: fast.id, startDate: fast.startDate,
             endDate: fast.endDate ?? fast.startDate, kind: .unavailable, fast: fast,
-            inferredInterval: nil
+            inferredInterval: nil,
+            textContext: textContext
         )
     }
 
-    static func automatic(_ interval: AutomaticFastInterval) -> Self {
+    static func automatic(
+        _ interval: AutomaticFastInterval,
+        textContext: HistoryTextContext = .init()
+    ) -> Self {
         Self(
             id: interval.identity.boundaries.start.id,
             startDate: interval.startDate,
             endDate: interval.endDate,
             kind: .automatic,
             fast: nil,
-            inferredInterval: nil
+            inferredInterval: nil,
+            textContext: textContext
         )
     }
 
-    static func inferred(_ interval: InferredFastInterval) -> Self {
+    static func inferred(
+        _ interval: InferredFastInterval,
+        textContext: HistoryTextContext = .init()
+    ) -> Self {
         Self(
             id: interval.id,
             startDate: interval.startDate,
             endDate: interval.endDate,
             kind: .inferred,
             fast: nil,
-            inferredInterval: interval
+            inferredInterval: interval,
+            textContext: textContext
         )
     }
 
@@ -572,7 +693,8 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
             endDate: date,
             kind: kind,
             fast: fast,
-            inferredInterval: inferredInterval
+            inferredInterval: inferredInterval,
+            textContext: textContext
         )
     }
 
@@ -582,16 +704,20 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
 
     var title: String {
         switch kind {
-        case .recorded: "Recorded fast"
-        case .active: "Active Fast"
-        case .automatic: "Fast"
-        case .inferred where inferredInterval?.isInProgress == true: "Inferred fast in progress"
-        case .inferred: "Inferred fast"
+        case .recorded: textContext.textResolver(.historyCopy(.recordedFast))
+        case .active: textContext.textResolver(.historyCopy(.activeFast))
+        case .automatic: textContext.textResolver(.historyCopy(.fast))
+        case .inferred where inferredInterval?.isInProgress == true:
+            textContext.textResolver(.historyCopy(.inferredFastInProgress))
+        case .inferred: textContext.textResolver(.historyCopy(.inferredFast))
         case .previouslySaved:
-            fast?.reviewState == .needsReview
-                ? "Previously saved fast · Needs review"
-                : "Previously saved fast"
-        case .unavailable: "Saved fast · Details unavailable"
+            textContext.textResolver(
+                .historyFastTitle(
+                    kind: .previouslySaved,
+                    needsReview: fast?.reviewState == .needsReview
+                )
+            )
+        case .unavailable: textContext.textResolver(.historyCopy(.unavailableFast))
         }
     }
 
@@ -619,17 +745,48 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
 
     var detail: String {
         let duration = kind == .active
-            ? ActiveElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
-            : ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
+            ? HistoryTextFormatting.activeAccessibility(
+                seconds: endDate.timeIntervalSince(startDate),
+                resolver: textContext.textResolver
+            )
+            : HistoryTextFormatting.duration(
+                from: startDate, to: endDate, resolver: textContext.textResolver
+            )
+        let start = HistoryTextFormatting.dateTime(
+            startDate,
+            calendar: textContext.calendar,
+            locale: textContext.locale,
+            timeZone: textContext.timeZone
+        )
+        let end = HistoryTextFormatting.dateTime(
+            endDate,
+            calendar: textContext.calendar,
+            locale: textContext.locale,
+            timeZone: textContext.timeZone
+        )
         var components = [
-            "start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
+            textContext.textResolver(.historyFastComponent(kind: .start, value: start)),
         ]
         if kind != .active {
-            components[0] += " → end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
+            components[0] += textContext.textResolver(.historyCopy(.separatorSpace))
+                + textContext.textResolver(.historyCopy(.separatorArrow))
+                + textContext.textResolver(.historyCopy(.separatorSpace))
+                + textContext.textResolver(.historyFastComponent(kind: .end, value: end))
         }
-        components.append("duration \(duration)")
+        components.append(
+            textContext.textResolver(.historyFastComponent(kind: .duration, value: duration))
+        )
         if kind == .recorded, let goal = fast?.capturedHistoricalGoal {
-            components.append("goal \(goal.hours) hours")
+            components.append(
+                textContext.textResolver(
+                    .historyFastComponent(
+                        kind: .goal,
+                        value: textContext.textResolver(
+                            .durationComponent(value: goal.hours, unit: .hour)
+                        )
+                    )
+                )
+            )
         }
         if let reviewBoundaryUnavailableDescription {
             components.append(reviewBoundaryUnavailableDescription)
@@ -637,50 +794,95 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         if kind == .inferred {
             components.append(
                 inferredInterval?.isInProgress == true
-                    ? "start action available"
-                    : "save action available"
+                    ? textContext.textResolver(.historyCopy(.startActionAvailable))
+                    : textContext.textResolver(.historyCopy(.saveActionAvailable))
             )
         }
-        return components.joined(separator: " · ")
+        return components.joined(
+            separator: " \(textContext.textResolver(.historyCopy(.separatorMiddleDot))) "
+        )
     }
 
     var accessibilityLabel: String {
         let duration = kind == .active
-            ? ActiveElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
-            : ElapsedTimeFormatter.string(from: endDate.timeIntervalSince(startDate))
+            ? HistoryTextFormatting.activeAccessibility(
+                seconds: endDate.timeIntervalSince(startDate),
+                resolver: textContext.textResolver
+            )
+            : HistoryTextFormatting.duration(
+                from: startDate, to: endDate, resolver: textContext.textResolver
+            )
+        let start = HistoryTextFormatting.dateTime(
+            startDate,
+            calendar: textContext.calendar,
+            locale: textContext.locale,
+            timeZone: textContext.timeZone
+        )
+        let end = HistoryTextFormatting.dateTime(
+            endDate,
+            calendar: textContext.calendar,
+            locale: textContext.locale,
+            timeZone: textContext.timeZone
+        )
         var components = [
             title,
-            "start \(startDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
-            "duration \(duration)",
+            textContext.textResolver(.historyFastComponent(kind: .start, value: start)),
+            textContext.textResolver(.historyFastComponent(kind: .duration, value: duration)),
         ]
         if kind != .active {
             components.insert(
-                "end \(endDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))",
+                textContext.textResolver(.historyFastComponent(kind: .end, value: end)),
                 at: 2
             )
         }
         if kind == .recorded, let goal = fast?.capturedHistoricalGoal {
-            components.append("goal \(goal.hours) hours")
+            components.append(
+                textContext.textResolver(
+                    .historyFastComponent(
+                        kind: .goal,
+                        value: textContext.textResolver(
+                            .durationComponent(value: goal.hours, unit: .hour)
+                        )
+                    )
+                )
+            )
         }
         if let reviewBoundaryUnavailableDescription {
             components.append(reviewBoundaryUnavailableDescription)
         }
         if kind == .inferred {
-            let sourceKind = inferredInterval.map {
-                $0.sourceKind == .hydration ? "drink" : "food"
-            } ?? "food"
-            components.append("source \(sourceKind) \(inferredInterval?.sourceDescription ?? "")")
-            components.append(inferredInterval?.isInProgress == true ? "Start fast available" : "Save fast available")
+            let sourceKind: AppText.HistoryEventFamily = inferredInterval.map {
+                $0.sourceKind == .hydration ? .drink : .food
+            } ?? .food
+            components.append(
+                textContext.textResolver(
+                    .historyFastSource(
+                        kind: sourceKind,
+                        description: inferredInterval?.sourceDescription ?? ""
+                    )
+                )
+            )
+            components.append(
+                inferredInterval?.isInProgress == true
+                    ? textContext.textResolver(.historyCopy(.startActionAvailable))
+                    : textContext.textResolver(.historyCopy(.saveActionAvailable))
+            )
         }
-        return components.joined(separator: ", ")
+        return components.joined(
+            separator: textContext.textResolver(.historyCopy(.separatorComma))
+                + textContext.textResolver(.historyCopy(.separatorSpace))
+        )
     }
 
     private var reviewBoundaryUnavailableDescription: String? {
         guard fast?.reviewState == .needsReview else { return nil }
         guard let reference = fast?.retainedReviewBoundary else {
-            return "boundary evidence unavailable"
+            return textContext.textResolver(.historyFastBoundary(kind: .unavailable))
         }
-        let kind = reference.kind == .hydration ? "drink" : "food"
-        return "former \(kind) boundary unavailable"
+        return textContext.textResolver(
+            .historyFastBoundary(
+                kind: reference.kind == .hydration ? .formerDrink : .formerFood
+            )
+        )
     }
 }

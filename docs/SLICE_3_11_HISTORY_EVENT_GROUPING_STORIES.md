@@ -1,5 +1,9 @@
 # Slice 3.11 — Settled History event grouping
 
+> **Repository classification: Completed.** Story-level completion is retained
+> below as evidence; the old sprint header is not an active implementation
+> command. See the [document index](DOCUMENT_INDEX.md).
+
 **Sprint status:** Ready for autonomous implementation  
 **Target agent:** Luna 5.6  
 **Story order:** OW-397 → OW-398 → OW-399 → OW-400

@@ -1,21 +1,23 @@
 import Foundation
+import UFastCore
 
-extension FoodEntryEditor {
+/// The composition boundary converts persistent records before handing them to a feature editor.
+extension HydrationEntryEditor {
     init(
-        record: FoodEntryRecord?,
+        record: HydrationEntryRecord?,
         clock: any AppClock,
         activeFastStart: Date?,
-        initialOccurredAt: Date? = nil,
+        initialDraft: HydrationEntryDraft? = nil,
         allowedRange: Range<Date>? = nil,
-        onSave: @escaping (FoodEntryDraft, Bool) throws -> Void,
+        onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void,
         onDelete: ((Bool) throws -> Void)?,
         onCancel: @escaping () -> Void
     ) {
         self.init(
-            snapshot: record.map(FoodEntrySnapshot.init),
+            snapshot: record.map(HydrationEntrySnapshot.init),
             clock: clock,
             activeFastStart: activeFastStart,
-            initialOccurredAt: initialOccurredAt,
+            initialDraft: initialDraft,
             allowedRange: allowedRange,
             onSave: onSave,
             onDelete: onDelete,

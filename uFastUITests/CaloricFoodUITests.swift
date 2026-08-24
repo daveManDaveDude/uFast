@@ -12,7 +12,10 @@ final class CaloricFoodUITests: XCTestCase {
         openFoodEditor(in: app)
 
         XCTAssertFalse(app.switches["food.caloric"].exists)
-        XCTAssertFalse(app.buttons["Non-caloric"].exists)
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(identifier: "drink.classification.non-caloric").firstMatch.exists
+        )
         XCTAssertEqual(
             app.staticTexts["food.caloric.explanation"].label,
             "Food events count as caloric and are used as fasting boundaries. "
@@ -27,8 +30,9 @@ final class CaloricFoodUITests: XCTestCase {
         enterDescription("Lunch", in: app)
         app.buttons["food.save"].tap()
 
-        let alert = app.alerts["This entry is during your recorded fast."]
+        let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        XCTAssertTrue(alert.staticTexts["This entry is during your recorded fast."].exists)
         XCTAssertTrue(
             alert.descendants(matching: .any)
                 .matching(identifier: "food.confirmation.primary").firstMatch.exists
@@ -37,11 +41,14 @@ final class CaloricFoodUITests: XCTestCase {
             alert.descendants(matching: .any)
                 .matching(identifier: "food.confirmation.cancel").firstMatch.exists
         )
-        XCTAssertTrue(alert.buttons["Save and end fast"].exists)
+        XCTAssertEqual(
+            alert.descendants(matching: .any)
+                .matching(identifier: "food.confirmation.primary").firstMatch.label,
+            "Save and end fast"
+        )
         XCTAssertFalse(alert.buttons["Save entry only"].exists)
         alert.descendants(matching: .any)
             .matching(identifier: "food.confirmation.cancel").firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Log food"].exists)
         app.buttons["food.cancel"].tap()
 
         XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
@@ -54,7 +61,7 @@ final class CaloricFoodUITests: XCTestCase {
         openFoodEditor(in: app)
         enterDescription("Lunch", in: app)
         app.buttons["food.save"].tap()
-        let alert = app.alerts["This entry is during your recorded fast."]
+        let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 2))
         let primaryAction = alert.descendants(matching: .any)
             .matching(identifier: "food.confirmation.primary").firstMatch
@@ -64,6 +71,52 @@ final class CaloricFoodUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["fast.inactive-state"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Lunch"].exists)
         XCTAssertTrue(app.staticTexts["Caloric"].exists)
+    }
+
+    @MainActor
+    func testPseudolocalizedFoodConfirmationUsesStableIdentifiers() {
+        let app = launchWithActiveFast(pseudolocalization: true)
+        openFoodEditor(in: app)
+        enterDescription("Lunch", in: app)
+        app.buttons["food.save"].tap()
+
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), app.debugDescription)
+        let primary = alert.descendants(matching: .any)
+            .matching(identifier: "food.confirmation.primary").firstMatch
+        let consequence = alert.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH '［'"))
+            .firstMatch
+        XCTAssertTrue(primary.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(consequence.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(primary.label.hasPrefix("［"), app.debugDescription)
+        XCTAssertTrue(consequence.label.hasPrefix("［"), app.debugDescription)
+        primary.tap()
+        XCTAssertTrue(app.staticTexts["fast.inactive-state"].waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    @MainActor
+    func testFoodConfirmationRemainsReachableAtAccessibilityXXXL() {
+        let app = launchWithActiveFast(
+            preferredContentSizeCategory: "UICTContentSizeCategoryAccessibilityXXXL"
+        )
+        openFoodEditor(in: app)
+        enterDescription("Lunch", in: app)
+        app.buttons["food.save"].tap()
+
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(alert.staticTexts["This entry is during your recorded fast."].exists)
+        let primary = alert.descendants(matching: .any)
+            .matching(identifier: "food.confirmation.primary").firstMatch
+        let consequence = alert.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS 'ends your fast'"))
+            .firstMatch
+        XCTAssertTrue(primary.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(consequence.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(primary.isHittable, app.debugDescription)
+        primary.tap()
+        XCTAssertTrue(app.staticTexts["fast.inactive-state"].waitForExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor
@@ -83,10 +136,15 @@ final class CaloricFoodUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchWithActiveFast() -> XCUIApplication {
+    private func launchWithActiveFast(
+        pseudolocalization: Bool = false,
+        preferredContentSizeCategory: String? = nil
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = baseArguments(
-            activeFastStart: now.addingTimeInterval(-3600)
+            activeFastStart: now.addingTimeInterval(-3600),
+            pseudolocalization: pseudolocalization,
+            preferredContentSizeCategory: preferredContentSizeCategory
         )
         app.launch()
         XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
@@ -111,15 +169,18 @@ final class CaloricFoodUITests: XCTestCase {
         field.typeText(text)
     }
 
-    private func baseArguments(activeFastStart: Date) -> [String] {
-        [
-            "--ui-testing",
-            "--reset-data",
-            "--seed-onboarded",
-            "--fixed-now",
-            String(now.timeIntervalSince1970),
-            "--seed-active-fast-start",
-            String(activeFastStart.timeIntervalSince1970),
-        ]
+    private func baseArguments(
+        activeFastStart: Date,
+        pseudolocalization: Bool = false,
+        preferredContentSizeCategory: String? = nil
+    ) -> [String] {
+        UITestLaunchConfiguration(
+            resetData: true,
+            pseudolocalization: pseudolocalization,
+            seedOnboarded: true,
+            fixedNow: now,
+            seedActiveFastStart: activeFastStart,
+            preferredContentSizeCategory: preferredContentSizeCategory
+        ).arguments
     }
 }

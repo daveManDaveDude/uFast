@@ -1,5 +1,9 @@
 # Ready stories
 
+> **Repository classification: Historical catalog.** Story text and original
+> statuses are retained as evidence; the active implementation sprint is
+> MNT-101. See the [document index](DOCUMENT_INDEX.md) for current authorities.
+
 These stories are refined in backlog order after D-002, D-007 and the local
 persistence choice are accepted and OW-000 establishes the repository. A story
 marked **Ready** has no known material product question; a story marked **Draft**

@@ -32,6 +32,12 @@ enum UITestDataReset {
         }
         try seedHistoryFixtures(in: context, configuration: configuration, clock: clock)
         seedFavouriteFixtures(in: context, configuration: configuration, clock: clock)
+        if configuration.seedTodayMultiYear {
+            UITestSeedFixtures.seedTodayMultiYear(in: context, clock: clock)
+        }
+        if configuration.seedCaloricBoundaryMultiYear {
+            UITestSeedFixtures.seedCaloricBoundaryMultiYear(in: context, clock: clock)
+        }
         if let startDate = configuration.seedActiveFastStart {
             let fast = FastRecord(
                 startDate: startDate,

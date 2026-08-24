@@ -5,7 +5,7 @@
 Read these before implementing product behaviour:
 
 - `PRODUCT.md`
-- `MVP_SCOPE.md`
+- `docs/MVP_SCOPE.md`
 - `DOMAIN_RULES.md`
 - `DECISIONS.md`
 - `BACKLOG.md`
@@ -94,6 +94,27 @@ are still active.
 - If evidence is missing, inconsistent, or shows a failure, Sol requests the
   smallest appropriate rerun from Luna. Do not duplicate a passing verification
   run merely to establish independence.
+
+### Human build checks between sprint stories
+
+When the controlling sprint document requests a physical-device check after
+each story, the orchestrator must pause after the independent Sol story gate
+accepts the implementation and before starting the next story.
+
+- Sol remains the technical acceptance authority. The human device check is a
+  separate progression gate and does not replace source/test review.
+- Build and, when a configured iPhone is connected, deploy the exact Sol-
+  accepted source with `make deploy-iphone`. A successful deployment alone is
+  not a human pass.
+- Report `HUMAN BUILD CHECK REQUIRED` with the story-specific device checklist,
+  source identity, build/deploy result and known limitations, then stop. Do not
+  inspect or delegate the next story while the response is pending.
+- Continue only after the user replies `HUMAN CHECK PASSED` or explicitly
+  authorises a recorded skip. Record the device and observations when supplied.
+- If the user reports a problem, reopen the same story as `CHANGES REQUESTED`.
+  Apply the normal Luna/Terra correction budget, obtain a new Sol verdict for
+  any changed source or tests, deploy the corrected accepted build and repeat
+  the human check before moving on.
 
 ### Focused-test circuit breaker
 

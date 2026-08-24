@@ -30,20 +30,29 @@ def walk_json(value: Any) -> Iterable[dict[str, Any]]:
 
 
 def expected_tests(source_directory: pathlib.Path) -> set[str]:
-    class_pattern = re.compile(
-        r"^\s*(?:final\s+)?class\s+(\w+)\s*:\s*(\w+)",
+    declaration_pattern = re.compile(
+        r"^\s*(?:(?:final\s+)?class\s+(?P<class_name>\w+)\s*:\s*(?P<parent>\w+)|"
+        r"extension\s+(?P<extension_name>\w+))",
         re.MULTILINE,
     )
     test_pattern = re.compile(r"^\s*func\s+(test[A-Za-z0-9_]+)\s*\(", re.MULTILINE)
     expected: set[str] = set()
+    sources: list[tuple[str, str, list[re.Match[str]]]] = []
+    inheritance: dict[str, str] = {}
 
-    for source_path in sorted(source_directory.glob("*.swift")):
+    for source_path in sorted(source_directory.rglob("*.swift")):
         source = source_path.read_text(encoding="utf-8")
-        declarations = list(class_pattern.finditer(source))
+        declarations = list(declaration_pattern.finditer(source))
         if not declarations:
             continue
-
-        inheritance = {declaration.group(1): declaration.group(2) for declaration in declarations}
+        sources.append((source_path.name, source, declarations))
+        inheritance.update(
+            {
+                declaration.group("class_name"): declaration.group("parent")
+                for declaration in declarations
+                if declaration.group("class_name") is not None
+            }
+        )
 
         def derives_from_xctest(class_name: str) -> bool:
             visited: set[str] = set()
@@ -57,9 +66,12 @@ def expected_tests(source_directory: pathlib.Path) -> set[str]:
                     return False
             return True
 
+    for _, source, declarations in sources:
         for index, declaration in enumerate(declarations):
-            class_name = declaration.group(1)
-            if not class_name.endswith("UITests") or not derives_from_xctest(class_name):
+            class_name = declaration.group("class_name") or declaration.group("extension_name")
+            if class_name is None:
+                continue
+            if not derives_from_xctest(class_name):
                 continue
             next_start = declarations[index + 1].start() if index + 1 < len(declarations) else len(source)
             class_body = source[declaration.end() : next_start]
@@ -142,13 +154,27 @@ def self_test() -> None:
         (source_directory / "ExampleUITests.swift").write_text(
             "final class ExampleUITests: XCTestCase {\n"
             "    func testOne() {}\n"
+            "}\n"
+            "extension ExampleUITests {\n"
             "    func testTwo() throws {}\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        support_directory = source_directory / "Support"
+        support_directory.mkdir()
+        (support_directory / "UITestLaunchConfigurationTests.swift").write_text(
+            "final class UITestLaunchConfigurationTests: XCTestCase {\n"
+            "    func testConfiguration() {}\n"
             "}\n",
             encoding="utf-8",
         )
         discovered = expected_tests(source_directory)
 
-    expected = {"ExampleUITests/testOne()", "ExampleUITests/testTwo()"}
+    expected = {
+        "ExampleUITests/testOne()",
+        "ExampleUITests/testTwo()",
+        "UITestLaunchConfigurationTests/testConfiguration()",
+    }
     if discovered != expected:
         raise VerificationError(f"Unexpected source inventory: {sorted(discovered)}")
     cases = [

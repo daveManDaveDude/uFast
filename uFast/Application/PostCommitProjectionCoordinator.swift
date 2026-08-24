@@ -48,28 +48,36 @@ final class PostCommitProjectionCoordinator {
 
     private let widgetEffect: WidgetEffect
     private let activityEffect: ActivityEffect
+    private let diagnosticSink: any DiagnosticEventSink
     let historyPresentationInvalidation: HistoryPresentationInvalidation
     private var pendingEffect: Task<Void, Never>?
 
     init(
         widgetEffect: @escaping WidgetEffect,
         activityEffect: @escaping ActivityEffect,
-        historyPresentationInvalidation: HistoryPresentationInvalidation = HistoryPresentationInvalidation()
+        historyPresentationInvalidation: HistoryPresentationInvalidation = HistoryPresentationInvalidation(),
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
     ) {
         self.widgetEffect = widgetEffect
         self.activityEffect = activityEffect
+        self.diagnosticSink = diagnosticSink
         self.historyPresentationInvalidation = historyPresentationInvalidation
     }
 
-    convenience init(liveActivityCoordinator: ActiveFastLiveActivityCoordinator?) {
+    convenience init(
+        liveActivityCoordinator: ActiveFastLiveActivityCoordinator?,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+    ) {
         self.init(
             widgetEffect: { event in
                 switch event {
                 case let .activeFastStarted(fast, goal, now),
                      let .activeFastChanged(fast, goal, now):
-                    WidgetProjectionSupport.publish(fast, goal: goal, now: now)
+                    WidgetProjectionSupport.publish(
+                        fast, goal: goal, now: now, diagnosticSink: diagnosticSink
+                    )
                 case .fastEndedOrDeleted, .allDataDeleted:
-                    WidgetProjectionSupport.clear()
+                    WidgetProjectionSupport.clear(diagnosticSink: diagnosticSink)
                 case .automaticPreferenceChanged:
                     break
                 case .inferredFastDetectionChanged:
@@ -92,7 +100,8 @@ final class PostCommitProjectionCoordinator {
                 case .allDataDeleted:
                     return await liveActivityCoordinator.didCommitDeleteAllData()
                 }
-            }
+            },
+            diagnosticSink: diagnosticSink
         )
     }
 
@@ -106,6 +115,7 @@ final class PostCommitProjectionCoordinator {
             widgetError = nil
         } catch {
             widgetError = error
+            record(.postCommitProjectionFailed)
         }
 
         // Persistence has already committed before ApplicationCommands calls
@@ -135,5 +145,16 @@ final class PostCommitProjectionCoordinator {
 
     func waitForPendingEffects() async {
         await pendingEffect?.value
+    }
+
+    private func record(_ outcome: DiagnosticOutcome) {
+        guard let event = DiagnosticEvent(
+            subsystem: .command,
+            outcome: outcome,
+            severity: .error
+        ) else {
+            return
+        }
+        diagnosticSink.record(event)
     }
 }

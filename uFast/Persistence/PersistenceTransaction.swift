@@ -7,7 +7,10 @@ struct PersistenceTransaction {
     private let modelContext: ModelContext
     private let saveAction: Save
 
-    init(modelContext: ModelContext, saveAction: Save? = nil) {
+    init(
+        modelContext: ModelContext,
+        saveAction: Save? = nil
+    ) {
         self.modelContext = modelContext
         self.saveAction = saveAction ?? { try modelContext.save() }
     }
@@ -20,5 +23,27 @@ struct PersistenceTransaction {
             modelContext.rollback()
             throw error
         }
+    }
+}
+
+enum PersistenceTransactionDiagnostics {
+    static func recordFailure(to sink: any DiagnosticEventSink) {
+        record(.commitFailed, severity: .error, to: sink)
+        record(.rollbackApplied, severity: .warning, to: sink)
+    }
+
+    private static func record(
+        _ outcome: DiagnosticOutcome,
+        severity: DiagnosticSeverity,
+        to sink: any DiagnosticEventSink
+    ) {
+        guard let event = DiagnosticEvent(
+            subsystem: .command,
+            outcome: outcome,
+            severity: severity
+        ) else {
+            return
+        }
+        sink.record(event)
     }
 }

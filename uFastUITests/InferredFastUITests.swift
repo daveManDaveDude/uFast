@@ -51,10 +51,15 @@ final class InferredFastUITests: XCTestCase {
             "UICTContentSizeCategoryAccessibilityXXXL"
         app.launch()
 
-        let historyDetails = app.otherElements["history.event-info-panel"]
-        XCTAssertTrue(historyDetails.waitForExistence(timeout: 5), app.debugDescription)
         let historyContent = app.scrollViews["history.content"]
-        let historical = historyDetails.buttons["history.fast.\(historicalID)"]
+        let previousDay = app.buttons["history.previous-day"]
+        XCTAssertTrue(previousDay.waitForExistence(timeout: 5), app.debugDescription)
+        previousDay.tap()
+        XCTAssertTrue(waitForSettledHistory(in: app), app.debugDescription)
+
+        let historicalDetails = app.otherElements["history.event-info-panel"]
+        XCTAssertTrue(historicalDetails.waitForExistence(timeout: 5), app.debugDescription)
+        let historical = historicalDetails.buttons["history.fast.\(historicalID)"]
         XCTAssertTrue(historical.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(historical.label.contains("Inferred fast"), historical.debugDescription)
         XCTAssertTrue(historical.label.contains("source food"), historical.debugDescription)
@@ -69,7 +74,14 @@ final class InferredFastUITests: XCTestCase {
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5), app.debugDescription)
 
-        let current = historyDetails.buttons["history.fast.\(currentID)"]
+        let nextDay = app.buttons["history.next-day"]
+        XCTAssertTrue(nextDay.waitForExistence(timeout: 5), app.debugDescription)
+        nextDay.tap()
+        XCTAssertTrue(waitForSettledHistory(in: app), app.debugDescription)
+
+        let currentDetails = app.otherElements["history.event-info-panel"]
+        XCTAssertTrue(currentDetails.waitForExistence(timeout: 5), app.debugDescription)
+        let current = currentDetails.buttons["history.fast.\(currentID)"]
         XCTAssertTrue(current.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(current.label.contains("Inferred fast in progress"), current.debugDescription)
         tapFullyVisible(current, in: historyContent, app: app)
@@ -83,6 +95,17 @@ final class InferredFastUITests: XCTestCase {
         XCTAssertTrue(start.isHittable, start.debugDescription)
         app.buttons["history.inferred.cancel"].tap()
         XCTAssertTrue(start.waitForNonExistence(timeout: 5), app.debugDescription)
+    }
+
+    @MainActor
+    private func waitForSettledHistory(in app: XCUIApplication) -> Bool {
+        let carousel = app.scrollViews["history.day-carousel"]
+        guard carousel.waitForExistence(timeout: 5) else { return false }
+        let settled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "Settled"),
+            object: carousel
+        )
+        return XCTWaiter.wait(for: [settled], timeout: 5) == .completed
     }
 
     @MainActor
@@ -123,19 +146,12 @@ final class InferredFastUITests: XCTestCase {
         seedInferredFast: Bool = false,
         startsOnHistory: Bool = false
     ) -> [String] {
-        var arguments = ["--ui-testing", "--fixed-now", String(now.timeIntervalSince1970)]
-        if resetData {
-            arguments.append("--reset-data")
-        }
-        if seedOnboarded {
-            arguments.append("--seed-onboarded")
-        }
-        if seedInferredFast {
-            arguments.append("--seed-inferred-fast")
-        }
-        if startsOnHistory {
-            arguments.append("--ui-testing-start-history")
-        }
-        return arguments
+        UITestLaunchConfiguration(
+            resetData: resetData,
+            seedOnboarded: seedOnboarded,
+            fixedNow: now,
+            seedInferredFast: seedInferredFast,
+            startsOnHistory: startsOnHistory
+        ).arguments
     }
 }

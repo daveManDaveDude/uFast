@@ -1,12 +1,32 @@
 import Foundation
 
 @MainActor
-protocol ActiveFastRepository {
+protocol ActiveFastRepository: CaloricBoundaryQuerying {
     func activeFast() throws -> FastRecord?
     func recordedFasts() throws -> [FastRecord]
+    func hasRecordedFastConflict(
+        proposedStart: Date,
+        proposedEnd: Date?,
+        excluding excludedID: UUID?
+    ) throws -> Bool
     func saveNewActiveFast(_ fast: FastRecord) throws
     func updateStartDate(of fast: FastRecord, to startDate: Date) throws
     func complete(_ fast: FastRecord, at endDate: Date, goal: FastingGoal) throws
+}
+
+extension ActiveFastRepository {
+    func hasRecordedFastConflict(
+        proposedStart: Date,
+        proposedEnd: Date?,
+        excluding excludedID: UUID?
+    ) throws -> Bool {
+        try FastConflictChecker.hasConflict(
+            proposedStart: proposedStart,
+            proposedEnd: proposedEnd,
+            excluding: excludedID,
+            among: recordedFasts().map(\.recordedInterval)
+        )
+    }
 }
 
 enum FastStartError: Error, Equatable {
@@ -75,12 +95,10 @@ final class FastStartService {
         startDate: Date,
         excluding excludedID: UUID? = nil
     ) throws -> Bool {
-        let intervals = try repository.recordedFasts().map(\.recordedInterval)
-        return FastConflictChecker.hasConflict(
+        try repository.hasRecordedFastConflict(
             proposedStart: startDate,
             proposedEnd: nil,
-            excluding: excludedID,
-            among: intervals
+            excluding: excludedID
         )
     }
 
@@ -95,11 +113,7 @@ final class FastStartService {
     }
 
     private func validateCaloricBoundary(startDate: Date) throws {
-        guard let query = repository as? any CaloricBoundaryQuerying,
-              let boundary = try query.savedCaloricBoundaries().first(where: {
-                  $0.occurredAt > startDate
-              })
-        else { return }
+        guard let boundary = try repository.earliestCaloricBoundary(after: startDate) else { return }
         throw FastStartError.crossesCaloricBoundary(boundary.occurredAt)
     }
 }

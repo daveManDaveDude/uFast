@@ -1,7 +1,7 @@
 # Ordered starter backlog
 
 This file is the delivery ledger for the original slices. The current product
-direction and working post-MVP order are maintained in `ROADMAP.md`.
+direction and working post-MVP order are maintained in `docs/ROADMAP.md`.
 
 ## 1.0 release boundary
 
@@ -13,11 +13,10 @@ reset decision for disposable pre-release CloudKit data is recorded in D-026.
 
 ## Maintainability hardening
 
-The sprint-ready, behavior-preserving reliability and architecture work from
-the 10 August 2026 app-wide review is maintained in
-`docs/MAINTAINABILITY_HARDENING_STORIES.md`. MH-001 through MH-011 must retain
-valid user behavior and pass the full four-worker UI suite before being marked
-done.
+The completed, behavior-preserving reliability and architecture work from the
+10 August 2026 app-wide review is retained in
+`docs/MAINTAINABILITY_HARDENING_STORIES.md`. MH-001 through MH-011 passed the
+recorded final sprint gate and remain available as historical evidence.
 
 The sprint-ready persistence-integrity follow-up from the 14 August 2026 code
 review is maintained in
@@ -38,6 +37,12 @@ CR-202 adds the truthful required-reason declaration for app-private
 UserDefaults access, derives the widget build number from
 `CURRENT_PROJECT_VERSION`, and extends built-product release verification for
 both. It is **Ready**.
+
+## Next post-MVP maintainability sprint
+
+- MNT-014 P2 — Own root tab accessibility through a supported app shell.
+  **Draft; architecture decision and contract in
+  `docs/MNT-014_ROOT_TAB_ACCESSIBILITY_STORY.md`.**
 
 ## Slice 0 — Foundation
 
@@ -220,7 +225,7 @@ The accepted contract and implementation-ready story are in
 
 ## Post-MVP candidate backlog
 
-These are candidate story seeds ordered by `ROADMAP.md`. They are not
+These are candidate story seeds ordered by `docs/ROADMAP.md`. They are not
 implementation-ready until their milestone decision gate is complete.
 
 ### Launch and stabilise

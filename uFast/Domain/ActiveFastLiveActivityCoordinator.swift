@@ -33,11 +33,14 @@ final class ActiveFastLiveActivityCoordinator {
         let now: Date
         let automaticAttempt: Bool
         let clearsSuppression: Bool
+        let isRetry: Bool
+        let isForeground: Bool
     }
 
     private let clock: any AppClock
     private let client: any LiveActivityClient
     private let lifecycleStore: any LiveActivityLifecycleStore
+    private let diagnosticSink: any DiagnosticEventSink
     private let installedBuildIdentity: LiveActivityBuildIdentity?
     private let resolveActiveFast: ActiveFastResolver
     private let resolveAutomaticPreference: @MainActor () -> AutomaticLiveActivityPreference
@@ -46,6 +49,7 @@ final class ActiveFastLiveActivityCoordinator {
     private var foregroundAutomaticAttempted = false
     private var committedStartAttempts = Set<UUID>()
     private var preferenceEnableAttempts = Set<UUID>()
+    private var endAttemptedActivityIDs = Set<String>()
     private var lifecycleGeneration = 0
 
     init(
@@ -54,11 +58,13 @@ final class ActiveFastLiveActivityCoordinator {
         lifecycleStore: any LiveActivityLifecycleStore,
         resolveActiveFast: @escaping ActiveFastResolver,
         resolveAutomaticPreference: @escaping @MainActor () -> AutomaticLiveActivityPreference = { .disabled },
-        installedBuildIdentity: LiveActivityBuildIdentity? = LiveActivityBuildIdentity.production()
+        installedBuildIdentity: LiveActivityBuildIdentity? = LiveActivityBuildIdentity.production(),
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
     ) {
         self.clock = clock
         self.client = client
         self.lifecycleStore = lifecycleStore
+        self.diagnosticSink = diagnosticSink
         self.installedBuildIdentity = installedBuildIdentity
         self.resolveActiveFast = resolveActiveFast
         self.resolveAutomaticPreference = resolveAutomaticPreference
@@ -73,7 +79,7 @@ final class ActiveFastLiveActivityCoordinator {
     }
 
     func controlState() async -> LiveActivityControlState {
-        guard let activeFast = try? resolveActiveFast() else {
+        guard let activeFast = activeFastForBoundary() else {
             return .show
         }
         let activities = await client.activities()
@@ -95,7 +101,7 @@ final class ActiveFastLiveActivityCoordinator {
         mutationInFlight = true
         defer { mutationInFlight = false }
 
-        guard let activeFast = activeFast() else {
+        guard let activeFast = activeFastForBoundary() else {
             return .noActiveFast
         }
         let now = clock.now
@@ -114,6 +120,7 @@ final class ActiveFastLiveActivityCoordinator {
         case .enabled:
             break
         case .disabled, .unsupported:
+            record(.unavailable, isForeground: foregroundIsActive)
             return .unavailable(client.availability)
         }
 
@@ -122,6 +129,8 @@ final class ActiveFastLiveActivityCoordinator {
             return .alreadyShown(activityIdentifier: existing.id)
         }
 
+        let metadata = lifecycleMetadata(for: activeFast)
+
         return await requestActivity(
             ActivityRequest(
                 activeFast: activeFast,
@@ -129,7 +138,9 @@ final class ActiveFastLiveActivityCoordinator {
                 contentState: contentState,
                 now: now,
                 automaticAttempt: false,
-                clearsSuppression: true
+                clearsSuppression: true,
+                isRetry: metadata.hasRequested || metadata.lastTerminalReason == .requestFailed,
+                isForeground: foregroundIsActive
             )
         )
     }
@@ -138,7 +149,7 @@ final class ActiveFastLiveActivityCoordinator {
     /// WidgetKit projection has been published.
     func didCommitActiveFastStart() async -> ActiveFastLiveActivityResult {
         _ = await reconcile()
-        return await attemptAutomaticRequest(kind: .committedStart)
+        return await attemptAutomaticRequest(kind: .committedStart, recordsAuthorityFailure: false)
     }
 
     /// Call after a preference commit. Enabling may request the current active
@@ -164,7 +175,7 @@ final class ActiveFastLiveActivityCoordinator {
 
         _ = await reconcile()
         foregroundAutomaticAttempted = true
-        return await attemptAutomaticRequest(kind: .foreground)
+        return await attemptAutomaticRequest(kind: .foreground, recordsAuthorityFailure: false)
     }
 
     func didBecomeInactive() {
@@ -193,9 +204,12 @@ final class ActiveFastLiveActivityCoordinator {
             // request. Never let a response from the old authority recreate a
             // projection or lifecycle metadata after that authoritative
             // transaction has completed.
-            let stillAuthoritative = lifecycleGeneration == requestGeneration
-                && activeFast()?.activeRecordIdentifier == request.activeFast.activeRecordIdentifier
+            let stillAuthoritative = isCurrentAuthority(
+                generation: requestGeneration,
+                activeRecordIdentifier: request.activeFast.activeRecordIdentifier
+            )
             guard stillAuthoritative else {
+                _ = markEndAttempt(for: activity.id)
                 try? await client.end(
                     activityID: activity.id,
                     dismissalPolicy: .immediate
@@ -221,12 +235,22 @@ final class ActiveFastLiveActivityCoordinator {
             save(metadata)
             return .shown(activityIdentifier: activity.id)
         } catch LiveActivityClientError.disabled {
-            return .unavailable(.disabled)
+            return unavailableResult(
+                .unavailable(.disabled),
+                request: request,
+                generation: requestGeneration
+            )
         } catch LiveActivityClientError.unavailable {
-            return .unavailable(.unsupported)
+            return unavailableResult(
+                .unavailable(.unsupported),
+                request: request,
+                generation: requestGeneration
+            )
         } catch {
-            let stillAuthoritative = lifecycleGeneration == requestGeneration
-                && activeFast()?.activeRecordIdentifier == request.activeFast.activeRecordIdentifier
+            let stillAuthoritative = isCurrentAuthority(
+                generation: requestGeneration,
+                activeRecordIdentifier: request.activeFast.activeRecordIdentifier
+            )
             guard stillAuthoritative else {
                 try? lifecycleStore.clear(for: request.activeFast.activeRecordIdentifier)
                 return .reconciled
@@ -238,6 +262,11 @@ final class ActiveFastLiveActivityCoordinator {
             }
             metadata.lastTerminalReason = .requestFailed
             save(metadata)
+            record(
+                .requestFailed,
+                isRetry: request.isRetry,
+                isForeground: request.isForeground
+            )
             return .requestFailed
         }
     }
@@ -247,12 +276,13 @@ final class ActiveFastLiveActivityCoordinator {
         mutationInFlight = true
         defer { mutationInFlight = false }
 
-        guard let activeFast = activeFast() else {
+        guard let activeFast = activeFastForBoundary() else {
             return .noActiveFast
         }
         let matching = await runningActivities(for: activeFast, in: client.activities())
         var didFail = false
         for activity in matching {
+            let isRetry = markEndAttempt(for: activity.id)
             do {
                 try await client.end(
                     activityID: activity.id,
@@ -260,6 +290,11 @@ final class ActiveFastLiveActivityCoordinator {
                 )
             } catch {
                 didFail = true
+                record(
+                    .endFailed,
+                    isRetry: isRetry,
+                    isForeground: foregroundIsActive
+                )
             }
         }
 
@@ -285,6 +320,7 @@ final class ActiveFastLiveActivityCoordinator {
         let activities = await client.activities()
         var didFail = false
         for activity in activities {
+            let isRetry = markEndAttempt(for: activity.id)
             do {
                 try await client.end(
                     activityID: activity.id,
@@ -292,6 +328,7 @@ final class ActiveFastLiveActivityCoordinator {
                 )
             } catch {
                 didFail = true
+                record(.endFailed, isRetry: isRetry, isForeground: foregroundIsActive)
             }
         }
         try? lifecycleStore.clearAll()
@@ -308,7 +345,7 @@ final class ActiveFastLiveActivityCoordinator {
 
     private func disableAutomaticLiveActivities() async -> ActiveFastLiveActivityResult {
         let activities = await client.activities()
-        let matching: [LiveActivityRecord] = if let activeFast = activeFast() {
+        let matching: [LiveActivityRecord] = if let activeFast = activeFastForBoundary() {
             runningActivities(for: activeFast, in: activities)
         } else {
             activities.filter(\.state.isRunning)
@@ -316,6 +353,7 @@ final class ActiveFastLiveActivityCoordinator {
 
         var didFail = false
         for activity in matching {
+            let isRetry = markEndAttempt(for: activity.id)
             do {
                 try await client.end(
                     activityID: activity.id,
@@ -323,6 +361,7 @@ final class ActiveFastLiveActivityCoordinator {
                 )
             } catch {
                 didFail = true
+                record(.endFailed, isRetry: isRetry, isForeground: foregroundIsActive)
             }
         }
         return didFail ? .hideFailed : .hidden
@@ -331,10 +370,12 @@ final class ActiveFastLiveActivityCoordinator {
     /// Idempotent cleanup for cold launch and foreground activation. It only
     /// changes derived ActivityKit state and presentation metadata.
     func reconcile() async -> ActiveFastLiveActivityResult {
+        let reconciliationGeneration = lifecycleGeneration
         let resolvedActiveFast: ActiveFastActivitySource?
         do {
             resolvedActiveFast = try resolveActiveFast()
         } catch {
+            recordAuthorityConflict(error)
             let activities = await client.activities()
             await endAll(activities)
             try? lifecycleStore.clearAll()
@@ -361,10 +402,19 @@ final class ActiveFastLiveActivityCoordinator {
 
         if let winner {
             if winner.contentState != expectedContent {
-                try? await client.update(
-                    activityID: winner.id,
-                    contentState: expectedContent
-                )
+                do {
+                    try await client.update(
+                        activityID: winner.id,
+                        contentState: expectedContent
+                    )
+                } catch {
+                    if isCurrentAuthority(
+                        generation: reconciliationGeneration,
+                        activeRecordIdentifier: activeFast.activeRecordIdentifier
+                    ) {
+                        record(.updateFailed, isRetry: false, isForeground: foregroundIsActive)
+                    }
+                }
             }
             // Do not repair unreadable bytes as an incidental side effect of
             // reconciliation. Automatic recovery must remain fail-closed;
@@ -406,10 +456,16 @@ final class ActiveFastLiveActivityCoordinator {
     }
 
     private func attemptAutomaticRequest(
-        kind: AutomaticLiveActivityAttemptKind
+        kind: AutomaticLiveActivityAttemptKind,
+        recordsAuthorityFailure: Bool = true
     ) async -> ActiveFastLiveActivityResult {
         guard !mutationInFlight else { return .coalesced }
-        guard let activeFast = activeFast() else { return .noActiveFast }
+        let activeFast: ActiveFastActivitySource? = if recordsAuthorityFailure {
+            activeFastForBoundary()
+        } else {
+            self.activeFast()
+        }
+        guard let activeFast else { return .noActiveFast }
         guard markAutomaticAttempt(kind, for: activeFast.activeRecordIdentifier) else {
             return .coalesced
         }
@@ -432,6 +488,9 @@ final class ActiveFastLiveActivityCoordinator {
             allowsUpdateRecovery: kind == .foreground
         )
         guard reason == .eligible else {
+            if reason == .unavailable {
+                record(.unavailable, isForeground: foregroundIsActive)
+            }
             if let existing = matching.first {
                 return .alreadyShown(activityIdentifier: existing.id)
             }
@@ -455,7 +514,9 @@ final class ActiveFastLiveActivityCoordinator {
                 contentState: contentState,
                 now: now,
                 automaticAttempt: true,
-                clearsSuppression: false
+                clearsSuppression: false,
+                isRetry: metadata.hasRequested || metadata.lastTerminalReason == .requestFailed,
+                isForeground: foregroundIsActive
             )
         )
     }
@@ -502,6 +563,48 @@ final class ActiveFastLiveActivityCoordinator {
         try? resolveActiveFast()
     }
 
+    private func isCurrentAuthority(
+        generation: Int,
+        activeRecordIdentifier: UUID
+    ) -> Bool {
+        lifecycleGeneration == generation
+            && activeFast()?.activeRecordIdentifier == activeRecordIdentifier
+    }
+
+    private func unavailableResult(
+        _ result: ActiveFastLiveActivityResult,
+        request: ActivityRequest,
+        generation: Int
+    ) -> ActiveFastLiveActivityResult {
+        guard isCurrentAuthority(
+            generation: generation,
+            activeRecordIdentifier: request.activeFast.activeRecordIdentifier
+        ) else {
+            return result
+        }
+        record(.unavailable, isForeground: request.isForeground)
+        return result
+    }
+
+    private func activeFastForBoundary() -> ActiveFastActivitySource? {
+        do {
+            return try resolveActiveFast()
+        } catch {
+            recordAuthorityConflict(error)
+            return nil
+        }
+    }
+
+    private func recordAuthorityConflict(_ error: Error) {
+        let countBucket = (error as? ActiveFastIntegrityError).flatMap { error in
+            if case let .multipleActiveFasts(count) = error {
+                return DiagnosticCountBucket(count: count)
+            }
+            return nil
+        }
+        record(.authorityConflict, countBucket: countBucket)
+    }
+
     private func runningActivities(
         for activeFast: ActiveFastActivitySource,
         in activities: [LiveActivityRecord]
@@ -531,10 +634,40 @@ final class ActiveFastLiveActivityCoordinator {
 
     private func endAll(_ activities: [LiveActivityRecord]) async {
         for activity in activities {
-            try? await client.end(
-                activityID: activity.id,
-                dismissalPolicy: .immediate
-            )
+            let isRetry = markEndAttempt(for: activity.id)
+            do {
+                try await client.end(
+                    activityID: activity.id,
+                    dismissalPolicy: .immediate
+                )
+            } catch {
+                record(.endFailed, isRetry: isRetry, isForeground: foregroundIsActive)
+            }
         }
+    }
+
+    private func markEndAttempt(for activityID: String) -> Bool {
+        let isRetry = endAttemptedActivityIDs.contains(activityID)
+        endAttemptedActivityIDs.insert(activityID)
+        return isRetry
+    }
+
+    private func record(
+        _ outcome: DiagnosticOutcome,
+        countBucket: DiagnosticCountBucket? = nil,
+        isRetry: Bool? = nil,
+        isForeground: Bool? = nil
+    ) {
+        guard let event = DiagnosticEvent(
+            subsystem: .liveActivity,
+            outcome: outcome,
+            severity: .error,
+            countBucket: countBucket,
+            isRetry: isRetry,
+            isForeground: isForeground
+        ) else {
+            return
+        }
+        diagnosticSink.record(event)
     }
 }

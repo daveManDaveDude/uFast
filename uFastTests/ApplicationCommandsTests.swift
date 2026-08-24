@@ -234,12 +234,14 @@ final class ApplicationCommandsTests: XCTestCase {
             HistoryProjectionRefreshBoundary.refresh(
                 state: &state,
                 source: source,
-                window: selectedWindow,
-                locale: calendar.locale ?? Locale(identifier: "en_GB"),
-                calendar: calendar,
-                timeZone: calendar.timeZone,
-                referenceNow: now,
-                nextGeneration: 2
+                request: HistoryProjectionRefreshRequest(
+                    window: selectedWindow,
+                    locale: calendar.locale ?? Locale(identifier: "en_GB"),
+                    calendar: calendar,
+                    timeZone: calendar.timeZone,
+                    referenceNow: now,
+                    nextGeneration: 2
+                )
             )
         )
         let afterSettledFast = try XCTUnwrap(state.presentation?.fastItems.first)
@@ -261,12 +263,14 @@ final class ApplicationCommandsTests: XCTestCase {
             HistoryProjectionRefreshBoundary.refresh(
                 state: &state,
                 source: failingSource,
-                window: selectedWindow,
-                locale: calendar.locale ?? Locale(identifier: "en_GB"),
-                calendar: calendar,
-                timeZone: calendar.timeZone,
-                referenceNow: now,
-                nextGeneration: 3
+                request: HistoryProjectionRefreshRequest(
+                    window: selectedWindow,
+                    locale: calendar.locale ?? Locale(identifier: "en_GB"),
+                    calendar: calendar,
+                    timeZone: calendar.timeZone,
+                    referenceNow: now,
+                    nextGeneration: 3
+                )
             )
         )
         XCTAssertEqual(state.data, committedState.data)
@@ -455,6 +459,7 @@ final class ApplicationCommandsTests: XCTestCase {
             }
             XCTAssertEqual(context.kind, .inferred)
             XCTAssertEqual(context.affectedPersistedFastCount, 0)
+            XCTAssertFalse(context.includesReconstructedReview)
             XCTAssertTrue(context.includesInferredInterval)
         }
         XCTAssertTrue(source.isCaloric)
@@ -499,20 +504,346 @@ final class ApplicationCommandsTests: XCTestCase {
             goal: .default,
             endingActiveFast: false
         )) { error in
-            guard case .inferredConfirmationWithImpact = error as? FoodEntrySaveError else {
+            guard case let .inferredConfirmationWithImpact(context) = error as? FoodEntrySaveError else {
                 return XCTFail("Expected inferred impact confirmation, got \(error)")
             }
+            XCTAssertEqual(context.kind, .inferred)
+            XCTAssertEqual(context.affectedPersistedFastCount, 0)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertTrue(context.includesInferredInterval)
         }
         XCTAssertEqual(source.occurredAt, now.addingTimeInterval(-10 * 60 * 60))
         XCTAssertFalse(context.hasChanges)
 
         XCTAssertThrowsError(try commands.deleteFood(id: source.id)) { error in
-            guard case .inferredConfirmationWithImpact = error as? FoodEntrySaveError else {
+            guard case let .inferredConfirmationWithImpact(context) = error as? FoodEntrySaveError else {
                 return XCTFail("Expected inferred impact confirmation, got \(error)")
             }
+            XCTAssertEqual(context.kind, .inferred)
+            XCTAssertEqual(context.affectedPersistedFastCount, 0)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertTrue(context.includesInferredInterval)
         }
         XCTAssertNotNil(try context.fetch(FetchDescriptor<FoodEntryRecord>()).first)
         XCTAssertFalse(context.hasChanges)
+    }
+
+    func testPresentedInferredImpactIncludesFastOverlappingSelectedPredecessorInterval() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let predecessorDate = now.addingTimeInterval(-25 * 60 * 60)
+        let insertedDate = now.addingTimeInterval(-4 * 60 * 60)
+        let predecessor = FoodEntryRecord(
+            draft: .init(description: "Predecessor", occurredAt: predecessorDate),
+            createdAt: predecessorDate
+        )
+        let fast = FastRecord(
+            startDate: predecessorDate.addingTimeInterval(60 * 60),
+            endDate: insertedDate.addingTimeInterval(-30 * 60),
+            goalAtStart: .default
+        )
+        context.insert(predecessor)
+        context.insert(fast)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+        let sink = RecordingBoundaryQueryObservationSink()
+
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            ),
+            observationSink: sink
+        )
+
+        try commands.saveFood(
+            .init(description: "Inserted", occurredAt: insertedDate),
+            replacing: nil,
+            goal: .default,
+            endingActiveFast: false
+        )
+
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 2)
+        XCTAssertEqual(fast.endDate, insertedDate.addingTimeInterval(-30 * 60))
+        XCTAssertFalse(context.hasChanges)
+        let predecessorUpperBound = min(
+            now,
+            predecessorDate.addingTimeInterval(
+                InferredFastProjector.maximumDuration(for: .default)
+            )
+        )
+        XCTAssertTrue(sink.observations.contains {
+            $0.entity == .fast
+                && $0.lowerBound == predecessorDate
+                && $0.upperBound == predecessorUpperBound
+        })
+    }
+
+    func testRemovingSourceWithExactIntervalRecordedFastDoesNotRequestInferredConfirmation() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let sourceDate = now.addingTimeInterval(-20 * 60 * 60)
+        let sourceID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000701"))
+        let source = FoodEntryRecord(
+            id: sourceID,
+            draft: .init(description: "Source", occurredAt: sourceDate),
+            createdAt: sourceDate
+        )
+        let fast = FastRecord(
+            startDate: now.addingTimeInterval(-5 * 60 * 60),
+            endDate: now.addingTimeInterval(-60 * 60),
+            goalAtStart: .default
+        )
+        context.insert(source)
+        context.insert(fast)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+        let sink = RecordingBoundaryQueryObservationSink()
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            ),
+            observationSink: sink
+        )
+
+        try commands.deleteFood(id: sourceID)
+
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 0)
+        XCTAssertEqual(fast.endDate, now.addingTimeInterval(-60 * 60))
+        XCTAssertTrue(sink.observations.contains {
+            $0.entity == .fast
+                && $0.lowerBound == sourceDate
+                && $0.returnedCount == 1
+        })
+    }
+
+    func testReclassifyingSourceWithExactIntervalRecordedFastDoesNotRequestInferredConfirmation() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let sourceDate = now.addingTimeInterval(-20 * 60 * 60)
+        let sourceID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000702"))
+        let source = HydrationEntryRecord(
+            id: sourceID,
+            type: .custom,
+            customName: "Juice",
+            volumeMillilitres: 250,
+            occurredAt: sourceDate,
+            isCaloric: true,
+            createdAt: sourceDate
+        )
+        let fast = FastRecord(
+            startDate: now.addingTimeInterval(-5 * 60 * 60),
+            endDate: now.addingTimeInterval(-60 * 60),
+            goalAtStart: .default
+        )
+        context.insert(source)
+        context.insert(fast)
+        context.insert(AppSettingsRecord(
+            hasCompletedOnboarding: true,
+            inferredFastDetectionEnabled: true
+        ))
+        try context.save()
+        let sink = RecordingBoundaryQueryObservationSink()
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            ),
+            observationSink: sink
+        )
+
+        try commands.saveHydration(
+            .init(
+                type: .custom,
+                customName: "Juice",
+                volumeMillilitres: 250,
+                occurredAt: sourceDate,
+                isCaloric: false
+            ),
+            replacing: sourceID,
+            goal: .default,
+            endingActiveFast: false
+        )
+
+        XCTAssertFalse(source.isCaloric)
+        XCTAssertEqual(fast.endDate, now.addingTimeInterval(-60 * 60))
+        XCTAssertTrue(sink.observations.contains {
+            $0.entity == .fast
+                && $0.lowerBound == sourceDate
+                && $0.returnedCount == 1
+        })
+    }
+
+    func testFoodConfirmationRetryRetainsEqualTimeProposalIDAndOrdering() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let eventDate = now.addingTimeInterval(-2 * 60 * 60)
+        let existingID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000710"))
+        let proposalID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000720"))
+        let hydrationID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000730"))
+        context.insert(FoodEntryRecord(
+            id: existingID,
+            draft: .init(description: "Existing", occurredAt: eventDate),
+            createdAt: eventDate
+        ))
+        context.insert(HydrationEntryRecord(
+            id: hydrationID,
+            type: .custom,
+            customName: "Juice",
+            volumeMillilitres: 250,
+            occurredAt: eventDate,
+            isCaloric: true,
+            createdAt: eventDate
+        ))
+        context.insert(FastRecord(
+            startDate: eventDate.addingTimeInterval(-60 * 60),
+            goalAtStart: .default
+        ))
+        try context.save()
+        var generatedIDs = 0
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            ),
+            recordIDProvider: {
+                generatedIDs += 1
+                return proposalID
+            }
+        )
+        let draft = FoodEntryDraft(description: "Added", occurredAt: eventDate)
+
+        XCTAssertThrowsError(try commands.saveFood(
+            draft,
+            replacing: nil,
+            goal: .default,
+            endingActiveFast: false
+        )) { error in
+            guard case let .confirmationRequiredWithImpact(context) = error as? FoodEntrySaveError else {
+                return XCTFail("Expected active boundary impact, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .active)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
+        }
+        try commands.saveFood(
+            draft,
+            replacing: nil,
+            goal: .default,
+            endingActiveFast: true
+        )
+
+        XCTAssertEqual(generatedIDs, 1)
+        XCTAssertNotNil(try context.fetch(FetchDescriptor<FoodEntryRecord>()).first { $0.id == proposalID })
+        let boundaries = try SwiftDataFoodEntryRepository(
+            modelContext: context,
+            clock: FixedAppClock(now: now)
+        ).savedCaloricBoundaries()
+        XCTAssertEqual(
+            boundaries.filter { $0.occurredAt == eventDate }.map(\.reference.id),
+            [existingID, proposalID, hydrationID]
+        )
+    }
+
+    func testHydrationConfirmationRetryRetainsEqualTimeProposalIDAndOrdering() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let eventDate = now.addingTimeInterval(-2 * 60 * 60)
+        let foodID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000740"))
+        let existingID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000750"))
+        let proposalID = try XCTUnwrap(UUID(uuidString: "50000000-0000-0000-0000-000000000760"))
+        context.insert(FoodEntryRecord(
+            id: foodID,
+            draft: .init(description: "Existing", occurredAt: eventDate),
+            createdAt: eventDate
+        ))
+        context.insert(HydrationEntryRecord(
+            id: existingID,
+            type: .custom,
+            customName: "Existing drink",
+            volumeMillilitres: 250,
+            occurredAt: eventDate,
+            isCaloric: true,
+            createdAt: eventDate
+        ))
+        context.insert(FastRecord(
+            startDate: eventDate.addingTimeInterval(-60 * 60),
+            goalAtStart: .default
+        ))
+        try context.save()
+        var generatedIDs = 0
+        let commands = ApplicationCommands(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            projectionCoordinator: PostCommitProjectionCoordinator(
+                widgetEffect: { _ in },
+                activityEffect: { _ in nil }
+            ),
+            recordIDProvider: {
+                generatedIDs += 1
+                return proposalID
+            }
+        )
+        let draft = HydrationEntryDraft(
+            type: .custom,
+            customName: "Added drink",
+            volumeMillilitres: 250,
+            occurredAt: eventDate,
+            isCaloric: true
+        )
+
+        XCTAssertThrowsError(try commands.saveHydration(
+            draft,
+            replacing: nil,
+            goal: .default,
+            endingActiveFast: false
+        )) { error in
+            guard case let .confirmationRequiredWithImpact(context) = error as? HydrationEntrySaveError else {
+                return XCTFail("Expected active boundary impact, got \(error)")
+            }
+            XCTAssertEqual(context.kind, .active)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
+        }
+        try commands.saveHydration(
+            draft,
+            replacing: nil,
+            goal: .default,
+            endingActiveFast: true
+        )
+
+        XCTAssertEqual(generatedIDs, 1)
+        XCTAssertNotNil(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).first { $0.id == proposalID })
+        let boundaries = try SwiftDataHydrationEntryRepository(
+            modelContext: context,
+            clock: FixedAppClock(now: now)
+        ).savedCaloricBoundaries()
+        XCTAssertEqual(
+            boundaries.filter { $0.occurredAt == eventDate }.map(\.reference.id),
+            [foodID, existingID, proposalID]
+        )
     }
 
     func testDeletingFoodSurfacesPersistedCompletedAndReconstructedImpact() throws {
@@ -559,6 +890,7 @@ final class ApplicationCommandsTests: XCTestCase {
             XCTAssertEqual(context.kind, .completed)
             XCTAssertEqual(context.affectedPersistedFastCount, 1)
             XCTAssertTrue(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodEntryRecord>()), 2)
         XCTAssertEqual(fast.reviewState, .confirmed)
@@ -618,6 +950,7 @@ final class ApplicationCommandsTests: XCTestCase {
             XCTAssertEqual(context.kind, .completed)
             XCTAssertEqual(context.affectedPersistedFastCount, 1)
             XCTAssertTrue(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         XCTAssertNotNil(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).first)
         XCTAssertEqual(fast.endDate, end)

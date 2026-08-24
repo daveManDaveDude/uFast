@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct CompletedFastEditor: View {
+    @Environment(\.appTextResolver) private var textResolver
     let presentation: CompletedFastEditorPresentation
     let validation: (Date, Date) -> CompletedFastError?
     let onSave: (Date, Date) throws -> Void
@@ -38,24 +39,27 @@ struct CompletedFastEditor: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        UFastSectionHeading("Recorded boundaries", eyebrow: "Edit fast")
-                        Text("Review both boundaries before saving. The recorded goal is unchanged.")
+                        UFastSectionHeading(
+                            textResolver(.fastingCopy(.recordedBoundaries)),
+                            eyebrow: textResolver(.fastingCopy(.editFastEyebrow))
+                        )
+                        Text(textResolver(.fastingCopy(.reviewBoundaries)))
                             .font(.subheadline)
                             .foregroundStyle(UFastTheme.secondaryText)
                     }
                     .listRowBackground(UFastTheme.formSurface)
                 }
 
-                Section("Start") {
+                Section(textResolver(.fastingCopy(.startSection))) {
                     DatePicker(
-                        "Start date",
+                        textResolver(.fastingCopy(.startDate)),
                         selection: $selectedStartDate,
                         displayedComponents: .date
                     )
                     .accessibilityIdentifier("history.edit.start-date")
 
                     DatePicker(
-                        "Start time",
+                        textResolver(.fastingCopy(.startTime)),
                         selection: $selectedStartDate,
                         displayedComponents: .hourAndMinute
                     )
@@ -66,26 +70,30 @@ struct CompletedFastEditor: View {
 
                 Section {
                     DatePicker(
-                        "End date",
+                        textResolver(.fastingCopy(.endDate)),
                         selection: $selectedEndDate,
                         displayedComponents: .date
                     )
                     .accessibilityIdentifier("history.edit.end-date")
 
                     DatePicker(
-                        "End time",
+                        textResolver(.fastingCopy(.endTime)),
                         selection: $selectedEndDate,
                         displayedComponents: .hourAndMinute
                     )
                     .accessibilityIdentifier("history.edit.end-time")
                 } header: {
-                    Text("End")
+                    Text(textResolver(.fastingCopy(.endHeader)))
                 } footer: {
                     if let message = validationMessage {
                         Text(message)
                             .foregroundStyle(UFastTheme.error)
                             .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityLabel("Validation error. \(message)")
+                            .accessibilityLabel(
+                                textResolver(.fastingCopy(.validationError))
+                                    + textResolver(.historyCopy(.separatorSpace))
+                                    + message
+                            )
                             .accessibilityIdentifier("history.edit.validation")
                     }
                 }
@@ -113,7 +121,7 @@ struct CompletedFastEditor: View {
                 }
 
                 Section {
-                    Button("Delete fast", role: .destructive) {
+                    Button(textResolver(.fastingCopy(.deleteFast)), role: .destructive) {
                         isDeleteConfirmationPresented = true
                     }
                     .buttonStyle(UFastDestructiveButtonStyle())
@@ -121,48 +129,56 @@ struct CompletedFastEditor: View {
                 }
                 .listRowBackground(Color.clear)
             }
-            .navigationTitle("Edit fast")
+            .navigationTitle(textResolver(.fastingCopy(.editFastTitle)))
             .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)
             .background(UFastTheme.canvas)
             .tint(UFastTheme.action)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button(textResolver(.cancel), action: onCancel)
                         .accessibilityIdentifier("history.edit.cancel")
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button(textResolver(.fastingCopy(.save)), action: save)
                         .disabled(validationError != nil)
                         .accessibilityIdentifier("history.edit.save")
                 }
             }
-            .alert("Delete this fast?", isPresented: $isDeleteConfirmationPresented) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete fast", role: .destructive, action: delete)
+            .alert(textResolver(.fastingCopy(.deleteConfirmationTitle)), isPresented: $isDeleteConfirmationPresented) {
+                Button(textResolver(.cancel), role: .cancel) {}
+                Button(textResolver(.fastingCopy(.deleteFast)), role: .destructive, action: delete)
             } message: {
-                Text("This removes the record from this device.")
+                Text(textResolver(.fastingCopy(.localDeviceRemoval)))
             }
         }
     }
 
     private var validationMessage: String? {
-        Self.validationMessage(for: validationError)
+        Self.validationMessage(for: validationError, textResolver: textResolver)
     }
 
-    static func validationMessage(for error: CompletedFastError?) -> String? {
+    static func validationMessage(
+        for error: CompletedFastError?,
+        textResolver: AppTextResolver = .init()
+    ) -> String? {
         switch error {
         case .startTimeNotBeforeEndTime:
-            "Start time must be before end time."
+            textResolver(.fastingCopy(.startBeforeEnd))
         case .futureStartTime:
-            "Start time can’t be in the future."
+            textResolver(.fastingCopy(.startFuture))
         case .futureEndTime:
-            "End time can’t be in the future."
+            textResolver(.fastingCopy(.endFuture))
         case .conflict:
-            "This fast overlaps another recorded fast."
+            textResolver(.fastingCopy(.overlapError))
         case let .crossesCaloricBoundary(date):
-            "This fast must end at or before the caloric event at \(date.formatted(date: .omitted, time: .shortened))."
+            textResolver(
+                .fastingValidation(
+                    .completedBoundary,
+                    value: date.formatted(date: .omitted, time: .shortened)
+                )
+            )
         case .noCompletedFast, nil:
             nil
         }
@@ -177,7 +193,7 @@ struct CompletedFastEditor: View {
             try onSave(selectedStartDate, selectedEndDate)
             saveError = nil
         } catch {
-            saveError = "Your changes couldn’t be saved. Please try again."
+            saveError = textResolver(.fastingCopy(.changesSaveError))
         }
     }
 
@@ -186,7 +202,7 @@ struct CompletedFastEditor: View {
             try onDelete()
             deleteError = nil
         } catch {
-            deleteError = "This fast couldn’t be deleted. Please try again."
+            deleteError = textResolver(.fastingCopy(.fastDeleteError))
         }
     }
 }

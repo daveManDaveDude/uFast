@@ -41,6 +41,26 @@ or Live Activity records to the developer or a third party. It has no
 analytics, advertising, tracking, HealthKit integration or developer-operated
 backend.
 
+## Local diagnostic events
+
+uFast may write metadata-only operational failure events to local OSLog for
+supportability. The accepted D-037 vocabulary is closed to persistence,
+command, History, widget-projection and Live Activity subsystem outcomes; it
+does not accept free-form event names or a generic metadata dictionary. Events
+may contain only their subsystem, outcome, severity and the typed declared
+current bundle/build/schema version values, plus the specifically permitted count
+bucket, retry flag or foreground flag for that outcome. Arbitrary, timestamp-like
+or undeclared version values are rejected. App and widget processes use separate local adapters;
+there is no upload, analytics transport, persisted diagnostic store or account
+identifier.
+
+Diagnostic events never contain user-entered text, food or drink/favourite
+names, nutrition, Health data, notes, full identifiers or timestamps,
+serialized records, store paths or raw underlying error descriptions. Success,
+cancellation, ordinary empty/no-data states and projection/timer progress are
+not diagnostic events. A later diagnostic export would require a separate
+privacy decision.
+
 ## Deletion
 
 Settings provides **Delete all data**, which requires two explicit confirmations

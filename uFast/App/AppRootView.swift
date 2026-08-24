@@ -7,6 +7,7 @@ struct AppRootView: View {
     let clock: any AppClock
     let liveActivityCoordinator: ActiveFastLiveActivityCoordinator?
     let applicationCommands: ApplicationCommands?
+    let appTextResolver: AppTextResolver
     let suppressAutomaticLiveActivityOffer: Bool
     let initialDestination: AppDestination
 
@@ -14,12 +15,14 @@ struct AppRootView: View {
         clock: any AppClock = SystemAppClock(),
         liveActivityCoordinator: ActiveFastLiveActivityCoordinator? = nil,
         applicationCommands: ApplicationCommands? = nil,
+        appTextResolver: AppTextResolver = AppTextResolver(),
         suppressAutomaticLiveActivityOffer: Bool = false,
         initialDestination: AppDestination = .today
     ) {
         self.clock = clock
         self.liveActivityCoordinator = liveActivityCoordinator
         self.applicationCommands = applicationCommands
+        self.appTextResolver = appTextResolver
         self.suppressAutomaticLiveActivityOffer = suppressAutomaticLiveActivityOffer
         self.initialDestination = initialDestination
     }
@@ -36,6 +39,7 @@ struct AppRootView: View {
         }
         .environment(\.liveActivityCoordinator, liveActivityCoordinator)
         .environment(\.applicationCommands, applicationCommands)
+        .environment(\.appTextResolver, appTextResolver)
         .environment(
             \.historyPresentationInvalidation,
             applicationCommands?.historyPresentationInvalidation
@@ -55,11 +59,13 @@ struct AppRootView: View {
 }
 
 private struct DataIntegrityUnavailableView: View {
+    @Environment(\.appTextResolver) private var textResolver
+
     var body: some View {
         VStack(spacing: 12) {
-            Text("Your local data needs attention")
+            Text(textResolver(.localDataIntegrityTitle))
                 .font(.title2.weight(.semibold))
-            Text("uFast found conflicting local settings and did not choose between them. Nothing was changed.")
+            Text(textResolver(.localDataIntegrityMessage))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }

@@ -110,17 +110,18 @@ the uFast Apple Developer identity; simulator builds do not require signing.
 
 ## Repository documents
 
+- [Document index](docs/DOCUMENT_INDEX.md) — current authorities and the status of supporting records
 - `PRODUCT.md` — promise, goal, user, principles and measures
-- `ROADMAP.md` — current release position and phased post-MVP direction
-- `MVP_SCOPE.md` — MVP boundary and build sequence
+- `docs/ROADMAP.md` — current release position and phased post-MVP direction
+- `docs/MVP_SCOPE.md` — MVP boundary and build sequence
 - `DOMAIN_RULES.md` — shared terms and numbered behavioural rules
 - `BACKLOG.md` — ordered starter backlog
-- `READY_STORIES.md` — implementation-ready user stories
-- `SLICE_1_5_UX_STORIES.md` — visual contract and implementation-ready fasting
+- `docs/READY_STORIES.md` — retained implementation-ready user-story catalog
+- `docs/SLICE_1_5_UX_STORIES.md` — visual contract and implementation-ready fasting
   experience stories
-- `SLICE_2_TODAY_STORIES.md` — implementation-ready food, hydration and Today
+- `docs/SLICE_2_TODAY_STORIES.md` — implementation-ready food, hydration and Today
   stories
-- `SLICE_3_CATCH_UP_STORIES.md` — implementation-ready historical entry,
+- `docs/SLICE_3_CATCH_UP_STORIES.md` — implementation-ready historical entry,
   reconstruction, provenance and invalidation stories
 - `UX_STYLE_GUIDE.md` — quick-reference design tokens, components, artwork,
   accessibility rules and visual Definition of Done

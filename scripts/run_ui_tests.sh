@@ -14,6 +14,7 @@ worker_count="${UI_TEST_WORKERS:-4}"
 developer_dir="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 xcodebuild_bin="${XCODEBUILD_BIN:-xcodebuild}"
 source_freeze_id="${SOURCE_FREEZE_ID:-unspecified}"
+source_freeze_content_id="$(python3 scripts/release_gate.py --print-source-freeze-id)"
 
 if [[ "${1:-}" == "--self-test" ]]; then
   print "UI test wrapper self-test passed"
@@ -67,7 +68,8 @@ command_line=(
   print "worker_count: $worker_count"
   print "simulator: $simulator"
   print "developer_dir: $developer_dir"
-  print "source_freeze_id: $source_freeze_id"
+  print "source_freeze_label: $source_freeze_id"
+  print "content_source_freeze_id: $source_freeze_content_id"
 } >"$log_path"
 
 print "UI test evidence log: $log_path"
@@ -92,6 +94,18 @@ if (( exit_code == 0 )) && [[ ! -e "$result_bundle" ]]; then
   print -u2 "UI test xcodebuild succeeded but did not produce: $result_bundle"
   print "wrapper_artifact_check: missing result bundle" >>"$log_path"
   final_exit_code=1
+fi
+
+if (( exit_code == 0 && final_exit_code == 0 )); then
+  if ! python3 scripts/release_gate.py \
+      --write-ui-binding "$result_bundle" \
+      --source-freeze-label "$source_freeze_id" \
+      --content-source-freeze-id "$source_freeze_content_id" \
+      --worker-count "$worker_count" >>"$log_path" 2>&1; then
+    print -u2 "UI test succeeded but source-freeze binding metadata could not be written."
+    print "wrapper_artifact_check: missing or invalid source-freeze binding" >>"$log_path"
+    final_exit_code=1
+  fi
 fi
 
 if [[ -n "${AGENTIC_ACTIVITY_WORKER:-}" ]]; then

@@ -8,9 +8,15 @@ import SwiftData
 final class SwiftDataHydrationFavouriteStore {
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
+    private let diagnosticSink: any DiagnosticEventSink
 
-    init(modelContext: ModelContext, simulateSaveFailure: Bool = false) {
+    init(
+        modelContext: ModelContext,
+        simulateSaveFailure: Bool = false,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+    ) {
         self.modelContext = modelContext
+        self.diagnosticSink = diagnosticSink
         transaction = PersistenceTransaction(
             modelContext: modelContext,
             saveAction: simulateSaveFailure ? {
@@ -44,7 +50,7 @@ final class SwiftDataHydrationFavouriteStore {
             creationOrder: (existing.map(\.creationOrder).max() ?? -1) + 1
         )
         modelContext.insert(record)
-        try transaction.save()
+        try saveTransaction()
         return record.snapshot
     }
 
@@ -73,7 +79,7 @@ final class SwiftDataHydrationFavouriteStore {
             isCaloric: values.isCaloric,
             updatedAt: date
         )
-        try transaction.save {
+        try saveTransaction {
             record.update(
                 name: old.name,
                 volumeMillilitres: old.volumeMillilitres,
@@ -89,7 +95,7 @@ final class SwiftDataHydrationFavouriteStore {
             throw HydrationFavouriteStoreError.recordNotFound
         }
         modelContext.delete(record)
-        try transaction.save()
+        try saveTransaction()
     }
 
     func resolve(id: UUID) throws -> HydrationFavouriteSnapshot {
@@ -109,6 +115,15 @@ final class SwiftDataHydrationFavouriteStore {
                 ]
             )
         )
+    }
+
+    private func saveTransaction(recovering recovery: @escaping () -> Void = {}) throws {
+        do {
+            try transaction.save(recovering: recovery)
+        } catch {
+            PersistenceTransactionDiagnostics.recordFailure(to: diagnosticSink)
+            throw error
+        }
     }
 }
 

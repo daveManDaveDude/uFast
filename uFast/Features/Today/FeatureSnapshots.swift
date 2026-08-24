@@ -1,4 +1,5 @@
 import Foundation
+import UFastCore
 
 struct AppSettingsSnapshot: Equatable {
     let id: UUID
@@ -26,28 +27,12 @@ struct AppSettingsSnapshot: Equatable {
         self.teaFavouriteMillilitres = teaFavouriteMillilitres
         self.coffeeFavouriteMillilitres = coffeeFavouriteMillilitres
     }
-
-    init(_ record: AppSettingsRecord) {
-        id = record.id
-        fastingGoal = record.fastingGoal
-        automaticLiveActivityPreference = record.automaticLiveActivityPreference
-        inferredFastDetectionEnabled = record.inferredFastDetectionEnabled
-        waterFavouriteMillilitres = record.waterFavouriteMillilitres
-        teaFavouriteMillilitres = record.teaFavouriteMillilitres
-        coffeeFavouriteMillilitres = record.coffeeFavouriteMillilitres
-    }
 }
 
 struct ActiveFastSnapshot: Equatable {
     let id: UUID
     let startDate: Date
     let endDate: Date?
-
-    init(_ record: FastRecord) {
-        id = record.id
-        startDate = record.startDate
-        endDate = record.endDate
-    }
 }
 
 struct FoodEntrySnapshot: Equatable {
@@ -56,15 +41,6 @@ struct FoodEntrySnapshot: Equatable {
     let occurredAt: Date
     let nutrition: FoodNutrition
     let isCaloric: Bool
-
-    init(_ record: FoodEntryRecord) {
-        id = record.id
-        foodDescription = record.foodDescription
-        occurredAt = record.occurredAt
-        nutrition = record.nutrition
-        // Food is always caloric. Older stores may contain a stale persisted flag.
-        isCaloric = true
-    }
 }
 
 struct HydrationEntrySnapshot: Equatable {
@@ -75,16 +51,6 @@ struct HydrationEntrySnapshot: Equatable {
     let volumeMillilitres: Int
     let occurredAt: Date
     let isCaloric: Bool
-
-    init(_ record: HydrationEntryRecord) {
-        id = record.id
-        drinkType = record.drinkType
-        customName = record.customName
-        displayName = record.displayName
-        volumeMillilitres = record.volumeMillilitres
-        occurredAt = record.occurredAt
-        isCaloric = record.isCaloric
-    }
 }
 
 struct TodayFeatureSnapshot: Equatable {

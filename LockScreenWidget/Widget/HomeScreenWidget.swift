@@ -9,8 +9,8 @@ struct UFastHomeScreenWidget: Widget {
         ) { entry in
             UFastHomeScreenWidgetView(entry: entry)
         }
-        .configurationDisplayName("Today")
-        .description("Shows your active fast progress at a glance.")
+        .configurationDisplayName(SystemSurfaceText.widgetToday.resource)
+        .description(SystemSurfaceText.widgetHomeDescription.resource)
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()
     }
@@ -22,6 +22,23 @@ struct UFastHomeScreenWidgetView: View {
     @Environment(\.widgetFamily) private var family
 
     let entry: UFastLockScreenEntry
+    private let familyOverride: WidgetFamily?
+
+    private let copy: SystemSurfaceTextResolver
+
+    init(
+        entry: UFastLockScreenEntry,
+        textResolver: SystemSurfaceTextResolver = .init(),
+        familyOverride: WidgetFamily? = nil
+    ) {
+        self.entry = entry
+        self.familyOverride = familyOverride
+        copy = textResolver
+    }
+
+    private var effectiveFamily: WidgetFamily {
+        familyOverride ?? family
+    }
 
     private var palette: UFastHomeScreenPalette {
         UFastHomeScreenPalette(colorScheme: colorScheme)
@@ -35,7 +52,8 @@ struct UFastHomeScreenWidgetView: View {
         .make(
             projectionResult: entry.projectionResult,
             now: entry.date,
-            privacyState: privacyState
+            privacyState: privacyState,
+            textResolver: copy
         )
     }
 
@@ -56,7 +74,7 @@ struct UFastHomeScreenWidgetView: View {
 
     @ViewBuilder
     private func activeView(_ active: LockScreenActivePresentation) -> some View {
-        switch family {
+        switch effectiveFamily {
         case .systemSmall:
             smallActiveView(active)
         case .systemLarge:
@@ -67,14 +85,15 @@ struct UFastHomeScreenWidgetView: View {
     }
 
     private func smallActiveView(_ active: LockScreenActivePresentation) -> some View {
-        ZStack {
+        let rendered = SystemSurfacePresentationContent.widget(layout: .small, presentation: active, resolver: copy)
+        return ZStack {
             palette.card
             UFastHomeScreenBotanicalArtwork()
 
             VStack(alignment: .leading, spacing: 6) {
                 UFastHomeScreenBrandMark(palette: palette, compact: true)
                 Spacer(minLength: 0)
-                Text("Elapsed")
+                Text(verbatim: rendered.visibleText[1])
                     .font(.caption)
                     .foregroundStyle(palette.secondaryText)
                 elapsedView(active)
@@ -88,11 +107,12 @@ struct UFastHomeScreenWidgetView: View {
             .padding(12)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(active.accessibilitySummary))
+        .accessibilityLabel(Text(verbatim: active.accessibilitySummary))
     }
 
     private func mediumActiveView(_ active: LockScreenActivePresentation) -> some View {
-        ZStack {
+        let rendered = SystemSurfacePresentationContent.widget(layout: .medium, presentation: active, resolver: copy)
+        return ZStack {
             palette.card
             UFastHomeScreenBotanicalArtwork()
 
@@ -100,7 +120,7 @@ struct UFastHomeScreenWidgetView: View {
                 HStack(alignment: .firstTextBaseline) {
                     UFastHomeScreenBrandMark(palette: palette)
                     Spacer(minLength: 8)
-                    Text("Fast in progress")
+                    Text(verbatim: rendered.visibleText[1])
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(palette.primary)
                         .lineLimit(1)
@@ -108,7 +128,7 @@ struct UFastHomeScreenWidgetView: View {
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Elapsed")
+                    Text(verbatim: rendered.visibleText[2])
                         .font(.subheadline)
                         .foregroundStyle(palette.secondaryText)
                     elapsedView(active)
@@ -124,11 +144,12 @@ struct UFastHomeScreenWidgetView: View {
             .padding(16)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(active.accessibilitySummary))
+        .accessibilityLabel(Text(verbatim: active.accessibilitySummary))
     }
 
     private func largeActiveView(_ active: LockScreenActivePresentation) -> some View {
-        ZStack {
+        let rendered = SystemSurfacePresentationContent.widget(layout: .large, presentation: active, resolver: copy)
+        return ZStack {
             palette.card
             UFastHomeScreenBotanicalArtwork()
 
@@ -136,11 +157,15 @@ struct UFastHomeScreenWidgetView: View {
                 UFastHomeScreenBrandMark(palette: palette)
                 Spacer(minLength: 0)
 
-                Label("Fast in progress", systemImage: "timer")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(palette.primary)
+                Label {
+                    Text(verbatim: rendered.visibleText[1])
+                } icon: {
+                    Image(systemName: "timer")
+                }
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(palette.primary)
 
-                Text("Elapsed time")
+                Text(verbatim: rendered.visibleText[2])
                     .font(.headline)
                     .foregroundStyle(palette.secondaryText)
                 elapsedView(active)
@@ -152,10 +177,10 @@ struct UFastHomeScreenWidgetView: View {
                 Spacer(minLength: 0)
                 systemDrivenProgress(active)
                 HStack(alignment: .firstTextBaseline) {
-                    Text(active.progressAccessibilityValue)
+                    Text(verbatim: rendered.visibleText[3])
                     Spacer(minLength: 8)
                     if let targetText = active.targetText {
-                        Text("Target \(targetText)")
+                        Text(verbatim: copy(.target(value: targetText)))
                     }
                 }
                 .font(.subheadline)
@@ -164,15 +189,19 @@ struct UFastHomeScreenWidgetView: View {
                 .minimumScaleFactor(0.75)
 
                 if active.hasReachedGoal == true {
-                    Label("Goal time reached", systemImage: "checkmark.circle")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(palette.primary)
+                    Label {
+                        Text(verbatim: copy(.goalReached))
+                    } icon: {
+                        Image(systemName: "checkmark.circle")
+                    }
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(palette.primary)
                 }
             }
             .padding(20)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(active.accessibilitySummary))
+        .accessibilityLabel(Text(verbatim: active.accessibilitySummary))
     }
 
     private func elapsedView(_ active: LockScreenActivePresentation) -> some View {
@@ -206,12 +235,12 @@ struct UFastHomeScreenWidgetView: View {
 
     private func compactDetail(_ active: LockScreenActivePresentation) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(verbatim: "\(active.progressPercentage)%")
+            Text(verbatim: copy(.percentage(value: active.progressPercentage)))
             Spacer(minLength: 6)
             if let targetText = active.targetText {
-                Text("Target \(targetText)")
+                Text(verbatim: copy(.target(value: targetText)))
             } else if active.hasReachedGoal == true {
-                Text("Goal reached")
+                Text(verbatim: copy(.goalReachedShort))
             }
         }
         .font(.caption2)
@@ -228,10 +257,10 @@ struct UFastHomeScreenWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 UFastHomeScreenBrandMark(palette: palette)
                 Spacer(minLength: 0)
-                Text("No active fast")
+                Text(verbatim: copy(.noActiveFast))
                     .font(.headline)
                     .foregroundStyle(palette.primary)
-                Text("Open uFast to start one.")
+                Text(verbatim: copy(.openToStart))
                     .font(.caption)
                     .foregroundStyle(palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -239,7 +268,7 @@ struct UFastHomeScreenWidgetView: View {
             .padding(16)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("uFast. No active fast. Opens uFast.")
+        .accessibilityLabel(Text(verbatim: copy(.unavailableSummary)))
     }
 }
 
@@ -273,6 +302,7 @@ private struct UFastHomeScreenPalette {
 private struct UFastHomeScreenBrandMark: View {
     let palette: UFastHomeScreenPalette
     let compact: Bool
+    private let copy = SystemSurfaceTextResolver()
 
     init(palette: UFastHomeScreenPalette, compact: Bool = false) {
         self.palette = palette
@@ -285,12 +315,12 @@ private struct UFastHomeScreenBrandMark: View {
                 .font(compact ? .caption : .subheadline)
                 .foregroundStyle(palette.action)
                 .accessibilityHidden(true)
-            Text("uFast")
+            Text(verbatim: copy(.brand))
                 .font(compact ? .headline : .title3.weight(.semibold))
                 .foregroundStyle(palette.primary)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("uFast")
+        .accessibilityLabel(Text(verbatim: copy(.brand)))
     }
 }
 

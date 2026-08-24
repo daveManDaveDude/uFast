@@ -44,7 +44,7 @@ hydration records, and sometimes forgets to log for several days.
 The delivered 1.0 foundation expands in this order: a Lock Screen fasting
 surface, user-controlled backup and restore, optional read-only Apple Health
 integration, calm fasting/health trends, and assisted food entry from text and
-photos. `ROADMAP.md` records the outcomes and decision gates.
+photos. `docs/ROADMAP.md` records the outcomes and decision gates.
 
 - Health data adds optional context; it never blocks manual tracking.
 - Stats describe recorded patterns and data completeness without scores,

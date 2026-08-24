@@ -3,6 +3,7 @@ import SwiftUI
 struct FoodEntryEditor: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
+    @Environment(\.appTextResolver) private var textResolver
     @FocusState private var isDescriptionFocused: Bool
     @State private var descriptionText: String
     @State private var occurredAt: Date
@@ -53,7 +54,7 @@ struct FoodEntryEditor: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("What did you eat?", text: $descriptionText, axis: .vertical)
+                    TextField(textResolver(.foodDescriptionPlaceholder), text: $descriptionText, axis: .vertical)
                         .lineLimit(2 ... 5)
                         .focused($isDescriptionFocused)
                         .accessibilityIdentifier("food.description")
@@ -63,9 +64,9 @@ struct FoodEntryEditor: View {
                     }
                 }
 
-                Section("Time") {
+                Section(textResolver(.foodTimeSection)) {
                     DatePicker(
-                        "Date",
+                        textResolver(.date),
                         selection: $occurredAt,
                         in: datePickerRange,
                         displayedComponents: .date
@@ -73,7 +74,7 @@ struct FoodEntryEditor: View {
                     .accessibilityIdentifier("food.date")
 
                     DatePicker(
-                        "Time",
+                        textResolver(.time),
                         selection: $occurredAt,
                         in: datePickerRange,
                         displayedComponents: .hourAndMinute
@@ -83,9 +84,7 @@ struct FoodEntryEditor: View {
 
                 Section {
                     Text(
-                        "Food events count as caloric and are used as fasting boundaries. "
-                            + "If this event falls during your active fast, "
-                            + "saving it ends the fast at this time."
+                        textResolver(.foodCaloricExplanation)
                     )
                     .font(.footnote)
                     .foregroundStyle(UFastTheme.secondaryText)
@@ -94,41 +93,41 @@ struct FoodEntryEditor: View {
 
                     if isAtActiveFastStart {
                         validationLabel(
-                            "Choose a time after the fast started, or change the fast start time.",
+                            textResolver(.foodActiveStartValidation),
                             identifier: "food.fast-start.validation"
                         )
                     }
                 }
 
                 Section {
-                    Button(showsDetails ? "Hide details" : "Add details") {
+                    Button(showsDetails ? textResolver(.foodDetailsHide) : textResolver(.foodDetailsAdd)) {
                         showsDetails.toggle()
                     }
                     .accessibilityIdentifier("food.details.toggle")
                 }
 
                 if showsDetails {
-                    Section("Optional manual details") {
-                        nutritionField("Energy", unit: "kcal", identifier: "energy", text: $nutritionInput.energy)
-                        nutritionField("Protein", unit: "g", identifier: "protein", text: $nutritionInput.protein)
+                    Section(textResolver(.foodOptionalDetailsSection)) {
+                        nutritionField(.energy, unit: .kilocalories, identifier: "energy", text: $nutritionInput.energy)
+                        nutritionField(.protein, unit: .grams, identifier: "protein", text: $nutritionInput.protein)
                         nutritionField(
-                            "Carbohydrate",
-                            unit: "g",
+                            .carbohydrate,
+                            unit: .grams,
                             identifier: "carbohydrate",
                             text: $nutritionInput.carbohydrate
                         )
-                        nutritionField("Fat", unit: "g", identifier: "fat", text: $nutritionInput.fat)
-                        nutritionField("Fibre", unit: "g", identifier: "fibre", text: $nutritionInput.fibre)
-                        nutritionField("Sugar", unit: "g", identifier: "sugar", text: $nutritionInput.sugar)
-                        nutritionField("Salt", unit: "g", identifier: "salt", text: $nutritionInput.salt)
+                        nutritionField(.fat, unit: .grams, identifier: "fat", text: $nutritionInput.fat)
+                        nutritionField(.fibre, unit: .grams, identifier: "fibre", text: $nutritionInput.fibre)
+                        nutritionField(.sugar, unit: .grams, identifier: "sugar", text: $nutritionInput.sugar)
+                        nutritionField(.salt, unit: .grams, identifier: "salt", text: $nutritionInput.salt)
 
-                        Text("Each value is optional. Valid range: 0–1,000,000.")
+                        Text(textResolver(.foodNutritionRange))
                             .font(.footnote)
                             .foregroundStyle(UFastTheme.secondaryText)
 
                         if nutritionResult == nil {
                             validationLabel(
-                                FoodEntryValidationError.invalidNutrition.message,
+                                textResolver(.foodValidation(.invalidNutrition)),
                                 identifier: "food.nutrition.validation"
                             )
                         }
@@ -145,7 +144,7 @@ struct FoodEntryEditor: View {
 
                 if onDelete != nil {
                     Section {
-                        Button("Delete food event", role: .destructive) {
+                        Button(textResolver(.foodDeleteEvent), role: .destructive) {
                             showsDeleteConfirmation = true
                         }
                         .accessibilityIdentifier("food.delete")
@@ -154,15 +153,15 @@ struct FoodEntryEditor: View {
             }
             .scrollContentBackground(.hidden)
             .background(UFastTheme.canvas)
-            .navigationTitle(record == nil ? "Log food" : "Edit food")
+            .navigationTitle(textResolver(.foodTitle(isEditing: record != nil)))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button(textResolver(.cancel), action: onCancel)
                         .accessibilityIdentifier("food.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(record == nil ? "Save food" : "Save changes") {
+                    Button(textResolver(.foodSaveTitle(isEditing: record != nil))) {
                         save()
                     }
                     .disabled(validDraft == nil)
@@ -174,16 +173,18 @@ struct FoodEntryEditor: View {
                     isDescriptionFocused = true
                 }
             }
-            .alert("Delete this food event?", isPresented: $showsDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
+            .alert(textResolver(.foodDeleteConfirmationTitle), isPresented: $showsDeleteConfirmation) {
+                Button(textResolver(.cancel), role: .cancel) {}
+                    .accessibilityIdentifier("food.delete.cancel")
+                Button(textResolver(.delete), role: .destructive) {
                     delete()
                 }
+                .accessibilityIdentifier("food.delete.confirm")
             } message: {
-                Text("This removes it from your local record.")
+                Text(textResolver(.localRecordRemoval))
             }
             .alert(confirmationTitle, isPresented: $showsFastEndConfirmation) {
-                Button("Cancel", role: .cancel) {
+                Button(textResolver(.cancel), role: .cancel) {
                     pendingFastEndDraft = nil
                     pendingDeletion = false
                 }
@@ -202,10 +203,10 @@ struct FoodEntryEditor: View {
     private var descriptionError: String? {
         let trimmed = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            return FoodEntryValidationError.emptyDescription.message
+            return textResolver(.foodValidation(.emptyDescription))
         }
         if trimmed.count > FoodEntryValidator.descriptionLimit {
-            return FoodEntryValidationError.descriptionTooLong.message
+            return textResolver(.foodValidation(.descriptionTooLong))
         }
         return nil
     }
@@ -254,24 +255,19 @@ struct FoodEntryEditor: View {
         do {
             try onSave(draft, false)
             saveError = nil
-        } catch let FoodEntrySaveError.confirmationRequiredWithImpact(context) {
-            showConfirmation(context, draft: draft)
-        } catch let FoodEntrySaveError.completedConfirmationWithImpact(context) {
-            showConfirmation(context, draft: draft)
-        } catch let FoodEntrySaveError.inferredConfirmationWithImpact(context) {
-            showConfirmation(context, draft: draft)
-        } catch FoodEntrySaveError.confirmationRequired {
-            showConfirmation(.init(fallbackKind: .active), draft: draft)
-        } catch FoodEntrySaveError.completedFastConfirmationRequired {
-            showConfirmation(.init(fallbackKind: .completed), draft: draft)
-        } catch FoodEntrySaveError.inferredFastConfirmationRequired {
-            showConfirmation(.init(fallbackKind: .inferred), draft: draft)
-        } catch FoodEntrySaveError.eventAtActiveFastStart {
-            saveError = "Choose a time after the fast started, or change the fast start time."
-        } catch FoodEntrySaveError.fastConflict {
-            saveError = "This fast overlaps another recorded fast. Correct the fast before saving."
+        } catch let error as FoodEntrySaveError {
+            switch error.presentation {
+            case let .confirmation(context):
+                showConfirmation(context, draft: draft)
+            case .eventAtActiveFastStart:
+                saveError = textResolver(.foodActiveStartValidation)
+            case .fastConflict:
+                saveError = textResolver(.foodConflictError)
+            case .saveFailure:
+                saveError = textResolver(.foodSaveError)
+            }
         } catch {
-            saveError = "Your food event couldn’t be saved. Please try again."
+            saveError = textResolver(.foodSaveError)
         }
     }
 
@@ -283,7 +279,7 @@ struct FoodEntryEditor: View {
                 showsFastEndConfirmation = false
                 saveError = nil
             } catch {
-                saveError = "Your food event couldn’t be deleted. Please try again."
+                saveError = textResolver(.foodDeleteError)
             }
             return
         }
@@ -295,7 +291,7 @@ struct FoodEntryEditor: View {
             saveError = nil
             pendingFastEndDraft = nil
         } catch {
-            saveError = "Your food event and fast couldn’t be saved. Please try again."
+            saveError = textResolver(.foodCombinedSaveError)
         }
     }
 
@@ -303,14 +299,14 @@ struct FoodEntryEditor: View {
         do {
             try onDelete?(false)
             saveError = nil
-        } catch let FoodEntrySaveError.confirmationRequiredWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let FoodEntrySaveError.completedConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let FoodEntrySaveError.inferredConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
+        } catch let error as FoodEntrySaveError {
+            if case let .confirmation(context) = error.presentation {
+                showConfirmation(context, pendingDeletion: true)
+            } else {
+                saveError = textResolver(.foodDeleteError)
+            }
         } catch {
-            saveError = "Your food event couldn’t be deleted. Please try again."
+            saveError = textResolver(.foodDeleteError)
         }
     }
 
@@ -332,83 +328,84 @@ extension FoodEntryEditor {
         action: String,
         time: String
     ) -> String {
-        guard context.affectedPersistedFastCount > 1 else {
-            return "\(action) this caloric event records the food and ends your fast at \(time)."
-        }
-        return "Ending your active fast at \(time) updates \(context.affectedPersistedFastCount) persisted fasts."
+        let confirmationAction: AppText.CaloricEventConfirmationAction = action == "Deleting" ? .deleting : .saving
+        return AppTextResolver()(
+            .confirmationMessage(
+                action: confirmationAction,
+                kind: .active,
+                noun: .food,
+                count: max(1, context.affectedPersistedFastCount),
+                time: time
+            )
+        )
     }
 }
 
 private extension FoodEntryEditor {
     func nutritionField(
-        _ label: String,
-        unit: String,
+        _ field: AppText.FoodNutritionField,
+        unit: AppText.FoodNutritionUnit,
         identifier: String,
         text: Binding<String>
     ) -> some View {
         HStack {
-            Text(label)
+            Text(textResolver(.foodNutritionField(field)))
                 .accessibilityIdentifier("food.nutrition.\(identifier).label")
             Spacer(minLength: UFastTheme.Spacing.compact)
-            TextField("Value", text: text)
+            TextField(textResolver(.foodNutritionValuePlaceholder), text: text)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .frame(minWidth: 72, idealWidth: 96, maxWidth: 120)
-                .accessibilityLabel(label)
+                .accessibilityLabel(textResolver(.foodNutritionField(field)))
                 .accessibilityIdentifier("food.nutrition.\(identifier).input")
-            Text(unit)
+            Text(textResolver(.foodNutritionUnit(unit)))
                 .foregroundStyle(UFastTheme.secondaryText)
                 .accessibilityIdentifier("food.nutrition.\(identifier).unit")
         }
         .accessibilityElement(children: .contain)
-        .accessibilityHint("Optional, from 0 to 1,000,000 \(unit).")
+        .accessibilityHint(
+            textResolver(.foodNutritionHint(unit: textResolver(.foodNutritionUnit(unit))))
+        )
     }
 
     var confirmationTitle: String {
-        switch confirmationContext.kind {
-        case .active: "This entry is during your recorded fast."
-        case .completed:
-            "This entry updates \(confirmationContext.affectedPersistedFastCount) recorded fast(s)."
-        case .inferred: "This entry updates inferred History."
-        }
+        textResolver(
+            .confirmationTitle(
+                confirmationContext.kind,
+                noun: .food,
+                count: max(1, confirmationContext.affectedPersistedFastCount)
+            )
+        )
     }
 
     var confirmationActionTitle: String {
         if pendingDeletion {
-            switch confirmationContext.kind {
-            case .active, .completed: return "Delete and update fast"
-            case .inferred: return "Delete and update History"
-            }
+            return textResolver(
+                .confirmationAction(.deleting, kind: confirmationContext.kind, noun: .food)
+            )
         }
-        switch confirmationContext.kind {
-        case .active: return "Save and end fast"
-        case .completed: return "Save and update fast"
-        case .inferred: return "Save and update History"
-        }
+        return textResolver(
+            .confirmationAction(.saving, kind: confirmationContext.kind, noun: .food)
+        )
     }
 
     var confirmationMessage: String {
         let time = occurredAt.formatted(date: .omitted, time: .shortened)
-        let action = pendingDeletion ? "Deleting" : "Saving"
-        let consequence = switch confirmationContext.kind {
-        case .active:
-            Self.activeConfirmationMessage(
-                context: confirmationContext,
+        let action: AppText.CaloricEventConfirmationAction = pendingDeletion ? .deleting : .saving
+        var details = textResolver(
+            .confirmationMessage(
                 action: action,
+                kind: confirmationContext.kind,
+                noun: .food,
+                count: max(1, confirmationContext.affectedPersistedFastCount),
                 time: time
             )
-        case .completed:
-            "\(action) this caloric event updates \(confirmationContext.affectedPersistedFastCount) "
-                + "recorded fast(s) at \(time)."
-        case .inferred:
-            "\(action) this caloric event refreshes derived inferred History at \(time)."
-        }
-        var details = consequence
+        )
         if confirmationContext.includesReconstructedReview {
-            details += " At least one affected fast is reconstructed and will be marked for review."
+            details += " " + textResolver(.reconstructedReviewDetail)
         }
         if confirmationContext.isCombined {
-            details += " It also refreshes the derived inferred interval."
+            details += " " + textResolver(.inferredIntervalDetail)
         }
         return details
     }

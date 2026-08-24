@@ -33,7 +33,13 @@ final class HydrationEntryServiceTests: XCTestCase {
         try fixture.service.save(HydrationEntryDraft(type: .water, customName: nil, volumeMillilitres: 500, occurredAt: now, isCaloric: false), replacing: nil, goal: .default)
         XCTAssertTrue(fixture.fast.isActive)
         XCTAssertThrowsError(try fixture.service.save(HydrationEntryDraft(type: .custom, customName: "Juice", volumeMillilitres: 200, occurredAt: now, isCaloric: true), replacing: nil, goal: .default)) {
-            XCTAssertEqual($0 as? HydrationEntrySaveError, .confirmationRequired)
+            guard case let .confirmationRequiredWithImpact(context) = $0 as? HydrationEntrySaveError else {
+                return XCTFail("Expected active boundary impact, got \($0)")
+            }
+            XCTAssertEqual(context.kind, .active)
+            XCTAssertEqual(context.affectedPersistedFastCount, 1)
+            XCTAssertFalse(context.includesReconstructedReview)
+            XCTAssertFalse(context.includesInferredInterval)
         }
         XCTAssertTrue(fixture.fast.isActive)
         XCTAssertEqual(try fixture.container.mainContext.fetch(FetchDescriptor<HydrationEntryRecord>()).count, 1)

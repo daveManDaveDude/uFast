@@ -11,6 +11,7 @@ struct HydrationFavouriteEditorPresentation: Identifiable {
 }
 
 struct HydrationFavouriteEditor: View {
+    @Environment(\.appTextResolver) private var textResolver
     @FocusState private var focusedField: Field?
     @State private var name: String
     @State private var amount: String
@@ -59,27 +60,29 @@ struct HydrationFavouriteEditor: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name", text: $name)
+                    TextField(textResolver(.favouriteNamePlaceholder), text: $name)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .name)
                         .accessibilityIdentifier("settings.favourite.name")
-                    TextField("Amount", text: $amount)
+                    TextField(textResolver(.favouriteAmountPlaceholder), text: $amount)
                         .keyboardType(.numberPad)
                         .focused($focusedField, equals: .amount)
                         .accessibilityIdentifier("settings.favourite.amount")
-                    LabeledContent("Unit") { Text("ml") }
-                        .accessibilityIdentifier("settings.favourite.unit")
-                    Toggle("Counts as caloric", isOn: $isCaloric)
+                    LabeledContent(textResolver(.favouriteUnit)) {
+                        Text(textResolver(.settingsMillilitres))
+                    }
+                    .accessibilityIdentifier("settings.favourite.unit")
+                    Toggle(textResolver(.favouriteCountsAsCaloric), isOn: $isCaloric)
                         .accessibilityIdentifier("settings.favourite.caloric")
-                    Text("A caloric drink counts as a fasting boundary.")
+                    Text(textResolver(.favouriteBoundaryExplanation))
                         .font(.subheadline)
                         .foregroundStyle(UFastTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 } header: {
-                    Text("Drink details")
+                    Text(textResolver(.favouriteDetailsHeading))
                 } footer: {
-                    Text("Names are unique and can be up to 80 characters.")
+                    Text(textResolver(.favouriteDetailsFooter))
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -99,7 +102,7 @@ struct HydrationFavouriteEditor: View {
 
                 if onRemove != nil {
                     Section {
-                        Button("Remove favourite", role: .destructive) {
+                        Button(textResolver(.favouriteRemove), role: .destructive) {
                             isRemovalConfirmationPresented = true
                         }
                         .disabled(isSaving)
@@ -110,15 +113,15 @@ struct HydrationFavouriteEditor: View {
             .accessibilityIdentifier("settings.favourite.editor")
             .scrollContentBackground(.hidden)
             .background(UFastTheme.canvas)
-            .navigationTitle(presentation.favourite == nil ? "Add favourite" : "Edit favourite")
+            .navigationTitle(textResolver(.favouriteTitle(isEditing: presentation.favourite != nil)))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button(textResolver(.cancel), action: onCancel)
                         .accessibilityIdentifier("settings.favourite.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
+                    Button(textResolver(.favouriteSave)) { save() }
                         .disabled(!isValid || isSaving)
                         .accessibilityIdentifier("settings.favourite.save")
                 }
@@ -127,24 +130,21 @@ struct HydrationFavouriteEditor: View {
             .onChange(of: amount) { _, _ in errorMessage = nil }
             .onChange(of: isCaloric) { _, _ in errorMessage = nil }
             .alert(
-                "Remove “\(presentation.favourite?.name ?? name)” from favourites?",
+                textResolver(
+                    .favouriteRemoveConfirmation(name: presentation.favourite?.name ?? name)
+                ),
                 isPresented: $isRemovalConfirmationPresented
             ) {
-                Button("Cancel", role: .cancel) {}
+                Button(textResolver(.cancel), role: .cancel) {}
                     .accessibilityIdentifier("settings.favourite.remove-cancel")
-                Button("Remove", role: .destructive) { remove() }
+                Button(textResolver(.favouriteRemoveAction), role: .destructive) { remove() }
                     .accessibilityIdentifier("settings.favourite.remove-confirm")
             }
         }
     }
 
     private var validationMessage: String? {
-        switch validationError {
-        case .blankName, .nameTooLong: "Enter a name up to 80 characters."
-        case .duplicateName, .reservedName: "Choose a name that isn’t already in your favourites."
-        case .invalidAmount: "Enter an amount from 1 to 5,000 ml."
-        case nil: nil
-        }
+        validationError.map { textResolver(.favouriteValidation($0)) }
     }
 
     private func save() {
@@ -171,17 +171,17 @@ struct HydrationFavouriteEditor: View {
 
     private func message(for error: Error, removal: Bool) -> String {
         if removal {
-            return "Your favourite couldn’t be removed. Please try again."
+            return textResolver(.favouriteRemoveError)
         }
         switch error as? HydrationFavouriteStoreError {
         case .duplicateName, .reservedName:
-            return "Choose a name that isn’t already in your favourites."
+            return textResolver(.favouriteValidation(.duplicateName))
         case .invalidName, .nameTooLong:
-            return "Enter a name up to 80 characters."
+            return textResolver(.favouriteValidation(.nameTooLong))
         case .invalidAmount:
-            return "Enter an amount from 1 to 5,000 ml."
+            return textResolver(.favouriteValidation(.invalidAmount))
         default:
-            return "Your favourite couldn’t be saved. Please try again."
+            return textResolver(.favouriteSaveError)
         }
     }
 

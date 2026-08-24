@@ -37,6 +37,40 @@ final class TemporalEventGroupingTests: XCTestCase {
         XCTAssertEqual(group.visualCountText, "2")
     }
 
+    func testCommonMemberTitlePreservesUniformTitleWithoutOwningFamilyCopy() throws {
+        let day = try XCTUnwrap(date(year: 2027, month: 1, day: 15, hour: 10))
+        let window = DateInterval(start: day.addingTimeInterval(-3600), duration: 26 * 3600)
+        let inputs = [
+            input("00000000-0000-0000-0000-000000000003", at: 10, minute: 42, title: "Lunch"),
+            input("00000000-0000-0000-0000-000000000004", at: 11, minute: 30, title: "Lunch"),
+        ]
+
+        guard case let .group(group) = try XCTUnwrap(
+            TemporalEventGrouping.project(inputs, in: window, calendar: calendar).first
+        ) else {
+            return XCTFail("Expected a group")
+        }
+
+        XCTAssertEqual(group.commonMemberTitle, "Lunch")
+    }
+
+    func testMixedMemberTitlesLeaveFamilyTitleToPresentationLayer() throws {
+        let day = try XCTUnwrap(date(year: 2027, month: 1, day: 15, hour: 10))
+        let window = DateInterval(start: day.addingTimeInterval(-3600), duration: 26 * 3600)
+        let inputs = [
+            input("00000000-0000-0000-0000-000000000005", at: 10, minute: 42, title: "Lunch"),
+            input("00000000-0000-0000-0000-000000000006", at: 11, minute: 30, title: "Snack"),
+        ]
+
+        guard case let .group(group) = try XCTUnwrap(
+            TemporalEventGrouping.project(inputs, in: window, calendar: calendar).first
+        ) else {
+            return XCTFail("Expected a group")
+        }
+
+        XCTAssertNil(group.commonMemberTitle)
+    }
+
     func testBucketMembershipIsHalfOpenAtTwoHourBoundary() throws {
         let windowStart = try XCTUnwrap(date(year: 2027, month: 1, day: 15, hour: 0))
         let window = DateInterval(start: windowStart, duration: 24 * 3600)

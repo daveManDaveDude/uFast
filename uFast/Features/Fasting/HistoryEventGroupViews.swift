@@ -4,6 +4,7 @@ struct GroupMarkerAccessibilityModifier: ViewModifier {
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
     @Environment(\.timeZone) private var timeZone
+    @Environment(\.appTextResolver) private var textResolver
 
     let group: TemporalEventGroup?
     let member: TemporalEventGroupingInput?
@@ -28,14 +29,23 @@ struct GroupMarkerAccessibilityModifier: ViewModifier {
             content
                 .accessibilityLabel(accessibilityLabel(for: group))
                 .accessibilityValue(String(group.count))
-                .accessibilityHint("Shows exact times and actions.")
+                .accessibilityHint(textResolver(.historyCopy(.groupHint)))
                 .accessibilityIdentifier(identifier)
         )
     }
 
     private func accessibilityLabel(for group: TemporalEventGroup) -> String {
-        "\(group.count) \(group.family.pluralName), \(timeText(group.bucket.start)) to "
-            + "\(timeText(group.bucket.end)), \(group.classificationSummary.lowercased())"
+        textResolver(
+            .historyGroupAccessibility(
+                count: group.count,
+                family: group.family == .food ? .food : .drink,
+                start: timeText(group.bucket.start),
+                end: timeText(group.bucket.end),
+                classification: textResolver(
+                    .historyGroupClassification(group.presentationCategory)
+                ).lowercased()
+            )
+        )
     }
 
     private func timeText(_ date: Date) -> String {
@@ -56,6 +66,7 @@ struct HistoryEventGroupDisclosure: View {
     @Environment(\.locale) private var locale
     @Environment(\.calendar) private var calendar
     @Environment(\.timeZone) private var timeZone
+    @Environment(\.appTextResolver) private var textResolver
     @State private var displayedGroup: TemporalEventGroup
     @State private var foodEditor: GroupFoodEditorPresentation?
     @State private var hydrationEditor: GroupHydrationEditorPresentation?
@@ -109,7 +120,7 @@ struct HistoryEventGroupDisclosure: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                    Text("Exact times")
+                    Text(textResolver(.historyCopy(.groupExactTimes)))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(UFastTheme.secondaryText)
                     ForEach(displayedGroup.members, id: \.reference) { member in
@@ -118,7 +129,7 @@ struct HistoryEventGroupDisclosure: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(bucketText)
                             .font(.subheadline)
-                        Text(displayedGroup.classificationSummary)
+                        Text(textResolver(.historyGroupClassification(displayedGroup.presentationCategory)))
                             .font(.subheadline)
                             .foregroundStyle(UFastTheme.secondaryText)
                     }
@@ -127,11 +138,18 @@ struct HistoryEventGroupDisclosure: View {
                 .padding(UFastTheme.Spacing.standard)
                 .padding(.bottom, 96)
             }
-            .navigationTitle("\(displayedGroup.count) \(displayedGroup.family.pluralName)")
+            .navigationTitle(
+                textResolver(
+                    .historyGroupTitle(
+                        count: displayedGroup.count,
+                        family: displayedGroup.family == .food ? .food : .drink
+                    )
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onDismiss)
+                    Button(textResolver(.historyCopy(.groupCancel)), action: onDismiss)
                         .accessibilityIdentifier("history.event-group.cancel")
                 }
             }
@@ -139,15 +157,15 @@ struct HistoryEventGroupDisclosure: View {
                 Button {
                     onAddEvent()
                 } label: {
-                    Label("Add event", systemImage: "plus")
+                    Label(textResolver(.historyCopy(.groupAddEvent)), systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(UFastSecondaryButtonStyle())
                 .disabled(!canAddEvent)
                 .accessibilityHint(
                     canAddEvent
-                        ? "Adds an event within this bucket."
-                        : "No eligible time remains in this bucket."
+                        ? textResolver(.historyCopy(.groupAddHint))
+                        : textResolver(.historyCopy(.groupNoEligibleTime))
                 )
                 .padding(.horizontal, UFastTheme.Spacing.standard)
                 .padding(.vertical, 8)
@@ -244,12 +262,18 @@ struct HistoryEventGroupDisclosure: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            "\(timeText(member.occurredAt)), \(member.title), \(member.detail)"
+            textResolver(
+                .historyMemberAccessibility(
+                    time: timeText(member.occurredAt),
+                    title: member.title,
+                    detail: member.detail
+                )
+            )
         )
         .accessibilityHint(
             member.family == .food
-                ? "Opens this food event for editing."
-                : "Opens this drink event for editing."
+                ? textResolver(.historyCopy(.groupMemberFoodHint))
+                : textResolver(.historyCopy(.groupMemberDrinkHint))
         )
         .accessibilityIdentifier("history.event-group.member.\(member.reference.id.uuidString)")
     }
@@ -268,7 +292,9 @@ struct HistoryEventGroupDisclosure: View {
     }
 
     private var bucketText: String {
-        "\(timeText(displayedGroup.bucket.start))–\(timeText(displayedGroup.bucket.end))"
+        "\(timeText(displayedGroup.bucket.start))"
+            + textResolver(.historyCopy(.separatorRange))
+            + "\(timeText(displayedGroup.bucket.end))"
     }
 
     private func timeText(_ date: Date) -> String {

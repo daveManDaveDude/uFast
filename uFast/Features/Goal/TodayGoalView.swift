@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable line_length switch_case_alignment
+// swiftlint:disable file_length line_length switch_case_alignment
 
 struct TodayGoalView: View {
     @Environment(\.calendar) var calendar
@@ -11,6 +11,7 @@ struct TodayGoalView: View {
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.timeZone) var timeZone
     @Environment(\.liveActivityCoordinator) var liveActivityCoordinator
+    @Environment(\.appTextResolver) var textResolver
     @Environment(\.suppressAutomaticLiveActivityOffer) var suppressAutomaticLiveActivityOffer
     let snapshot: TodayFeatureSnapshot
     @State var activeTimelineID = UUID()
@@ -34,7 +35,7 @@ struct TodayGoalView: View {
     @State var startTimeEditor: StartTimeEditorPresentation?
 
     let clock: any AppClock
-    let previewTimelineError: String?
+    let previewTimelineFailure: TodayDataProviderFailure?
 
     var authoritativeSettings: AppSettingsSnapshot? {
         snapshot.settings.count == 1 ? snapshot.settings[0] : nil
@@ -44,24 +45,32 @@ struct TodayGoalView: View {
         snapshot.activeFasts.count == 1 ? snapshot.activeFasts[0] : nil
     }
 
+    var timelineFailureMessage: String? {
+        guard let previewTimelineFailure else { return nil }
+        switch previewTimelineFailure {
+        case .snapshotUnavailable:
+            return textResolver(.todayTimelineLoadError)
+        }
+    }
+
     init(
         snapshot: TodayFeatureSnapshot = .init(
             settings: [], activeFasts: [], foodEntries: [], hydrationEntries: []
         ),
         clock: any AppClock = SystemAppClock(),
-        previewTimelineError: String? = nil
+        previewTimelineFailure: TodayDataProviderFailure? = nil
     ) {
         self.snapshot = snapshot
         self.clock = clock
-        self.previewTimelineError = previewTimelineError
+        self.previewTimelineFailure = previewTimelineFailure
     }
 
     var body: some View {
-        ScreenLayout(title: "Today", identifier: "today") {
+        ScreenLayout(title: textResolver(.todayTitle), identifier: "today") {
             Group {
                 if snapshot.settings.count > 1 || snapshot.activeFasts.count > 1 {
                     Label(
-                        "uFast found conflicting local records. Nothing was changed.",
+                        textResolver(.todayDataIntegrity),
                         systemImage: "exclamationmark.triangle"
                     )
                     .foregroundStyle(UFastTheme.error)
@@ -120,7 +129,10 @@ struct TodayGoalView: View {
                 caloricFavouriteSaveError = nil
             }
         }
-        .onAppear { controller.connect(commands: applicationCommands) }
+        .onAppear {
+            controller.connect(commands: applicationCommands)
+            controller.setTextResolver(textResolver)
+        }
         .onChange(of: applicationCommands != nil) { _, _ in
             controller.connect(commands: applicationCommands)
         }
@@ -128,7 +140,7 @@ struct TodayGoalView: View {
             if isRecorded {
                 UIAccessibility.post(
                     notification: .announcement,
-                    argument: "Fast recorded."
+                    argument: textResolver(.fastRecorded)
                 )
             }
         }
@@ -137,13 +149,13 @@ struct TodayGoalView: View {
                 UIAccessibility.post(notification: .announcement, argument: announcement)
             }
         }
-        .alert("End this fast?", isPresented: $isEndConfirmationPresented) {
-            Button("Cancel", role: .cancel) {}
-            Button("End fast") {
+        .alert(textResolver(.endFastConfirmationTitle), isPresented: $isEndConfirmationPresented) {
+            Button(textResolver(.cancel), role: .cancel) {}
+            Button(textResolver(.endFastAction)) {
                 endFastNow()
             }
         } message: {
-            Text("This will record the end time as now.")
+            Text(textResolver(.endFastMessage))
         }
         .sheet(item: $startTimeEditor) { presentation in
             StartTimeEditor(
@@ -212,8 +224,12 @@ struct TodayGoalView: View {
                 onAdd: { favourite in
                     try addFavouriteDrink(favourite)
                     caloricFavouriteSaveError = nil
-                    drinkAnnouncement = "\(favourite.displayName), "
-                        + "\(favourite.volumeMillilitres) millilitres, added."
+                    drinkAnnouncement = textResolver(
+                        .drinkAddedAnnouncement(
+                            name: localizedFavouriteName(favourite),
+                            volumeMillilitres: favourite.volumeMillilitres
+                        )
+                    )
                     isDrinkSheetPresented = false
                 },
                 onConfirmationRequired: { favourite, context in
@@ -234,14 +250,17 @@ struct TodayGoalView: View {
             caloricFavouriteConfirmationTitle,
             isPresented: $isCaloricFavouriteConfirmationPresented
         ) {
-            Button("Cancel", role: .cancel) {
+            Button(textResolver(.cancel), role: .cancel) {
                 caloricFavouritePending = nil
             }
+            .accessibilityIdentifier("drink.caloric-favourite.confirmation.cancel")
             Button(caloricFavouriteConfirmationActionTitle) {
                 savePendingCaloricFavourite(endingActiveFast: true)
             }
+            .accessibilityIdentifier("drink.caloric-favourite.confirmation.primary")
         } message: {
             Text(caloricFavouriteConfirmationMessage)
+                .accessibilityIdentifier("drink.caloric-favourite.confirmation.consequence")
         }
         .sheet(item: $hydrationEditor) { presentation in
             HydrationEntryEditor(
@@ -260,33 +279,33 @@ struct TodayGoalView: View {
             )
         }
         .alert(
-            AutomaticLiveActivityCopy.title,
+            textResolver(.automaticOfferTitle),
             isPresented: $isAutomaticLiveActivityOfferPresented
         ) {
             Button(
-                AutomaticLiveActivityCopy.showAutomatically,
+                textResolver(.automaticOfferShow),
                 action: enableAutomaticLiveActivities
             )
             .accessibilityIdentifier("fast.automatic-offer.show")
             Button(
-                AutomaticLiveActivityCopy.notNow,
+                textResolver(.automaticOfferNotNow),
                 role: .cancel,
                 action: disableAutomaticLiveActivities
             )
             .accessibilityIdentifier("fast.automatic-offer.not-now")
         } message: {
-            Text(AutomaticLiveActivityCopy.message)
+            Text(textResolver(.automaticOfferMessage))
         }
         .alert(
-            "Show Live Activity?",
+            textResolver(.liveActivityDisclosureTitle),
             isPresented: $isLiveActivityDisclosurePresented
         ) {
-            Button("Cancel", role: .cancel) {}
+            Button(textResolver(.cancel), role: .cancel) {}
                 .accessibilityIdentifier("fast.live-activity.disclosure.cancel")
-            Button("Show Live Activity", action: showLiveActivity)
+            Button(textResolver(.liveActivityShow), action: showLiveActivity)
                 .accessibilityIdentifier("fast.live-activity.disclosure.show")
         } message: {
-            Text(ActiveFastLiveActivityStatusCopy.disclosure)
+            Text(textResolver(.liveActivityDisclosureMessage))
         }
     }
 }
@@ -342,7 +361,7 @@ extension TodayGoalView {
             }
             controller.liveActivityStatus = nil
         } catch {
-            controller.liveActivityStatus = AutomaticLiveActivityCopy.settingsSaveFailure
+            controller.liveActivityStatus = textResolver(.settingsLiveActivitySaveError)
         }
     }
 
@@ -473,6 +492,12 @@ extension TodayGoalView {
         }
     }
 
+    func localizedFavouriteName(_ favourite: HydrationFavourite) -> String {
+        favourite.isUserCreated
+            ? favourite.displayName
+            : textResolver(.drinkTypeName(favourite.type))
+    }
+
     func timelineName(_ entry: TodayTimelineEntry) -> String {
         switch entry.kind { case let .food(_, name, _), let .drink(_, name, _, _): name }
     }
@@ -485,12 +510,19 @@ extension TodayGoalView {
 
     func timelineDetail(_ entry: TodayTimelineEntry) -> String {
         switch entry.kind {
-        case let .food(_, _, caloric): caloric ? "Caloric" : "Non-caloric"
-        case let .drink(_, _, volume, caloric): "\(volume) ml · \(caloric ? "Caloric" : "Non-caloric")"
+        case let .food(_, _, caloric):
+            textResolver(.drinkPickerClassification(isCaloric: caloric))
+        case let .drink(_, _, volume, caloric):
+            textResolver(.drinkPickerDetail(volumeMillilitres: volume, isCaloric: caloric))
         }
     }
 
     func timelineAccessibilityLabel(_ entry: TodayTimelineEntry) -> String {
-        "\(timelineSymbol(entry) == "fork.knife" ? "Food" : "Drink"), \(timelineName(entry))"
+        switch entry.kind {
+        case .food:
+            "\(textResolver(.historyFood)), \(timelineName(entry))"
+        case .drink:
+            "\(textResolver(.historyDrink)), \(timelineName(entry))"
+        }
     }
 }

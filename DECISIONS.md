@@ -14,7 +14,7 @@ is shown.
   calm fasting and health-data trends, then AI-assisted food entry from text
   and photos. Assisted entry must cover Apple Intelligence-capable and older
   supported iPhones while manual entry remains available everywhere.
-- **Consequence:** `ROADMAP.md` becomes the current product roadmap and
+- **Consequence:** `docs/ROADMAP.md` becomes the current product roadmap and
   `BACKLOG.md` remains the delivery ledger for the original slices. Each new
   milestone requires its own implementation-ready stories plus product,
   privacy, accessibility, persistence and App Review decisions. Health and AI
@@ -865,3 +865,87 @@ is shown.
   D-033/D-034 and OW-410, and amends BR-06 through BR-08, BR-21 through BR-24
   and BR-45 through BR-52. It does not add inferred persistence, network work,
   health claims or automatic fast creation.
+
+## D-036 Local source-bound verification for solo development
+
+- **Status:** Accepted
+- **Accepted:** 20 August 2026
+- **Decision:** uFast's required engineering and release gates run locally. As
+  the sole developer, David performs the focused, unit, build, lint, analyzer,
+  release-configuration and source-frozen UI gates on the development Mac.
+  GitHub Actions may be used later as independent clean-machine evidence, but
+  it is not a required acceptance or release authority.
+- **Decision:** Verification evidence is bound to a deterministic content-based
+  source-freeze identity covering the relevant tracked and untracked product,
+  test, project, script and configuration inputs. It also records the current
+  commit and clean/dirty state. The same content identity remains comparable
+  when an accepted working tree is subsequently committed.
+- **Decision:** A real upload requires a clean committed tree and matching
+  source-bound release/UI evidence. During an uncommitted implementation sprint,
+  the gate may produce candidate evidence for the frozen working tree but must
+  not describe it as upload-authorised.
+- **Decision:** The upload workflow increments the build number only after its
+  preflight gate passes. If archive, export or upload fails, it restores the
+  exact pre-run project file when the script's own increment is the only change;
+  a successful upload retains the increment. Concurrent or unrelated source
+  changes cause the workflow to stop rather than overwrite them.
+- **Consequence:** MNT-001 is not required for the post-MVP maintainability
+  sprint. Local automation must be truthful, fail closed and preserve durable
+  evidence; a green message that skipped a required input is a defect.
+
+## D-037 Local diagnostic privacy and vocabulary
+
+- **Status:** Accepted
+- **Accepted:** 22 August 2026
+- **Decision:** Diagnostics use unified local `OSLog` only. There is no
+  analytics SDK, network transport, remote upload, background delivery or
+  account identifier. App and widget processes own separate process-local
+  adapters; they share only sendable event/value types. The default no-op sink
+  is used by tests and previews, and diagnostic observation is synchronous,
+  non-throwing and non-authoritative.
+- **Decision:** The closed event vocabulary is exactly:
+  `persistence` (`storeOpenFailed`, `migrationFailed`, `authorityConflict`),
+  `command` (`commitFailed`, `rollbackApplied`,
+  `postCommitProjectionFailed`), `history` (`initialLoadFailed`,
+  `extensionLoadFailed`), `widgetProjection` (`containerUnavailable`,
+  `authorityConflict`, `publishFailed`, `clearFailed`) and `liveActivity`
+  (`unavailable`, `authorityConflict`, `requestFailed`, `updateFailed`,
+  `endFailed`). No free-form subsystem or outcome is accepted.
+- **Decision:** Every event contains only `subsystem`, `outcome` and
+  `severity`. Optional `appVersion`, `buildNumber` and `schemaVersion` values
+  are controlled by the typed internal declarations
+  `DiagnosticAppVersion.current` (`1.0.0`), `DiagnosticBuildNumber.current`
+  (`10`) and `DiagnosticSchemaVersion.current` (`1`). These values mirror the
+  declared app bundle/build and diagnostic schema source; arbitrary strings,
+  timestamp-like numbers and undeclared future values cannot cross the typed
+  boundary. A new value requires an explicit source declaration and tests.
+  `countBucket` (`zero`, `one`, `multiple`) is permitted only for
+  persistence/widgetProjection/liveActivity `authorityConflict`; `isRetry` is
+  permitted only for command, History and `liveActivity` outcomes listed below;
+  and `isForeground` is permitted only for `liveActivity` outcomes listed below.
+  There is no generic metadata map.
+
+  | Subsystem/outcome | Permitted optional event metadata |
+  | --- | --- |
+  | persistence/storeOpenFailed, migrationFailed | none |
+  | persistence/authorityConflict | `countBucket` |
+  | command/commitFailed, rollbackApplied, postCommitProjectionFailed | `isRetry` |
+  | history/initialLoadFailed, extensionLoadFailed | `isRetry` |
+  | widgetProjection/containerUnavailable, publishFailed, clearFailed | none |
+  | widgetProjection/authorityConflict | `countBucket` |
+  | liveActivity/unavailable | `isForeground` |
+  | liveActivity/authorityConflict | `countBucket` |
+  | liveActivity/requestFailed, updateFailed, endFailed | `isRetry`, `isForeground` |
+
+- **Decision:** User-entered text, food or drink/favourite names, nutrition,
+  Health data, notes, full UUIDs, full timestamps, serialized records, store
+  paths and raw underlying error descriptions are prohibited. Expected
+  cancellation, success, ordinary empty/no-data states, History motion,
+  geometry, prefetch progress and projection timer/update ticks emit nothing.
+  One event is permitted per failed operation attempt.
+- **Consequence:** The typed event boundary rejects undocumented outcomes and
+  fields during construction and decoding. Recording is an in-memory test
+  sink only; no diagnostic sink may persist data, perform network work, block
+  an operation or decide operation authority. A user-triggered diagnostic
+  export requires a later decision defining preview, redaction, retention and
+  cancellation semantics.

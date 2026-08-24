@@ -125,21 +125,30 @@ struct ActiveFastActivityPresentation: Equatable, Sendable {
         now: Date,
         privacyState: ActiveFastActivityPrivacyState = .visible,
         locale: Locale = .autoupdatingCurrent,
-        timeZone: TimeZone = .autoupdatingCurrent
+        timeZone: TimeZone = .autoupdatingCurrent,
+        textResolver: SystemSurfaceTextResolver? = nil
     ) -> Self {
         guard (try? contentState.validate(now: now)) != nil else { return redacted() }
 
         guard privacyState == .visible else { return redacted() }
+
+        let textResolver = textResolver ?? SystemSurfaceTextResolver(locale: locale)
 
         let elapsed = now.timeIntervalSince(contentState.startDate)
         let duration = contentState.targetDate.timeIntervalSince(contentState.startDate)
         let progress = min(max(elapsed / duration, 0), 1)
         let percentage = Int((progress * 100).rounded(.down))
         let elapsedAccessibility = ActiveFastActivityElapsedFormatter.accessibilityString(
-            from: elapsed
+            from: elapsed,
+            resolver: textResolver
         )
-        let progressAccessibility = "\(percentage) percent of \(contentState.goalHours)-hour goal"
-        let stableGoalText = ActiveFastActivityGoalFormatter.string(hours: contentState.goalHours)
+        let progressAccessibility = textResolver(
+            .progress(percent: percentage, goalHours: contentState.goalHours)
+        )
+        let stableGoalText = ActiveFastActivityGoalFormatter.string(
+            hours: contentState.goalHours,
+            resolver: textResolver
+        )
         let target = ActiveFastActivityTargetFormatter.string(
             from: contentState.targetDate,
             locale: locale,
@@ -147,12 +156,14 @@ struct ActiveFastActivityPresentation: Equatable, Sendable {
         )
         let reached = now >= contentState.targetDate
             && contentState.hasLegitimateGoalReachedObservation
-
-        var summary = "uFast, elapsed \(elapsedAccessibility), \(stableGoalText), target \(target)"
-        if reached {
-            summary += ", Goal time reached"
-        }
-        summary += ". Opens uFast."
+        let summary = textResolver(
+            .activitySummary(
+                elapsed: elapsedAccessibility,
+                goal: stableGoalText,
+                target: target,
+                reachedGoal: reached
+            )
+        )
 
         return Self(
             elapsedText: ActiveFastActivityElapsedFormatter.string(from: elapsed),
@@ -177,14 +188,17 @@ struct ActiveFastActivityPresentation: Equatable, Sendable {
             stableGoalText: nil,
             targetText: nil,
             hasReachedGoal: false,
-            accessibilitySummary: "uFast. Opens uFast."
+            accessibilitySummary: SystemSurfaceTextResolver()(.identitySummary)
         )
     }
 }
 
 enum ActiveFastActivityGoalFormatter {
-    static func string(hours: Int) -> String {
-        "\(hours)-hour goal"
+    static func string(
+        hours: Int,
+        resolver: SystemSurfaceTextResolver = .init()
+    ) -> String {
+        resolver(.goal(hours: hours))
     }
 }
 
@@ -202,7 +216,10 @@ enum ActiveFastActivityElapsedFormatter {
         return "\(twoDigits(hours)):\(twoDigits(minutes)):\(twoDigits(remainingSeconds))"
     }
 
-    static func accessibilityString(from duration: TimeInterval) -> String {
+    static func accessibilityString(
+        from duration: TimeInterval,
+        resolver: SystemSurfaceTextResolver = .init()
+    ) -> String {
         let seconds = max(Int(duration), 0)
         let days = seconds / (24 * 60 * 60)
         let hours = seconds % (24 * 60 * 60) / (60 * 60)
@@ -211,26 +228,20 @@ enum ActiveFastActivityElapsedFormatter {
         var components: [String] = []
 
         if days > 0 {
-            components.append(component(days, singular: "day", plural: "days"))
+            components.append(resolver(.duration(value: days, unit: .day)))
         }
         if hours > 0 || days > 0 {
-            components.append(component(hours, singular: "hour", plural: "hours"))
+            components.append(resolver(.duration(value: hours, unit: .hour)))
         }
         if minutes > 0 || hours > 0 || days > 0 {
-            components.append(component(minutes, singular: "minute", plural: "minutes"))
+            components.append(resolver(.duration(value: minutes, unit: .minute)))
         }
-        components.append(
-            component(remainingSeconds, singular: "second", plural: "seconds")
-        )
+        components.append(resolver(.duration(value: remainingSeconds, unit: .second)))
         return components.joined(separator: " ")
     }
 
     private static func twoDigits(_ value: Int) -> String {
         String(format: "%02d", value)
-    }
-
-    private static func component(_ value: Int, singular: String, plural: String) -> String {
-        "\(value) \(value == 1 ? singular : plural)"
     }
 }
 

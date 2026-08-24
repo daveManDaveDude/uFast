@@ -2,10 +2,11 @@ import SwiftUI
 import UIKit
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
-// swiftlint:disable large_tuple line_length opening_brace statement_position
+// swiftlint:disable large_tuple line_length opening_brace statement_position trailing_comma
 
 struct SettingsView: View {
     @Environment(\.applicationCommands) private var applicationCommands
+    @Environment(\.appTextResolver) private var textResolver
     @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     let snapshot: SettingsFeatureSnapshot
     @State private var focusedFavouriteField: FavouriteField?
@@ -26,7 +27,7 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var controller = controller
         NavigationStack {
-            ScreenLayout(title: "Settings", identifier: "settings") {
+            ScreenLayout(title: textResolver(.settingsTitle), identifier: "settings") {
                 ScrollView {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
                         SettingsGoalSection(selection: controller.selection, goalBinding: goalBinding)
@@ -79,6 +80,7 @@ struct SettingsView: View {
             }
             .onAppear {
                 controller.connect(commands: applicationCommands)
+                controller.setTextResolver(textResolver)
                 controller.load(snapshot)
                 Task {
                     liveActivityAvailability = liveActivityCoordinator?.availability()
@@ -93,30 +95,27 @@ struct SettingsView: View {
                 }
             }
             .alert(
-                "Delete all uFast data?",
+                textResolver(.settingsDeleteFirstTitle),
                 isPresented: $isFirstDeleteConfirmationPresented
             ) {
-                Button("Cancel", role: .cancel) {}
-                Button("Continue", role: .destructive) {
+                Button(textResolver(.cancel), role: .cancel) {}
+                Button(textResolver(.continueAction), role: .destructive) {
                     isFinalDeleteConfirmationPresented = true
                 }
             } message: {
-                Text(
-                    "This will remove your fasts, food, drinks, settings and history "
-                        + "from this iPhone."
-                )
+                Text(textResolver(.settingsDeleteFirstMessage))
             }
             .alert(
-                "Permanently delete everything?",
+                textResolver(.settingsDeleteFinalTitle),
                 isPresented: $isFinalDeleteConfirmationPresented
             ) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete everything", role: .destructive) {
+                Button(textResolver(.cancel), role: .cancel) {}
+                Button(textResolver(.settingsDeleteEverything), role: .destructive) {
                     isFinalDeleteConfirmationPresented = false
                     deleteAllData()
                 }
             } message: {
-                Text("This is your final confirmation. Deleted data cannot be recovered.")
+                Text(textResolver(.settingsDeleteFinalMessage))
             }
         }
         .sheet(item: $favouriteEditor) { presentation in
@@ -207,6 +206,7 @@ struct FavouriteAmountTextField: UIViewRepresentable {
     @Binding var text: String
     let label: String
     let identifier: String
+    let textResolver: AppTextResolver
     @Binding var isFocused: Bool
 
     func makeCoordinator() -> Coordinator {
@@ -217,10 +217,10 @@ struct FavouriteAmountTextField: UIViewRepresentable {
         let textField = UITextField()
         textField.keyboardType = .numberPad
         textField.textAlignment = .right
-        textField.placeholder = "Amount"
+        textField.placeholder = textResolver(.settingsAmountPlaceholder)
         textField.font = .preferredFont(forTextStyle: .body)
         textField.adjustsFontForContentSizeCategory = true
-        textField.accessibilityLabel = "\(label) amount"
+        textField.accessibilityLabel = textResolver(.settingsAmountAccessibilityLabel(label: label))
         textField.accessibilityIdentifier = identifier
         textField.addTarget(context.coordinator, action: #selector(Coordinator.textChanged), for: .editingChanged)
         textField.addTarget(context.coordinator, action: #selector(Coordinator.editingBegan), for: .editingDidBegin)
@@ -282,12 +282,26 @@ struct FavouriteAmountTextField: UIViewRepresentable {
 }
 
 #Preview("Settings") {
-    SettingsFeatureHost()
-        .modelContainer(PreviewFixtures.modelContainer)
+    SettingsView(snapshot: SettingsViewPreviewData.snapshot)
 }
 
 #Preview("Settings · Accessibility") {
-    SettingsFeatureHost()
-        .modelContainer(PreviewFixtures.modelContainer)
+    SettingsView(snapshot: SettingsViewPreviewData.snapshot)
         .environment(\.dynamicTypeSize, .accessibility3)
+}
+
+private enum SettingsViewPreviewData {
+    static let snapshot = SettingsFeatureSnapshot(
+        settings: [AppSettingsSnapshot()],
+        hydrationFavourites: [
+            HydrationFavouriteSnapshot(
+                id: UUID(),
+                name: "Sparkling water",
+                volumeMillilitres: 500,
+                isCaloric: false,
+                createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+                updatedAt: Date(timeIntervalSince1970: 1_800_000_000)
+            ),
+        ]
+    )
 }

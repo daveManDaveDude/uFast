@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FastingGoalOnboardingView: View {
     @Environment(\.applicationCommands) private var applicationCommands
+    @Environment(\.appTextResolver) private var textResolver
     @State private var selection = FastingGoal.default
     @State private var saveError: String?
 
@@ -16,13 +17,13 @@ struct FastingGoalOnboardingView: View {
 
                     HStack(alignment: .center, spacing: UFastTheme.Spacing.standard) {
                         VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                            Text("Your fasting goal")
+                            Text(textResolver(.onboardingTitle))
                                 .font(.uFastDisplay())
                                 .foregroundStyle(UFastTheme.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityAddTraits(.isHeader)
                                 .accessibilityIdentifier("screen-title.onboarding")
-                            Text("A calm, private companion for recording your fasts.")
+                            Text(textResolver(.onboardingPromise))
                                 .font(.body)
                                 .foregroundStyle(UFastTheme.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -35,16 +36,13 @@ struct FastingGoalOnboardingView: View {
 
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
                         UFastSectionHeading(
-                            "Choose what you intend to record",
-                            eyebrow: "8–24 whole hours"
+                            textResolver(.onboardingChoiceHeading),
+                            eyebrow: textResolver(.onboardingChoiceEyebrow)
                         )
-                        Text(
-                            "\(selection.hours) hours is selected. "
-                                + "You can change this later."
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(UFastTheme.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(textResolver(.onboardingSelectionSummary(hours: selection.hours)))
+                            .font(.subheadline)
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
 
                         FastingGoalPicker(selection: $selection)
                     }
@@ -63,7 +61,7 @@ struct FastingGoalOnboardingView: View {
                             .accessibilityIdentifier("goal.save-error")
                     }
 
-                    Button("Continue") {
+                    Button(textResolver(.continueAction)) {
                         saveSelection()
                     }
                     .buttonStyle(UFastPrimaryButtonStyle())
@@ -82,7 +80,7 @@ struct FastingGoalOnboardingView: View {
             guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
             try applicationCommands.completeOnboarding(goal: selection)
         } catch {
-            saveError = "Your goal couldn’t be saved. Please try again."
+            saveError = textResolver(.onboardingSaveError)
         }
     }
 }

@@ -1,10 +1,12 @@
 import SwiftUI
+import UFastCore
 
 // swiftlint:disable blanket_disable_command superfluous_disable_command
 // swiftlint:disable line_length statement_position
 
 struct HydrationEntryEditor: View {
     @Environment(\.calendar) private var calendar
+    @Environment(\.appTextResolver) private var textResolver
     @State private var type: HydrationDrinkType
     @State private var name: String
     @State private var volume: String
@@ -27,14 +29,6 @@ struct HydrationEntryEditor: View {
     let onDelete: ((Bool) throws -> Void)?
     let onCancel: () -> Void
 
-    init(record: HydrationEntryRecord?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: ((Bool) throws -> Void)?, onCancel: @escaping () -> Void) {
-        self.init(
-            snapshot: record.map(HydrationEntrySnapshot.init), clock: clock,
-            activeFastStart: activeFastStart, initialDraft: initialDraft,
-            allowedRange: allowedRange, onSave: onSave, onDelete: onDelete, onCancel: onCancel
-        )
-    }
-
     init(snapshot record: HydrationEntrySnapshot?, clock: any AppClock, activeFastStart: Date?, initialDraft: HydrationEntryDraft? = nil, allowedRange: Range<Date>? = nil, onSave: @escaping (HydrationEntryDraft, Bool) throws -> Void, onDelete: ((Bool) throws -> Void)?, onCancel: @escaping () -> Void) {
         self.record = record; self.clock = clock; self.activeFastStart = activeFastStart
         self.allowedRange = allowedRange
@@ -49,67 +43,87 @@ struct HydrationEntryEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Drink") {
-                    Picker("Type", selection: $type) {
-                        ForEach(HydrationDrinkType.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                Section(textResolver(.drinkSection)) {
+                    Picker(textResolver(.drinkType), selection: $type) {
+                        ForEach(HydrationDrinkType.allCases, id: \.self) {
+                            Text(textResolver(.drinkTypeName($0)))
+                                .tag($0)
+                                .accessibilityIdentifier("drink.type.\($0.rawValue)")
+                        }
                     }
-                    .accessibilityValue(type.displayName)
+                    .accessibilityValue(textResolver(.drinkTypeName(type)))
                     .accessibilityIdentifier("drink.type")
                     if type == .custom {
-                        TextField("Drink name", text: $name).accessibilityIdentifier("drink.name")
+                        TextField(textResolver(.drinkName), text: $name)
+                            .accessibilityIdentifier("drink.name")
                     }
-                    TextField("Amount (ml)", text: $volume)
+                    TextField(textResolver(.drinkAmount), text: $volume)
                         .keyboardType(.numberPad).accessibilityIdentifier("drink.volume")
                     if validVolume == nil {
-                        validation("Enter an amount from 1 to 5,000 ml.", id: "drink.volume.validation")
+                        validation(textResolver(.drinkVolumeValidation), id: "drink.volume.validation")
                     }
                     if type == .custom, HydrationEntryValidator.validatedCustomName(name) == nil {
-                        validation("Enter a drink name of 80 characters or fewer.", id: "drink.name.validation")
+                        validation(textResolver(.drinkNameValidation), id: "drink.name.validation")
                     }
                 }
-                Section("Time") {
-                    DatePicker("Date", selection: $occurredAt, in: datePickerRange, displayedComponents: .date)
+                Section(textResolver(.drinkTimeSection)) {
+                    DatePicker(textResolver(.date), selection: $occurredAt, in: datePickerRange, displayedComponents: .date)
                         .accessibilityIdentifier("drink.date")
-                    DatePicker("Time", selection: $occurredAt, in: datePickerRange, displayedComponents: .hourAndMinute)
+                    DatePicker(textResolver(.time), selection: $occurredAt, in: datePickerRange, displayedComponents: .hourAndMinute)
                         .accessibilityIdentifier("drink.time")
                 }
                 Section {
-                    Picker("Fasting classification", selection: $isCaloric) {
-                        Text("Non-caloric").tag(false)
-                        Text("Caloric").tag(true)
+                    Picker(textResolver(.drinkFastingClassification), selection: $isCaloric) {
+                        Text(textResolver(.drinkNonCaloric))
+                            .tag(false)
+                            .accessibilityIdentifier("drink.classification.non-caloric")
+                        Text(textResolver(.drinkCaloric))
+                            .tag(true)
+                            .accessibilityIdentifier("drink.classification.caloric")
                     }
                     .pickerStyle(.segmented)
-                    .accessibilityValue(isCaloric ? "Caloric" : "Non-caloric")
+                    .accessibilityValue(textResolver(.drinkPickerClassification(isCaloric: isCaloric)))
                     .accessibilityIdentifier("drink.caloric")
-                    Text("Used as a fasting boundary. If it falls during your active fast, saving it ends the fast at this time.")
+                    Text(textResolver(.drinkBoundaryExplanation))
                         .font(.footnote).foregroundStyle(UFastTheme.secondaryText)
                     if isAtActiveFastStart {
-                        validation("Choose a time after the fast started, or change the fast start time.", id: "drink.fast-start.validation")
+                        validation(textResolver(.drinkActiveStartValidation), id: "drink.fast-start.validation")
                     }
                 }
                 if let saveError {
                     Section { validation(saveError, id: "drink.editor.save-error") }
                 }
                 if onDelete != nil {
-                    Section { Button("Delete drink", role: .destructive) { showsDeleteConfirmation = true }.accessibilityIdentifier("drink.delete") }
+                    Section {
+                        Button(textResolver(.drinkDelete), role: .destructive) {
+                            showsDeleteConfirmation = true
+                        }
+                        .accessibilityIdentifier("drink.delete")
+                    }
                 }
             }
             .scrollContentBackground(.hidden).background(UFastTheme.canvas)
-            .navigationTitle(record == nil ? "Add another drink" : "Edit drink")
+            .navigationTitle(textResolver(.drinkTitle(isEditing: record != nil)))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button(textResolver(.cancel), action: onCancel)
                         .accessibilityIdentifier("drink.cancel")
                 }
-                ToolbarItem(placement: .confirmationAction) { Button(record == nil ? "Save drink" : "Save changes") { save() }.disabled(validDraft == nil).accessibilityIdentifier("drink.editor.save") }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(textResolver(.drinkSaveTitle(isEditing: record != nil))) { save() }
+                        .disabled(validDraft == nil)
+                        .accessibilityIdentifier("drink.editor.save")
+                }
             }
-            .alert("Delete this drink?", isPresented: $showsDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) { delete() }
-            } message: { Text("This removes it from your local record.") }
+            .alert(textResolver(.drinkDeleteConfirmationTitle), isPresented: $showsDeleteConfirmation) {
+                Button(textResolver(.cancel), role: .cancel) {}
+                    .accessibilityIdentifier("drink.delete.cancel")
+                Button(textResolver(.delete), role: .destructive) { delete() }
+                    .accessibilityIdentifier("drink.delete.confirm")
+            } message: { Text(textResolver(.localRecordRemoval)) }
             .alert(confirmationTitle, isPresented: $showsFastEndConfirmation) {
-                Button("Cancel", role: .cancel) {
+                Button(textResolver(.cancel), role: .cancel) {
                     pendingDraft = nil
                     pendingDeletion = false
                 }
@@ -150,15 +164,14 @@ struct HydrationEntryEditor: View {
     private func save() {
         guard let draft = validDraft else { return }
         do { try onSave(draft, false) }
-        catch let HydrationEntrySaveError.confirmationRequiredWithImpact(context) { showConfirmation(context, draft: draft) }
-        catch let HydrationEntrySaveError.completedConfirmationWithImpact(context) { showConfirmation(context, draft: draft) }
-        catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) { showConfirmation(context, draft: draft) }
-        catch HydrationEntrySaveError.confirmationRequired { showConfirmation(.init(fallbackKind: .active), draft: draft) }
-        catch HydrationEntrySaveError.completedFastConfirmationRequired { showConfirmation(.init(fallbackKind: .completed), draft: draft) }
-        catch HydrationEntrySaveError.inferredFastConfirmationRequired { showConfirmation(.init(fallbackKind: .inferred), draft: draft) }
-        catch HydrationEntrySaveError.eventAtActiveFastStart { saveError = "Choose a time after the fast started, or change the fast start time." }
-        catch HydrationEntrySaveError.fastConflict { saveError = "This fast overlaps another recorded fast. Correct the fast before saving." }
-        catch { saveError = "Your drink couldn’t be saved. Please try again." }
+        catch let error as HydrationEntrySaveError {
+            switch error.presentation {
+            case let .confirmation(context): showConfirmation(context, draft: draft)
+            case .eventAtActiveFastStart: saveError = textResolver(.drinkActiveStartValidation)
+            case .fastConflict: saveError = textResolver(.drinkConflictError)
+            case .saveFailure: saveError = textResolver(.drinkSaveError)
+            }
+        } catch { saveError = textResolver(.drinkSaveError) }
     }
 
     private func saveEndingFast() {
@@ -169,56 +182,56 @@ struct HydrationEntryEditor: View {
                 showsFastEndConfirmation = false
                 saveError = nil
             } catch {
-                saveError = "Your drink couldn’t be deleted. Please try again."
+                saveError = textResolver(.drinkDeleteError)
             }
             return
         }
-        guard let pendingDraft else { return }; do { try onSave(pendingDraft, true) } catch { saveError = "Your drink and fast couldn’t be saved. Please try again." }
+        guard let pendingDraft else { return }
+        do {
+            try onSave(pendingDraft, true)
+        } catch {
+            saveError = textResolver(.drinkCombinedSaveError)
+        }
     }
 
     private var confirmationTitle: String {
-        switch confirmationContext.kind {
-        case .active: "This entry is during your recorded fast."
-        case .completed: "This drink updates \(confirmationContext.affectedPersistedFastCount) recorded fast(s)."
-        case .inferred: "This drink updates inferred History."
-        }
+        textResolver(
+            .confirmationTitle(
+                confirmationContext.kind,
+                noun: .drink,
+                count: max(1, confirmationContext.affectedPersistedFastCount)
+            )
+        )
     }
 
     private var confirmationActionTitle: String {
         if pendingDeletion {
-            switch confirmationContext.kind {
-            case .active, .completed: return "Delete and update fast"
-            case .inferred: return "Delete and update History"
-            }
+            return textResolver(
+                .confirmationAction(.deleting, kind: confirmationContext.kind, noun: .drink)
+            )
         }
-        switch confirmationContext.kind {
-        case .active: return "Save and end fast"
-        case .completed: return "Save and update fast"
-        case .inferred: return "Save and update History"
-        }
+        return textResolver(
+            .confirmationAction(.saving, kind: confirmationContext.kind, noun: .drink)
+        )
     }
 
     private var confirmationMessage: String {
         let time = occurredAt.formatted(date: .omitted, time: .shortened)
-        let action = pendingDeletion ? "Deleting" : "Saving"
-        let consequence = switch confirmationContext.kind {
-        case .active:
-            Self.activeConfirmationMessage(
-                context: confirmationContext,
+        let action: AppText.CaloricEventConfirmationAction = pendingDeletion ? .deleting : .saving
+        var details = textResolver(
+            .confirmationMessage(
                 action: action,
+                kind: confirmationContext.kind,
+                noun: .drink,
+                count: max(1, confirmationContext.affectedPersistedFastCount),
                 time: time
             )
-        case .completed:
-            "\(action) this caloric drink updates \(confirmationContext.affectedPersistedFastCount) recorded fast(s) at \(time)."
-        case .inferred:
-            "\(action) this caloric drink refreshes derived inferred History at \(time)."
-        }
-        var details = consequence
+        )
         if confirmationContext.includesReconstructedReview {
-            details += " At least one affected fast is reconstructed and will be marked for review."
+            details += " " + textResolver(.reconstructedReviewDetail)
         }
         if confirmationContext.isCombined {
-            details += " It also refreshes the derived inferred interval."
+            details += " " + textResolver(.inferredIntervalDetail)
         }
         return details
     }
@@ -226,14 +239,14 @@ struct HydrationEntryEditor: View {
     private func delete() {
         do {
             try onDelete?(false)
-        } catch let HydrationEntrySaveError.confirmationRequiredWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let HydrationEntrySaveError.completedConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
-        } catch let HydrationEntrySaveError.inferredConfirmationWithImpact(context) {
-            showConfirmation(context, pendingDeletion: true)
+        } catch let error as HydrationEntrySaveError {
+            if case let .confirmation(context) = error.presentation {
+                showConfirmation(context, pendingDeletion: true)
+            } else {
+                saveError = textResolver(.drinkDeleteError)
+            }
         } catch {
-            saveError = "Your drink couldn’t be deleted. Please try again."
+            saveError = textResolver(.drinkDeleteError)
         }
     }
 
@@ -255,9 +268,15 @@ extension HydrationEntryEditor {
         action: String,
         time: String
     ) -> String {
-        guard context.affectedPersistedFastCount > 1 else {
-            return "\(action) this caloric drink records it and ends your fast at \(time)."
-        }
-        return "Ending your active fast at \(time) updates \(context.affectedPersistedFastCount) persisted fasts."
+        let confirmationAction: AppText.CaloricEventConfirmationAction = action == "Deleting" ? .deleting : .saving
+        return AppTextResolver()(
+            .confirmationMessage(
+                action: confirmationAction,
+                kind: .active,
+                noun: .drink,
+                count: max(1, context.affectedPersistedFastCount),
+                time: time
+            )
+        )
     }
 }

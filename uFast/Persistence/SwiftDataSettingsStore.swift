@@ -20,9 +20,15 @@ enum SettingsStoreError: Error, Equatable {
 final class SwiftDataSettingsStore {
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
+    private let diagnosticSink: any DiagnosticEventSink
 
-    init(modelContext: ModelContext, simulateSaveFailure: Bool = false) {
+    init(
+        modelContext: ModelContext,
+        simulateSaveFailure: Bool = false,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+    ) {
         self.modelContext = modelContext
+        self.diagnosticSink = diagnosticSink
         transaction = PersistenceTransaction(
             modelContext: modelContext,
             saveAction: simulateSaveFailure ? {
@@ -35,15 +41,17 @@ final class SwiftDataSettingsStore {
         let records = try sortedRecords()
         guard records.count > 1 else { return }
         guard records.dropFirst().allSatisfy({ $0.userVisibleSnapshot == records[0].userVisibleSnapshot }) else {
+            recordAuthorityConflict(count: records.count)
             throw SettingsStoreError.conflictingAuthorities(count: records.count)
         }
         records.dropFirst().forEach(modelContext.delete)
-        try transaction.save()
+        try saveTransaction(recordFailure: false)
     }
 
     func authoritativeRecord() throws -> AppSettingsRecord? {
         let records = try sortedRecords()
         guard records.count <= 1 else {
+            recordAuthorityConflict(count: records.count)
             throw SettingsStoreError.conflictingAuthorities(count: records.count)
         }
         return records.first
@@ -55,14 +63,14 @@ final class SwiftDataSettingsStore {
             let snapshot = existing.userVisibleSnapshot
             existing.setFastingGoal(goal)
             existing.completeOnboarding()
-            try transaction.save {
+            try saveTransaction {
                 existing.restore(from: snapshot)
             }
             return existing
         }
         let settings = AppSettingsRecord(fastingGoal: goal, hasCompletedOnboarding: true)
         modelContext.insert(settings)
-        try transaction.save()
+        try saveTransaction()
         return settings
     }
 
@@ -70,7 +78,7 @@ final class SwiftDataSettingsStore {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
         settings.setFastingGoal(goal)
-        try transaction.save {
+        try saveTransaction {
             settings.restore(from: snapshot)
         }
     }
@@ -79,7 +87,7 @@ final class SwiftDataSettingsStore {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
         settings.setHydrationFavourites(water: water, tea: tea, coffee: coffee)
-        try transaction.save {
+        try saveTransaction {
             settings.restore(from: snapshot)
         }
     }
@@ -90,7 +98,7 @@ final class SwiftDataSettingsStore {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
         settings.setAutomaticLiveActivityPreference(preference)
-        try transaction.save {
+        try saveTransaction {
             settings.restore(from: snapshot)
         }
     }
@@ -99,7 +107,7 @@ final class SwiftDataSettingsStore {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
         settings.setInferredFastDetectionEnabled(enabled)
-        try transaction.save {
+        try saveTransaction {
             settings.restore(from: snapshot)
         }
     }
@@ -114,5 +122,31 @@ final class SwiftDataSettingsStore {
     private func sortedRecords() throws -> [AppSettingsRecord] {
         try modelContext.fetch(FetchDescriptor<AppSettingsRecord>())
             .sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
+    private func saveTransaction(
+        recovering recovery: @escaping () -> Void = {},
+        recordFailure: Bool = true
+    ) throws {
+        do {
+            try transaction.save(recovering: recovery)
+        } catch {
+            if recordFailure {
+                PersistenceTransactionDiagnostics.recordFailure(to: diagnosticSink)
+            }
+            throw error
+        }
+    }
+
+    private func recordAuthorityConflict(count: Int) {
+        guard let event = DiagnosticEvent(
+            subsystem: .persistence,
+            outcome: .authorityConflict,
+            severity: .error,
+            countBucket: DiagnosticCountBucket(count: count)
+        ) else {
+            return
+        }
+        diagnosticSink.record(event)
     }
 }

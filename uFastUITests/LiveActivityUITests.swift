@@ -46,11 +46,7 @@ final class LiveActivityUITests: XCTestCase {
         XCTAssertTrue(offer.waitForNonExistence(timeout: 5), app.debugDescription)
 
         app.terminate()
-        app.launchArguments = [
-            "--ui-testing",
-            "--fixed-now",
-            String(fixedNow.timeIntervalSince1970),
-        ]
+        app.launchArguments = UITestLaunchConfiguration(fixedNow: fixedNow).arguments
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5))
         XCTAssertTrue(offer.waitForNonExistence(timeout: 5), app.debugDescription)
@@ -88,11 +84,7 @@ final class LiveActivityUITests: XCTestCase {
         XCTAssertEqual(toggle.value as? String, "1")
 
         app.terminate()
-        app.launchArguments = [
-            "--ui-testing",
-            "--fixed-now",
-            String(fixedNow.timeIntervalSince1970),
-        ]
+        app.launchArguments = UITestLaunchConfiguration(fixedNow: fixedNow).arguments
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5), app.debugDescription)
         app.tabBars.buttons["Today"].tap()
@@ -135,7 +127,7 @@ final class LiveActivityUITests: XCTestCase {
 
     @MainActor
     func testDisabledLiveActivityShowsTheSettledStatusAndDoesNotMutateTheFast() {
-        let app = launchLiveActivityApp(additionalArguments: ["--simulate-live-activity-disabled"])
+        let app = launchLiveActivityApp(simulateLiveActivityDisabled: true)
         startFast(in: app)
         showLiveActivity(in: app)
 
@@ -148,7 +140,7 @@ final class LiveActivityUITests: XCTestCase {
 
     @MainActor
     func testRequestFailureUsesSettledCopyAndLeavesActivityAvailableForRetry() {
-        let app = launchLiveActivityApp(additionalArguments: ["--simulate-live-activity-request-failure"])
+        let app = launchLiveActivityApp(simulateLiveActivityRequestFailure: true)
         startFast(in: app)
         showLiveActivity(in: app)
 
@@ -162,17 +154,14 @@ final class LiveActivityUITests: XCTestCase {
     @MainActor
     func testUpdateRecoveryUsesDeterministicBuildIdentityAndDoesNotRepeatOnSameBuild() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--fixed-now",
-            String(fixedNow.timeIntervalSince1970),
-            "--reset-data",
-            "--seed-active-fast-start",
-            String(fixedNow.addingTimeInterval(-60 * 60).timeIntervalSince1970),
-            "--seed-live-activity-recovery",
-            "--live-activity-build",
-            "B",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            fixedNow: fixedNow,
+            seedActiveFastStart: fixedNow.addingTimeInterval(-60 * 60),
+            seedLiveActivityRecovery: true,
+            liveActivityRelease: "1.0.0",
+            liveActivityBuild: "B"
+        ).arguments
         app.launch()
 
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5), app.debugDescription)
@@ -182,13 +171,11 @@ final class LiveActivityUITests: XCTestCase {
         )
         app.terminate()
 
-        app.launchArguments = [
-            "--ui-testing",
-            "--fixed-now",
-            String(fixedNow.timeIntervalSince1970),
-            "--live-activity-build",
-            "B",
-        ]
+        app.launchArguments = UITestLaunchConfiguration(
+            fixedNow: fixedNow,
+            liveActivityRelease: "1.0.0",
+            liveActivityBuild: "B"
+        ).arguments
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(
@@ -199,14 +186,17 @@ final class LiveActivityUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchLiveActivityApp(additionalArguments: [String] = []) -> XCUIApplication {
+    private func launchLiveActivityApp(
+        simulateLiveActivityDisabled: Bool = false,
+        simulateLiveActivityRequestFailure: Bool = false
+    ) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--fixed-now",
-            String(fixedNow.timeIntervalSince1970),
-            "--reset-data",
-        ] + additionalArguments
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            fixedNow: fixedNow,
+            simulateLiveActivityDisabled: simulateLiveActivityDisabled,
+            simulateLiveActivityRequestFailure: simulateLiveActivityRequestFailure
+        ).arguments
         app.launch()
         completeOnboarding(in: app)
         return app

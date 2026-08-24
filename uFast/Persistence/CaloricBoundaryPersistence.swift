@@ -38,6 +38,15 @@ struct FastRecordMutationSnapshot {
 @MainActor
 struct CaloricBoundaryPersistencePlanner {
     let modelContext: ModelContext
+    let observationSink: BoundaryQueryObservationSink
+
+    init(
+        modelContext: ModelContext,
+        observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink()
+    ) {
+        self.modelContext = modelContext
+        self.observationSink = observationSink
+    }
 
     func allBoundaries(excluding excluded: CaloricBoundaryReference? = nil) throws -> [CaloricBoundary] {
         let foods = try modelContext.fetch(FetchDescriptor<FoodEntryRecord>()).map {
@@ -62,6 +71,118 @@ struct CaloricBoundaryPersistencePlanner {
 
     func fasts() throws -> [FastRecord] {
         try modelContext.fetch(FetchDescriptor<FastRecord>())
+    }
+
+    // swiftlint:disable function_body_length cyclomatic_complexity
+    /// Returns only the event/fast neighbourhood permitted for an ordinary
+    /// mutation after the D-035 store-open reconciliation has succeeded. The
+    /// reconciler intentionally continues to use `allBoundaries()` and
+    /// `fasts()` as its lifetime repair pass.
+    func boundedNeighborhood(
+        for mutation: CaloricBoundaryMutation,
+        currentGoal: FastingGoal
+    ) throws -> (boundaries: [CaloricBoundary], fasts: [FastRecord]) {
+        let boundaryIdentityUnchanged = mutation.oldReference != nil
+            && mutation.oldIsCaloric
+            && mutation.oldOccurredAt == mutation.newBoundary?.occurredAt
+        let noBoundaryAfterMutation = mutation.newBoundary == nil && !mutation.oldIsCaloric
+        if boundaryIdentityUnchanged || noBoundaryAfterMutation {
+            return ([], [])
+        }
+        let query = SwiftDataCaloricBoundaryQueryAdapter(
+            modelContext: modelContext,
+            observationSink: observationSink
+        )
+        let dates = [mutation.oldOccurredAt, mutation.newBoundary?.occurredAt].compactMap(\.self)
+        var foods: [FoodEntryRecord] = []
+        var hydration: [HydrationEntryRecord] = []
+        var fastsByID: [UUID: FastRecord] = [:]
+        var boundaryIDs = Set<CaloricBoundaryReference>()
+        let predecessorWindow = InferredFastProjector.maximumDuration(for: currentGoal)
+
+        for date in dates {
+            let exactFoods = try query.exactFood(at: date)
+            let exactHydration = try query.exactCaloricHydration(at: date)
+            foods.append(contentsOf: exactFoods)
+            hydration.append(contentsOf: exactHydration)
+            for record in exactFoods {
+                boundaryIDs.insert(.init(kind: .food, id: record.id))
+            }
+            for record in exactHydration {
+                boundaryIDs.insert(.init(kind: .hydration, id: record.id))
+            }
+
+            // One nearest predecessor per entity gives the canonical ordering
+            // context without loading unrelated rows between the two points.
+            let lowerBound = date.addingTimeInterval(-predecessorWindow)
+            if let predecessor = try query.nearestFood(before: date, notBefore: lowerBound).first {
+                foods.append(predecessor)
+                boundaryIDs.insert(.init(kind: .food, id: predecessor.id))
+                for fast in try query.fasts(overlapping: predecessor.occurredAt) {
+                    fastsByID[fast.id] = fast
+                }
+            }
+            if let predecessor = try query.nearestCaloricHydration(before: date, notBefore: lowerBound).first {
+                hydration.append(predecessor)
+                boundaryIDs.insert(.init(kind: .hydration, id: predecessor.id))
+                for fast in try query.fasts(overlapping: predecessor.occurredAt) {
+                    fastsByID[fast.id] = fast
+                }
+            }
+
+            for fast in try query.fasts(overlapping: date) {
+                fastsByID[fast.id] = fast
+            }
+        }
+
+        if let oldReference = mutation.oldReference {
+            for fast in try query.reconstructedFasts(endingWith: oldReference) {
+                fastsByID[fast.id] = fast
+            }
+        }
+
+        let allSelectedBoundaries = CaloricBoundaryExtractor.boundaries(
+            food: foods.map {
+                FoodBoundarySnapshot(
+                    id: $0.id,
+                    occurredAt: $0.occurredAt,
+                    description: $0.foodDescription,
+                    isCaloric: true
+                )
+            },
+            hydration: hydration.map {
+                HydrationBoundarySnapshot(
+                    id: $0.id,
+                    occurredAt: $0.occurredAt,
+                    description: $0.displayName,
+                    isCaloric: true
+                )
+            }
+        )
+        let resultBoundaries = allSelectedBoundaries
+            .filter { $0.reference != mutation.oldReference }
+            .adding(mutation.newBoundary)
+            .filter { boundaryIDs.contains($0.reference) || $0.reference == mutation.newBoundary?.reference }
+        return (resultBoundaries, Array(fastsByID.values))
+    }
+
+    // swiftlint:enable function_body_length cyclomatic_complexity
+
+    func boundedMutation(
+        for mutation: CaloricBoundaryMutation,
+        currentGoal: FastingGoal
+    ) throws -> (mutation: CaloricBoundaryMutation, fasts: [FastRecord]) {
+        let neighborhood = try boundedNeighborhood(for: mutation, currentGoal: currentGoal)
+        return (
+            CaloricBoundaryMutation(
+                oldReference: mutation.oldReference,
+                oldOccurredAt: mutation.oldOccurredAt,
+                oldIsCaloric: mutation.oldIsCaloric,
+                newBoundary: mutation.newBoundary,
+                resultingBoundaries: neighborhood.boundaries
+            ),
+            neighborhood.fasts
+        )
     }
 
     func snapshots(for fasts: [FastRecord]) -> [UUID: FastRecordMutationSnapshot] {

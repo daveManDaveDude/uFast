@@ -196,7 +196,7 @@ extension TemporalRibbonView {
         let orderedItems = semanticOrder(intervals: visibleIntervals, eventItems: eventItems)
         return VStack(spacing: 0) {
             if orderedItems.isEmpty {
-                Text(emptySemanticMessage)
+                Text(emptySemanticMessage ?? textResolver(.historyCopy(.timelineEmpty)))
                     .foregroundStyle(UFastTheme.secondaryText)
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .accessibilityIdentifier("temporal.empty")
@@ -222,8 +222,11 @@ extension TemporalRibbonView {
                         .buttonStyle(.plain)
                         .disabled(!isInteractive)
                         .accessibilityLabel(item.accessibilityLabel)
-                        .accessibilityValue(item.eventGroup.map { String($0.count) } ?? "")
-                        .accessibilityHint("Opens details and available actions.")
+                        .accessibilityValue(
+                            item.eventGroup.map { String($0.count) }
+                                ?? textResolver(.historyCopy(.empty))
+                        )
+                        .accessibilityHint(textResolver(.historyCopy(.memberDetailHint)))
                         .accessibilityIdentifier(item.identifier)
                     }
                     if item.semanticID != orderedItems.last?.semanticID {

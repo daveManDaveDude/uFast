@@ -31,7 +31,10 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
             app.swipeUp()
         }
         app.buttons["drink.delete"].tap()
-        app.alerts["Delete this drink?"].buttons["Delete"].tap()
+        let deleteAlert = app.alerts.firstMatch
+        XCTAssertTrue(deleteAlert.waitForExistence(timeout: 2), app.debugDescription)
+        deleteAlert.descendants(matching: .any)
+            .matching(identifier: "drink.delete.confirm").firstMatch.tap()
         XCTAssertEqual(app.staticTexts["drink.total"].label, "0 ml")
         XCTAssertTrue(app.staticTexts["timeline.empty"].exists)
     }
@@ -42,10 +45,11 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
         openCustomEditor(in: app)
         app.textFields["drink.name"].tap(); app.textFields["drink.name"].typeText("Juice")
         app.textFields["drink.volume"].tap(); app.textFields["drink.volume"].typeText("200")
-        app.buttons["Caloric"].tap()
+        app.buttons["drink.classification.caloric"].tap()
         app.buttons["drink.editor.save"].tap()
-        let alert = app.alerts["This entry is during your recorded fast."]
+        let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        XCTAssertTrue(alert.staticTexts["This entry is during your recorded fast."].exists)
         XCTAssertTrue(
             alert.descendants(matching: .any)
                 .matching(identifier: "drink.confirmation.primary").firstMatch.exists
@@ -54,13 +58,41 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
             alert.descendants(matching: .any)
                 .matching(identifier: "drink.confirmation.cancel").firstMatch.exists
         )
-        XCTAssertTrue(alert.buttons["Save and end fast"].exists)
+        XCTAssertEqual(
+            alert.descendants(matching: .any)
+                .matching(identifier: "drink.confirmation.primary").firstMatch.label,
+            "Save and end fast"
+        )
         XCTAssertFalse(alert.buttons["Save entry only"].exists)
         alert.descendants(matching: .any)
             .matching(identifier: "drink.confirmation.cancel").firstMatch.tap()
-        app.buttons["Cancel"].tap()
+        app.buttons["drink.cancel"].tap()
         XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
         XCTAssertFalse(app.staticTexts["Juice"].exists)
+    }
+
+    @MainActor
+    func testPseudolocalizedCaloricDrinkConfirmationUsesStableIdentifiers() {
+        let app = launch(activeFastStart: now.addingTimeInterval(-3600), pseudolocalization: true)
+        openCustomEditor(in: app)
+        app.textFields["drink.name"].tap(); app.textFields["drink.name"].typeText("Juice")
+        app.textFields["drink.volume"].tap(); app.textFields["drink.volume"].typeText("200")
+        app.buttons["drink.classification.caloric"].tap()
+        app.buttons["drink.editor.save"].tap()
+
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), app.debugDescription)
+        let primary = alert.descendants(matching: .any)
+            .matching(identifier: "drink.confirmation.primary").firstMatch
+        let consequence = alert.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH '［'"))
+            .firstMatch
+        XCTAssertTrue(primary.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(consequence.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(primary.label.hasPrefix("［"), app.debugDescription)
+        XCTAssertTrue(consequence.label.hasPrefix("［"), app.debugDescription)
+        primary.tap()
+        XCTAssertTrue(app.staticTexts["fast.inactive-state"].waitForExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor
@@ -120,23 +152,20 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
         }
         add.tap()
         app.buttons["drink.custom"].tap()
-        XCTAssertTrue(app.navigationBars["Add another drink"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.textFields["drink.name"].waitForExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor
-    private func launch(activeFastStart: Date? = nil) -> XCUIApplication {
+    private func launch(activeFastStart: Date? = nil, pseudolocalization: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "--ui-testing",
-            "--reset-data",
-            "--seed-onboarded",
-            "--fixed-now",
-            String(now.timeIntervalSince1970),
-            "--suppress-automatic-live-activity-offer",
-        ]
-        if let activeFastStart {
-            app.launchArguments += ["--seed-active-fast-start", String(activeFastStart.timeIntervalSince1970)]
-        }
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            pseudolocalization: pseudolocalization,
+            seedOnboarded: true,
+            fixedNow: now,
+            seedActiveFastStart: activeFastStart,
+            suppressAutomaticLiveActivityOffer: true
+        ).arguments
         app.launch()
         XCTAssertTrue(app.buttons["drink.add"].waitForExistence(timeout: 2))
         return app

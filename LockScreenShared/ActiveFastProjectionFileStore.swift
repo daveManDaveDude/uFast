@@ -1,5 +1,4 @@
 import Foundation
-import OSLog
 
 protocol ActiveFastProjectionStore: Sendable {
     func read() throws -> ActiveFastWidgetProjection?
@@ -87,17 +86,26 @@ protocol ActiveFastProjectionReloading: Sendable {
     func reloadTimelines()
 }
 
+// SwiftLint's analyzer does not attribute references from the separate app
+// target back to this shared source file.
+// swiftlint:disable unused_declaration
 /// Keeps the widget's disposable projection strictly downstream of committed
 /// fasting changes. Errors are intentionally reported to the caller but do not
 /// affect the already-committed source record.
 struct ActiveFastProjectionCoordinator: Sendable {
-    private static let logger = Logger(
-        subsystem: "com.davidmcgrath.uFast",
-        category: "WidgetProjection"
-    )
-
     let store: any ActiveFastProjectionStore
     let reloader: any ActiveFastProjectionReloading
+    let diagnosticSink: any DiagnosticEventSink
+
+    init(
+        store: any ActiveFastProjectionStore,
+        reloader: any ActiveFastProjectionReloading,
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+    ) {
+        self.store = store
+        self.reloader = reloader
+        self.diagnosticSink = diagnosticSink
+    }
 
     func publish(
         activeRecordIdentifier: UUID,
@@ -115,10 +123,9 @@ struct ActiveFastProjectionCoordinator: Sendable {
         )
         do {
             try store.write(projection)
-            Self.logger.notice("Active fast projection written; requesting widget reload")
             reloader.reloadTimelines()
         } catch {
-            Self.logger.error("Active fast projection publish failed: \(String(describing: error), privacy: .public)")
+            record(.publishFailed)
             // The SwiftData commit is authoritative and must never be rolled back.
         }
     }
@@ -126,20 +133,30 @@ struct ActiveFastProjectionCoordinator: Sendable {
     func clear() {
         do {
             try store.clear()
-            Self.logger.notice("Active fast projection cleared; requesting widget reload")
             reloader.reloadTimelines()
         } catch {
-            Self.logger.error("Active fast projection clear failed: \(String(describing: error), privacy: .public)")
+            record(.clearFailed)
             // If removal fails after a committed end, hide any old JSON before
             // reloading. This keeps the Lock Screen projection fail-closed.
             do {
                 try store.invalidate()
-                Self.logger.notice("Projection invalidation marker written; requesting widget reload")
                 reloader.reloadTimelines()
             } catch {
-                Self.logger.error("Projection invalidation failed: \(String(describing: error), privacy: .public)")
                 // The authoritative SwiftData record remains unchanged either way.
             }
         }
     }
+
+    private func record(_ outcome: DiagnosticOutcome) {
+        guard let event = DiagnosticEvent(
+            subsystem: .widgetProjection,
+            outcome: outcome,
+            severity: .error
+        ) else {
+            return
+        }
+        diagnosticSink.record(event)
+    }
 }
+
+// swiftlint:enable unused_declaration

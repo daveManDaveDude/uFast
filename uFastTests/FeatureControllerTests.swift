@@ -33,7 +33,10 @@ final class FeatureControllerTests: XCTestCase {
 
         commands.completions[1](.init(widgetError: nil, liveActivityResult: .requestFailed))
         XCTAssertEqual(accepted, 1)
-        XCTAssertEqual(controller.liveActivityStatus, ActiveFastLiveActivityStatusCopy.requestFailure)
+        XCTAssertEqual(
+            controller.liveActivityStatus,
+            AppTextResolver()(.liveActivityStatus(.requestFailed))
+        )
     }
 
     func testSettingsLoadsSnapshotAndRestoresGoalAfterFailure() {

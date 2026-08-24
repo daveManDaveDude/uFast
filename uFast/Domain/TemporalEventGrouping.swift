@@ -7,20 +7,6 @@ import Foundation
 enum TemporalEventFamily: String, CaseIterable, Equatable, Hashable, Sendable {
     case food
     case hydration
-
-    var singularName: String {
-        switch self {
-        case .food: "food event"
-        case .hydration: "drink"
-        }
-    }
-
-    var pluralName: String {
-        switch self {
-        case .food: "food events"
-        case .hydration: "drinks"
-        }
-    }
 }
 
 /// Presentation categories are intentionally more specific than the storage
@@ -162,26 +148,12 @@ struct TemporalEventGroup: Identifiable, Equatable, Sendable {
         count > 99 ? "99+" : String(count)
     }
 
-    var classificationSummary: String {
-        switch presentationCategory {
-        case .food:
-            "Caloric food"
-        case .caloricDrink:
-            "Caloric drink"
-        case .nonCaloricDrink:
-            "Non-caloric drink"
-        }
-    }
-
-    var allTitlesMatch: Bool {
-        Set(members.map(\.title)).count == 1
-    }
-
-    var summaryTitle: String {
-        if allTitlesMatch, let firstTitle = members.first?.title {
-            return "\(firstTitle) ×\(count)"
-        }
-        return "\(count) \(family.pluralName)"
+    /// Returns the shared member title when the group can use it as a
+    /// presentation title. Family/count wording belongs to the catalog-backed
+    /// History presentation layer, not to the grouping domain model.
+    var commonMemberTitle: String? {
+        guard Set(members.map(\.title)).count == 1 else { return nil }
+        return members.first?.title
     }
 }
 

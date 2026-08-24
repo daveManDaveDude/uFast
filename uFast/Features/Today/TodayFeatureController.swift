@@ -99,10 +99,15 @@ final class TodayFeatureController {
     var liveActivityStatus: String?
 
     @ObservationIgnored private weak var commands: (any TodayFeatureCommanding)?
+    @ObservationIgnored private var textResolver = AppTextResolver()
     @ObservationIgnored private var outcomeRevision = 0
 
     func connect(commands: (any TodayFeatureCommanding)?) {
         self.commands = commands
+    }
+
+    func setTextResolver(_ resolver: AppTextResolver) {
+        textResolver = resolver
     }
 
     func startFast(goal: FastingGoal, onOutcome: @escaping () -> Void) {
@@ -115,7 +120,7 @@ final class TodayFeatureController {
             startError = nil
             fastRecorded = false
         } catch {
-            startError = "Your fast couldn’t be started. Please try again."
+            startError = textResolver(.todayStartError)
         }
     }
 
@@ -148,7 +153,7 @@ final class TodayFeatureController {
             endError = nil
             fastRecorded = true
         } catch {
-            endError = "Your fast couldn’t be ended. Please try again."
+            endError = textResolver(.todayEndError)
         }
     }
 
@@ -222,7 +227,9 @@ final class TodayFeatureController {
     }
 
     func setLiveActivityStatus(_ result: ActiveFastLiveActivityResult) {
-        liveActivityStatus = ActiveFastLiveActivityStatusCopy.message(for: result)
+        liveActivityStatus = ActiveFastLiveActivityStatus.status(for: result).map {
+            textResolver(.liveActivityStatus($0))
+        }
     }
 
     private func nextOutcomeRevision() -> Int {

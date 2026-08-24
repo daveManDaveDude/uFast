@@ -1,16 +1,18 @@
 import SwiftUI
 
 struct PersistenceUnavailableView: View {
+    @Environment(\.appTextResolver) private var textResolver
+
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "externaldrive.badge.exclamationmark")
                 .font(.largeTitle)
                 .accessibilityHidden(true)
-            Text("Your local data couldn’t be opened")
+            Text(textResolver(.persistenceUnavailableTitle))
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("persistence.unavailable.title")
-            Text("Nothing was deleted or replaced. Close uFast and try again.")
+            Text(textResolver(.persistenceUnavailableMessage))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("persistence.unavailable.message")

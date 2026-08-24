@@ -16,6 +16,8 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedFavouriteValidation = false
     var seedCaloricFavouriteActiveFast = false
     var seedInferredFast = false
+    var seedTodayMultiYear = false
+    var seedCaloricBoundaryMultiYear = false
 
     static let disabled = Self()
 }
@@ -31,6 +33,7 @@ enum LiveActivityAdapterConfiguration: Equatable {
 
 struct AppLaunchConfiguration {
     let isUITesting: Bool
+    let pseudolocalizationEnabled: Bool
     let fixedNow: Date?
     let fixtures: DevelopmentFixtureConfiguration
     let commands: ApplicationCommandConfiguration
@@ -39,15 +42,18 @@ struct AppLaunchConfiguration {
     let simulatePersistenceBootstrapFailure: Bool
     let suppressAutomaticLiveActivityOffer: Bool
     let startsOnHistory: Bool
+    let historyMotionRetryFixture: Bool
 
     static func current() -> Self {
         Self(arguments: ProcessInfo.processInfo.arguments)
     }
 
+    // swiftlint:disable:next function_body_length
     init(arguments: [String]) {
         let isUITesting = arguments.contains("--ui-testing")
         self.isUITesting = isUITesting
         guard isUITesting else {
+            pseudolocalizationEnabled = false
             fixedNow = nil
             fixtures = .disabled
             commands = .init()
@@ -56,9 +62,11 @@ struct AppLaunchConfiguration {
             simulatePersistenceBootstrapFailure = false
             suppressAutomaticLiveActivityOffer = false
             startsOnHistory = false
+            historyMotionRetryFixture = false
             return
         }
 
+        pseudolocalizationEnabled = arguments.contains("--ui-testing-pseudolocalization")
         fixedNow = Self.date(after: "--fixed-now", in: arguments)
         fixtures = DevelopmentFixtureConfiguration(
             resetData: arguments.contains("--reset-data"),
@@ -77,7 +85,11 @@ struct AppLaunchConfiguration {
             seedFavouriteDuplicateName: arguments.contains("--seed-favourite-duplicate-name"),
             seedFavouriteValidation: arguments.contains("--seed-favourite-validation"),
             seedCaloricFavouriteActiveFast: arguments.contains("--seed-caloric-favourite-active-fast"),
-            seedInferredFast: arguments.contains("--seed-inferred-fast")
+            seedInferredFast: arguments.contains("--seed-inferred-fast"),
+            seedTodayMultiYear: arguments.contains("--seed-today-multi-year"),
+            seedCaloricBoundaryMultiYear: arguments.contains(
+                "--seed-caloric-boundary-multi-year"
+            )
         )
         commands = Self.commandConfiguration(from: arguments)
         liveActivityAdapter = Self.liveActivityAdapterConfiguration(from: arguments)
@@ -89,6 +101,7 @@ struct AppLaunchConfiguration {
             "--suppress-automatic-live-activity-offer"
         )
         startsOnHistory = arguments.contains("--ui-testing-start-history")
+        historyMotionRetryFixture = arguments.contains("--ui-testing-history-retry-fixture")
     }
 
     private static func commandConfiguration(from arguments: [String]) -> ApplicationCommandConfiguration {

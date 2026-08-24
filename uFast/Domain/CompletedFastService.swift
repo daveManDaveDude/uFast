@@ -12,14 +12,34 @@ enum CompletedFastOrdering {
 }
 
 @MainActor
-protocol CompletedFastRepository {
+protocol CompletedFastRepository: CaloricBoundaryQuerying {
     func recordedFasts() throws -> [FastRecord]
+    func hasRecordedFastConflict(
+        proposedStart: Date,
+        proposedEnd: Date?,
+        excluding excludedID: UUID?
+    ) throws -> Bool
     func updateCompletedFast(
         id: UUID,
         startDate: Date,
         endDate: Date
     ) throws -> FastRecord
     func deleteCompletedFast(id: UUID) throws
+}
+
+extension CompletedFastRepository {
+    func hasRecordedFastConflict(
+        proposedStart: Date,
+        proposedEnd: Date?,
+        excluding excludedID: UUID?
+    ) throws -> Bool {
+        try FastConflictChecker.hasConflict(
+            proposedStart: proposedStart,
+            proposedEnd: proposedEnd,
+            excluding: excludedID,
+            among: recordedFasts().map(\.recordedInterval)
+        )
+    }
 }
 
 @MainActor
@@ -68,12 +88,10 @@ final class CompletedFastService {
             return .crossesCaloricBoundary(boundary.occurredAt)
         }
 
-        let intervals = try repository.recordedFasts().map(\.recordedInterval)
-        guard !FastConflictChecker.hasConflict(
+        guard try !repository.hasRecordedFastConflict(
             proposedStart: startDate,
             proposedEnd: endDate,
-            excluding: id,
-            among: intervals
+            excluding: id
         ) else {
             return .conflict
         }
@@ -82,10 +100,7 @@ final class CompletedFastService {
     }
 
     private func crossingBoundary(startDate: Date, endDate: Date) throws -> CaloricBoundary? {
-        guard let query = repository as? any CaloricBoundaryQuerying else { return nil }
-        return try query.savedCaloricBoundaries().first {
-            $0.occurredAt > startDate && endDate > $0.occurredAt
-        }
+        try repository.firstCaloricBoundary(in: startDate ..< endDate)
     }
 
     @discardableResult
@@ -144,11 +159,10 @@ final class CompletedFastCreationService {
         if let boundary = try crossingBoundary(startDate: startDate, endDate: endDate) {
             throw CompletedFastError.crossesCaloricBoundary(boundary.occurredAt)
         }
-        let intervals = try repository.recordedFasts().map(\.recordedInterval)
-        guard !FastConflictChecker.hasConflict(
+        guard try !repository.hasRecordedFastConflict(
             proposedStart: startDate,
             proposedEnd: endDate,
-            among: intervals
+            excluding: nil
         ) else {
             throw CompletedFastError.conflict
         }
@@ -159,9 +173,6 @@ final class CompletedFastCreationService {
     }
 
     private func crossingBoundary(startDate: Date, endDate: Date) throws -> CaloricBoundary? {
-        guard let query = repository as? any CaloricBoundaryQuerying else { return nil }
-        return try query.savedCaloricBoundaries().first {
-            $0.occurredAt > startDate && endDate > $0.occurredAt
-        }
+        try repository.firstCaloricBoundary(in: startDate ..< endDate)
     }
 }

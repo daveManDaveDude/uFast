@@ -4,7 +4,7 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testFirstUseDefaultsToTwelveAndPersistsSelectedGoalAcrossRelaunch() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = launchArguments(resetData: true)
         app.launch()
 
         XCTAssertTrue(app.staticTexts["goal.promise"].waitForExistence(timeout: 2))
@@ -20,7 +20,7 @@ final class FastingGoalUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 2))
 
         app.terminate()
-        app.launchArguments = ["--ui-testing"]
+        app.launchArguments = launchArguments()
         app.launch()
         app.tabBars.buttons["Settings"].tap()
 
@@ -31,7 +31,7 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testGoalCanBeChangedToEightHoursInSettings() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
         app.tabBars.buttons["Settings"].tap()
@@ -45,7 +45,7 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testGoalControlRemainsUsableAtLargestAccessibilityTextSize() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = launchArguments(resetData: true)
         app.launchEnvironment["UIPreferredContentSizeCategoryName"] =
             "UICTContentSizeCategoryAccessibilityXXXL"
         app.launch()
@@ -59,9 +59,64 @@ final class FastingGoalUITests: XCTestCase {
     }
 
     @MainActor
+    func testPseudolocalizedOnboardingTodayAndSettingsRemainActionableInRTLAtAccessibilitySize() {
+        let app = XCUIApplication()
+        app.launchArguments = UITestLaunchConfiguration(
+            resetData: true,
+            pseudolocalization: true,
+            appleLanguages: "(ar)",
+            appleLocale: "ar_SA",
+            preferredContentSizeCategory: "UICTContentSizeCategoryAccessibilityXXXL"
+        ).arguments
+        app.launch()
+
+        let promise = app.staticTexts["goal.promise"]
+        XCTAssertTrue(promise.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(promise.label.hasPrefix("［"))
+
+        let onboardingGoal = app.buttons["goal.option.8"]
+        let onboardingScroll = app.scrollViews.firstMatch
+        XCTAssertTrue(onboardingScroll.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0 ..< 4 where !onboardingGoal.exists {
+            onboardingScroll.swipeUp()
+        }
+        XCTAssertTrue(onboardingGoal.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(onboardingGoal.isHittable, app.debugDescription)
+        onboardingGoal.tap()
+
+        let continueButton = app.buttons["goal.continue"]
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(continueButton.isHittable, app.debugDescription)
+        continueButton.tap()
+
+        let todayTab = app.tabBars.buttons["Today"]
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.scrollViews["today.content"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["fast.start"].waitForExistence(timeout: 5), app.debugDescription)
+
+        let settingsTab = app.tabBars.buttons["Settings"]
+        XCTAssertTrue(settingsTab.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(settingsTab.isHittable, app.debugDescription)
+        settingsTab.tap()
+
+        let settingsScroll = app.scrollViews["settings.content"]
+        XCTAssertTrue(settingsScroll.waitForExistence(timeout: 5), app.debugDescription)
+        let settingsGoal = app.buttons["goal.option.8"]
+        for _ in 0 ..< 3 where !settingsGoal.exists {
+            settingsScroll.swipeUp()
+        }
+        XCTAssertTrue(settingsGoal.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(settingsGoal.isHittable, app.debugDescription)
+
+        XCTAssertTrue(todayTab.isHittable, app.debugDescription)
+        todayTab.tap()
+        XCTAssertTrue(app.buttons["fast.start"].waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    @MainActor
     func testEveryWholeHourChoiceIsAvailableAndSelectedWithoutColourAlone() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = launchArguments(resetData: true)
         app.launch()
 
         for hours in 8 ... 24 {
@@ -79,7 +134,7 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testOnboardingSaveFailureRetainsSelectionAndShowsRetryMessage() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data", "--simulate-goal-save-failure"]
+        app.launchArguments = launchArguments(resetData: true, simulateGoalSaveFailure: true)
         app.launch()
 
         selectGoal(16, in: app)
@@ -94,13 +149,13 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testSettingsSaveFailureRestoresPreviousGoal() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 2))
 
         app.terminate()
-        app.launchArguments = ["--ui-testing", "--simulate-goal-save-failure"]
+        app.launchArguments = launchArguments(simulateGoalSaveFailure: true)
         app.launch()
         app.tabBars.buttons["Settings"].tap()
         let sixteenHours = app.buttons["goal.option.16"]
@@ -120,7 +175,7 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testDeleteAllDataRequiresTwoConfirmationsAndReturnsToOnboarding() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
         app.tabBars.buttons["Settings"].tap()
@@ -153,7 +208,7 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testSettingsExplainsLocalStorageAndOpensPrivacySafety() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data"]
+        app.launchArguments = launchArguments(resetData: true)
         app.launch()
         app.buttons["goal.continue"].tap()
         app.tabBars.buttons["Settings"].tap()
@@ -175,7 +230,7 @@ final class FastingGoalUITests: XCTestCase {
     @MainActor
     func testDeleteAllDataFailureKeepsSettingsAvailableAndShowsRetry() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-data", "--simulate-delete-all-failure"]
+        app.launchArguments = launchArguments(resetData: true, simulateDeleteAllFailure: true)
         app.launch()
         app.buttons["goal.continue"].tap()
         app.tabBars.buttons["Settings"].tap()
@@ -204,5 +259,17 @@ final class FastingGoalUITests: XCTestCase {
         }
         option.tap()
         XCTAssertTrue(option.isSelected)
+    }
+
+    private func launchArguments(
+        resetData: Bool = false,
+        simulateGoalSaveFailure: Bool = false,
+        simulateDeleteAllFailure: Bool = false
+    ) -> [String] {
+        UITestLaunchConfiguration(
+            resetData: resetData,
+            simulateGoalSaveFailure: simulateGoalSaveFailure,
+            simulateDeleteAllFailure: simulateDeleteAllFailure
+        ).arguments
     }
 }

@@ -436,7 +436,10 @@ enum TemporalHistoryPresentation {
             calendar: context.calendar,
             timeZone: context.timeZone
         )
-        let duration = ElapsedTimeFormatter.string(from: end.timeIntervalSince(start))
+        let duration = HistoryTextFormatting.duration(
+            seconds: end.timeIntervalSince(start),
+            resolver: .init()
+        )
         return "\(provenance.title), start \(start.formatted(style)), end "
             + "\(end.formatted(style)), duration \(duration)"
     }

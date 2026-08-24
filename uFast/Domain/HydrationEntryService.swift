@@ -1,38 +1,11 @@
 import Foundation
 
 enum HydrationEntrySaveError: Error, Equatable {
-    case confirmationRequired
     case confirmationRequiredWithImpact(CaloricEventConfirmationContext)
-    case completedFastConfirmationRequired
     case completedConfirmationWithImpact(CaloricEventConfirmationContext)
-    case inferredFastConfirmationRequired
     case inferredConfirmationWithImpact(CaloricEventConfirmationContext)
     case eventAtActiveFastStart
     case fastConflict
-
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.confirmationRequired, .confirmationRequired),
-             (.confirmationRequiredWithImpact, .confirmationRequiredWithImpact),
-             (.confirmationRequired, .confirmationRequiredWithImpact),
-             (.confirmationRequiredWithImpact, .confirmationRequired):
-            true
-        case (.completedFastConfirmationRequired, .completedFastConfirmationRequired),
-             (.completedConfirmationWithImpact, .completedConfirmationWithImpact),
-             (.completedFastConfirmationRequired, .completedConfirmationWithImpact),
-             (.completedConfirmationWithImpact, .completedFastConfirmationRequired):
-            true
-        case (.inferredFastConfirmationRequired, .inferredFastConfirmationRequired),
-             (.inferredConfirmationWithImpact, .inferredConfirmationWithImpact),
-             (.inferredFastConfirmationRequired, .inferredConfirmationWithImpact),
-             (.inferredConfirmationWithImpact, .inferredFastConfirmationRequired):
-            true
-        case (.eventAtActiveFastStart, .eventAtActiveFastStart), (.fastConflict, .fastConflict):
-            true
-        default:
-            false
-        }
-    }
 }
 
 @MainActor
@@ -45,45 +18,26 @@ final class HydrationEntryService {
         self.clock = clock
     }
 
+    // swiftlint:disable:next function_body_length
     func save(
         _ draft: HydrationEntryDraft,
         replacing record: HydrationEntryRecord?,
         goal: FastingGoal,
-        endingActiveFast: Bool = false
+        endingActiveFast: Bool = false,
+        recordID: UUID? = nil
     ) throws {
-        if let boundaryAwareRepository = repository as? any CaloricHydrationRepository {
-            try saveWithBoundaryAwareRepository(
-                boundaryAwareRepository,
-                draft,
-                replacing: record,
-                goal: goal,
-                endingActiveFast: endingActiveFast
-            )
-            return
-        }
-
-        try saveWithBasicRepository(
-            draft,
+        let impact = try repository.caloricEventImpact(
+            for: draft,
             replacing: record,
-            goal: goal,
-            endingActiveFast: endingActiveFast
+            recordID: recordID
         )
-    }
-
-    private func saveWithBoundaryAwareRepository(
-        _ repository: any CaloricHydrationRepository,
-        _ draft: HydrationEntryDraft,
-        replacing record: HydrationEntryRecord?,
-        goal: FastingGoal,
-        endingActiveFast: Bool
-    ) throws {
-        let impact = try repository.caloricEventImpact(for: draft, replacing: record)
-        let activeFastStart = try self.repository.activeFast()?.startDate
-        switch CaloricEventSavePolicy.decision(
+        let activeFast = try repository.activeFast()
+        let decision = CaloricEventSavePolicy.decision(
             isCaloric: draft.isCaloric,
             occurredAt: draft.occurredAt,
-            activeFastStart: activeFastStart
-        ) {
+            activeFastStart: activeFast?.startDate
+        )
+        switch decision {
         case .invalidAtActiveFastStart:
             throw HydrationEntrySaveError.eventAtActiveFastStart
         case .requiresEndingActiveFast where !endingActiveFast:
@@ -100,57 +54,54 @@ final class HydrationEntryService {
         default:
             break
         }
-        if impact.requiresConfirmation, !endingActiveFast {
-            throw impact.affectsActiveFast
-                ? HydrationEntrySaveError.confirmationRequiredWithImpact(
-                    CaloricEventConfirmationContext(
-                        persistedImpact: impact,
-                        fallbackKind: .active
-                    )
-                )
-                : HydrationEntrySaveError.completedConfirmationWithImpact(
-                    CaloricEventConfirmationContext(persistedImpact: impact)
-                )
+        if let confirmationError = confirmationError(
+            for: impact,
+            endingActiveFast: endingActiveFast
+        ) {
+            throw confirmationError
         }
-        try repository.saveCaloricEvent(draft, replacing: record, goal: goal)
+        if endingActiveFast, let activeFast, decision == .requiresEndingActiveFast {
+            if let record {
+                try repository.update(
+                    record,
+                    with: draft,
+                    at: clock.now,
+                    ending: activeFast,
+                    goal: goal
+                )
+            } else {
+                _ = try repository.create(
+                    draft,
+                    at: clock.now,
+                    ending: activeFast,
+                    goal: goal,
+                    recordID: recordID
+                )
+            }
+        } else {
+            try repository.saveCaloricEvent(
+                draft,
+                replacing: record,
+                goal: goal,
+                recordID: recordID
+            )
+        }
     }
 
-    private func saveWithBasicRepository(
-        _ draft: HydrationEntryDraft,
-        replacing record: HydrationEntryRecord?,
-        goal: FastingGoal,
+    private func confirmationError(
+        for impact: CaloricEventImpact,
         endingActiveFast: Bool
-    ) throws {
-        let activeFast = try repository.activeFast()
-        switch CaloricEventSavePolicy.decision(
-            isCaloric: draft.isCaloric,
-            occurredAt: draft.occurredAt,
-            activeFastStart: activeFast?.startDate
-        ) {
-        case .saveWithoutEndingFast:
-            if let record {
-                try repository.update(record, with: draft, at: clock.now)
-            } else {
-                _ = try repository.create(draft, at: clock.now)
-            }
-        case .invalidAtActiveFastStart:
-            throw HydrationEntrySaveError.eventAtActiveFastStart
-        case .requiresEndingActiveFast:
-            guard endingActiveFast, let activeFast else {
-                throw HydrationEntrySaveError.confirmationRequired
-            }
-            let intervals = try repository.recordedFasts().map(\.recordedInterval)
-            guard !FastConflictChecker.hasConflict(
-                proposedStart: activeFast.startDate,
-                proposedEnd: draft.occurredAt,
-                excluding: activeFast.id,
-                among: intervals
-            ) else { throw HydrationEntrySaveError.fastConflict }
-            if let record {
-                try repository.update(record, with: draft, at: clock.now, ending: activeFast, goal: goal)
-            } else {
-                _ = try repository.create(draft, at: clock.now, ending: activeFast, goal: goal)
-            }
-        }
+    ) -> HydrationEntrySaveError? {
+        guard impact.requiresConfirmation, !endingActiveFast else { return nil }
+        return impact.affectsActiveFast
+            ? .confirmationRequiredWithImpact(
+                CaloricEventConfirmationContext(
+                    persistedImpact: impact,
+                    fallbackKind: .active
+                )
+            )
+            : .completedConfirmationWithImpact(
+                CaloricEventConfirmationContext(persistedImpact: impact)
+            )
     }
 }

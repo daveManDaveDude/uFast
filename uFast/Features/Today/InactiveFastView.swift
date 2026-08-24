@@ -1,4 +1,7 @@
 import SwiftUI
+import UFastCore
+
+// swiftlint:disable trailing_comma
 
 struct HydrationEditorPresentation: Identifiable {
     let id = UUID()
@@ -6,6 +9,7 @@ struct HydrationEditorPresentation: Identifiable {
 }
 
 struct InactiveFastView: View {
+    @Environment(\.appTextResolver) private var textResolver
     let goal: FastingGoal
     let target: String
     let fastRecorded: Bool
@@ -19,11 +23,11 @@ struct InactiveFastView: View {
             VStack(spacing: UFastTheme.Spacing.generous) {
                 HStack(spacing: UFastTheme.Spacing.standard) {
                     VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        Text("Ready when you are")
+                        Text(textResolver(.inactiveReady))
                             .font(.uFastDisplay(.title))
                             .foregroundStyle(UFastTheme.primary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("No fast is running.")
+                        Text(textResolver(.inactiveNoFast))
                             .foregroundStyle(UFastTheme.secondaryText)
                             .accessibilityIdentifier("fast.inactive-state")
                     }
@@ -33,17 +37,20 @@ struct InactiveFastView: View {
                 }
 
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
-                    UFastSectionHeading("Your next target", eyebrow: "\(goal.hours)-hour goal")
+                    UFastSectionHeading(
+                        textResolver(.inactiveNextTarget),
+                        eyebrow: textResolver(.inactiveGoalEyebrow(hours: goal.hours))
+                    )
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("If started now")
+                            Text(textResolver(.inactiveStartedNow))
                                 .font(.caption)
                                 .foregroundStyle(UFastTheme.secondaryText)
                             Text(target)
                                 .font(.uFastDisplay(.title2))
                                 .foregroundStyle(UFastTheme.primary)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityLabel("Target if started now")
+                                .accessibilityLabel(textResolver(.inactiveTargetLabel))
                                 .accessibilityValue(target)
                                 .accessibilityIdentifier("fast.preview-target")
                         }
@@ -53,7 +60,7 @@ struct InactiveFastView: View {
                             .foregroundStyle(UFastTheme.apricot)
                             .accessibilityHidden(true)
                     }
-                    Text("Your fasting goal is \(goal.hours) hours.")
+                    Text(textResolver(.inactiveGoal(hours: goal.hours)))
                         .font(.subheadline)
                         .foregroundStyle(UFastTheme.secondaryText)
                 }
@@ -61,7 +68,7 @@ struct InactiveFastView: View {
                 .uFastCard(accent: UFastTheme.sky)
 
                 if fastRecorded {
-                    Label("Fast recorded.", systemImage: "checkmark.circle")
+                    Label(textResolver(.fastRecorded), systemImage: "checkmark.circle")
                         .font(.headline)
                         .foregroundStyle(UFastTheme.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,11 +85,14 @@ struct InactiveFastView: View {
                 }
 
                 VStack(spacing: UFastTheme.Spacing.standard) {
-                    Button(startError == nil ? "Start fast" : "Try again", action: onStart)
-                        .buttonStyle(UFastPrimaryButtonStyle())
-                        .accessibilityIdentifier("fast.start")
+                    Button(
+                        startError == nil ? textResolver(.startFast) : textResolver(.tryAgain),
+                        action: onStart
+                    )
+                    .buttonStyle(UFastPrimaryButtonStyle())
+                    .accessibilityIdentifier("fast.start")
 
-                    Button("Start at a past time", action: onStartPast)
+                    Button(textResolver(.startAtPastTime), action: onStartPast)
                         .buttonStyle(UFastSecondaryButtonStyle())
                         .accessibilityIdentifier("fast.start-past")
                 }
@@ -113,40 +123,124 @@ struct FoodEditorPresentation: Identifiable {
 }
 
 #Preview("Today · Empty") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.modelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Mixed timeline") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.todayTimelineModelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 2, drinkCount: 2),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Active fast and timeline") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.activeFastTodayTimelineModelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(
+            foodCount: 2,
+            drinkCount: 2,
+            hasActiveFast: true
+        ),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Long content") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.longTodayTimelineModelContainer)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 7, drinkCount: 6),
+        clock: InactiveFastPreviewData.clock
+    )
 }
 
 #Preview("Today · Persistence error") {
     TodayGoalView(
         clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow),
-        previewTimelineError: "Your timeline couldn’t be loaded. Please try again."
+        previewTimelineFailure: .snapshotUnavailable
     )
 }
 
 #Preview("Today · Dark") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.todayTimelineModelContainer)
-        .preferredColorScheme(.dark)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 2, drinkCount: 2),
+        clock: InactiveFastPreviewData.clock
+    )
+    .preferredColorScheme(.dark)
 }
 
 #Preview("Today · Accessibility size") {
-    TodayFeatureHost(clock: FixedAppClock(now: PreviewFixtures.todayTimelineNow))
-        .modelContainer(PreviewFixtures.todayTimelineModelContainer)
-        .environment(\.dynamicTypeSize, .accessibility3)
+    TodayGoalView(
+        snapshot: InactiveFastPreviewData.snapshot(foodCount: 2, drinkCount: 2),
+        clock: InactiveFastPreviewData.clock
+    )
+    .environment(\.dynamicTypeSize, .accessibility3)
+}
+
+private enum InactiveFastPreviewData {
+    static let clock = FixedAppClock(now: Date(timeIntervalSince1970: 1_800_000_000))
+
+    static func snapshot(
+        foodCount: Int = 0,
+        drinkCount: Int = 0,
+        hasActiveFast: Bool = false
+    ) -> TodayFeatureSnapshot {
+        let foods = [
+            "Porridge and berries",
+            "Vegetable soup and bread",
+            "Apple and peanut butter",
+            "Rice, tofu and greens",
+            "Yoghurt with seeds",
+            "Tomato pasta",
+            "Banana",
+        ]
+        let drinks = [
+            PreviewDrink(type: .water, name: nil, volume: 500, isCaloric: false),
+            PreviewDrink(type: .tea, name: nil, volume: 300, isCaloric: false),
+            PreviewDrink(type: .custom, name: "Coconut water", volume: 330, isCaloric: true),
+            PreviewDrink(type: .coffee, name: nil, volume: 300, isCaloric: false),
+        ]
+        let now = clock.now
+        return TodayFeatureSnapshot(
+            settings: [AppSettingsSnapshot()],
+            activeFasts: hasActiveFast
+                ? [
+                    ActiveFastSnapshot(
+                        id: UUID(),
+                        startDate: now.addingTimeInterval(-4 * 60 * 60),
+                        endDate: nil
+                    ),
+                ]
+                : [],
+            foodEntries: (0 ..< foodCount).map { index in
+                let occurredAt = now.addingTimeInterval(TimeInterval(-index * 37 * 60))
+                return FoodEntrySnapshot(
+                    id: UUID(),
+                    foodDescription: foods[index % foods.count],
+                    occurredAt: occurredAt,
+                    nutrition: FoodNutrition(energyKilocalories: Double(240 + index * 35)),
+                    isCaloric: true
+                )
+            },
+            hydrationEntries: (0 ..< drinkCount).map { index in
+                let drink = drinks[index % drinks.count]
+                return HydrationEntrySnapshot(
+                    id: UUID(),
+                    drinkType: drink.type,
+                    customName: drink.name,
+                    displayName: drink.name ?? drink.type.displayName,
+                    volumeMillilitres: drink.volume,
+                    occurredAt: now.addingTimeInterval(TimeInterval(-(index * 41 + 12) * 60)),
+                    isCaloric: drink.isCaloric
+                )
+            }
+        )
+    }
+
+    private struct PreviewDrink {
+        let type: HydrationDrinkType
+        let name: String?
+        let volume: Int
+        let isCaloric: Bool
+    }
 }

@@ -48,8 +48,7 @@ final class FoodEntryUITests: XCTestCase {
             app.swipeUp()
         }
         app.buttons["food.delete"].tap()
-        XCTAssertTrue(app.alerts["Delete this food event?"].waitForExistence(timeout: 2))
-        app.alerts.buttons["Cancel"].tap()
+        tapDeleteAlertButton("food.delete.cancel", in: app)
         app.buttons["food.cancel"].tap()
         XCTAssertTrue(app.staticTexts["Soup, bread and fruit"].exists)
 
@@ -58,9 +57,16 @@ final class FoodEntryUITests: XCTestCase {
             app.swipeUp()
         }
         app.buttons["food.delete"].tap()
-        app.alerts.buttons["Delete"].tap()
+        tapDeleteAlertButton("food.delete.confirm", in: app)
         XCTAssertFalse(savedRow.exists)
         XCTAssertFalse(app.staticTexts["Soup, bread and fruit"].exists)
+    }
+
+    @MainActor
+    private func tapDeleteAlertButton(_ identifier: String, in app: XCUIApplication) {
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        alert.descendants(matching: .any).matching(identifier: identifier).firstMatch.tap()
     }
 
     @MainActor
@@ -101,11 +107,7 @@ final class FoodEntryUITests: XCTestCase {
     }
 
     private func launchArguments(resetData: Bool = false) -> [String] {
-        var arguments = ["--ui-testing", "--fixed-now", String(now.timeIntervalSince1970)]
-        if resetData {
-            arguments.append("--reset-data")
-        }
-        return arguments
+        UITestLaunchConfiguration(resetData: resetData, fixedNow: now).arguments
     }
 }
 

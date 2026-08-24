@@ -581,6 +581,19 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testCarouselDoesNotRepublishEquivalentMotionAtFingerLift() {
+        XCTAssertFalse(TemporalCarouselMovementPhase.userDriven
+            .requiresPresentationUpdate(to: .decelerating))
+        XCTAssertFalse(TemporalCarouselMovementPhase.decelerating
+            .requiresPresentationUpdate(to: .aligning))
+        XCTAssertTrue(TemporalCarouselMovementPhase.userDriven
+            .requiresPresentationUpdate(to: .settled))
+        XCTAssertTrue(TemporalCarouselMovementPhase.settled
+            .requiresPresentationUpdate(to: .programmatic))
+    }
+
+    @MainActor
     func testFutureAdjacentMotionKeepsTimelineAppearanceWhileActionsStayGated() {
         let moving = TemporalHistoryCarousel.timelineInteractionState(
             movementPhase: .decelerating,
@@ -601,9 +614,10 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertFalse(settledFuture.allowsEmptySelection)
     }
 
+    @MainActor
     func testFutureShadingInputRemainsAvailableDuringAdjacentDayMotion() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
-        var carousel = TemporalHistoryCarousel(
+        let carousel = TemporalHistoryCarousel(
             dates: [],
             selection: .constant(now),
             intervals: [],
@@ -630,12 +644,12 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     func testFlushPageGeometryUsesOneContainerWidthPerCalendarDay() throws {
         let calendar = try londonCalendar()
         let today = try date(2026, 7, 23, 12, calendar: calendar)
-        let days = TemporalDayBuffer(
+        let days = HistoryMotionCoverage.initial(
             centeredOn: today,
             maximumDate: today,
             calendar: calendar,
-            radius: 3
-        ).days
+            configuration: HistoryMotionConfiguration(initialRadius: 3)
+        ).days(calendar: calendar)
         let containerWidth = 320.0
         let contentWidth = containerWidth * Double(days.count)
 
@@ -658,11 +672,11 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     func testCarouselSettlementResolvesSlowAndFastNativeTargetsWithoutTiming() throws {
         let calendar = try londonCalendar()
         let today = try date(2027, 1, 2, 12, calendar: calendar)
-        let buffer = TemporalDayBuffer(
+        let coverage = HistoryMotionCoverage.initial(
             centeredOn: today,
             maximumDate: today,
             calendar: calendar,
-            radius: 6
+            configuration: HistoryMotionConfiguration(initialRadius: 6)
         )
         let todayDay = calendar.startOfDay(for: today)
         let slowTarget = try XCTUnwrap(
@@ -676,7 +690,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             TemporalHistoryPresentation.settledCarouselDay(
                 centeredPage: slowTarget,
                 currentSelection: today,
-                availableDays: buffer.days,
+                availableDays: coverage.days(calendar: calendar),
                 maximumDate: today,
                 calendar: calendar
             ),
@@ -686,7 +700,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             TemporalHistoryPresentation.settledCarouselDay(
                 centeredPage: fastTarget,
                 currentSelection: today,
-                availableDays: buffer.days,
+                availableDays: coverage.days(calendar: calendar),
                 maximumDate: today,
                 calendar: calendar
             ),
@@ -698,11 +712,11 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         let calendar = try londonCalendar()
         let today = try date(2026, 7, 23, 12, calendar: calendar)
         let selected = try date(2026, 7, 22, 12, calendar: calendar)
-        let buffer = TemporalDayBuffer(
+        let coverage = HistoryMotionCoverage.initial(
             centeredOn: selected,
             maximumDate: today,
             calendar: calendar,
-            radius: 2
+            configuration: HistoryMotionConfiguration(initialRadius: 2)
         )
         let selectedDay = calendar.startOfDay(for: selected)
         let future = try XCTUnwrap(
@@ -715,7 +729,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
                 TemporalHistoryPresentation.settledCarouselDay(
                     centeredPage: invalidTarget,
                     currentSelection: selected,
-                    availableDays: buffer.days,
+                    availableDays: coverage.days(calendar: calendar),
                     maximumDate: today,
                     calendar: calendar
                 ),
@@ -728,18 +742,18 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         let calendar = try londonCalendar()
         let today = try date(2026, 4, 2, 12, calendar: calendar)
         let selected = try date(2026, 3, 29, 12, calendar: calendar)
-        let buffer = TemporalDayBuffer(
+        let coverage = HistoryMotionCoverage.initial(
             centeredOn: selected,
             maximumDate: today,
             calendar: calendar,
-            radius: 5
+            configuration: HistoryMotionConfiguration(initialRadius: 5)
         )
 
-        XCTAssertEqual(buffer.days.count, 10)
-        XCTAssertEqual(buffer.days.last, calendar.startOfDay(for: today))
-        XCTAssertTrue(buffer.days.contains(calendar.startOfDay(for: selected)))
+        XCTAssertEqual(coverage.days(calendar: calendar).count, 10)
+        XCTAssertEqual(coverage.days(calendar: calendar).last, calendar.startOfDay(for: today))
+        XCTAssertTrue(coverage.days(calendar: calendar).contains(calendar.startOfDay(for: selected)))
         XCTAssertEqual(
-            buffer.days[6].timeIntervalSince(buffer.days[5]),
+            coverage.days(calendar: calendar)[6].timeIntervalSince(coverage.days(calendar: calendar)[5]),
             23 * 60 * 60
         )
     }
@@ -750,22 +764,22 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         let maximumDisplayDay = try XCTUnwrap(
             calendar.date(byAdding: .day, value: 400, to: today)
         )
-        let buffer = TemporalDayBuffer(
+        let coverage = HistoryMotionCoverage.initial(
             centeredOn: today,
             maximumDate: maximumDisplayDay,
             calendar: calendar,
-            radius: 400
+            configuration: HistoryMotionConfiguration(initialRadius: 400)
         )
         let todayDay = calendar.startOfDay(for: today)
 
-        XCTAssertEqual(buffer.days.count, 801)
-        XCTAssertEqual(buffer.days[400], todayDay)
+        XCTAssertEqual(coverage.days(calendar: calendar).count, 801)
+        XCTAssertEqual(coverage.days(calendar: calendar)[400], todayDay)
         XCTAssertEqual(
-            buffer.days.last,
+            coverage.days(calendar: calendar).last,
             calendar.startOfDay(for: maximumDisplayDay)
         )
         XCTAssertEqual(
-            buffer.days[401].timeIntervalSince(buffer.days[400]),
+            coverage.days(calendar: calendar)[401].timeIntervalSince(coverage.days(calendar: calendar)[400]),
             23 * 60 * 60
         )
     }
@@ -774,48 +788,50 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         let calendar = try londonCalendar()
         let today = try date(2027, 1, 15, 12, calendar: calendar)
         let selected = try date(2027, 1, 1, 12, calendar: calendar)
-        var buffer = TemporalDayBuffer(
+        var coverage = HistoryMotionCoverage.initial(
             centeredOn: selected,
             maximumDate: today,
             calendar: calendar,
-            radius: 4
+            configuration: HistoryMotionConfiguration(initialRadius: 4, extensionLength: 3)
         )
-        let original = buffer.days
+        let original = coverage.days(calendar: calendar)
 
-        try buffer.ensureCoverage(
-            around: XCTUnwrap(original.first),
-            maximumDate: today,
-            calendar: calendar,
-            edgeThreshold: 1,
-            expansion: 3
+        coverage = try XCTUnwrap(
+            coverage.extended(
+                toward: .preceding,
+                maximumDate: today,
+                calendar: calendar,
+                configuration: HistoryMotionConfiguration(initialRadius: 4, extensionLength: 3)
+            )
         )
 
-        XCTAssertEqual(Array(buffer.days.dropFirst(3).prefix(original.count)), original)
-        XCTAssertEqual(buffer.days, buffer.days.sorted())
-        XCTAssertEqual(Set(buffer.days).count, buffer.days.count)
+        XCTAssertEqual(Array(coverage.days(calendar: calendar).dropFirst(3).prefix(original.count)), original)
+        XCTAssertEqual(coverage.days(calendar: calendar), coverage.days(calendar: calendar).sorted())
+        XCTAssertEqual(Set(coverage.days(calendar: calendar)).count, coverage.days(calendar: calendar).count)
     }
 
     func testDayBufferExpandsForwardOnlyThroughMaximumDay() throws {
         let calendar = try londonCalendar()
         let today = try date(2026, 11, 3, 12, calendar: calendar)
         let selected = try date(2026, 10, 25, 12, calendar: calendar)
-        var buffer = TemporalDayBuffer(
+        var coverage = HistoryMotionCoverage.initial(
             centeredOn: selected,
             maximumDate: today,
             calendar: calendar,
-            radius: 2
+            configuration: HistoryMotionConfiguration(initialRadius: 2, extensionLength: 30)
         )
 
-        try buffer.ensureCoverage(
-            around: XCTUnwrap(buffer.days.last),
-            maximumDate: today,
-            calendar: calendar,
-            edgeThreshold: 1,
-            expansion: 30
+        coverage = try XCTUnwrap(
+            coverage.extended(
+                toward: .following,
+                maximumDate: today,
+                calendar: calendar,
+                configuration: HistoryMotionConfiguration(initialRadius: 2, extensionLength: 30)
+            )
         )
 
-        XCTAssertEqual(buffer.days.last, calendar.startOfDay(for: today))
-        XCTAssertFalse(buffer.days.contains {
+        XCTAssertEqual(coverage.days(calendar: calendar).last, calendar.startOfDay(for: today))
+        XCTAssertFalse(coverage.days(calendar: calendar).contains {
             $0 > calendar.startOfDay(for: today)
         })
     }
@@ -823,35 +839,29 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     func testDayBufferRecentresForLongDistanceDatePickerJump() throws {
         let calendar = try londonCalendar()
         let today = try date(2026, 7, 23, 12, calendar: calendar)
-        var buffer = TemporalDayBuffer(
-            centeredOn: today,
-            maximumDate: today,
-            calendar: calendar,
-            radius: 5
-        )
         let distant = try date(2021, 2, 14, 12, calendar: calendar)
 
-        buffer.ensureCoverage(
-            around: distant,
+        let coverage = HistoryMotionCoverage.initial(
+            centeredOn: distant,
             maximumDate: today,
             calendar: calendar,
-            expansion: 8
+            configuration: HistoryMotionConfiguration(initialRadius: 8)
         )
 
-        XCTAssertTrue(buffer.days.contains(calendar.startOfDay(for: distant)))
-        XCTAssertEqual(buffer.days.count, 17)
-        XCTAssertFalse(buffer.days.contains(calendar.startOfDay(for: today)))
+        XCTAssertTrue(coverage.days(calendar: calendar).contains(calendar.startOfDay(for: distant)))
+        XCTAssertEqual(coverage.days(calendar: calendar).count, 17)
+        XCTAssertFalse(coverage.days(calendar: calendar).contains(calendar.startOfDay(for: today)))
     }
 
     func testDaySpaceProgressMapsForwardBackwardReversalAndMultipleDays() throws {
         let calendar = try londonCalendar()
         let today = try date(2026, 7, 23, 12, calendar: calendar)
-        let days = TemporalDayBuffer(
+        let days = HistoryMotionCoverage.initial(
             centeredOn: today,
             maximumDate: today,
             calendar: calendar,
-            radius: 5
-        ).days
+            configuration: HistoryMotionConfiguration(initialRadius: 5)
+        ).days(calendar: calendar)
         let stride = 332.0
         let contentWidth = stride * Double(days.count - 1) + 320
 
@@ -881,12 +891,12 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     func testDaySpaceProgressMapsRTLGeometryToTheSameCalendarProgress() throws {
         let calendar = try londonCalendar()
         let today = try date(2026, 7, 23, 12, calendar: calendar)
-        let days = TemporalDayBuffer(
+        let days = HistoryMotionCoverage.initial(
             centeredOn: today,
             maximumDate: today,
             calendar: calendar,
-            radius: 3
-        ).days
+            configuration: HistoryMotionConfiguration(initialRadius: 3)
+        ).days(calendar: calendar)
         let stride = 340.0
         let container = 320.0
         let content = stride * Double(days.count - 1) + container
@@ -1136,15 +1146,15 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     func testCoupledCoordinatorEnforcesExclusiveOwnershipAndRejectsStalePreview() throws {
         let calendar = try londonCalendar()
         let today = try date(2026, 7, 23, 12, calendar: calendar)
-        let buffer = TemporalDayBuffer(
+        let coverage = HistoryMotionCoverage.initial(
             centeredOn: today,
             maximumDate: today,
             calendar: calendar,
-            radius: 2
+            configuration: HistoryMotionConfiguration(initialRadius: 2)
         )
         let progress = TemporalDaySpaceProgress(
-            leadingDay: buffer.days[1],
-            trailingDay: buffer.days[2],
+            leadingDay: coverage.days(calendar: calendar)[1],
+            trailingDay: coverage.days(calendar: calendar)[2],
             fraction: 0.3,
             lowerPageStride: 330
         )
@@ -1156,7 +1166,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             coordinator.publish(
                 progress,
                 epoch: epoch,
-                days: buffer.days,
+                days: coverage.days(calendar: calendar),
                 maximumDate: today,
                 calendar: calendar
             )
@@ -1170,7 +1180,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             coordinator.publish(
                 progress,
                 epoch: epoch,
-                days: buffer.days,
+                days: coverage.days(calendar: calendar),
                 maximumDate: today,
                 calendar: calendar
             )
@@ -1180,15 +1190,15 @@ final class TemporalHistoryPresentationTests: XCTestCase {
     func testCoupledCoordinatorRebasePreservesPreviewAndRejectsFutureOrOutOfBuffer() throws {
         let calendar = try londonCalendar()
         let today = try date(2026, 7, 23, 12, calendar: calendar)
-        var buffer = TemporalDayBuffer(
+        var coverage = HistoryMotionCoverage.initial(
             centeredOn: today,
             maximumDate: today,
             calendar: calendar,
-            radius: 3
+            configuration: HistoryMotionConfiguration(initialRadius: 3, extensionLength: 4)
         )
         let progress = TemporalDaySpaceProgress(
-            leadingDay: buffer.days[1],
-            trailingDay: buffer.days[2],
+            leadingDay: coverage.days(calendar: calendar)[1],
+            trailingDay: coverage.days(calendar: calendar)[2],
             fraction: 0.65,
             lowerPageStride: 330
         )
@@ -1198,21 +1208,22 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             coordinator.publish(
                 progress,
                 epoch: epoch,
-                days: buffer.days,
+                days: coverage.days(calendar: calendar),
                 maximumDate: today,
                 calendar: calendar
             )
         )
-        try buffer.ensureCoverage(
-            around: XCTUnwrap(buffer.days.first),
-            maximumDate: today,
-            calendar: calendar,
-            edgeThreshold: 1,
-            expansion: 4
+        coverage = try XCTUnwrap(
+            coverage.extended(
+                toward: .preceding,
+                maximumDate: today,
+                calendar: calendar,
+                configuration: HistoryMotionConfiguration(initialRadius: 3, extensionLength: 4)
+            )
         )
         XCTAssertTrue(
             coordinator.rebase(
-                days: buffer.days,
+                days: coverage.days(calendar: calendar),
                 maximumDate: today,
                 calendar: calendar
             )
@@ -1230,14 +1241,14 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             coordinator.publish(
                 invalid,
                 epoch: epoch,
-                days: buffer.days,
+                days: coverage.days(calendar: calendar),
                 maximumDate: today,
                 calendar: calendar
             )
         )
         XCTAssertFalse(
             coordinator.rebase(
-                days: Array(buffer.days.suffix(2)),
+                days: Array(coverage.days(calendar: calendar).suffix(2)),
                 maximumDate: today,
                 calendar: calendar
             )

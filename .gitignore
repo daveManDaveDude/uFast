@@ -35,4 +35,10 @@ uFast.xcodeproj/
 tmp/
 
 # Generated review exports (screenshots, recordings, traces and test results).
-artifacts/review-*/
+artifacts/
+*.xcarchive
+*.trace
+*.mp4
+*.mov
+*.zip
+*.log
