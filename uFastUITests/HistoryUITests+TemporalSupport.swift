@@ -145,6 +145,17 @@ extension HistoryUITests {
             && candidate.maxY <= container.maxY + visibilityTolerance
     }
 
+    static func intersectsVisibleFrame(_ candidate: CGRect, with container: CGRect) -> Bool {
+        guard candidate.origin.x.isFinite, candidate.origin.y.isFinite,
+              candidate.size.width.isFinite, candidate.size.height.isFinite,
+              container.origin.x.isFinite, container.origin.y.isFinite,
+              container.size.width.isFinite, container.size.height.isFinite,
+              candidate.width > 0, candidate.height > 0,
+              container.width > 0, container.height > 0
+        else { return false }
+        return candidate.intersects(container)
+    }
+
     @MainActor
     func visibleActiveFast(
         in app: XCUIApplication,
@@ -203,7 +214,7 @@ extension HistoryUITests {
                 return (0 ..< candidates.count).allSatisfy { index in
                     let candidate = candidates.element(boundBy: index)
                     return candidate.exists
-                        && Self.isVisibleFrame(candidate.frame, boundedBy: carousel.frame)
+                        && Self.intersectsVisibleFrame(candidate.frame, with: carousel.frame)
                 }
             },
             object: app

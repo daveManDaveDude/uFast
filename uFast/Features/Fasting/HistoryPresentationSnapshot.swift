@@ -726,7 +726,7 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         case .recorded: .recorded
         case .active: .active
         case .automatic: .automatic
-        case .inferred: .automatic
+        case .inferred: .inferred
         case .previouslySaved, .unavailable: .previouslySaved
         }
     }

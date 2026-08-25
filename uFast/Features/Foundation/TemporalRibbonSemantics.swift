@@ -205,7 +205,7 @@ extension TemporalRibbonView {
         switch kind {
         case .recorded: "moon.stars.fill"
         case .active: "moon.stars.fill"
-        case .automatic: "moon.fill"
+        case .automatic, .inferred: "moon.fill"
         case .previouslySaved: "archivebox"
         case .reconstructed: "wand.and.stars"
         case .needsReview: "exclamationmark.triangle"
@@ -216,7 +216,7 @@ extension TemporalRibbonView {
     func intervalColour(_ kind: TemporalRibbonIntervalItem.Kind) -> Color {
         switch kind {
         case .recorded, .active: UFastTheme.sage
-        case .automatic: UFastTheme.sky
+        case .automatic, .inferred: UFastTheme.sky
         case .previouslySaved: UFastTheme.raisedSurface
         case .reconstructed: UFastTheme.sky
         case .needsReview: UFastTheme.apricot
@@ -251,7 +251,16 @@ extension TemporalRibbonView {
         _ item: TemporalRibbonIntervalItem,
         markWidth: Double
     ) -> String {
-        guard item.kind == .active else { return item.title }
+        switch item.kind {
+        case .recorded, .automatic:
+            return textResolver(.historyCopy(.fast))
+        case .inferred:
+            return item.title
+        case .active:
+            break
+        case .previouslySaved, .reconstructed, .needsReview, .unknown:
+            return item.title
+        }
         guard markWidth >= 180 else {
             return textResolver(.historyCopy(.activeFast))
         }

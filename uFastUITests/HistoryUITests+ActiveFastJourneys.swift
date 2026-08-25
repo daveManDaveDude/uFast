@@ -279,7 +279,15 @@ extension HistoryUITests {
         XCTAssertTrue(originalStartDateButton.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(waitForHittable(originalStartDateButton, app: app), originalStartDateButton.debugDescription)
         originalStartDateButton.tap()
-        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+        let selectedDate = app.staticTexts["history.selected-date"]
+        let expectedSelectedDay = day.formatted(
+            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+        )
+        XCTAssertTrue(waitForSettledHistory(
+            selectedDate: selectedDate,
+            carousel: carousel,
+            expectedSelectedDate: "Selected day, \(expectedSelectedDay)"
+        ), app.debugDescription)
         XCTAssertEqual(visibleActiveFastVisualContent(in: app, carousel: carousel).count, 1, app.debugDescription)
         captureScreenshot(named: "history-active-fast-midnight-seam", in: app)
     }

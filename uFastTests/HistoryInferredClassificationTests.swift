@@ -74,6 +74,8 @@ final class HistoryInferredClassificationTests: XCTestCase {
         let item = HistoryVisibleFastItem.inferred(interval)
         XCTAssertTrue(item.accessibilityLabel.contains("source drink Juice"))
         XCTAssertFalse(item.accessibilityLabel.contains("source food Juice"))
+        XCTAssertEqual(item.ribbonItem.kind, .inferred)
+        XCTAssertEqual(item.ribbonItem.title, "Inferred fast")
     }
 
     func testCompatibilityFoodRowsRemainCaloricPersistenceBoundaries() throws {

@@ -266,56 +266,51 @@ extension TemporalRibbonView {
                     in: window,
                     visibleWidth: markWidth
                 )
-                let showsContent = contentLayout != .none
+                let resolvedContentLayout = contentLayout == .none
+                    ? segment.visualContentFallbackLayout(
+                        in: window,
+                        visibleWidth: markWidth,
+                        surfaceWidth: policy.contentWidth,
+                        calendar: calendar
+                    )
+                    : contentLayout
+                let showsContent = resolvedContentLayout != .none
+                let fallbackLeadingOverflow = segment.visualContentFallbackLeadingOverflow(
+                    in: window,
+                    visibleWidth: markWidth,
+                    surfaceWidth: policy.contentWidth,
+                    calendar: calendar
+                ) ?? 0
                 Button {
                     onSelectInterval?(item.id)
                 } label: {
-                    HStack(spacing: contentLayout == .compact ? 2 : 4) {
-                        if showsContent {
-                            HStack(spacing: contentLayout == .compact ? 2 : 4) {
-                                Image(systemName: intervalSymbol(item.kind))
-                                    .accessibilityHidden(true)
-                                if contentLayout == .compact {
-                                    Text(compactIntervalTitle(item))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.7)
-                                        .allowsTightening(true)
-                                } else {
-                                    Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
-                                }
+                    Color.clear
+                        .frame(width: markWidth, height: max(44, policy.intervalLaneHeight))
+                        .background(intervalColour(item.kind))
+                        .clipShape(intervalMarkShape(for: segment, visibleWidth: markWidth))
+                        .overlay {
+                            intervalOutlineShape(for: segment, visibleWidth: markWidth)
+                                .stroke(intervalStroke(item.kind), style: strokeStyle(item.kind))
+                        }
+                        .overlay(alignment: .leading) {
+                            if showsContent {
+                                intervalVisualContent(
+                                    item,
+                                    layout: resolvedContentLayout,
+                                    markWidth: markWidth
+                                )
+                                .font(.caption.weight(.semibold))
+                                .fixedSize(
+                                    horizontal: segment.continuesAfter,
+                                    vertical: false
+                                )
+                                .foregroundStyle(intervalForeground(item.kind))
+                                .padding(.horizontal, 2)
+                                .offset(x: -fallbackLeadingOverflow)
                             }
-                            // This identifies only the visible glyph/text region; the
-                            // enclosing button still represents the full bar hit area.
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
                         }
-                    }
-                    .font(
-                        contentLayout == .compact
-                            ? .caption2.weight(.semibold)
-                            : .caption.weight(.semibold)
-                    )
-                    .foregroundStyle(intervalForeground(item.kind))
-                    .padding(.horizontal, contentLayout == .compact ? 2 : 8)
-                    .frame(width: markWidth, height: max(44, policy.intervalLaneHeight), alignment: .leading)
-                    .background(intervalColour(item.kind))
-                    .clipShape(intervalMarkShape(for: segment, visibleWidth: markWidth))
-                    .overlay {
-                        intervalMarkShape(for: segment, visibleWidth: markWidth)
-                            .stroke(intervalStroke(item.kind), style: strokeStyle(item.kind))
-                    }
-                    .overlay(alignment: .leading) {
-                        if segment.continuesBefore {
-                            continuationEdgeCover(for: item.kind)
-                        }
-                    }
-                    .overlay(alignment: .trailing) {
-                        if segment.continuesAfter {
-                            continuationEdgeCover(for: item.kind)
-                        }
-                    }
-                    .padding(.leading, geometry.leadingHitPadding)
-                    .padding(.trailing, geometry.trailingHitPadding)
+                        .padding(.leading, geometry.leadingHitPadding)
+                        .padding(.trailing, geometry.trailingHitPadding)
                 }
                 .buttonStyle(.plain)
                 .disabled(onSelectInterval == nil)
@@ -332,6 +327,29 @@ extension TemporalRibbonView {
         }
     }
 
+    func intervalVisualContent(
+        _ item: TemporalRibbonIntervalItem,
+        layout: TemporalIntervalContentLayout,
+        markWidth: Double
+    ) -> some View {
+        HStack(spacing: layout == .compact ? 2 : 4) {
+            Image(systemName: intervalSymbol(item.kind))
+                .accessibilityHidden(true)
+            if layout == .compact {
+                Text(compactIntervalTitle(item))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .allowsTightening(true)
+            } else {
+                Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
+            }
+        }
+        // This identifies only the visible glyph/text region; the enclosing
+        // button still represents the full bar hit area.
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
+    }
+
     func intervalVisualContentIdentifier(for item: TemporalRibbonIntervalItem) -> String {
         let prefix = item.kind == .active
             ? "history.active-fast-content"
@@ -339,8 +357,17 @@ extension TemporalRibbonView {
         return "\(prefix).\(item.id.uuidString)"
     }
 
-    func compactIntervalTitle(_: TemporalRibbonIntervalItem) -> String {
-        textResolver(.historyCopy(.fast))
+    func compactIntervalTitle(_ item: TemporalRibbonIntervalItem) -> String {
+        switch item.kind {
+        case .recorded, .automatic:
+            textResolver(.historyCopy(.fast))
+        case .inferred:
+            textResolver(.historyCopy(.inferredFast))
+        case .active:
+            textResolver(.historyCopy(.activeFast))
+        case .previouslySaved, .reconstructed, .needsReview, .unknown:
+            item.title
+        }
     }
 
     func intervalMarkShape(
@@ -349,7 +376,9 @@ extension TemporalRibbonView {
     ) -> UnevenRoundedRectangle {
         let radius = TemporalRibbonGeometry.intervalCornerRadius(
             visibleWidth: visibleWidth,
-            preferredRadius: UFastTheme.Radius.control
+            preferredRadius: UFastTheme.Radius.control,
+            hasLeadingCap: !segment.continuesBefore,
+            hasTrailingCap: !segment.continuesAfter
         )
         return UnevenRoundedRectangle(
             cornerRadii: .init(
@@ -359,6 +388,22 @@ extension TemporalRibbonView {
                 topTrailing: segment.continuesAfter ? 0 : radius
             ),
             style: .continuous
+        )
+    }
+
+    func intervalOutlineShape(
+        for segment: TemporalIntervalSegment,
+        visibleWidth: Double
+    ) -> TemporalIntervalOutlineShape {
+        TemporalIntervalOutlineShape(
+            continuesBefore: segment.continuesBefore,
+            continuesAfter: segment.continuesAfter,
+            cornerRadius: TemporalRibbonGeometry.intervalCornerRadius(
+                visibleWidth: visibleWidth,
+                preferredRadius: UFastTheme.Radius.control,
+                hasLeadingCap: !segment.continuesBefore,
+                hasTrailingCap: !segment.continuesAfter
+            )
         )
     }
 }

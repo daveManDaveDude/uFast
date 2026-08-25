@@ -5,6 +5,7 @@ struct TemporalRibbonIntervalItem: Identifiable, Equatable, Sendable {
         case recorded
         case active
         case automatic
+        case inferred
         case previouslySaved
         case reconstructed
         case needsReview

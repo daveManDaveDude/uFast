@@ -2,7 +2,7 @@
 
 **Slice:** History visual reliability  
 **Priority:** P1 UX clarity and motion polish  
-**Status:** Ready  
+**Status:** Done 24 August 2026
 **Story type:** Bounded presentation refinement
 
 ## User outcome
@@ -304,3 +304,17 @@ physical-device regression check and separate follow-up only if it persists.
 Continuation-only viewports correctly have no visible owner, and programmatic
 motion is included in the all-phase invariant. No document changes were
 required for readiness beyond recording those clarifications and this verdict.
+
+## Completion record
+
+- Human validation: **PASSED** — the user confirmed the committed History
+  baseline and the follow-up removal of the post-midnight continuation marker
+  on a physical device.
+- Final behavior: one fasting icon and label on the original-start fragment;
+  continuation fragments retain only the continuous bar and seam geometry.
+- Focused temporal tests: 58/58 passed.
+- Focused midnight UI journeys: 2/2 passed.
+- Lint and build: passed.
+- Final four-worker UI integration: 116/117 passed across four clones; the
+  single Fasting Goal alert-timing failure was outside BF-103 and quarantined
+  by the independent Sol integration gate.

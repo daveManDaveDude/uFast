@@ -26,15 +26,24 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
 
     static func intervalCornerRadius(
         visibleWidth: Double,
-        preferredRadius: Double
+        preferredRadius: Double,
+        hasLeadingCap: Bool,
+        hasTrailingCap: Bool
     ) -> Double {
-        min(max(visibleWidth / 2, 0), preferredRadius)
+        let capCount = [hasLeadingCap, hasTrailingCap].count(where: { $0 })
+        let availableWidth = capCount > 1 ? visibleWidth / 2 : visibleWidth
+        return min(max(availableWidth, 0), preferredRadius)
     }
 
     static func intervalContentLayout(for visibleWidth: Double) -> TemporalIntervalContentLayout {
-        guard visibleWidth.isFinite, visibleWidth >= 36 else { return .none }
-        return visibleWidth >= 84 ? .regular : .compact
+        guard visibleWidth.isFinite, visibleWidth >= compactContentMinimumWidth else {
+            return .none
+        }
+        return visibleWidth >= regularContentMinimumWidth ? .regular : .compact
     }
+
+    static let compactContentMinimumWidth = 36.0
+    static let regularContentMinimumWidth = 84.0
 }
 
 enum TemporalIntervalContentLayout: Equatable, Sendable {
@@ -51,16 +60,6 @@ extension TemporalIntervalSegment {
         let pageInterval = window.selectedDayInterval
         return pageInterval.start <= originalStart
             && originalStart < pageInterval.end
-    }
-
-    /// Chooses a bounded label treatment only after ownership is established.
-    /// A continuation never gains content merely because its fragment is wider.
-    func visualContentLayout(
-        in window: TemporalRibbonWindow,
-        visibleWidth: Double
-    ) -> TemporalIntervalContentLayout {
-        guard ownsVisualContent(in: window) else { return .none }
-        return TemporalRibbonGeometry.intervalContentLayout(for: visibleWidth)
     }
 
     func pageGeometry(

@@ -494,6 +494,113 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         )
     }
 
+    func testLateNightFastAnchorsOneRegularLabelAcrossFirstContinuation() throws {
+        let calendar = try londonCalendar()
+        let cases: [(start: Date, end: Date)] = try [
+            (
+                date(2026, 8, 7, 23, 0, calendar: calendar),
+                date(2026, 8, 8, 17, 55, calendar: calendar)
+                    .addingTimeInterval(10)
+            ),
+            (
+                date(2026, 8, 10, 23, 12, calendar: calendar)
+                    .addingTimeInterval(52),
+                date(2026, 8, 11, 15, 56, calendar: calendar)
+            ),
+        ]
+
+        for (start, end) in cases {
+            let input = TemporalIntervalInput(id: UUID(), start: start, end: end)
+            let ownerWindow = try XCTUnwrap(
+                TemporalHistoryPresentation.calendarDayWindow(containing: start, calendar: calendar)
+            )
+            let owner = try XCTUnwrap(
+                TemporalHistoryPresentation.pageGeometry(
+                    [input],
+                    in: ownerWindow,
+                    surfaceWidth: 360
+                ).first
+            )
+
+            XCTAssertLessThan(owner.visualWidth, TemporalRibbonGeometry.compactContentMinimumWidth)
+            XCTAssertTrue(owner.segment.ownsVisualContent(in: ownerWindow))
+            XCTAssertEqual(
+                owner.segment.visualContentLayout(
+                    in: ownerWindow,
+                    visibleWidth: owner.visualWidth
+                ),
+                .none
+            )
+
+            let continuationWindow = try XCTUnwrap(
+                TemporalHistoryPresentation.calendarDayWindow(containing: end, calendar: calendar)
+            )
+            let continuation = try XCTUnwrap(
+                TemporalHistoryPresentation.pageGeometry(
+                    [input],
+                    in: continuationWindow,
+                    surfaceWidth: 360
+                ).first
+            )
+
+            XCTAssertEqual(
+                continuation.segment.visualContentLayout(
+                    in: continuationWindow,
+                    visibleWidth: continuation.visualWidth
+                ),
+                .none
+            )
+            XCTAssertEqual(
+                continuation.segment.visualContentFallbackLayout(
+                    in: continuationWindow,
+                    visibleWidth: continuation.visualWidth,
+                    surfaceWidth: 360,
+                    calendar: calendar
+                ),
+                .regular
+            )
+            let fallbackLeadingOverflow = try XCTUnwrap(
+                continuation.segment.visualContentFallbackLeadingOverflow(
+                    in: continuationWindow,
+                    visibleWidth: continuation.visualWidth,
+                    surfaceWidth: 360,
+                    calendar: calendar
+                )
+            )
+            XCTAssertEqual(
+                fallbackLeadingOverflow,
+                owner.visualWidth,
+                accuracy: 0.001
+            )
+        }
+    }
+
+    func testLateNightFastUsesCompactLabelWhenJoinedSpaceRemainsNarrow() throws {
+        let calendar = try londonCalendar()
+        let start = try date(2026, 8, 10, 23, 12, calendar: calendar)
+        let end = try date(2026, 8, 11, 4, 0, calendar: calendar)
+        let continuationWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: end, calendar: calendar)
+        )
+        let continuation = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [TemporalIntervalInput(id: UUID(), start: start, end: end)],
+                in: continuationWindow,
+                surfaceWidth: 360
+            ).first
+        )
+
+        XCTAssertEqual(
+            continuation.segment.visualContentFallbackLayout(
+                in: continuationWindow,
+                visibleWidth: continuation.visualWidth,
+                surfaceWidth: 360,
+                calendar: calendar
+            ),
+            .compact
+        )
+    }
+
     func testContentOwnerUsesHalfOpenLocalMidnightOwnership() throws {
         let calendar = try londonCalendar()
         let midnight = try date(2026, 7, 22, 0, calendar: calendar)
@@ -630,7 +737,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         let start = try date(2026, 7, 22, 4, calendar: calendar)
         let end = try date(2026, 7, 22, 8, calendar: calendar)
         let kinds: [TemporalRibbonIntervalItem.Kind] = [
-            .recorded, .active, .automatic, .previouslySaved,
+            .recorded, .active, .automatic, .inferred, .previouslySaved,
             .reconstructed, .needsReview, .unknown,
         ]
         let dayWindow = try XCTUnwrap(
@@ -1821,16 +1928,41 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertEqual(
             TemporalRibbonGeometry.intervalCornerRadius(
                 visibleWidth: 12,
-                preferredRadius: 20
+                preferredRadius: 20,
+                hasLeadingCap: true,
+                hasTrailingCap: true
             ),
             6
         )
         XCTAssertEqual(
             TemporalRibbonGeometry.intervalCornerRadius(
                 visibleWidth: 80,
-                preferredRadius: 20
+                preferredRadius: 20,
+                hasLeadingCap: true,
+                hasTrailingCap: true
             ),
             20
+        )
+    }
+
+    func testOneSidedContinuationUsesFullShortFragmentForItsRoundedCap() {
+        XCTAssertEqual(
+            TemporalRibbonGeometry.intervalCornerRadius(
+                visibleWidth: 12,
+                preferredRadius: 20,
+                hasLeadingCap: true,
+                hasTrailingCap: false
+            ),
+            12
+        )
+        XCTAssertEqual(
+            TemporalRibbonGeometry.intervalCornerRadius(
+                visibleWidth: 12,
+                preferredRadius: 20,
+                hasLeadingCap: false,
+                hasTrailingCap: true
+            ),
+            12
         )
     }
 
