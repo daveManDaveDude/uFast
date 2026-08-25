@@ -6,7 +6,7 @@ import XCTest
 
 @MainActor
 final class HistoryFavouriteRefreshTests: XCTestCase {
-    func testReloadHistoryUsesCanonicalFavouriteOrderBeforeCreatedAt() throws {
+    func testReloadHydrationFavouritesUsesCanonicalOrderBeforeCreatedAt() throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let customID = try XCTUnwrap(
             UUID(uuidString: "70100000-0000-0000-0000-000000000001")
@@ -23,13 +23,53 @@ final class HistoryFavouriteRefreshTests: XCTestCase {
             timeZone: .gmt
         )
 
-        XCTAssertTrue(model.reloadHistory())
+        XCTAssertTrue(model.reloadHydrationFavourites())
         XCTAssertEqual(model.hydrationFavouriteSnapshots.map(\.id), [
             HydrationFavouriteMigration.waterID,
             HydrationFavouriteMigration.teaID,
             HydrationFavouriteMigration.coffeeID,
             customID,
         ])
+    }
+
+    func testCalendarReloadDoesNotFetchOrRepublishFavouriteSnapshots() throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let customID = try XCTUnwrap(
+            UUID(uuidString: "70100000-0000-0000-0000-000000000001")
+        )
+        let container = try PersistenceContainer.make(inMemory: true, now: now)
+        let context = container.mainContext
+        context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        let favourite = HydrationFavouriteRecord(
+            id: customID,
+            name: "Sparkling water",
+            volumeMillilitres: 330,
+            isCaloric: false,
+            createdAt: now
+        )
+        context.insert(favourite)
+        try context.save()
+        let model = HistoryPresentationModel(
+            modelContext: context,
+            clock: FixedAppClock(now: now),
+            timeZone: .gmt
+        )
+
+        XCTAssertTrue(model.reloadHydrationFavourites())
+        XCTAssertEqual(model.hydrationFavouriteSnapshots.map(\.name), ["Sparkling water"])
+
+        favourite.update(
+            name: "Soda water",
+            volumeMillilitres: 355,
+            isCaloric: false,
+            updatedAt: now.addingTimeInterval(1)
+        )
+        try context.save()
+
+        XCTAssertTrue(model.reloadHistory())
+        XCTAssertEqual(model.hydrationFavouriteSnapshots.map(\.name), ["Sparkling water"])
+        XCTAssertTrue(model.reloadHydrationFavourites())
+        XCTAssertEqual(model.hydrationFavouriteSnapshots.map(\.name), ["Soda water"])
     }
 
     func testCommittedFavouriteEditAndRemovalRefreshHistorySnapshots() throws {
@@ -55,6 +95,7 @@ final class HistoryFavouriteRefreshTests: XCTestCase {
             timeZone: .gmt
         )
 
+        XCTAssertTrue(model.reloadHydrationFavourites())
         XCTAssertTrue(model.reloadHistory())
         XCTAssertTrue(model.hydrationFavouriteSnapshots.isEmpty)
         let initialRevision = invalidation.revision

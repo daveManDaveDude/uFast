@@ -34,6 +34,7 @@ extension HistoryView {
             model.updateEnvironment(calendar: calendar, locale: locale, timeZone: timeZone, now: clock.now)
             ensureHistoryDayCoverage(around: selectedDate)
             resetToCurrentDayIfSelected()
+            _ = model.reloadHydrationFavourites()
             _ = model.reloadHistory()
         }
         .onChange(of: isTabSelected) { _, isSelected in

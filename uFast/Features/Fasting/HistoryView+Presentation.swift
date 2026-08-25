@@ -337,6 +337,10 @@ extension HistoryView {
             return
         }
         model.setSelectedDate(change.day)
+        // Carousel settlement has already published its exact geometry-derived
+        // visible window. Keep that callback as the sole persistence reload so
+        // selection reconciliation cannot replace it with a second day window.
+        guard source != .carousel else { return }
         if let window = TemporalHistoryPresentation.ribbonWindow(
             containing: change.day,
             calendar: calendar
@@ -344,9 +348,7 @@ extension HistoryView {
             settledVisibleWindow = window
             _ = model.reloadHistory(in: window.interval)
         }
-        if source != .carousel || temporalMovementPhase == .settled {
-            ensureHistoryDayCoverage(around: change.day)
-        }
+        ensureHistoryDayCoverage(around: change.day)
     }
 
     func navigateDay(_ direction: Int) {

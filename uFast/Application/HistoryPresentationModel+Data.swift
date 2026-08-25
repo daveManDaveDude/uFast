@@ -28,14 +28,6 @@ extension HistoryPresentationModel {
                 referenceNow: referenceNow,
                 textResolver: textResolver
             )
-            let creationOrder = SortDescriptor<HydrationFavouriteRecord>(\.creationOrder)
-            let createdAt = SortDescriptor<HydrationFavouriteRecord>(\.createdAt)
-            let identifier = SortDescriptor<HydrationFavouriteRecord>(\.id)
-            let sortDescriptors = [creationOrder, createdAt, identifier]
-            let favouriteSnapshots = try modelContext.fetch(
-                FetchDescriptor<HydrationFavouriteRecord>(sortBy: sortDescriptors)
-            ).map(\.snapshot)
-            hydrationFavouriteSnapshots = favouriteSnapshots
         } catch {
             // Retain the last complete projection. A later lifecycle or
             // mutation refresh can replace it atomically.
@@ -48,6 +40,19 @@ extension HistoryPresentationModel {
             refreshLoadedMotionChunks()
         }
         return true
+    }
+
+    @discardableResult
+    func reloadHydrationFavourites() -> Bool {
+        do {
+            let snapshots = try fetchHydrationFavouriteSnapshots()
+            if snapshots != hydrationFavouriteSnapshots {
+                hydrationFavouriteSnapshots = snapshots
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 
     @discardableResult
@@ -85,23 +90,18 @@ extension HistoryPresentationModel {
         let presentation = projectionState.presentation else {
             return false
         }
-        let creationOrder = SortDescriptor<HydrationFavouriteRecord>(\.creationOrder)
-        let createdAt = SortDescriptor<HydrationFavouriteRecord>(\.createdAt)
-        let identifier = SortDescriptor<HydrationFavouriteRecord>(\.id)
         let favouriteSnapshots: [HydrationFavouriteSnapshot]
         do {
-            favouriteSnapshots = try modelContext.fetch(
-                FetchDescriptor<HydrationFavouriteRecord>(
-                    sortBy: [creationOrder, createdAt, identifier]
-                )
-            ).map(\.snapshot)
+            favouriteSnapshots = try fetchHydrationFavouriteSnapshots()
         } catch {
             return false
         }
         presentationCache.invalidate()
         historyData = data
         historyPresentation = presentation
-        hydrationFavouriteSnapshots = favouriteSnapshots
+        if favouriteSnapshots != hydrationFavouriteSnapshots {
+            hydrationFavouriteSnapshots = favouriteSnapshots
+        }
         historyDataRevision += 1
         motionGeneration = projectionState.generation
         motionLoadingEdges.removeAll()
@@ -149,5 +149,16 @@ extension HistoryPresentationModel {
         motionPriorSelectedDate = selectedDate
         motionPendingEnvironmentRebuild = true
         _ = ensureMotionRunway(around: selectedDate, force: true)
+    }
+
+    private func fetchHydrationFavouriteSnapshots() throws -> [HydrationFavouriteSnapshot] {
+        let creationOrder = SortDescriptor<HydrationFavouriteRecord>(\.creationOrder)
+        let createdAt = SortDescriptor<HydrationFavouriteRecord>(\.createdAt)
+        let identifier = SortDescriptor<HydrationFavouriteRecord>(\.id)
+        return try modelContext.fetch(
+            FetchDescriptor<HydrationFavouriteRecord>(
+                sortBy: [creationOrder, createdAt, identifier]
+            )
+        ).map(\.snapshot)
     }
 }
