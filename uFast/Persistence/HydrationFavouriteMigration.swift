@@ -34,19 +34,16 @@ enum HydrationFavouriteMigration {
         guard markers.count <= 1 else {
             throw HydrationFavouriteMigrationError.conflictingMigrationMarkers
         }
-        let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
-        guard settings.count <= 1 else {
-            throw HydrationFavouriteMigrationError.conflictingSettingsAuthority
-        }
+        let settings = try canonicalSettings(in: context)
         let records = try context.fetch(FetchDescriptor<HydrationFavouriteRecord>())
             .sorted(by: canonicalOrder)
         try rejectOrphanedFavouriteRecords(
             markers: markers,
-            settings: settings,
+            hasSettings: settings != nil,
             records: records
         )
         guard markers.first == nil else { return }
-        guard let settings = settings.first else { return }
+        guard let settings else { return }
 
         try validateLegacyAmounts(settings)
         try rejectDuplicateIDs(in: records)
@@ -54,6 +51,7 @@ enum HydrationFavouriteMigration {
         try validateLegacyRecords(records)
 
         let converted = try convertedRecords(settings: settings, before: records, at: now)
+        canonicalizeLegacyCreationOrder(records)
         converted.forEach(context.insert)
         context.insert(
             HydrationFavouriteMigrationRecord(
@@ -122,12 +120,26 @@ enum HydrationFavouriteMigration {
 
     private static func rejectOrphanedFavouriteRecords(
         markers: [HydrationFavouriteMigrationRecord],
-        settings: [AppSettingsRecord],
+        hasSettings: Bool,
         records: [HydrationFavouriteRecord]
     ) throws {
-        guard records.isEmpty || !markers.isEmpty || !settings.isEmpty else {
+        guard records.isEmpty || !markers.isEmpty || hasSettings else {
             throw HydrationFavouriteMigrationError.conflictingFavouriteAuthority
         }
+    }
+
+    private static func canonicalSettings(
+        in context: ModelContext
+    ) throws -> AppSettingsRecord? {
+        let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        guard let canonical = settings.first else { return nil }
+        guard settings.dropFirst().allSatisfy({
+            $0.userVisibleSnapshot == canonical.userVisibleSnapshot
+        }) else {
+            throw HydrationFavouriteMigrationError.conflictingSettingsAuthority
+        }
+        return canonical
     }
 
     private static func validateLegacyAmounts(
@@ -174,7 +186,15 @@ enum HydrationFavouriteMigration {
         else {
             throw HydrationFavouriteMigrationError.invalidLegacyCreationOrder
         }
-        return minimum - 3
+        return -3
+    }
+
+    private static func canonicalizeLegacyCreationOrder(
+        _ records: [HydrationFavouriteRecord]
+    ) {
+        for (index, record) in records.enumerated() {
+            record.creationOrder = Int64(index)
+        }
     }
 
     private static func convertedRecords(
@@ -222,11 +242,11 @@ enum HydrationFavouriteMigration {
         _ lhs: HydrationFavouriteRecord,
         _ rhs: HydrationFavouriteRecord
     ) -> Bool {
-        if lhs.creationOrder != rhs.creationOrder {
-            return lhs.creationOrder < rhs.creationOrder
-        }
         if lhs.createdAt != rhs.createdAt {
             return lhs.createdAt < rhs.createdAt
+        }
+        if lhs.creationOrder != rhs.creationOrder {
+            return lhs.creationOrder < rhs.creationOrder
         }
         return lhs.id.uuidString < rhs.id.uuidString
     }

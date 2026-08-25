@@ -16,20 +16,25 @@ enum SettingsStoreError: Error, Equatable {
 
 @MainActor
 final class SwiftDataSettingsStore {
+    typealias NewStoreSeeder = (ModelContext, Date) throws -> Void
+
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
     private let diagnosticSink: any DiagnosticEventSink
     private let now: Date
+    private let newStoreSeeder: NewStoreSeeder
 
     init(
         modelContext: ModelContext,
         simulateSaveFailure: Bool = false,
         diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
-        now: Date = .now
+        now: Date = .now,
+        newStoreSeeder: @escaping NewStoreSeeder = HydrationFavouriteMigration.seedNewStore
     ) {
         self.modelContext = modelContext
         self.diagnosticSink = diagnosticSink
         self.now = now
+        self.newStoreSeeder = newStoreSeeder
         transaction = PersistenceTransaction(
             modelContext: modelContext,
             saveAction: simulateSaveFailure ? {
@@ -71,14 +76,20 @@ final class SwiftDataSettingsStore {
         }
         let settings = AppSettingsRecord(fastingGoal: goal, hasCompletedOnboarding: true)
         modelContext.insert(settings)
-        try HydrationFavouriteMigration.seedNewStore(in: modelContext, at: now)
-        modelContext.insert(
-            HydrationFavouriteMigrationRecord(
-                migrationVersion: HydrationFavouriteMigration.migrationVersion,
-                completedAt: now
+        do {
+            try newStoreSeeder(modelContext, now)
+            modelContext.insert(
+                HydrationFavouriteMigrationRecord(
+                    migrationVersion: HydrationFavouriteMigration.migrationVersion,
+                    completedAt: now
+                )
             )
-        )
-        try saveTransaction()
+            try transaction.save()
+        } catch {
+            modelContext.rollback()
+            PersistenceTransactionDiagnostics.recordFailure(to: diagnosticSink)
+            throw error
+        }
         return settings
     }
 

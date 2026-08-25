@@ -191,6 +191,10 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         )
         tapTab("Today", in: succeeded)
         tapDrinkAdd(in: succeeded)
+        XCTAssertTrue(
+            succeeded.scrollViews["drink.picker"].waitForExistence(timeout: 5),
+            succeeded.debugDescription
+        )
         let favouriteRows = succeeded.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "drink.favourite.")
         )
@@ -211,6 +215,10 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         ).arguments
         relaunched.launch()
         tapDrinkAdd(in: relaunched)
+        XCTAssertTrue(
+            relaunched.scrollViews["drink.picker"].waitForExistence(timeout: 5),
+            relaunched.debugDescription
+        )
         let relaunchedFavouriteRows = relaunched.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "drink.favourite.")
         )

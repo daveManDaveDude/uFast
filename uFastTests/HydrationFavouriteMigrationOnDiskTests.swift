@@ -60,6 +60,61 @@ final class HydrationFavouriteMigrationDiskTests: XCTestCase {
         )
     }
 
+    func testV4EquivalentDuplicateSettingsMigrateBeforeAuthorityCollapse() throws {
+        let directory = try makeDirectory(prefix: "uFast-v4-equivalent-settings")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "production.store")
+        let lowerID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000010")
+        )
+        let higherID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000020")
+        )
+        do {
+            let schema = Schema(versionedSchema: UFastSchemaV4.self)
+            let legacy = try ModelContainer(
+                for: schema,
+                configurations: [
+                    ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none),
+                ]
+            )
+            legacy.mainContext.insert(
+                AppSettingsRecord(
+                    id: higherID,
+                    hasCompletedOnboarding: true,
+                    waterFavouriteMillilitres: 600,
+                    teaFavouriteMillilitres: 350,
+                    coffeeFavouriteMillilitres: 275
+                )
+            )
+            legacy.mainContext.insert(
+                AppSettingsRecord(
+                    id: lowerID,
+                    hasCompletedOnboarding: true,
+                    waterFavouriteMillilitres: 750,
+                    teaFavouriteMillilitres: 425,
+                    coffeeFavouriteMillilitres: 225
+                )
+            )
+            try legacy.mainContext.save()
+        }
+
+        let migrated = try PersistenceContainer.make(storeURL: storeURL, now: migrationDate)
+        let context = migrated.mainContext
+        let amountsByID = try Dictionary(uniqueKeysWithValues: context.fetch(
+            FetchDescriptor<HydrationFavouriteRecord>()
+        ).map { ($0.id, $0.volumeMillilitres) })
+        XCTAssertEqual(amountsByID[HydrationFavouriteMigration.waterID], 750)
+        XCTAssertEqual(amountsByID[HydrationFavouriteMigration.teaID], 425)
+        XCTAssertEqual(amountsByID[HydrationFavouriteMigration.coffeeID], 225)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 2)
+
+        let settingsStore = SwiftDataSettingsStore(modelContext: context)
+        try settingsStore.prepareForUse()
+        XCTAssertEqual(try settingsStore.authoritativeRecord()?.id, lowerID)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 1)
+    }
+
     private func assertConvertedStore(
         _ container: ModelContainer,
         customID: UUID,

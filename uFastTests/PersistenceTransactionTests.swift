@@ -5,6 +5,10 @@ import XCTest
 
 @MainActor
 final class PersistenceTransactionTests: XCTestCase {
+    private enum SeederFailure: Error {
+        case requested
+    }
+
     func testSettingsFailureRollsBackAndLaterUnrelatedSaveDoesNotCommitIt() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
@@ -34,6 +38,45 @@ final class PersistenceTransactionTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(failingStore.authoritativeRecord()).fastingGoal, originalGoal)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<FastRecord>()), 1)
         XCTAssertFalse(context.hasChanges)
+    }
+
+    func testOnboardingSeederFailureRollsBackSettingsFavouriteAndMarker() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let store = SwiftDataSettingsStore(
+            modelContext: context,
+            newStoreSeeder: { context, now in
+                context.insert(
+                    HydrationFavouriteRecord(
+                        name: "Partial favourite",
+                        volumeMillilitres: 330,
+                        isCaloric: false,
+                        createdAt: now
+                    )
+                )
+                throw SeederFailure.requested
+            }
+        )
+
+        XCTAssertThrowsError(try store.completeOnboarding(goal: .default)) { error in
+            XCTAssertTrue(error is SeederFailure)
+        }
+        XCTAssertTrue(try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
+        XCTAssertTrue(
+            try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).isEmpty
+        )
+        XCTAssertFalse(context.hasChanges)
+
+        context.insert(
+            FastRecord(
+                startDate: Date(timeIntervalSince1970: 1_800_000_000),
+                goalAtStart: .default
+            )
+        )
+        try context.save()
+        XCTAssertTrue(try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
     }
 
     func testOnDiskCaloricFailureLeavesNoPartialRecordsOrLaterStaleCommit() throws {
