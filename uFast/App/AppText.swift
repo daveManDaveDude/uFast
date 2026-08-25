@@ -76,7 +76,7 @@ enum AppText: Equatable {
     case drinkPickerTitle
     case drinkPickerHeading
     case drinkPickerDetail(volumeMillilitres: Int, isCaloric: Bool)
-    case drinkPickerAccessibilityValue(volumeMillilitres: Int)
+    case drinkPickerAccessibilityValue(volumeMillilitres: Int, isCaloric: Bool)
     case drinkPickerClassification(isCaloric: Bool)
     case drinkAddAnother
     case drinkAddError
@@ -645,8 +645,12 @@ enum AppText: Equatable {
                 isCaloric ? "\(volumeMillilitres) ml · Caloric" : "\(volumeMillilitres) ml · Non-caloric",
                 "Favourite drink detail"
             )
-        case let .drinkPickerAccessibilityValue(volumeMillilitres):
-            return resource("drink.picker.accessibility-value", "\(volumeMillilitres) millilitres", "Favourite drink VoiceOver volume")
+        case let .drinkPickerAccessibilityValue(volumeMillilitres, isCaloric):
+            return resource(
+                isCaloric ? "drink.picker.accessibility-value.caloric" : "drink.picker.accessibility-value.non-caloric",
+                isCaloric ? "\(volumeMillilitres) millilitres, Caloric" : "\(volumeMillilitres) millilitres, Non-caloric",
+                "Favourite drink VoiceOver value"
+            )
         case let .drinkPickerClassification(isCaloric):
             return resource(
                 isCaloric ? "drink.picker.classification.caloric" : "drink.picker.classification.non-caloric",
@@ -885,7 +889,7 @@ enum AppText: Equatable {
             switch error {
             case .blankName, .nameTooLong:
                 return resource("favourite.validation.name", "Enter a name up to 80 characters.", "Drink favourite name validation")
-            case .duplicateName, .reservedName:
+            case .duplicateName:
                 return resource("favourite.validation.duplicate", "Choose a name that isn’t already in your favourites.", "Drink favourite duplicate-name validation")
             case .invalidAmount:
                 return resource("favourite.validation.amount", "Enter an amount from 1 to 5,000 ml.", "Drink favourite amount validation")
@@ -1162,7 +1166,9 @@ enum AppText: Equatable {
         .drinkCombinedSaveError, .drinkConflictError, .drinkAddedAnnouncement(name: "Drink", volumeMillilitres: 300),
         .drinkPickerTitle, .drinkPickerHeading, .drinkPickerDetail(volumeMillilitres: 300, isCaloric: false),
         .drinkPickerDetail(volumeMillilitres: 300, isCaloric: true),
-        .drinkPickerAccessibilityValue(volumeMillilitres: 300), .drinkPickerClassification(isCaloric: false),
+        .drinkPickerAccessibilityValue(volumeMillilitres: 300, isCaloric: false),
+        .drinkPickerAccessibilityValue(volumeMillilitres: 300, isCaloric: true),
+        .drinkPickerClassification(isCaloric: false),
         .drinkPickerClassification(isCaloric: true), .drinkAddAnother, .drinkAddError,
         .todayFoodAdd, .todayDrinkAdd, .todayDrinkRetry, .todayFluids, .todayFluidTotal(0),
         .todayTimelineEmpty, .todayTimelineHeading, .todayTimelineLoadError,
@@ -1739,7 +1745,7 @@ private extension AppText {
         case let .drinkAddedAnnouncement(name, volumeMillilitres):
             [name, String(volumeMillilitres)]
         case let .drinkPickerDetail(volumeMillilitres, _): [String(volumeMillilitres)]
-        case let .drinkPickerAccessibilityValue(volumeMillilitres): [String(volumeMillilitres)]
+        case let .drinkPickerAccessibilityValue(volumeMillilitres, _): [String(volumeMillilitres)]
         case let .todayFluidTotal(volumeMillilitres): [String(volumeMillilitres)]
         case let .todayTimelineAccessibilityValue(detail, time): [detail, time]
         case let .goalSelectionSummary(hours): [String(hours)]

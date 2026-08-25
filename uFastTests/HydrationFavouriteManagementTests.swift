@@ -6,7 +6,7 @@ import XCTest
 final class HydrationFavouriteManagementTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func testValidationTrimsCountsGraphemesAndRejectsReservedAndNormalizedDuplicates() {
+    func testValidationTrimsCountsGraphemesAndAllowsOrdinaryDefaultNames() {
         let first = HydrationFavouriteSnapshot(
             id: UUID(),
             name: "Café",
@@ -55,8 +55,38 @@ final class HydrationFavouriteManagementTests: XCTestCase {
             HydrationFavouriteValidator.validationError(
                 name: " WATER ", amount: "250", existing: []
             ),
-            .reservedName
+            nil
         )
+    }
+
+    func testInvisibleNameIsRejectedForCreateAndUpdate() throws {
+        let invisibleName = "\u{200D}"
+        XCTAssertEqual(
+            HydrationFavouriteValidator.validationError(
+                name: invisibleName, amount: "330", existing: []
+            ),
+            .blankName
+        )
+        let container = try PersistenceContainer.make(inMemory: true)
+        let store = SwiftDataHydrationFavouriteStore(modelContext: container.mainContext)
+        XCTAssertThrowsError(
+            try store.create(
+                name: invisibleName, volumeMillilitres: 330, isCaloric: false, at: now
+            )
+        ) { error in
+            XCTAssertEqual(error as? HydrationFavouriteStoreError, .invalidName)
+        }
+        let created = try store.create(
+            name: "Sparkling water", volumeMillilitres: 330, isCaloric: false, at: now
+        )
+        XCTAssertThrowsError(
+            try store.update(
+                id: created.id, name: invisibleName, volumeMillilitres: 355,
+                isCaloric: false, at: now.addingTimeInterval(1)
+            )
+        ) { error in
+            XCTAssertEqual(error as? HydrationFavouriteStoreError, .invalidName)
+        }
     }
 
     func testProjectionPreservesCustomNameVolumeClassificationAndInstant() {

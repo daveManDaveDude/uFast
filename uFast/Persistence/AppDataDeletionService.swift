@@ -18,14 +18,16 @@ enum AppDataDeletionService {
             modelContext: context,
             saveAction: saveAction
         )
-        try context.fetch(FetchDescriptor<AppSettingsRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<FastRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
-        try LegacyHistoryDeletion.deleteSchemaOnlyRecords(in: context)
         do {
-            try transaction.save()
+            try transaction.perform {
+                try context.fetch(FetchDescriptor<AppSettingsRecord>()).forEach(context.delete)
+                try context.fetch(FetchDescriptor<FastRecord>()).forEach(context.delete)
+                try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
+                try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
+                try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
+                try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).forEach(context.delete)
+                try LegacyHistoryDeletion.deleteSchemaOnlyRecords(in: context)
+            }
         } catch {
             PersistenceTransactionDiagnostics.recordFailure(to: diagnosticSink)
             throw error

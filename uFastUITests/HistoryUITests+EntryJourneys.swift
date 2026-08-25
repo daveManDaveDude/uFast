@@ -35,7 +35,7 @@ extension HistoryUITests {
         let addDrink = app.buttons["history.add.drink"]
         XCTAssertTrue(addDrink.waitForExistence(timeout: 5), app.debugDescription)
         addDrink.tap()
-        let waterFavourite = app.buttons["drink.favourite.water"]
+        let waterFavourite = app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"]
         XCTAssertTrue(waterFavourite.waitForExistence(timeout: 5), app.debugDescription)
         waterFavourite.tap()
         let drinkSave = app.buttons["drink.editor.save"]

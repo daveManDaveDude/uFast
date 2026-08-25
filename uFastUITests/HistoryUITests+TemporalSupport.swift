@@ -20,7 +20,8 @@ extension HistoryUITests {
     @MainActor
     func settledSeamState(
         in app: XCUIApplication,
-        expectedSelectedDate: String
+        expectedSelectedDate: String,
+        expectedVisualOwnerLabelCount: Int? = nil
     ) -> SettledSeamState? {
         let carousel = app.scrollViews["history.day-carousel"]
         let selectedDate = app.staticTexts["history.selected-date"]
@@ -47,6 +48,18 @@ extension HistoryUITests {
                 HistoryTemporalIdentifiers.activeFastVisualContent
             )
         )
+        if let expectedVisualOwnerLabelCount, expectedVisualOwnerLabelCount > 0 {
+            let visualOwnerExpectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in
+                    Self.visibleElements(in: activeFastVisualContent, boundedBy: carousel).count
+                        == expectedVisualOwnerLabelCount
+                },
+                object: app
+            )
+            guard XCTWaiter.wait(for: [visualOwnerExpectation], timeout: 5) == .completed else {
+                return nil
+            }
+        }
         let visibleActiveFastVisualContent = Self.visibleElements(
             in: activeFastVisualContent,
             boundedBy: carousel

@@ -180,7 +180,7 @@ extension HistoryUITests {
         }
         XCTAssertTrue(addDrink.isHittable, addDrink.debugDescription)
         addDrink.tap()
-        let water = app.buttons["drink.favourite.water"]
+        let water = app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"]
         XCTAssertTrue(water.waitForExistence(timeout: 5), app.debugDescription)
         water.tap()
         XCTAssertTrue(
@@ -366,7 +366,8 @@ extension HistoryUITests {
         let originalStartSelectedDate = "Selected day, \(originalStartDayLabel)"
         let previousOffsetState = try XCTUnwrap(settledSeamState(
             in: app,
-            expectedSelectedDate: originalStartSelectedDate
+            expectedSelectedDate: originalStartSelectedDate,
+            expectedVisualOwnerLabelCount: 1
         ), app.debugDescription)
         XCTAssertEqual(previousOffsetState.selectedDateLabel, originalStartSelectedDate)
         XCTAssertFalse(previousOffsetState.noonMarkerVisible, app.debugDescription)

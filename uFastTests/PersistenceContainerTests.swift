@@ -7,18 +7,28 @@ import XCTest
 @MainActor
 final class PersistenceContainerTests: XCTestCase {
     func testCurrentVersionedSchemaAndMigrationPlanCoverEveryProductionModel() {
+        assertVersionedIdentifiersAndMigrationPlan()
+        assertReleaseSchema()
+        assertCurrentSchema()
+    }
+
+    private func assertVersionedIdentifiersAndMigrationPlan() {
         XCTAssertEqual(UFastSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
         XCTAssertEqual(UFastSchemaV2.versionIdentifier, Schema.Version(2, 0, 0))
         XCTAssertEqual(UFastSchemaV3.versionIdentifier, Schema.Version(3, 0, 0))
         XCTAssertEqual(UFastSchemaV4.versionIdentifier, Schema.Version(4, 0, 0))
-        XCTAssertEqual(UFastMigrationPlan.schemas.count, 4)
+        XCTAssertEqual(UFastSchemaV5.versionIdentifier, Schema.Version(5, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 5)
         XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[2] == UFastSchemaV3.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[3] == UFastSchemaV4.self)
-        XCTAssertEqual(UFastMigrationPlan.stages.count, 3)
-        XCTAssertEqual(PersistenceContainer.schema.entities.count, 6)
+        XCTAssertTrue(UFastMigrationPlan.schemas[4] == UFastSchemaV5.self)
+        XCTAssertEqual(UFastMigrationPlan.stages.count, 4)
+        XCTAssertEqual(PersistenceContainer.schema.entities.count, 7)
+    }
 
+    private func assertReleaseSchema() {
         let releaseSchema = Schema(versionedSchema: UFastSchemaV1.self)
         XCTAssertEqual(
             Set(releaseSchema.entities.map(\.name)),
@@ -47,7 +57,9 @@ final class PersistenceContainerTests: XCTestCase {
             ]
         )
         XCTAssertNil(releaseSchema.entitiesByName["HydrationFavouriteRecord"])
+    }
 
+    private func assertCurrentSchema() {
         XCTAssertEqual(
             Set(PersistenceContainer.schema.entities.map(\.name)),
             [
@@ -56,6 +68,7 @@ final class PersistenceContainerTests: XCTestCase {
                 "FoodEntryRecord",
                 "HydrationEntryRecord",
                 "HydrationFavouriteRecord",
+                "HydrationFavouriteMigrationRecord",
                 "UnknownPeriodRecord",
             ]
         )
@@ -241,6 +254,9 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<FoodEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
+        XCTAssertTrue(
+            try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).isEmpty
+        )
         XCTAssertTrue(try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).isEmpty)
     }
 
@@ -261,6 +277,10 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<UnknownPeriodRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationFavouriteRecord>()), 1)
+        XCTAssertEqual(
+            try context.fetchCount(FetchDescriptor<HydrationFavouriteMigrationRecord>()),
+            1
+        )
         XCTAssertFalse(context.hasChanges)
     }
 
@@ -311,6 +331,9 @@ final class PersistenceContainerTests: XCTestCase {
                 createdAt: now
             )
         )
+        context.insert(HydrationFavouriteMigrationRecord(
+            migrationVersion: HydrationFavouriteMigration.migrationVersion, completedAt: now
+        ))
         try context.save()
         return container
     }

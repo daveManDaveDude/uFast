@@ -2,6 +2,31 @@ import XCTest
 
 final class HydrationFavouriteLifecycleUITests: HydrationFavouriteUITestCase {
     @MainActor
+    func testRemovingLastFavouriteKeepsSettingsAndPickerUsable() {
+        let app = launch()
+        tapTab("Settings", in: app)
+        let water = app.buttons["settings.favourite.\(waterFavouriteID)"]
+        tapSettingsControl(water, in: app)
+        XCTAssertTrue(app.navigationBars["Edit favourite"].waitForExistence(timeout: 3), app.debugDescription)
+        tapWhenReady(app.buttons["settings.favourite.remove"], in: editorScrollView(in: app), app: app)
+        let confirmation = app.alerts.firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3), app.debugDescription)
+        tapAlertButton("Remove", in: confirmation, app: app)
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["settings.favourite.add"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["settings.favourite.\(waterFavouriteID)"].exists)
+
+        tapTab("Today", in: app)
+        tapDrinkAdd(in: app)
+        XCTAssertTrue(app.buttons["drink.custom"].waitForExistence(timeout: 5), app.debugDescription)
+        let favouriteRows = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "drink.favourite.")
+        )
+        XCTAssertEqual(favouriteRows.count, 0, app.debugDescription)
+        XCTAssertFalse(app.staticTexts["drink.save-error"].exists)
+    }
+
+    @MainActor
     func testCustomFavouriteEditAndRemoveCancelThenConfirm() {
         let app = launch(seedFavouritePopulated: true)
         tapTab("Settings", in: app)

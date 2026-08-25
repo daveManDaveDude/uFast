@@ -48,10 +48,12 @@ struct AddDrinkSheet: View {
                         .disabled(isSaving)
                         .accessibilityLabel(displayName(for: favourite))
                         .accessibilityValue(
-                            textResolver(.drinkPickerAccessibilityValue(volumeMillilitres: favourite.volumeMillilitres))
-                        )
-                        .accessibilityHint(
-                            textResolver(.drinkPickerClassification(isCaloric: favourite.isCaloric))
+                            textResolver(
+                                .drinkPickerAccessibilityValue(
+                                    volumeMillilitres: favourite.volumeMillilitres,
+                                    isCaloric: favourite.isCaloric
+                                )
+                            )
                         )
                         .accessibilityIdentifier(identifier(for: favourite))
                     }
@@ -104,15 +106,11 @@ struct AddDrinkSheet: View {
     }
 
     private func identifier(for favourite: HydrationFavourite) -> String {
-        favourite.isUserCreated
-            ? "drink.favourite.custom.\(favourite.id.uuidString)"
-            : "drink.favourite.\(favourite.type.rawValue)"
+        "drink.favourite.\(favourite.id.uuidString)"
     }
 
     private func displayName(for favourite: HydrationFavourite) -> String {
-        favourite.isUserCreated
-            ? favourite.displayName
-            : textResolver(.drinkTypeName(favourite.type))
+        favourite.displayName
     }
 
     private func symbol(for type: HydrationDrinkType) -> String {

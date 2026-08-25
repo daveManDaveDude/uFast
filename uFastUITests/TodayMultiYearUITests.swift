@@ -36,7 +36,7 @@ final class TodayMultiYearUITests: XCTestCase {
         }
         drinkAdd.tap()
         XCTAssertTrue(app.navigationBars["Add a drink"].waitForExistence(timeout: 5), app.debugDescription)
-        let water = app.buttons["drink.favourite.water"]
+        let water = app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"]
         XCTAssertTrue(water.waitForExistence(timeout: 5), app.debugDescription)
         water.tap()
         XCTAssertTrue(app.staticTexts["drink.total"].waitForExistence(timeout: 5), app.debugDescription)

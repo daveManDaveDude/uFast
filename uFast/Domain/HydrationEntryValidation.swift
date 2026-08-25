@@ -8,6 +8,10 @@ enum HydrationEntryValidator {
     static let maximumVolumeMillilitres = 5000
     static let customNameLimit = 80
 
+    private static let invisibleNameCharacters = CharacterSet.whitespacesAndNewlines
+        .union(.controlCharacters)
+        .union(.nonBaseCharacters)
+
     static func isValid(volumeMillilitres: Int) -> Bool {
         DomainValidation.contains(
             volumeMillilitres,
@@ -16,7 +20,20 @@ enum HydrationEntryValidator {
     }
 
     static func validatedCustomName(_ name: String) -> String? {
-        DomainValidation.nonEmptyTrimmed(name, maximumLength: customNameLimit)
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              hasVisibleText(trimmed),
+              trimmed.count <= customNameLimit
+        else {
+            return nil
+        }
+        return trimmed
+    }
+
+    static func hasVisibleText(_ value: String) -> Bool {
+        value.unicodeScalars.contains {
+            !invisibleNameCharacters.contains($0)
+        }
     }
 
     static func validated(
@@ -122,10 +139,6 @@ struct HydrationFavourite: Equatable, Identifiable {
         name
     }
 
-    var isUserCreated: Bool {
-        userCreatedID != nil
-    }
-
     static func builtInID(for type: HydrationDrinkType) -> UUID {
         switch type {
         case .water: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID()
@@ -137,45 +150,11 @@ struct HydrationFavourite: Equatable, Identifiable {
 }
 
 enum HydrationFavouriteProvider {
-    static func favourites(snapshot: AppSettingsSnapshot?) -> [HydrationFavourite] {
-        values(
-            water: snapshot?.waterFavouriteMillilitres ?? 500,
-            tea: snapshot?.teaFavouriteMillilitres ?? 300,
-            coffee: snapshot?.coffeeFavouriteMillilitres ?? 300
-        )
-    }
-
-    static func favourites(settings: AppSettingsRecord?) -> [HydrationFavourite] {
-        values(
-            water: settings?.waterFavouriteMillilitres ?? 500,
-            tea: settings?.teaFavouriteMillilitres ?? 300,
-            coffee: settings?.coffeeFavouriteMillilitres ?? 300
-        )
-    }
-
-    private static func values(water: Int, tea: Int, coffee: Int) -> [HydrationFavourite] {
-        [
-            HydrationFavourite(type: .water, volumeMillilitres: water, isCaloric: false),
-            HydrationFavourite(type: .tea, volumeMillilitres: tea, isCaloric: false),
-            HydrationFavourite(type: .coffee, volumeMillilitres: coffee, isCaloric: false),
-        ]
-    }
-
-    static func combined(
-        settings: AppSettingsSnapshot?,
-        userCreated: [HydrationFavouriteSnapshot]
-    ) -> [HydrationFavourite] {
-        favourites(snapshot: settings) + userCreated
-            .sorted { lhs, rhs in
-                if lhs.creationOrder != rhs.creationOrder {
-                    return lhs.creationOrder < rhs.creationOrder
-                }
-                if lhs.createdAt != rhs.createdAt {
-                    return lhs.createdAt < rhs.createdAt
-                }
-                return lhs.id.uuidString < rhs.id.uuidString
-            }
-            .map(\.hydrationFavourite)
+    /// Record snapshots are the only runtime source for favourite templates.
+    /// The legacy overloads remain source-compatible for old fixture code but
+    /// deliberately return no synthesized defaults.
+    static func favourites(records: [HydrationFavouriteSnapshot]) -> [HydrationFavourite] {
+        records.map(\.hydrationFavourite)
     }
 }
 

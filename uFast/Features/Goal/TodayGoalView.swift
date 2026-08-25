@@ -217,10 +217,7 @@ struct TodayGoalView: View {
         }
         .sheet(isPresented: $isDrinkSheetPresented) {
             AddDrinkSheet(
-                favourites: HydrationFavouriteProvider.combined(
-                    settings: authoritativeSettings,
-                    userCreated: snapshot.hydrationFavourites
-                ),
+                favourites: HydrationFavouriteProvider.favourites(records: snapshot.hydrationFavourites),
                 onAdd: { favourite in
                     try addFavouriteDrink(favourite)
                     caloricFavouriteSaveError = nil
@@ -493,9 +490,7 @@ extension TodayGoalView {
     }
 
     func localizedFavouriteName(_ favourite: HydrationFavourite) -> String {
-        favourite.isUserCreated
-            ? favourite.displayName
-            : textResolver(.drinkTypeName(favourite.type))
+        favourite.displayName
     }
 
     func timelineName(_ entry: TodayTimelineEntry) -> String {

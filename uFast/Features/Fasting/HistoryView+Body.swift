@@ -34,6 +34,7 @@ extension HistoryView {
             model.updateEnvironment(calendar: calendar, locale: locale, timeZone: timeZone, now: clock.now)
             ensureHistoryDayCoverage(around: selectedDate)
             resetToCurrentDayIfSelected()
+            _ = model.reloadHydrationFavourites()
             _ = model.reloadHistory()
         }
         .onChange(of: isTabSelected) { _, isSelected in
@@ -214,8 +215,8 @@ extension HistoryView {
         DirectHistoricalEntryView(
             presentation: presentation, clock: clock,
             activeFastStart: authoritativeActiveFast?.startDate,
-            favourites: HydrationFavouriteProvider.combined(
-                settings: authoritativeSettings, userCreated: model.hydrationFavouriteSnapshots
+            favourites: HydrationFavouriteProvider.favourites(
+                records: model.hydrationFavouriteSnapshots
             ),
             resolveFavouriteDraft: { favourite, occurredAt in
                 guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }

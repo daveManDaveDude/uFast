@@ -431,6 +431,31 @@ is shown.
 - **Consequence:** Fasts are not timeline rows, food never implies fluid, and
   the app adds no hydration target or judgment.
 
+## S2-D7 Food favourites
+
+- **Status:** Accepted
+- **Accepted:** 25 August 2026 by OW-D102
+- **Decision:** Food favourites are local reusable templates containing the
+  existing food description and optional manually entered nutrition values.
+  Descriptions are trimmed, visible, limited to 200 user-perceived characters
+  and unique after case-, width- and diacritic-insensitive normalization.
+  Nutrition remains independently optional and uses S2-D1's finite,
+  non-negative, 1,000,000 maximum. Food favourites are always caloric and have
+  no seeded default; existing food events are never converted into favourites.
+  Today selection quick-adds one ordinary food event at the current
+  `AppClock.now` after re-resolving the persisted favourite identifier. A
+  selection during an active fast uses D-013's **Save and end fast** or
+  **Cancel** atomic choice. History selection opens the existing food editor
+  with the selected occurrence time and requires explicit Save; it never saves
+  immediately. Editing or removing a favourite never rewrites saved food
+  history, and Delete All Data removes favourites without reseeding one.
+- **Consequence:** Favourite foods reduce repeated manual entry without adding
+  a second food-event authority, inferred nutrition, automatic history changes,
+  or a timestamp invented by a template selection. The V6 local template
+  entity must remain empty when a V5 store has no food favourites, and failed
+  V5-to-V6 migration preserves the original store and uses the existing
+  persistence-unavailable state.
+
 ## D-014 Food events are always caloric
 
 - **Status:** Accepted

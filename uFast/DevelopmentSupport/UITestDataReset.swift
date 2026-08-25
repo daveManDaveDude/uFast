@@ -12,13 +12,8 @@ enum UITestDataReset {
         guard configuration.resetData else { return }
 
         let context = container.mainContext
-        try context.fetch(FetchDescriptor<AppSettingsRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<FastRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).forEach(context.delete)
-        try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
-        try UserDefaultsLiveActivityLifecycleStore().clearAll()
+        try clearPersistedData(in: context)
+        try context.save()
 
         if configuration.seedOnboarded || configuration.seedLiveActivityRecovery {
             context.insert(
@@ -31,6 +26,7 @@ enum UITestDataReset {
             )
         }
         try seedHistoryFixtures(in: context, configuration: configuration, clock: clock)
+        UITestSeedFixtures.seedNewFavouriteDefault(in: context, clock: clock)
         seedFavouriteFixtures(in: context, configuration: configuration, clock: clock)
         if configuration.seedTodayMultiYear {
             UITestSeedFixtures.seedTodayMultiYear(in: context, clock: clock)
@@ -56,7 +52,35 @@ enum UITestDataReset {
             }
         }
         seedIntegrityFixtures(in: context, configuration: configuration, now: now)
+        try establishMigrationMarker(in: context, now: now)
         try context.save()
+    }
+
+    private static func clearPersistedData(in context: ModelContext) throws {
+        try context.fetch(FetchDescriptor<AppSettingsRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<FastRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).forEach(context.delete)
+        try UserDefaultsLiveActivityLifecycleStore().clearAll()
+    }
+
+    private static func establishMigrationMarker(
+        in context: ModelContext,
+        now: Date
+    ) throws {
+        let migrationMarkers = try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>())
+        guard migrationMarkers.isEmpty else { return }
+        let settingsRecords = try context.fetch(FetchDescriptor<AppSettingsRecord>())
+        guard !settingsRecords.isEmpty else { return }
+        context.insert(
+            HydrationFavouriteMigrationRecord(
+                migrationVersion: HydrationFavouriteMigration.migrationVersion,
+                completedAt: now
+            )
+        )
     }
 
     private static func seedHistoryFixtures(

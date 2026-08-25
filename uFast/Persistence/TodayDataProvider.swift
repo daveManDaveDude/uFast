@@ -138,8 +138,8 @@ final class SwiftDataTodayDataProvider {
         )).map(HydrationEntrySnapshot.init)
         let favourites = try modelContext.fetch(FetchDescriptor<HydrationFavouriteRecord>(
             sortBy: [
-                SortDescriptor(\HydrationFavouriteRecord.createdAt),
                 SortDescriptor(\HydrationFavouriteRecord.creationOrder),
+                SortDescriptor(\HydrationFavouriteRecord.createdAt),
                 SortDescriptor(\HydrationFavouriteRecord.id),
             ]
         )).map(\.snapshot)

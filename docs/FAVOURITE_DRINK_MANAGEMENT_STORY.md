@@ -1,10 +1,10 @@
 # OW-D101 — Manage default and custom favourite drinks in Settings
 
-**Status:** Ready — Sol readiness gate passed 25 August 2026
+**Status:** Unblocked — Sol readiness gate passed 25 August 2026
 **Priority:** P1  
 **Estimate:** 8 points  
 **Milestone:** Manual hydration convenience  
-**Updated:** 25 August 2026 — default favourites become ordinary editable records
+**Updated:** 25 August 2026 — unblocked; default favourites become ordinary editable records
 
 ## User story
 

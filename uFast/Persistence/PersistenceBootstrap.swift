@@ -12,6 +12,7 @@ enum PersistenceBootstrapResult {
     case ready(ModelContainer)
     case unavailable(PersistenceBootstrapFailure)
 
+    @MainActor
     static func open(
         containerFactory: () throws -> ModelContainer = { try PersistenceContainer.make() },
         diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()

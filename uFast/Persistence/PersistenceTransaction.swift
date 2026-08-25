@@ -24,6 +24,17 @@ struct PersistenceTransaction {
             throw error
         }
     }
+
+    /// Applies the transaction's changes and commits them within one rollback boundary.
+    func perform(_ changes: () throws -> Void) throws {
+        do {
+            try changes()
+            try saveAction()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
 }
 
 enum PersistenceTransactionDiagnostics {

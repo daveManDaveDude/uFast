@@ -174,7 +174,7 @@ struct HydrationFavouriteEditor: View {
             return textResolver(.favouriteRemoveError)
         }
         switch error as? HydrationFavouriteStoreError {
-        case .duplicateName, .reservedName:
+        case .duplicateName:
             return textResolver(.favouriteValidation(.duplicateName))
         case .invalidName, .nameTooLong:
             return textResolver(.favouriteValidation(.nameTooLong))

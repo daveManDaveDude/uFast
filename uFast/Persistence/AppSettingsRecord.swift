@@ -44,12 +44,6 @@ final class AppSettingsRecord {
         hasCompletedOnboarding = true
     }
 
-    func setHydrationFavourites(water: Int, tea: Int, coffee: Int) {
-        waterFavouriteMillilitres = water
-        teaFavouriteMillilitres = tea
-        coffeeFavouriteMillilitres = coffee
-    }
-
     var automaticLiveActivityPreference: AutomaticLiveActivityPreference {
         AutomaticLiveActivityPreference(
             persistedRawValue: automaticLiveActivityPreferenceRawValue
@@ -68,9 +62,6 @@ final class AppSettingsRecord {
         AppSettingsUserVisibleSnapshot(
             fastingGoalHours: fastingGoalHours,
             hasCompletedOnboarding: hasCompletedOnboarding,
-            waterFavouriteMillilitres: waterFavouriteMillilitres,
-            teaFavouriteMillilitres: teaFavouriteMillilitres,
-            coffeeFavouriteMillilitres: coffeeFavouriteMillilitres,
             automaticLiveActivityPreferenceRawValue: automaticLiveActivityPreferenceRawValue,
             inferredFastDetectionEnabled: inferredFastDetectionEnabled
         )
@@ -79,9 +70,6 @@ final class AppSettingsRecord {
     func restore(from snapshot: AppSettingsUserVisibleSnapshot) {
         fastingGoalHours = snapshot.fastingGoalHours
         hasCompletedOnboarding = snapshot.hasCompletedOnboarding
-        waterFavouriteMillilitres = snapshot.waterFavouriteMillilitres
-        teaFavouriteMillilitres = snapshot.teaFavouriteMillilitres
-        coffeeFavouriteMillilitres = snapshot.coffeeFavouriteMillilitres
         automaticLiveActivityPreferenceRawValue = snapshot.automaticLiveActivityPreferenceRawValue
         inferredFastDetectionEnabled = snapshot.inferredFastDetectionEnabled
     }

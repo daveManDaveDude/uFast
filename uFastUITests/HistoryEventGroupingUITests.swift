@@ -230,7 +230,7 @@ final class HistoryEventGroupingUITests: XCTestCase {
         app.buttons["history.event-group.add"].tap()
         XCTAssertTrue(app.navigationBars["Add to history"].waitForExistence(timeout: 3))
         app.buttons["history.add.drink"].tap()
-        app.buttons["drink.favourite.tea"].tap()
+        app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"].tap()
         app.buttons["drink.editor.save"].tap()
 
         let threeMemberGroup = app.buttons[groupMarkerIdentifier]
@@ -366,8 +366,13 @@ final class HistoryEventGroupingUITests: XCTestCase {
     private func replaceText(_ value: String, in element: XCUIElement, app: XCUIApplication) {
         element.tap()
         element.press(forDuration: 0.7)
-        if app.menuItems["Select All"].waitForExistence(timeout: 1) {
-            app.menuItems["Select All"].tap()
+        let selectAll = app.menuItems["Select All"]
+        if selectAll.waitForExistence(timeout: 5) {
+            XCTAssertTrue(selectAll.isHittable, app.debugDescription)
+            selectAll.tap()
+            XCTAssertTrue(selectAll.waitForNonExistence(timeout: 5), app.debugDescription)
+        } else {
+            element.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         }
         element.typeText(value)
     }
