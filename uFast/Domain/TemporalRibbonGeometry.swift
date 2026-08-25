@@ -26,13 +26,42 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
 
     static func intervalCornerRadius(
         visibleWidth: Double,
-        preferredRadius: Double
+        preferredRadius: Double,
+        hasLeadingCap: Bool,
+        hasTrailingCap: Bool
     ) -> Double {
-        min(max(visibleWidth / 2, 0), preferredRadius)
+        let capCount = [hasLeadingCap, hasTrailingCap].count(where: { $0 })
+        let availableWidth = capCount > 1 ? visibleWidth / 2 : visibleWidth
+        return min(max(availableWidth, 0), preferredRadius)
     }
+
+    static func intervalContentLayout(for visibleWidth: Double) -> TemporalIntervalContentLayout {
+        guard visibleWidth.isFinite, visibleWidth >= compactContentMinimumWidth else {
+            return .none
+        }
+        return visibleWidth >= regularContentMinimumWidth ? .regular : .compact
+    }
+
+    static let compactContentMinimumWidth = 36.0
+    static let regularContentMinimumWidth = 84.0
+}
+
+enum TemporalIntervalContentLayout: Equatable, Sendable {
+    case none
+    case compact
+    case regular
 }
 
 extension TemporalIntervalSegment {
+    /// The page containing the original start is the only visual content
+    /// owner for this interval. Page ownership is half-open so an interval
+    /// starting exactly at local midnight belongs to the day being entered.
+    func ownsVisualContent(in window: TemporalRibbonWindow) -> Bool {
+        let pageInterval = window.selectedDayInterval
+        return pageInterval.start <= originalStart
+            && originalStart < pageInterval.end
+    }
+
     func pageGeometry(
         in window: TemporalRibbonWindow,
         surfaceWidth: Double
@@ -352,19 +381,6 @@ enum TemporalHistoryPresentation {
         clip(intervals, to: window).compactMap {
             $0.pageGeometry(in: window, surfaceWidth: surfaceWidth)
         }
-    }
-
-    static func intervalContinuationShowsContent(
-        isActive: Bool,
-        continuesBefore: Bool,
-        continuesAfter: Bool = false,
-        isSelectedPage: Bool
-    ) -> Bool {
-        !isActive || isSelectedPage || continuesBefore || continuesAfter
-    }
-
-    static func intervalContinuationShowsMarkers(isActive: Bool) -> Bool {
-        !isActive
     }
 
     static func chronological(_ values: [TemporalEventOrderingValue]) -> [TemporalEventOrderingValue] {

@@ -59,7 +59,10 @@ struct TemporalHistoryCarousel: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 0) {
                     ForEach(dates, id: \.self) { date in
+                        // Preserve deterministic page stacking at midnight;
+                        // interval labels remain clipped to their host page.
                         daySegment(date)
+                            .zIndex(-date.timeIntervalSinceReferenceDate)
                             .containerRelativeFrame(
                                 .horizontal,
                                 count: 26,
@@ -334,11 +337,6 @@ extension TemporalHistoryCarousel {
             usesContinuousSurface: true,
             includesSemanticItems: false,
             hidesVisualEventAccessibility: true,
-            // A moving page should retain the same complete interval
-            // treatment as the settled page instead of dropping active-fast
-            // labels at the page seam. At rest, preserve the selected-page
-            // continuation rule used by the settled design.
-            isSelectedPage: isSelected || movementPhase != .settled,
             windowOverride: TemporalHistoryPresentation.calendarDayWindow(
                 containing: date,
                 calendar: calendar

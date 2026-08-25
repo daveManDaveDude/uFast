@@ -3,16 +3,6 @@ import SwiftUI
 // swiftlint:disable function_body_length opening_brace
 
 extension TemporalRibbonView {
-    func continuationEdgeCover(
-        for kind: TemporalRibbonIntervalItem.Kind
-    ) -> some View {
-        Rectangle()
-            .fill(intervalColour(kind))
-            .frame(width: 2)
-            .padding(.vertical, strokeStyle(kind).lineWidth)
-            .accessibilityHidden(true)
-    }
-
     func eventMarks(
         window: TemporalRibbonWindow,
         width: Double,

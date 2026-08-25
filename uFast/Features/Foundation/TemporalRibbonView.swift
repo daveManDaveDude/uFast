@@ -28,7 +28,6 @@ struct TemporalRibbonView: View {
     var showsVisualRibbon = true
     var includesSemanticItems = true
     var hidesVisualEventAccessibility = false
-    var isSelectedPage = true
     var windowOverride: TemporalRibbonWindow?
     var emptySemanticMessage: String?
     var futureReadOnlyFrom: Date?
@@ -169,8 +168,7 @@ extension TemporalRibbonView {
                 )
                 intervalMarks(
                     window: window,
-                    policy: policy,
-                    isSelectedPage: isSelectedPage
+                    policy: policy
                 )
                 .accessibilityHidden(true)
                 eventMarks(
@@ -253,8 +251,7 @@ extension TemporalRibbonView {
 
     func intervalMarks(
         window: TemporalRibbonWindow,
-        policy: TemporalRibbonGeometry,
-        isSelectedPage: Bool
+        policy: TemporalRibbonGeometry
     ) -> some View {
         let geometries = TemporalHistoryPresentation.pageGeometry(
             intervals.map { TemporalIntervalInput(id: $0.id, start: $0.start, end: $0.end) },
@@ -265,56 +262,62 @@ extension TemporalRibbonView {
             if let item = intervals.first(where: { $0.id == geometry.id }) {
                 let segment = geometry.segment
                 let markWidth = geometry.visualWidth
-                let showsContent = TemporalHistoryPresentation.intervalContinuationShowsContent(
-                    isActive: item.kind == .active,
-                    continuesBefore: segment.continuesBefore,
-                    continuesAfter: segment.continuesAfter,
-                    isSelectedPage: isSelectedPage
+                let contentLayout = segment.visualContentLayout(
+                    in: window,
+                    visibleWidth: markWidth
                 )
-                let showsContinuationMarkers = TemporalHistoryPresentation
-                    .intervalContinuationShowsMarkers(isActive: item.kind == .active)
+                let resolvedContentLayout = contentLayout == .none
+                    ? segment.visualContentFallbackLayout(
+                        in: window,
+                        visibleWidth: markWidth,
+                        surfaceWidth: policy.contentWidth,
+                        calendar: calendar
+                    )
+                    : contentLayout
+                let showsContent = resolvedContentLayout != .none
+                let usesAvailableContinuationWidth = item.compactTitle != nil
+                    && segment.continuesAfter
                 Button {
                     onSelectInterval?(item.id)
                 } label: {
-                    HStack(spacing: 4) {
-                        if showsContinuationMarkers, segment.continuesBefore, markWidth >= 60 {
-                            Image(systemName: "chevron.left.2")
-                                .accessibilityHidden(true)
+                    Color.clear
+                        .frame(width: markWidth, height: max(44, policy.intervalLaneHeight))
+                        .background(intervalColour(item.kind))
+                        .clipShape(intervalMarkShape(for: segment, visibleWidth: markWidth))
+                        .overlay {
+                            intervalOutlineShape(for: segment, visibleWidth: markWidth)
+                                .stroke(intervalStroke(item.kind), style: strokeStyle(item.kind))
                         }
-                        if showsContent {
-                            Image(systemName: intervalSymbol(item.kind))
-                                .accessibilityHidden(true)
-                            if markWidth >= 84 {
-                                Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
+                        .overlay(alignment: .leading) {
+                            if showsContent {
+                                Group {
+                                    if usesAvailableContinuationWidth {
+                                        intervalVisualContent(
+                                            item,
+                                            layout: .regular,
+                                            markWidth: markWidth
+                                        )
+                                        .fixedSize(horizontal: true, vertical: false)
+                                    } else {
+                                        intervalVisualContent(
+                                            item,
+                                            layout: resolvedContentLayout,
+                                            markWidth: markWidth
+                                        )
+                                        .frame(
+                                            width: max(markWidth - 4, 0),
+                                            alignment: .leading
+                                        )
+                                        .clipped()
+                                    }
+                                }
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(intervalForeground(item.kind))
+                                .padding(.horizontal, 2)
                             }
                         }
-                        if showsContinuationMarkers, segment.continuesAfter, markWidth >= 60 {
-                            Image(systemName: "chevron.right.2")
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(intervalForeground(item.kind))
-                    .padding(.horizontal, 8)
-                    .frame(width: markWidth, height: max(44, policy.intervalLaneHeight), alignment: .leading)
-                    .background(intervalColour(item.kind))
-                    .clipShape(intervalMarkShape(for: segment, visibleWidth: markWidth))
-                    .overlay {
-                        intervalMarkShape(for: segment, visibleWidth: markWidth)
-                            .stroke(intervalStroke(item.kind), style: strokeStyle(item.kind))
-                    }
-                    .overlay(alignment: .leading) {
-                        if segment.continuesBefore {
-                            continuationEdgeCover(for: item.kind)
-                        }
-                    }
-                    .overlay(alignment: .trailing) {
-                        if segment.continuesAfter {
-                            continuationEdgeCover(for: item.kind)
-                        }
-                    }
-                    .padding(.leading, geometry.leadingHitPadding)
-                    .padding(.trailing, geometry.trailingHitPadding)
+                        .padding(.leading, geometry.leadingHitPadding)
+                        .padding(.trailing, geometry.trailingHitPadding)
                 }
                 .buttonStyle(.plain)
                 .disabled(onSelectInterval == nil)
@@ -331,13 +334,59 @@ extension TemporalRibbonView {
         }
     }
 
+    func intervalVisualContent(
+        _ item: TemporalRibbonIntervalItem,
+        layout: TemporalIntervalContentLayout,
+        markWidth: Double
+    ) -> some View {
+        HStack(spacing: layout == .compact ? 2 : 4) {
+            Image(systemName: intervalSymbol(item.kind))
+                .accessibilityHidden(true)
+            if layout == .compact {
+                let compactTitle = compactIntervalTitle(item)
+                Text(compactTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(item.compactTitle == nil ? 0.7 : 0.9)
+                    .allowsTightening(true)
+            } else {
+                Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
+            }
+        }
+        // This identifies only the visible glyph/text region; the enclosing
+        // button still represents the full bar hit area.
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
+    }
+
+    func intervalVisualContentIdentifier(for item: TemporalRibbonIntervalItem) -> String {
+        let prefix = item.kind == .active
+            ? "history.active-fast-content"
+            : "history.interval-content"
+        return "\(prefix).\(item.id.uuidString)"
+    }
+
+    func compactIntervalTitle(_ item: TemporalRibbonIntervalItem) -> String {
+        switch item.kind {
+        case .recorded, .automatic:
+            textResolver(.historyCopy(.fast))
+        case .inferred:
+            item.compactTitle ?? item.title
+        case .active:
+            textResolver(.historyCopy(.activeFast))
+        case .previouslySaved, .reconstructed, .needsReview, .unknown:
+            item.title
+        }
+    }
+
     func intervalMarkShape(
         for segment: TemporalIntervalSegment,
         visibleWidth: Double
     ) -> UnevenRoundedRectangle {
         let radius = TemporalRibbonGeometry.intervalCornerRadius(
             visibleWidth: visibleWidth,
-            preferredRadius: UFastTheme.Radius.control
+            preferredRadius: UFastTheme.Radius.control,
+            hasLeadingCap: !segment.continuesBefore,
+            hasTrailingCap: !segment.continuesAfter
         )
         return UnevenRoundedRectangle(
             cornerRadii: .init(
@@ -347,6 +396,23 @@ extension TemporalRibbonView {
                 topTrailing: segment.continuesAfter ? 0 : radius
             ),
             style: .continuous
+        )
+    }
+
+    func intervalOutlineShape(
+        for segment: TemporalIntervalSegment,
+        visibleWidth: Double
+    ) -> TemporalIntervalOutlineShape {
+        TemporalIntervalOutlineShape(
+            continuesBefore: segment.continuesBefore,
+            continuesAfter: segment.continuesAfter,
+            layoutDirection: layoutDirection,
+            cornerRadius: TemporalRibbonGeometry.intervalCornerRadius(
+                visibleWidth: visibleWidth,
+                preferredRadius: UFastTheme.Radius.control,
+                hasLeadingCap: !segment.continuesBefore,
+                hasTrailingCap: !segment.continuesAfter
+            )
         )
     }
 }

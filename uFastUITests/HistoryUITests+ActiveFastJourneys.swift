@@ -266,13 +266,29 @@ extension HistoryUITests {
         app.launch()
         selectHistoryTab(in: app)
 
-        let activeFast = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Active Fast")
-        ).firstMatch
-        XCTAssertTrue(activeFast.waitForExistence(timeout: 2), activeFast.debugDescription)
-        XCTAssertTrue(activeFast.label.contains("19:06"))
-        XCTAssertTrue(activeFast.label.contains("18 hours 13 minutes 0 seconds"))
-        XCTAssertFalse(activeFast.label.contains("end"))
+        let carousel = app.scrollViews["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+        XCTAssertEqual(visibleActiveFastVisualContent(in: app, carousel: carousel).count, 0, app.debugDescription)
+
+        let dateNavigator = app.descendants(matching: .any)["temporal.date-navigator"]
+        XCTAssertTrue(dateNavigator.waitForExistence(timeout: 5), app.debugDescription)
+        let originalStartDateButton = dateNavigator.buttons[
+            "temporal.date.\(calendar.startOfDay(for: day).timeIntervalSince1970)"
+        ]
+        XCTAssertTrue(originalStartDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForHittable(originalStartDateButton, app: app), originalStartDateButton.debugDescription)
+        originalStartDateButton.tap()
+        let selectedDate = app.staticTexts["history.selected-date"]
+        let expectedSelectedDay = day.formatted(
+            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+        )
+        XCTAssertTrue(waitForSettledHistory(
+            selectedDate: selectedDate,
+            carousel: carousel,
+            expectedSelectedDate: "Selected day, \(expectedSelectedDay)"
+        ), app.debugDescription)
+        XCTAssertEqual(visibleActiveFastVisualContent(in: app, carousel: carousel).count, 1, app.debugDescription)
         captureScreenshot(named: "history-active-fast-midnight-seam", in: app)
     }
 
@@ -325,24 +341,36 @@ extension HistoryUITests {
         ), app.debugDescription)
         XCTAssertEqual(settledState.selectedDateLabel, expectedSelectedDate)
         XCTAssertTrue(settledState.activeLabel.contains("Active Fast"), app.debugDescription)
-        XCTAssertTrue(settledState.activeLabel.contains("1d 18:13:00"), app.debugDescription)
+        XCTAssertTrue(
+            settledState.activeLabel.contains(
+                "duration 1 day 18 hours 13 minutes 0 seconds"
+            ),
+            app.debugDescription
+        )
+        XCTAssertEqual(settledState.visualOwnerLabelCount, 0, app.debugDescription)
         XCTAssertTrue(settledState.noonMarkerVisible, app.debugDescription)
         XCTAssertTrue(settledState.noonMarkerFrameIntersectsCarousel, app.debugDescription)
         let settledActiveFrame = settledState.activeFrame
         captureScreenshot(named: "history-midnight-seam-settled", in: app)
 
         carousel.swipeRight(velocity: .slow)
-        let previousDay = try XCTUnwrap(calendar.date(byAdding: .day, value: -2, to: nextDay))
-        let previousDayLabel = previousDay.formatted(
+        XCTAssertLessThanOrEqual(
+            visibleActiveFastVisualContent(in: app, carousel: carousel).count,
+            1,
+            "More than one active-fast visual content region was visible during movement.\n\(app.debugDescription)"
+        )
+        let originalStartDay = try XCTUnwrap(calendar.date(byAdding: .day, value: -2, to: nextDay))
+        let originalStartDayLabel = originalStartDay.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
-        let previousSelectedDate = "Selected day, \(previousDayLabel)"
+        let originalStartSelectedDate = "Selected day, \(originalStartDayLabel)"
         let previousOffsetState = try XCTUnwrap(settledSeamState(
             in: app,
-            expectedSelectedDate: previousSelectedDate
+            expectedSelectedDate: originalStartSelectedDate
         ), app.debugDescription)
-        XCTAssertEqual(previousOffsetState.selectedDateLabel, previousSelectedDate)
+        XCTAssertEqual(previousOffsetState.selectedDateLabel, originalStartSelectedDate)
         XCTAssertFalse(previousOffsetState.noonMarkerVisible, app.debugDescription)
+        XCTAssertEqual(previousOffsetState.visualOwnerLabelCount, 1, app.debugDescription)
         let previousOffsetActiveFrame = previousOffsetState.activeFrame
         XCTAssertGreaterThan(
             abs(previousOffsetActiveFrame.minX - settledActiveFrame.minX),
@@ -352,6 +380,11 @@ extension HistoryUITests {
         captureScreenshot(named: "history-midnight-seam-previous-day", in: app)
 
         carousel.swipeLeft(velocity: .slow)
+        XCTAssertLessThanOrEqual(
+            visibleActiveFastVisualContent(in: app, carousel: carousel).count,
+            1,
+            "More than one active-fast visual content region was visible during movement.\n\(app.debugDescription)"
+        )
         let currentOffsetState = try XCTUnwrap(settledSeamState(
             in: app,
             expectedSelectedDate: expectedSelectedDate
@@ -359,7 +392,13 @@ extension HistoryUITests {
         XCTAssertEqual(currentOffsetState.selectedDateLabel, expectedSelectedDate)
         XCTAssertTrue(currentOffsetState.noonMarkerVisible, app.debugDescription)
         XCTAssertTrue(currentOffsetState.noonMarkerFrameIntersectsCarousel, app.debugDescription)
-        XCTAssertTrue(currentOffsetState.activeLabel.contains("1d 18:13:00"), app.debugDescription)
+        XCTAssertTrue(
+            currentOffsetState.activeLabel.contains(
+                "duration 1 day 18 hours 13 minutes 0 seconds"
+            ),
+            app.debugDescription
+        )
+        XCTAssertEqual(currentOffsetState.visualOwnerLabelCount, 0, app.debugDescription)
         let currentOffsetActiveFrame = currentOffsetState.activeFrame
         XCTAssertGreaterThan(
             abs(currentOffsetActiveFrame.minX - previousOffsetActiveFrame.minX),

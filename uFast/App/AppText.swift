@@ -411,6 +411,7 @@ enum AppText: Equatable {
         case activeFast
         case fast
         case inferredFastInProgress
+        case inferredFastInProgressCompact
         case inferredFast
         case previouslySavedFast
         case previouslySavedFastNeedsReview
@@ -1258,7 +1259,8 @@ enum AppText: Equatable {
         .historyCopy(.timelineEmpty), .historyCopy(.eventFood), .historyCopy(.eventDrink),
         .historyCopy(.caloric), .historyCopy(.nonCaloric), .historyCopy(.food), .historyCopy(.drink),
         .historyCopy(.recordedFast), .historyCopy(.activeFast), .historyCopy(.fast),
-        .historyCopy(.inferredFastInProgress), .historyCopy(.inferredFast),
+        .historyCopy(.inferredFastInProgress), .historyCopy(.inferredFastInProgressCompact),
+        .historyCopy(.inferredFast),
         .historyCopy(.previouslySavedFast), .historyCopy(.previouslySavedFastNeedsReview),
         .historyCopy(.unavailableFast), .historyCopy(.startActionAvailable),
         .historyCopy(.saveActionAvailable), .historyCopy(.currentlyActive),
@@ -1446,6 +1448,7 @@ enum AppText: Equatable {
         case .activeFast: resource("history.fast.active", "Active Fast", "History active fast title")
         case .fast: resource("history.fast.automatic", "Fast", "History automatic fast title")
         case .inferredFastInProgress: resource("history.fast.inferred.in-progress", "Inferred fast in progress", "History inferred fast in-progress title")
+        case .inferredFastInProgressCompact: resource("history.fast.inferred.in-progress.compact", "Est. now", "Compact History inferred fast in-progress title")
         case .inferredFast: resource("history.fast.inferred", "Inferred fast", "History inferred fast title")
         case .previouslySavedFast: resource("history.fast.previously-saved", "Previously saved fast", "History previously saved fast title")
         case .previouslySavedFastNeedsReview: resource("history.fast.previously-saved.needs-review", "Previously saved fast · Needs review", "History previously saved fast review title")

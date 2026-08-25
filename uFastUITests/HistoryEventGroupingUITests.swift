@@ -64,6 +64,26 @@ final class HistoryEventGroupingUITests: XCTestCase {
     }
 
     @MainActor
+    func testHistoryRowsCanScrollClearOfFloatingTabBar() {
+        let app = launchHistory(additionalArguments: ["-AppleLocale", "en_GB"])
+        app.tabBars.buttons["History"].tap()
+
+        let content = app.scrollViews["history.content"]
+        let tabBar = app.tabBars.firstMatch
+        let lastRow = app.buttons[ungroupedFoodRowID]
+        XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(lastRow.waitForExistence(timeout: 5), app.debugDescription)
+
+        for _ in 0 ..< 6 where !lastRow.isHittable || lastRow.frame.maxY >= tabBar.frame.minY {
+            content.swipeUp()
+        }
+
+        XCTAssertTrue(lastRow.isHittable, lastRow.debugDescription)
+        XCTAssertLessThan(lastRow.frame.maxY, tabBar.frame.minY, app.debugDescription)
+    }
+
+    @MainActor
     func testCaloricDrinkGroupUsesHydrationDisclosureAndEditor() {
         let app = launchHistory(additionalArguments: ["-AppleLocale", "en_GB"])
         app.tabBars.buttons["History"].tap()
