@@ -366,7 +366,8 @@ extension HistoryUITests {
         let originalStartSelectedDate = "Selected day, \(originalStartDayLabel)"
         let previousOffsetState = try XCTUnwrap(settledSeamState(
             in: app,
-            expectedSelectedDate: originalStartSelectedDate
+            expectedSelectedDate: originalStartSelectedDate,
+            expectedVisualOwnerLabelCount: 1
         ), app.debugDescription)
         XCTAssertEqual(previousOffsetState.selectedDateLabel, originalStartSelectedDate)
         XCTAssertFalse(previousOffsetState.noonMarkerVisible, app.debugDescription)

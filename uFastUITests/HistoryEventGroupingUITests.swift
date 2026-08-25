@@ -366,8 +366,13 @@ final class HistoryEventGroupingUITests: XCTestCase {
     private func replaceText(_ value: String, in element: XCUIElement, app: XCUIApplication) {
         element.tap()
         element.press(forDuration: 0.7)
-        if app.menuItems["Select All"].waitForExistence(timeout: 1) {
-            app.menuItems["Select All"].tap()
+        let selectAll = app.menuItems["Select All"]
+        if selectAll.waitForExistence(timeout: 5) {
+            XCTAssertTrue(selectAll.isHittable, app.debugDescription)
+            selectAll.tap()
+            XCTAssertTrue(selectAll.waitForNonExistence(timeout: 5), app.debugDescription)
+        } else {
+            element.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         }
         element.typeText(value)
     }
