@@ -254,6 +254,9 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<FoodEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
+        XCTAssertTrue(
+            try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).isEmpty
+        )
         XCTAssertTrue(try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).isEmpty)
     }
 
@@ -274,6 +277,10 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<UnknownPeriodRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationFavouriteRecord>()), 1)
+        XCTAssertEqual(
+            try context.fetchCount(FetchDescriptor<HydrationFavouriteMigrationRecord>()),
+            1
+        )
         XCTAssertFalse(context.hasChanges)
     }
 
@@ -324,6 +331,9 @@ final class PersistenceContainerTests: XCTestCase {
                 createdAt: now
             )
         )
+        context.insert(HydrationFavouriteMigrationRecord(
+            migrationVersion: HydrationFavouriteMigration.migrationVersion, completedAt: now
+        ))
         try context.save()
         return container
     }

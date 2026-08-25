@@ -79,6 +79,27 @@ final class PersistenceTransactionTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
     }
 
+    func testPreparationFailureRollsBackPendingChanges() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let settings = AppSettingsRecord(hasCompletedOnboarding: true)
+        context.insert(settings)
+        try context.save()
+
+        let transaction = PersistenceTransaction(modelContext: context)
+        XCTAssertThrowsError(
+            try transaction.perform {
+                context.delete(settings)
+                throw SeederFailure.requested
+            }
+        ) { error in
+            XCTAssertTrue(error is SeederFailure)
+        }
+
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 1)
+        XCTAssertFalse(context.hasChanges)
+    }
+
     func testOnDiskCaloricFailureLeavesNoPartialRecordsOrLaterStaleCommit() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "uFast-transaction-\(UUID().uuidString)", directoryHint: .isDirectory)
