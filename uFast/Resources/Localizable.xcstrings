@@ -367,6 +367,7 @@
     "history.future-day.hint" : {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Future day, history is read only."}}},"comment":"MNT-010C English source copy and interpolation contract"},
     "history.fast.inferred" : {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Inferred fast"}}},"comment":"MNT-010C English source copy and interpolation contract"},
     "history.fast.inferred.in-progress" : {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Inferred fast in progress"}}},"comment":"MNT-010C English source copy and interpolation contract"},
+    "history.fast.inferred.in-progress.compact" : {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Est. now"}}},"comment":"Compact History inferred fast in-progress title"},
     "history.fast.previously-saved" : {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Previously saved fast"}}},"comment":"MNT-010C English source copy and interpolation contract"},
     "history.fast.previously-saved.needs-review" : {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Previously saved fast · Needs review"}}},"comment":"MNT-010C English source copy and interpolation contract"},
     "history.fast.recorded" : {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Recorded fast"}}},"comment":"MNT-010C English source copy and interpolation contract"},

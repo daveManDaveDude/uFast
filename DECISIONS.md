@@ -367,27 +367,37 @@ is shown.
 
 ## S2-D2 Hydration defaults, units and input bounds
 
-- **Status:** Accepted
-- **Accepted:** 20 July 2026
-- **Decision:** Use metric millilitres only for MVP. Initial favourites are
-  Water 500 ml, Tea 300 ml and Coffee 300 ml. OW-204 adds Settings controls for
-  changing those defaults, affecting future events only. Accept 1–5,000 ml per
-  event. Custom drinks default to non-caloric, always expose an editable
+- **Status:** Accepted; amended 25 August 2026 by OW-D101
+- **Accepted:** 20 July 2026; amendment accepted 25 August 2026
+- **Decision:** Use metric millilitres only for MVP. A newly initialized local
+  store has one ordinary editable favourite, Water 330 ml, and does not seed
+  Tea or Coffee. An existing store converts its current Water, Tea and Coffee
+  amounts into ordinary editable, removable, non-caloric favourite records
+  exactly once, preserving customized amounts and existing user-created rows.
+  All current favourites use one local record-backed source of truth; Water,
+  Tea and Coffee are not reserved names. Accept 1–5,000 ml per event. New
+  custom favourites default to non-caloric, always expose an editable
   classification and limit names to 80 user-perceived characters. Do not add
   hydration targets.
 - **Consequence:** Every event retains its recorded volume and all hydration
-  totals remain neutral descriptions rather than goals.
+  totals remain neutral descriptions rather than goals. Editing or removing a
+  favourite never rewrites existing hydration history, and deleting a converted
+  row does not recreate it on a later launch.
 
 ## S2-D3 Two-tap hydration
 
-- **Status:** Accepted
-- **Accepted:** 20 July 2026
+- **Status:** Accepted; amended 25 August 2026 by OW-D101
+- **Accepted:** 20 July 2026; amendment accepted 25 August 2026
 - **Decision:** From Today, the first tap opens **Add a drink**. The second tap
-  selects Water, Tea or Coffee and immediately saves the configured amount at
-  the current time. On success the sheet dismisses, Today updates and the
-  result is announced accessibly. Editing happens from the timeline.
+  selects any current favourite record and immediately saves its configured
+  amount at the current time. On success the sheet dismisses, Today updates
+  and the result is announced accessibly. From History, selecting a favourite
+  opens the existing historical drink editor with the selected date/time;
+  saving that editor creates the event and cancelling creates nothing.
+  Editing an existing event happens from its timeline/history editor.
 - **Consequence:** Favourite hydration meets the two-tap outcome without adding
-  permanent competing actions to the fasting hero.
+  permanent competing actions to the fasting hero, while historical entry
+  continues to require an explicit occurrence-time save.
 
 ## S2-D4 Caloric events during an active fast
 

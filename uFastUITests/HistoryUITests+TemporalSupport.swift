@@ -138,21 +138,6 @@ extension HistoryUITests {
               candidate.width > 0, candidate.height > 0,
               container.width > 0, container.height > 0
         else { return false }
-        let visibilityTolerance = 0.5
-        return candidate.minX >= container.minX - visibilityTolerance
-            && candidate.maxX <= container.maxX + visibilityTolerance
-            && candidate.minY >= container.minY - visibilityTolerance
-            && candidate.maxY <= container.maxY + visibilityTolerance
-    }
-
-    static func intersectsVisibleFrame(_ candidate: CGRect, with container: CGRect) -> Bool {
-        guard candidate.origin.x.isFinite, candidate.origin.y.isFinite,
-              candidate.size.width.isFinite, candidate.size.height.isFinite,
-              container.origin.x.isFinite, container.origin.y.isFinite,
-              container.size.width.isFinite, container.size.height.isFinite,
-              candidate.width > 0, candidate.height > 0,
-              container.width > 0, container.height > 0
-        else { return false }
         return candidate.intersects(container)
     }
 
@@ -208,21 +193,35 @@ extension HistoryUITests {
         let candidates = app.buttons.matching(
             NSPredicate(format: "identifier == %@", identifier)
         )
+        func visibleFrames() -> [CGRect] {
+            (0 ..< candidates.count).reduce(into: []) { frames, index in
+                let candidate = candidates.element(boundBy: index)
+                let frame = candidate.frame
+                guard candidate.exists,
+                      Self.isVisibleFrame(frame, boundedBy: carousel.frame),
+                      !frames.contains(where: { Self.framesMatch($0, frame) })
+                else { return }
+                frames.append(frame)
+            }
+        }
         let fragmentsExpectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in
-                guard candidates.count == 2 else { return false }
-                return (0 ..< candidates.count).allSatisfy { index in
-                    let candidate = candidates.element(boundBy: index)
-                    return candidate.exists
-                        && Self.intersectsVisibleFrame(candidate.frame, with: carousel.frame)
-                }
+                visibleFrames().count == 2
             },
             object: app
         )
         guard XCTWaiter.wait(for: [fragmentsExpectation], timeout: 5) == .completed else {
             return []
         }
-        return (0 ..< candidates.count).map { candidates.element(boundBy: $0).frame }
+        return visibleFrames()
+    }
+
+    static func framesMatch(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+        let tolerance = 0.5
+        return abs(lhs.minX - rhs.minX) <= tolerance
+            && abs(lhs.minY - rhs.minY) <= tolerance
+            && abs(lhs.width - rhs.width) <= tolerance
+            && abs(lhs.height - rhs.height) <= tolerance
     }
 
     @MainActor

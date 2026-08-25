@@ -1,4 +1,5 @@
 import CoreGraphics
+import SwiftUI
 @testable import uFast
 import XCTest
 
@@ -46,14 +47,37 @@ final class TemporalIntervalOutlineShapeTests: XCTestCase {
         XCTAssertTrue(outline.contains(CGPoint(x: rect.maxX - 0.25, y: rect.midY)))
     }
 
+    func testRightToLeftMirrorsContinuationEdges() {
+        let rect = CGRect(x: 0, y: 0, width: 120, height: 44)
+        let owner = strokedPath(
+            continuesBefore: false,
+            continuesAfter: true,
+            layoutDirection: .rightToLeft,
+            in: rect
+        )
+        let continuation = strokedPath(
+            continuesBefore: true,
+            continuesAfter: false,
+            layoutDirection: .rightToLeft,
+            in: rect
+        )
+
+        XCTAssertFalse(owner.contains(CGPoint(x: rect.minX + 0.25, y: rect.midY)))
+        XCTAssertTrue(owner.contains(CGPoint(x: rect.maxX - 0.25, y: rect.midY)))
+        XCTAssertTrue(continuation.contains(CGPoint(x: rect.minX + 0.25, y: rect.midY)))
+        XCTAssertFalse(continuation.contains(CGPoint(x: rect.maxX - 0.25, y: rect.midY)))
+    }
+
     private func strokedPath(
         continuesBefore: Bool,
         continuesAfter: Bool,
+        layoutDirection: LayoutDirection = .leftToRight,
         in rect: CGRect
     ) -> CGPath {
         TemporalIntervalOutlineShape(
             continuesBefore: continuesBefore,
             continuesAfter: continuesAfter,
+            layoutDirection: layoutDirection,
             cornerRadius: 12
         )
         .path(in: rect)

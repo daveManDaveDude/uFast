@@ -3,6 +3,7 @@ import SwiftUI
 struct HistoryView: View {
     static let futureDisplayDayCount = 1
     static let futureRailContextDayCount = 4
+    static let bottomScrollClearance: CGFloat = 96
 
     @Environment(\.calendar) var calendar
     @Environment(\.appTextResolver) var textResolver

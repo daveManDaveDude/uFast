@@ -59,10 +59,8 @@ struct TemporalHistoryCarousel: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 0) {
                     ForEach(dates, id: \.self) { date in
-                        // Interval content belongs to the page containing the
-                        // original start. Keep that earlier page above its
-                        // continuation so a full-size label can cross midnight
-                        // without the next page painting over trailing glyphs.
+                        // Preserve deterministic page stacking at midnight;
+                        // interval labels remain clipped to their host page.
                         daySegment(date)
                             .zIndex(-date.timeIntervalSinceReferenceDate)
                             .containerRelativeFrame(

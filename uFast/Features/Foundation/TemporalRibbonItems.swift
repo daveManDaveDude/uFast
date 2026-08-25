@@ -16,9 +16,30 @@ struct TemporalRibbonIntervalItem: Identifiable, Equatable, Sendable {
     let start: Date
     let end: Date
     let title: String
+    let compactTitle: String?
     let detail: String
     let accessibilityLabel: String
     let kind: Kind
+
+    init(
+        id: UUID,
+        start: Date,
+        end: Date,
+        title: String,
+        compactTitle: String? = nil,
+        detail: String,
+        accessibilityLabel: String,
+        kind: Kind
+    ) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.title = title
+        self.compactTitle = compactTitle
+        self.detail = detail
+        self.accessibilityLabel = accessibilityLabel
+        self.kind = kind
+    }
 }
 
 struct TemporalRibbonEventItem: Identifiable, Equatable, Sendable {

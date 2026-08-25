@@ -220,8 +220,8 @@ The accepted contract and implementation-ready story are in
 
 ### Manual hydration convenience
 
-- OW-D101 P1 — Add and remove favourite drinks in Settings. **Ready; contract
-  in `docs/FAVOURITE_DRINK_MANAGEMENT_STORY.md`.**
+- OW-D101 P1 — Manage default and custom favourite drinks in Settings. **Ready;
+  contract in `docs/FAVOURITE_DRINK_MANAGEMENT_STORY.md`.**
 
 ## Post-MVP candidate backlog
 

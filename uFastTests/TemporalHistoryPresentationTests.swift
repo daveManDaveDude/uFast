@@ -494,7 +494,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         )
     }
 
-    func testLateNightFastAnchorsOneRegularLabelAcrossFirstContinuation() throws {
+    func testLateNightFastUsesOneBoundedFallbackOnFirstContinuation() throws {
         let calendar = try londonCalendar()
         let cases: [(start: Date, end: Date)] = try [
             (
@@ -550,6 +550,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
                 ),
                 .none
             )
+            XCTAssertFalse(continuation.segment.ownsVisualContent(in: continuationWindow))
             XCTAssertEqual(
                 continuation.segment.visualContentFallbackLayout(
                     in: continuationWindow,
@@ -559,26 +560,13 @@ final class TemporalHistoryPresentationTests: XCTestCase {
                 ),
                 .regular
             )
-            let fallbackLeadingOverflow = try XCTUnwrap(
-                continuation.segment.visualContentFallbackLeadingOverflow(
-                    in: continuationWindow,
-                    visibleWidth: continuation.visualWidth,
-                    surfaceWidth: 360,
-                    calendar: calendar
-                )
-            )
-            XCTAssertEqual(
-                fallbackLeadingOverflow,
-                owner.visualWidth,
-                accuracy: 0.001
-            )
         }
     }
 
-    func testLateNightFastUsesCompactLabelWhenJoinedSpaceRemainsNarrow() throws {
+    func testLateNightFallbackRemainsAbsentWhenContinuationIsAlsoTooNarrow() throws {
         let calendar = try londonCalendar()
         let start = try date(2026, 8, 10, 23, 12, calendar: calendar)
-        let end = try date(2026, 8, 11, 4, 0, calendar: calendar)
+        let end = try date(2026, 8, 11, 1, calendar: calendar)
         let continuationWindow = try XCTUnwrap(
             TemporalHistoryPresentation.calendarDayWindow(containing: end, calendar: calendar)
         )
@@ -597,7 +585,44 @@ final class TemporalHistoryPresentationTests: XCTestCase {
                 surfaceWidth: 360,
                 calendar: calendar
             ),
+            .none
+        )
+    }
+
+    func testContinuationDoesNotGainFallbackWhenOriginalOwnerCanRender() throws {
+        let calendar = try londonCalendar()
+        let start = try date(2026, 8, 10, 21, calendar: calendar)
+        let end = try date(2026, 8, 11, 8, calendar: calendar)
+        let ownerWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: start, calendar: calendar)
+        )
+        let continuationWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: end, calendar: calendar)
+        )
+        let input = TemporalIntervalInput(id: UUID(), start: start, end: end)
+        let owner = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry([input], in: ownerWindow, surfaceWidth: 360).first
+        )
+        let continuation = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [input],
+                in: continuationWindow,
+                surfaceWidth: 360
+            ).first
+        )
+
+        XCTAssertEqual(
+            owner.segment.visualContentLayout(in: ownerWindow, visibleWidth: owner.visualWidth),
             .compact
+        )
+        XCTAssertEqual(
+            continuation.segment.visualContentFallbackLayout(
+                in: continuationWindow,
+                visibleWidth: continuation.visualWidth,
+                surfaceWidth: 360,
+                calendar: calendar
+            ),
+            .none
         )
     }
 

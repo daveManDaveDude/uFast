@@ -60,17 +60,19 @@ as a separate diagnostic story rather than adding speculative scrolling work.
 One absolute fast owns at most one visible fasting glyph and one visible text
 label across all of its page-local History fragments.
 
-The fragment containing the fast's original start is the stable visual content
-owner. That ownership derives only from the original absolute interval and the
-Calendar/TimeZone page boundary. It must not depend on the selected page,
-movement phase, scroll direction, viewport centre, exact-versus-motion source,
-or whether the fragment is currently onscreen.
+The fragment containing the fast's original start is the preferred stable
+visual content owner. When that fragment is narrower than the bounded compact
+content minimum, the first continuation becomes the one deterministic fallback
+host if it is wide enough. This derives only from the original absolute
+interval, Calendar/TimeZone page boundary and page width. It must not depend on
+the selected page, movement phase, scroll direction, viewport centre,
+exact-versus-motion source or whether a fragment is currently onscreen.
 
 Continuation fragments retain the same bar colour, stroke, lane, identity and
-seam treatment, but render no fasting glyph, text or continuation-edge marker.
-Existing width-aware truncation may still apply within the owner fragment, and
-a continuation-only viewport may show the unlabelled continuous bar while the
-settled semantic panel supplies the complete fast description.
+seam treatment and normally render no fasting glyph, text or continuation-edge
+marker. The one narrow-start fallback may render bounded, clipped content on
+the first continuation. Existing width-aware truncation applies within whichever
+fragment hosts content; content never crosses a page boundary.
 
 This changes presentation only. It does not split, merge, move, shorten,
 lengthen, infer, persist or reclassify a fast.
@@ -79,8 +81,8 @@ lengthen, infer, persist or reclassify a fast.
 
 - Introduce a pure, deterministic visual-content ownership rule for clipped
   interval fragments.
-- Render the fasting glyph and text only in the original-start fragment for
-  recorded, active, inferred/automatic and retained legacy interval kinds.
+- Render the fasting glyph and text in the original-start fragment, or in the
+  deterministic first-continuation fallback when that owner is too narrow.
 - Keep ownership identical for exact settled and compact moving projections.
 - Remove selection- or movement-dependent content ownership from page-local
   interval rendering.
@@ -119,10 +121,11 @@ lengthen, infer, persist or reclassify a fast.
 - A fast starting exactly at midnight has the following local day as its one
   owner under half-open interval semantics.
 - A fast wholly inside one local day continues to show one glyph and label.
-- A multi-day fast still has one owner at its original start; later
-  continuation-only viewports may show the bar without repeated content.
-- Very narrow owner fragments retain existing bounded width/truncation rules;
-  content must not overflow into another interval, event lane or page.
+- A multi-day fast still has at most one content host; later continuation-only
+  viewports show the bar without repeated content.
+- A very narrow original-start fragment may transfer its one content host to
+  the first continuation. Content remains clipped within that fragment and
+  must not overflow into another interval, event lane or page.
 - Active-fast end projection may advance, but the owner remains fixed at the
   original start page. Completed and inferred-fast ownership is equally stable.
 - Europe/London 23- and 25-hour days use Calendar-derived page boundaries.
@@ -133,12 +136,11 @@ lengthen, infer, persist or reclassify a fast.
 
 ## Acceptance criteria
 
-1. **Exactly one visual content owner**  
-   Given the complete page-fragment projection for a fast, then exactly the
-   fragment containing the original start owns the fasting glyph/text content
-   and every continuation fragment is content-free. A viewport that excludes
-   that owner correctly contains zero visible content owners, never a promoted
-   replacement or duplicate.
+1. **At most one deterministic visual content host**
+   Given the complete page-fragment projection for a fast, the original-start
+   fragment hosts content when wide enough. Otherwise the first continuation
+   hosts it when wide enough. Every other fragment is content-free, and no
+   viewport or movement state can promote an additional host or duplicate.
 
 2. **Midnight remains visually continuous**  
    Given the BF-102 21:00-to-08:40 Europe/London fixture, when both sides of
@@ -267,7 +269,7 @@ Execution profile:
 - Uncertainty: medium
 - Initial implementer: Luna xhigh
 - Deterministic reproduction and observability: BF-102 fixed London fixture;
-  pure original-start owner invariant across page fragments, phases and sources;
+  pure preferred-owner/fallback invariant across page fragments, phases and sources;
   semantic item count; retained render attachments; bounded physical slow-swipe
   checklist for the non-deterministic residual frame observation
 - Acceptance matrix and downstream fixture/legacy-suite impact: temporal
@@ -283,7 +285,8 @@ Execution profile:
 ## Definition of Ready
 
 - [x] The user's one-glyph/one-label product decision is explicit.
-- [x] Stable original-start ownership is independent of movement and selection.
+- [x] Stable preferred ownership and narrow-start fallback are independent of
+      movement and selection.
 - [x] The midnight hunch is recorded as plausible but unproven, not embedded as
       a false root-cause claim.
 - [x] Every criterion has deterministic technical observability, with the
@@ -295,25 +298,32 @@ Execution profile:
 ## Sol readiness gate
 
 Sol gate: **READY** — `gpt-5.6-sol`, medium reasoning. Sol found the one-label
-product decision explicit, the pure original-start ownership boundary
+product decision explicit, the pure preferred-owner/fallback boundary
 architecturally appropriate, the acceptance matrix and downstream fixture
 inventory complete, and the medium-uncertainty Luna execution profile bounded.
 No discovery split is required: duplicate fragment content and stable ownership
 are deterministic, while the unproven residual frame disturbance remains a
 physical-device regression check and separate follow-up only if it persists.
-Continuation-only viewports correctly have no visible owner, and programmatic
-motion is included in the all-phase invariant. No document changes were
-required for readiness beyond recording those clarifications and this verdict.
+Continuation-only viewports normally have no visible host; the deterministic
+narrow-start fallback is the sole exception. Programmatic motion is included in
+the all-phase invariant. No discovery split was required.
 
 ## Completion record
 
 - Human validation: **PASSED** — the user confirmed the committed History
   baseline and the follow-up removal of the post-midnight continuation marker
   on a physical device.
-- Final behavior: one fasting icon and label on the original-start fragment;
-  continuation fragments retain only the continuous bar and seam geometry.
-- Focused temporal tests: 58/58 passed.
-- Focused midnight UI journeys: 2/2 passed.
+- Final behavior, amended 25 August 2026 after physical-device evidence: one
+  fasting icon and label on the original-start fragment when it fits, otherwise
+  one bounded label on the first continuation; all other continuations retain
+  only the continuous bar and seam geometry.
+- A current inferred fast crossing midnight uses the available continuous bar
+  width to show the full single-line “Inferred fast in progress” title. The
+  abbreviated “Est. now” treatment is reserved for genuinely narrow intervals
+  without usable continuation width; semantic and accessibility copy remains
+  unchanged.
+- Amended focused temporal tests: 65/65 passed.
+- Amended affected History UI journeys: 2/2 passed.
 - Lint and build: passed.
 - Final four-worker UI integration: 116/117 passed across four clones; the
   single Fasting Goal alert-timing failure was outside BF-103 and quarantined

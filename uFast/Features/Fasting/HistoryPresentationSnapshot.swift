@@ -737,6 +737,9 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
             start: startDate,
             end: endDate,
             title: title,
+            compactTitle: inferredInterval?.isInProgress == true
+                ? textContext.textResolver(.historyCopy(.inferredFastInProgressCompact))
+                : nil,
             detail: detail,
             accessibilityLabel: accessibilityLabel,
             kind: ribbonKind

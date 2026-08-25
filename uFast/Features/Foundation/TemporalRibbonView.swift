@@ -275,12 +275,8 @@ extension TemporalRibbonView {
                     )
                     : contentLayout
                 let showsContent = resolvedContentLayout != .none
-                let fallbackLeadingOverflow = segment.visualContentFallbackLeadingOverflow(
-                    in: window,
-                    visibleWidth: markWidth,
-                    surfaceWidth: policy.contentWidth,
-                    calendar: calendar
-                ) ?? 0
+                let usesAvailableContinuationWidth = item.compactTitle != nil
+                    && segment.continuesAfter
                 Button {
                     onSelectInterval?(item.id)
                 } label: {
@@ -294,19 +290,30 @@ extension TemporalRibbonView {
                         }
                         .overlay(alignment: .leading) {
                             if showsContent {
-                                intervalVisualContent(
-                                    item,
-                                    layout: resolvedContentLayout,
-                                    markWidth: markWidth
-                                )
+                                Group {
+                                    if usesAvailableContinuationWidth {
+                                        intervalVisualContent(
+                                            item,
+                                            layout: .regular,
+                                            markWidth: markWidth
+                                        )
+                                        .fixedSize(horizontal: true, vertical: false)
+                                    } else {
+                                        intervalVisualContent(
+                                            item,
+                                            layout: resolvedContentLayout,
+                                            markWidth: markWidth
+                                        )
+                                        .frame(
+                                            width: max(markWidth - 4, 0),
+                                            alignment: .leading
+                                        )
+                                        .clipped()
+                                    }
+                                }
                                 .font(.caption.weight(.semibold))
-                                .fixedSize(
-                                    horizontal: segment.continuesAfter,
-                                    vertical: false
-                                )
                                 .foregroundStyle(intervalForeground(item.kind))
                                 .padding(.horizontal, 2)
-                                .offset(x: -fallbackLeadingOverflow)
                             }
                         }
                         .padding(.leading, geometry.leadingHitPadding)
@@ -336,9 +343,10 @@ extension TemporalRibbonView {
             Image(systemName: intervalSymbol(item.kind))
                 .accessibilityHidden(true)
             if layout == .compact {
-                Text(compactIntervalTitle(item))
+                let compactTitle = compactIntervalTitle(item)
+                Text(compactTitle)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(item.compactTitle == nil ? 0.7 : 0.9)
                     .allowsTightening(true)
             } else {
                 Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
@@ -362,7 +370,7 @@ extension TemporalRibbonView {
         case .recorded, .automatic:
             textResolver(.historyCopy(.fast))
         case .inferred:
-            textResolver(.historyCopy(.inferredFast))
+            item.compactTitle ?? item.title
         case .active:
             textResolver(.historyCopy(.activeFast))
         case .previouslySaved, .reconstructed, .needsReview, .unknown:
@@ -398,6 +406,7 @@ extension TemporalRibbonView {
         TemporalIntervalOutlineShape(
             continuesBefore: segment.continuesBefore,
             continuesAfter: segment.continuesAfter,
+            layoutDirection: layoutDirection,
             cornerRadius: TemporalRibbonGeometry.intervalCornerRadius(
                 visibleWidth: visibleWidth,
                 preferredRadius: UFastTheme.Radius.control,

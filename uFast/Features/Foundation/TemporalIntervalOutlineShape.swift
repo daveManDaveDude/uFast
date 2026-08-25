@@ -9,6 +9,7 @@ import SwiftUI
 struct TemporalIntervalOutlineShape: Shape {
     let continuesBefore: Bool
     let continuesAfter: Bool
+    let layoutDirection: LayoutDirection
     let cornerRadius: Double
 
     func path(in rect: CGRect) -> Path {
@@ -19,8 +20,14 @@ struct TemporalIntervalOutlineShape: Shape {
             availableWidth,
             rect.height / 2
         )
-        let leadingRadius = continuesBefore ? 0 : radius
-        let trailingRadius = continuesAfter ? 0 : radius
+        let continuesAtLeadingEdge = layoutDirection == .leftToRight
+            ? continuesBefore
+            : continuesAfter
+        let continuesAtTrailingEdge = layoutDirection == .leftToRight
+            ? continuesAfter
+            : continuesBefore
+        let leadingRadius = continuesAtLeadingEdge ? 0 : radius
+        let trailingRadius = continuesAtTrailingEdge ? 0 : radius
         var path = Path()
 
         if leadingRadius > 0 {

@@ -26,6 +26,7 @@ extension HistoryView {
                     }
                 }
                 .padding(.vertical, UFastTheme.Spacing.standard)
+                .padding(.bottom, Self.bottomScrollClearance)
             }
             .accessibilityIdentifier("history.content")
         }

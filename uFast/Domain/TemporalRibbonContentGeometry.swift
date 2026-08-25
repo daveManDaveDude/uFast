@@ -15,59 +15,45 @@ extension TemporalIntervalSegment {
         return .none
     }
 
-    /// A very late start can leave the original owner fragment too narrow for
-    /// any readable content. In that case the first continuation page becomes
-    /// the sole visual content host, provided it has enough room for the
-    /// complete compact icon and title. Later continuations remain content-free.
+    /// Hosts one stable fallback label on the first continuation only when the
+    /// original-start fragment is too narrow to render any bounded content.
     func visualContentFallbackLayout(
         in window: TemporalRibbonWindow,
         visibleWidth: Double,
         surfaceWidth: Double,
         calendar: Calendar
     ) -> TemporalIntervalContentLayout {
-        guard let leadingOverflow = visualContentFallbackLeadingOverflow(
+        guard isVisualContentFallbackHost(
             in: window,
-            visibleWidth: visibleWidth,
             surfaceWidth: surfaceWidth,
             calendar: calendar
         ) else { return .none }
-        return TemporalRibbonGeometry.intervalContentLayout(
-            for: visibleWidth + leadingOverflow
-        )
+        return TemporalRibbonGeometry.intervalContentLayout(for: visibleWidth)
     }
 
-    /// Keeps fallback content visually anchored to the original start even
-    /// though the first continuation hosts it. This lets a late-night label
-    /// span the midnight page join instead of appearing to start at midnight.
-    func visualContentFallbackLeadingOverflow(
+    private func isVisualContentFallbackHost(
         in window: TemporalRibbonWindow,
-        visibleWidth: Double,
         surfaceWidth: Double,
         calendar: Calendar
-    ) -> Double? {
+    ) -> Bool {
         guard !ownsVisualContent(in: window),
               continuesBefore,
-              window.interval.start == window.selectedDayInterval.start,
-              visibleWidth.isFinite,
-              visibleWidth >= TemporalRibbonGeometry.compactContentMinimumWidth,
               surfaceWidth.isFinite,
               surfaceWidth > 0
-        else { return nil }
+        else { return false }
 
         let ownerDay = calendar.startOfDay(for: originalStart)
-        let continuationDay = window.selectedDayInterval.start
-        guard calendar.date(byAdding: .day, value: 1, to: ownerDay) == continuationDay,
-              let ownerEnd = calendar.date(byAdding: .day, value: 1, to: ownerDay)
-        else { return nil }
+        guard let ownerEnd = calendar.date(byAdding: .day, value: 1, to: ownerDay),
+              ownerEnd == window.selectedDayInterval.start
+        else { return false }
 
         let ownerDayDuration = ownerEnd.timeIntervalSince(ownerDay)
-        guard ownerDayDuration > 0 else { return nil }
+        guard ownerDayDuration > 0 else { return false }
         let ownerWidth = surfaceWidth
-            * continuationDay.timeIntervalSince(originalStart)
+            * ownerEnd.timeIntervalSince(originalStart)
             / ownerDayDuration
-        guard ownerWidth > 0,
-              ownerWidth < TemporalRibbonGeometry.compactContentMinimumWidth
-        else { return nil }
-        return ownerWidth
+        return ownerWidth.isFinite
+            && ownerWidth > 0
+            && ownerWidth < TemporalRibbonGeometry.compactContentMinimumWidth
     }
 }
