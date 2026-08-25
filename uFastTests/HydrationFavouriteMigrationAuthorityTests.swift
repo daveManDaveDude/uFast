@@ -15,7 +15,7 @@ final class HydrationMigrationAuthorityTests: XCTestCase {
         let higherID = try XCTUnwrap(
             UUID(uuidString: "00000000-0000-0000-0000-000000000020")
         )
-        context.insert(settings(id: higherID, water: 600, tea: 350, coffee: 275))
+        context.insert(settings(id: higherID, water: 750, tea: 425, coffee: 225))
         context.insert(settings(id: lowerID, water: 750, tea: 425, coffee: 225))
         try context.save()
 
@@ -34,6 +34,35 @@ final class HydrationMigrationAuthorityTests: XCTestCase {
         try settingsStore.prepareForUse()
         XCTAssertEqual(try settingsStore.authoritativeRecord()?.id, lowerID)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 1)
+    }
+
+    func testDuplicateSettingsWithConflictingLegacyAmountsFailBeforeConversion() throws {
+        let container = try PersistenceContainer.make(inMemory: true)
+        let context = container.mainContext
+        let lowerID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000010")
+        )
+        let higherID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000020")
+        )
+        context.insert(settings(id: lowerID, water: 750, tea: 425, coffee: 225))
+        context.insert(settings(id: higherID, water: 600, tea: 350, coffee: 275))
+        try context.save()
+
+        XCTAssertThrowsError(
+            try HydrationFavouriteMigration.run(in: context, now: migrationDate)
+        ) { error in
+            XCTAssertEqual(
+                error as? HydrationFavouriteMigrationError,
+                .conflictingSettingsAuthority
+            )
+        }
+        XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
+        XCTAssertTrue(
+            try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).isEmpty
+        )
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 2)
+        XCTAssertFalse(context.hasChanges)
     }
 
     func testConflictingDuplicateSettingsStillFailBeforeConversion() throws {

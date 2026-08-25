@@ -136,6 +136,9 @@ enum HydrationFavouriteMigration {
         guard let canonical = settings.first else { return nil }
         guard settings.dropFirst().allSatisfy({
             $0.userVisibleSnapshot == canonical.userVisibleSnapshot
+                && $0.waterFavouriteMillilitres == canonical.waterFavouriteMillilitres
+                && $0.teaFavouriteMillilitres == canonical.teaFavouriteMillilitres
+                && $0.coffeeFavouriteMillilitres == canonical.coffeeFavouriteMillilitres
         }) else {
             throw HydrationFavouriteMigrationError.conflictingSettingsAuthority
         }
