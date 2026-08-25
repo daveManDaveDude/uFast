@@ -4,7 +4,6 @@ import Observation
 @MainActor
 protocol SettingsFeatureCommanding: AnyObject {
     func settingsUpdateGoal(_ goal: FastingGoal) throws
-    func settingsUpdateHydrationFavourites(water: Int, tea: Int, coffee: Int) throws
     func settingsCreateFavourite(
         name: String,
         volumeMillilitres: Int,
@@ -29,10 +28,6 @@ protocol SettingsFeatureCommanding: AnyObject {
 extension ApplicationCommands: SettingsFeatureCommanding {
     func settingsUpdateGoal(_ goal: FastingGoal) throws {
         try updateGoal(goal)
-    }
-
-    func settingsUpdateHydrationFavourites(water: Int, tea: Int, coffee: Int) throws {
-        try updateHydrationFavourites(water: water, tea: tea, coffee: coffee)
     }
 
     func settingsCreateFavourite(
@@ -128,9 +123,6 @@ final class SettingsFeatureController {
     var automaticallyShowLiveActivities = false
     var inferredFastDetectionEnabled = false
     var liveActivityStatus: String?
-    var waterAmount = "500"
-    var teaAmount = "300"
-    var coffeeAmount = "300"
 
     @ObservationIgnored private weak var commands: (any SettingsFeatureCommanding)?
     @ObservationIgnored private var textResolver = AppTextResolver()
@@ -152,9 +144,6 @@ final class SettingsFeatureController {
         selection = settings.fastingGoal
         automaticallyShowLiveActivities = settings.automaticLiveActivityPreference == .enabled
         inferredFastDetectionEnabled = settings.inferredFastDetectionEnabled
-        waterAmount = String(settings.waterFavouriteMillilitres)
-        teaAmount = String(settings.teaFavouriteMillilitres)
-        coffeeAmount = String(settings.coffeeFavouriteMillilitres)
     }
 
     func setInferredFastDetection(enabled: Bool) {
@@ -211,21 +200,6 @@ final class SettingsFeatureController {
         }
     }
 
-    func saveFavourites(values: HydrationFavouriteAmounts, previous: HydrationFavouriteAmounts) {
-        do {
-            guard let commands else { throw ApplicationCommandError.recordNotFound }
-            try commands.settingsUpdateHydrationFavourites(
-                water: values.water, tea: values.tea, coffee: values.coffee
-            )
-            saveError = nil
-        } catch {
-            waterAmount = String(previous.water)
-            teaAmount = String(previous.tea)
-            coffeeAmount = String(previous.coffee)
-            saveError = textResolver(.settingsFavouritesSaveError)
-        }
-    }
-
     func deleteAllData() {
         do {
             guard let commands else { throw ApplicationCommandError.recordNotFound }
@@ -268,10 +242,4 @@ final class SettingsFeatureController {
         guard let commands else { throw ApplicationCommandError.recordNotFound }
         try commands.settingsDeleteFavourite(id: id)
     }
-}
-
-struct HydrationFavouriteAmounts: Equatable {
-    let water: Int
-    let tea: Int
-    let coffee: Int
 }

@@ -1,11 +1,9 @@
+import Foundation
 import SwiftData
 
 struct AppSettingsUserVisibleSnapshot: Equatable, Sendable {
     let fastingGoalHours: Int
     let hasCompletedOnboarding: Bool
-    let waterFavouriteMillilitres: Int
-    let teaFavouriteMillilitres: Int
-    let coffeeFavouriteMillilitres: Int
     let automaticLiveActivityPreferenceRawValue: String
     let inferredFastDetectionEnabled: Bool
 }
@@ -21,14 +19,17 @@ final class SwiftDataSettingsStore {
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
     private let diagnosticSink: any DiagnosticEventSink
+    private let now: Date
 
     init(
         modelContext: ModelContext,
         simulateSaveFailure: Bool = false,
-        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
+        now: Date = .now
     ) {
         self.modelContext = modelContext
         self.diagnosticSink = diagnosticSink
+        self.now = now
         transaction = PersistenceTransaction(
             modelContext: modelContext,
             saveAction: simulateSaveFailure ? {
@@ -70,6 +71,13 @@ final class SwiftDataSettingsStore {
         }
         let settings = AppSettingsRecord(fastingGoal: goal, hasCompletedOnboarding: true)
         modelContext.insert(settings)
+        try HydrationFavouriteMigration.seedNewStore(in: modelContext, at: now)
+        modelContext.insert(
+            HydrationFavouriteMigrationRecord(
+                migrationVersion: HydrationFavouriteMigration.migrationVersion,
+                completedAt: now
+            )
+        )
         try saveTransaction()
         return settings
     }
@@ -78,15 +86,6 @@ final class SwiftDataSettingsStore {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
         settings.setFastingGoal(goal)
-        try saveTransaction {
-            settings.restore(from: snapshot)
-        }
-    }
-
-    func updateHydrationFavourites(water: Int, tea: Int, coffee: Int) throws {
-        let settings = try requiredAuthority()
-        let snapshot = settings.userVisibleSnapshot
-        settings.setHydrationFavourites(water: water, tea: tea, coffee: coffee)
         try saveTransaction {
             settings.restore(from: snapshot)
         }

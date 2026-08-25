@@ -109,8 +109,8 @@ final class SwiftDataHydrationFavouriteStore {
         try modelContext.fetch(
             FetchDescriptor<HydrationFavouriteRecord>(
                 sortBy: [
-                    SortDescriptor(\HydrationFavouriteRecord.createdAt),
                     SortDescriptor(\HydrationFavouriteRecord.creationOrder),
+                    SortDescriptor(\HydrationFavouriteRecord.createdAt),
                     SortDescriptor(\HydrationFavouriteRecord.id),
                 ]
             )

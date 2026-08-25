@@ -252,12 +252,14 @@ final class ApplicationCommands {
         isCaloric: Bool
     ) throws -> HydrationFavouriteSnapshot {
         try requireUnambiguousSettingsAuthority()
-        return try favouriteStore().create(
+        let snapshot = try favouriteStore().create(
             name: name,
             volumeMillilitres: volumeMillilitres,
             isCaloric: isCaloric,
             at: clock.now
         )
+        projectionCoordinator.publishHistoryInvalidation()
+        return snapshot
     }
 
     func updateFavourite(
@@ -267,18 +269,21 @@ final class ApplicationCommands {
         isCaloric: Bool
     ) throws -> HydrationFavouriteSnapshot {
         try requireUnambiguousSettingsAuthority()
-        return try favouriteStore().update(
+        let snapshot = try favouriteStore().update(
             id: id,
             name: name,
             volumeMillilitres: volumeMillilitres,
             isCaloric: isCaloric,
             at: clock.now
         )
+        projectionCoordinator.publishHistoryInvalidation()
+        return snapshot
     }
 
     func deleteFavourite(id: UUID) throws {
         try requireUnambiguousSettingsAuthority()
         try favouriteStore().delete(id: id)
+        projectionCoordinator.publishHistoryInvalidation()
     }
 
     func deleteHydration(id: UUID, confirmingInferredImpact: Bool = false) throws {
@@ -307,10 +312,6 @@ final class ApplicationCommands {
             simulateFailure: configuration.simulateInferredFastDetectionSaveFailure
         ).updateInferredFastDetectionEnabled(enabled)
         projectionCoordinator.enqueue(.inferredFastDetectionChanged(enabled))
-    }
-
-    func updateHydrationFavourites(water: Int, tea: Int, coffee: Int) throws {
-        try settingsStore().updateHydrationFavourites(water: water, tea: tea, coffee: coffee)
     }
 
     func completeOnboarding(goal: FastingGoal) throws {
@@ -356,7 +357,8 @@ final class ApplicationCommands {
         SwiftDataSettingsStore(
             modelContext: modelContext,
             simulateSaveFailure: simulateFailure,
-            diagnosticSink: diagnosticSink
+            diagnosticSink: diagnosticSink,
+            now: clock.now
         )
     }
 }
@@ -382,15 +384,7 @@ private extension ApplicationCommands {
     }
 
     func resolveFavourite(_ favourite: HydrationFavourite) throws -> HydrationFavourite {
-        if let id = favourite.userCreatedID {
-            return try favouriteStore().resolve(id: id).hydrationFavourite
-        }
-        guard favourite.type != .custom else {
-            throw HydrationFavouriteStoreError.recordNotFound
-        }
-        let settings = try authoritativeSettingsRecord()
-        return HydrationFavouriteProvider.favourites(settings: settings)
-            .first { $0.type == favourite.type } ?? favourite
+        try favouriteStore().resolve(id: favourite.id).hydrationFavourite
     }
 
     func requireUnambiguousSettingsAuthority() throws {

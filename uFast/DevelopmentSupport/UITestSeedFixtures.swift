@@ -4,6 +4,17 @@ import SwiftData
 // SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
 // swiftlint:disable trailing_comma function_body_length
 enum UITestSeedFixtures {
+    static func seedNewFavouriteDefault(in context: ModelContext, clock: any AppClock) {
+        guard let settings = try? context.fetch(FetchDescriptor<AppSettingsRecord>()),
+              !settings.isEmpty,
+              let records = try? context.fetch(FetchDescriptor<HydrationFavouriteRecord>()),
+              records.isEmpty
+        else {
+            return
+        }
+        try? HydrationFavouriteMigration.seedNewStore(in: context, at: clock.now)
+    }
+
     static func seedFavouritePopulated(in context: ModelContext, clock: any AppClock) {
         let createdAt = clock.now.addingTimeInterval(-120)
         guard let id = UUID(uuidString: "10100000-0000-0000-0000-000000000001") else { return }
@@ -12,7 +23,8 @@ enum UITestSeedFixtures {
             name: "Sparkling water",
             volumeMillilitres: 330,
             isCaloric: false,
-            createdAt: createdAt
+            createdAt: createdAt,
+            creationOrder: 1
         ))
     }
 
@@ -21,7 +33,8 @@ enum UITestSeedFixtures {
             name: "Water",
             volumeMillilitres: 250,
             isCaloric: false,
-            createdAt: clock.now
+            createdAt: clock.now,
+            creationOrder: 1
         ))
     }
 
@@ -30,7 +43,8 @@ enum UITestSeedFixtures {
             name: "",
             volumeMillilitres: 0,
             isCaloric: false,
-            createdAt: clock.now
+            createdAt: clock.now,
+            creationOrder: 2
         ))
     }
 

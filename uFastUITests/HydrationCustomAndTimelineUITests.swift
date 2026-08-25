@@ -99,7 +99,7 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
     func testExistingDrinkRowOpensFromItsOpenAreaDuringAnActiveFast() {
         let app = launch(activeFastStart: now.addingTimeInterval(-3600))
         app.buttons["drink.add"].tap()
-        app.buttons["drink.favourite.water"].tap()
+        app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"].tap()
 
         let drinkRow = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH 'timeline.entry.'")

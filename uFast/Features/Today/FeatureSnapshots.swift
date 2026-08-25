@@ -6,26 +6,17 @@ struct AppSettingsSnapshot: Equatable {
     let fastingGoal: FastingGoal
     let automaticLiveActivityPreference: AutomaticLiveActivityPreference
     let inferredFastDetectionEnabled: Bool
-    let waterFavouriteMillilitres: Int
-    let teaFavouriteMillilitres: Int
-    let coffeeFavouriteMillilitres: Int
 
     init(
         id: UUID = UUID(),
         fastingGoal: FastingGoal = .default,
         automaticLiveActivityPreference: AutomaticLiveActivityPreference = .notAsked,
-        inferredFastDetectionEnabled: Bool = false,
-        waterFavouriteMillilitres: Int = 500,
-        teaFavouriteMillilitres: Int = 300,
-        coffeeFavouriteMillilitres: Int = 300
+        inferredFastDetectionEnabled: Bool = false
     ) {
         self.id = id
         self.fastingGoal = fastingGoal
         self.automaticLiveActivityPreference = automaticLiveActivityPreference
         self.inferredFastDetectionEnabled = inferredFastDetectionEnabled
-        self.waterFavouriteMillilitres = waterFavouriteMillilitres
-        self.teaFavouriteMillilitres = teaFavouriteMillilitres
-        self.coffeeFavouriteMillilitres = coffeeFavouriteMillilitres
     }
 }
 

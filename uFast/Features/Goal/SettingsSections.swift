@@ -122,12 +122,7 @@ struct SettingsInferredFastSection: View {
 
 struct SettingsFavouritesSection: View {
     @Environment(\.appTextResolver) private var textResolver
-    @Binding var water: String
-    @Binding var tea: String
-    @Binding var coffee: String
-    @Binding var focusedField: FavouriteField?
-    let valuesAreValid: Bool
-    let userCreatedFavourites: [HydrationFavouriteSnapshot]
+    let favourites: [HydrationFavouriteSnapshot]
     let onAddFavourite: () -> Void
     let onEditFavourite: (HydrationFavouriteSnapshot) -> Void
 
@@ -136,10 +131,7 @@ struct SettingsFavouritesSection: View {
             UFastSectionHeading(textResolver(.settingsFavouritesHeading))
             Text(textResolver(.settingsFavouritesDescription))
                 .font(.subheadline).foregroundStyle(UFastTheme.secondaryText)
-            field(.water, text: $water, identifier: "settings.drink.water")
-            field(.tea, text: $tea, identifier: "settings.drink.tea")
-            field(.coffee, text: $coffee, identifier: "settings.drink.coffee")
-            ForEach(userCreatedFavourites) { favourite in
+            ForEach(favourites) { favourite in
                 Button { onEditFavourite(favourite) } label: {
                     HStack(spacing: UFastTheme.Spacing.standard) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -177,43 +169,8 @@ struct SettingsFavouritesSection: View {
             Button(textResolver(.settingsAddFavourite), action: onAddFavourite)
                 .buttonStyle(UFastSecondaryButtonStyle())
                 .accessibilityIdentifier("settings.favourite.add")
-            if !valuesAreValid {
-                Label(textResolver(.settingsFavouriteValidation), systemImage: "exclamationmark.circle")
-                    .foregroundStyle(UFastTheme.error)
-                    .accessibilityIdentifier("settings.drink.validation")
-            }
-            Text(textResolver(.settingsFavouriteAutoSave))
-                .font(.footnote)
-                .foregroundStyle(UFastTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .uFastCard(accent: UFastTheme.sky)
-    }
-
-    private func field(
-        _ field: FavouriteField,
-        text: Binding<String>,
-        identifier: String
-    ) -> some View {
-        let label = textResolver(.settingsFavouriteField(field))
-        return HStack {
-            Text(label)
-            Spacer()
-            FavouriteAmountTextField(
-                text: text,
-                label: label,
-                identifier: identifier,
-                textResolver: textResolver,
-                isFocused: Binding(
-                    get: { focusedField == field },
-                    set: { focusedField = $0 ? field : (focusedField == field ? nil : focusedField) }
-                )
-            )
-            .frame(width: 100)
-            Text(textResolver(.settingsMillilitres))
-                .foregroundStyle(UFastTheme.secondaryText)
-                .accessibilityHidden(true)
-        }
     }
 }
 

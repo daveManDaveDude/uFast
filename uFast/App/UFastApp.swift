@@ -33,7 +33,10 @@ struct UFastApp: App {
                 if launchConfiguration.simulatePersistenceBootstrapFailure {
                     throw SimulatedPersistenceBootstrapError.requested
                 }
-                return try PersistenceContainer.make(diagnosticSink: diagnosticSink)
+                return try PersistenceContainer.make(
+                    diagnosticSink: diagnosticSink,
+                    now: configuredClock.now
+                )
             },
             diagnosticSink: diagnosticSink
         )

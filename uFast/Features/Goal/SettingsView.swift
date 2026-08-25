@@ -9,7 +9,6 @@ struct SettingsView: View {
     @Environment(\.appTextResolver) private var textResolver
     @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     let snapshot: SettingsFeatureSnapshot
-    @State private var focusedFavouriteField: FavouriteField?
     @State private var controller = SettingsFeatureController()
     @State private var isFirstDeleteConfirmationPresented = false
     @State private var isFinalDeleteConfirmationPresented = false
@@ -48,12 +47,7 @@ struct SettingsView: View {
                             )
                         )
                         SettingsFavouritesSection(
-                            water: $controller.waterAmount,
-                            tea: $controller.teaAmount,
-                            coffee: $controller.coffeeAmount,
-                            focusedField: $focusedFavouriteField,
-                            valuesAreValid: favouriteValues != nil,
-                            userCreatedFavourites: snapshot.hydrationFavourites,
+                            favourites: snapshot.hydrationFavourites,
                             onAddFavourite: {
                                 favouriteEditor = HydrationFavouriteEditorPresentation(favourite: nil)
                             },
@@ -88,11 +82,6 @@ struct SettingsView: View {
             }
             .onChange(of: applicationCommands != nil) { _, _ in
                 controller.connect(commands: applicationCommands)
-            }
-            .onChange(of: focusedFavouriteField) { previousField, currentField in
-                if previousField != nil, previousField != currentField {
-                    saveFavouritesIfValid()
-                }
             }
             .alert(
                 textResolver(.settingsDeleteFirstTitle),
@@ -173,28 +162,6 @@ struct SettingsView: View {
         ) {
             liveActivityAvailability = liveActivityCoordinator?.availability()
         }
-    }
-
-    private var favouriteValues: (Int, Int, Int)? {
-        guard let water = Int(controller.waterAmount), let tea = Int(controller.teaAmount),
-              let coffee = Int(controller.coffeeAmount),
-              HydrationEntryValidator.isValid(volumeMillilitres: water),
-              HydrationEntryValidator.isValid(volumeMillilitres: tea),
-              HydrationEntryValidator.isValid(volumeMillilitres: coffee)
-        else { return nil }
-        return (water, tea, coffee)
-    }
-
-    private func saveFavouritesIfValid() {
-        guard let settings = authoritativeSettings, let values = favouriteValues else { return }
-        controller.saveFavourites(
-            values: HydrationFavouriteAmounts(water: values.0, tea: values.1, coffee: values.2),
-            previous: HydrationFavouriteAmounts(
-                water: settings.waterFavouriteMillilitres,
-                tea: settings.teaFavouriteMillilitres,
-                coffee: settings.coffeeFavouriteMillilitres
-            )
-        )
     }
 
     private func deleteAllData() {

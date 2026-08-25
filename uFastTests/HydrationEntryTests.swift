@@ -7,22 +7,36 @@ import XCTest
 
 @MainActor
 final class HydrationEntryTests: XCTestCase {
-    func testFavouriteDefaultsAndConfiguredAmountsMapIndependently() {
+    func testFavouriteRecordSnapshotsMapIndependently() {
+        let createdAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let snapshots = [
+            HydrationFavouriteSnapshot(
+                id: UUID(),
+                name: "Water",
+                volumeMillilitres: 750,
+                isCaloric: false,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            ),
+            HydrationFavouriteSnapshot(
+                id: UUID(),
+                name: "Tea",
+                volumeMillilitres: 250,
+                isCaloric: false,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            ),
+            HydrationFavouriteSnapshot(
+                id: UUID(),
+                name: "Juice",
+                volumeMillilitres: 125,
+                isCaloric: true,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            ),
+        ]
         XCTAssertEqual(
-            HydrationFavouriteProvider.favourites(settings: nil),
-            [
-                HydrationFavourite(type: .water, volumeMillilitres: 500),
-                HydrationFavourite(type: .tea, volumeMillilitres: 300),
-                HydrationFavourite(type: .coffee, volumeMillilitres: 300),
-            ]
-        )
-        let settings = AppSettingsRecord(
-            waterFavouriteMillilitres: 750,
-            teaFavouriteMillilitres: 250,
-            coffeeFavouriteMillilitres: 125
-        )
-        XCTAssertEqual(
-            HydrationFavouriteProvider.favourites(settings: settings).map(\.volumeMillilitres),
+            HydrationFavouriteProvider.favourites(records: snapshots).map(\.volumeMillilitres),
             [750, 250, 125]
         )
     }
@@ -68,5 +82,25 @@ final class HydrationEntryTests: XCTestCase {
         )
         XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
         XCTAssertFalse(container.mainContext.hasChanges)
+    }
+
+    func testCustomNameRejectsInvisibleOnlyUnicode() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertNil(
+            HydrationEntryValidator.validated(
+                type: .custom,
+                customName: "\u{200D}",
+                volumeMillilitres: 330,
+                occurredAt: now,
+                isCaloric: false,
+                now: now,
+                calendar: calendar
+            )
+        )
+        XCTAssertEqual(
+            HydrationEntryValidator.validatedCustomName("  Café  "),
+            "Café"
+        )
     }
 }

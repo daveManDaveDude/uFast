@@ -6,8 +6,8 @@ import SwiftUI
 struct SettingsFeatureHost: View {
     @Query private var settingsRecords: [AppSettingsRecord]
     @Query(sort: [
-        SortDescriptor(\HydrationFavouriteRecord.createdAt),
         SortDescriptor(\HydrationFavouriteRecord.creationOrder),
+        SortDescriptor(\HydrationFavouriteRecord.createdAt),
         SortDescriptor(\HydrationFavouriteRecord.id),
     ])
     private var hydrationFavourites: [HydrationFavouriteRecord]

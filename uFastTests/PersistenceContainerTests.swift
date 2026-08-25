@@ -7,18 +7,28 @@ import XCTest
 @MainActor
 final class PersistenceContainerTests: XCTestCase {
     func testCurrentVersionedSchemaAndMigrationPlanCoverEveryProductionModel() {
+        assertVersionedIdentifiersAndMigrationPlan()
+        assertReleaseSchema()
+        assertCurrentSchema()
+    }
+
+    private func assertVersionedIdentifiersAndMigrationPlan() {
         XCTAssertEqual(UFastSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
         XCTAssertEqual(UFastSchemaV2.versionIdentifier, Schema.Version(2, 0, 0))
         XCTAssertEqual(UFastSchemaV3.versionIdentifier, Schema.Version(3, 0, 0))
         XCTAssertEqual(UFastSchemaV4.versionIdentifier, Schema.Version(4, 0, 0))
-        XCTAssertEqual(UFastMigrationPlan.schemas.count, 4)
+        XCTAssertEqual(UFastSchemaV5.versionIdentifier, Schema.Version(5, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 5)
         XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[2] == UFastSchemaV3.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[3] == UFastSchemaV4.self)
-        XCTAssertEqual(UFastMigrationPlan.stages.count, 3)
-        XCTAssertEqual(PersistenceContainer.schema.entities.count, 6)
+        XCTAssertTrue(UFastMigrationPlan.schemas[4] == UFastSchemaV5.self)
+        XCTAssertEqual(UFastMigrationPlan.stages.count, 4)
+        XCTAssertEqual(PersistenceContainer.schema.entities.count, 7)
+    }
 
+    private func assertReleaseSchema() {
         let releaseSchema = Schema(versionedSchema: UFastSchemaV1.self)
         XCTAssertEqual(
             Set(releaseSchema.entities.map(\.name)),
@@ -47,7 +57,9 @@ final class PersistenceContainerTests: XCTestCase {
             ]
         )
         XCTAssertNil(releaseSchema.entitiesByName["HydrationFavouriteRecord"])
+    }
 
+    private func assertCurrentSchema() {
         XCTAssertEqual(
             Set(PersistenceContainer.schema.entities.map(\.name)),
             [
@@ -56,6 +68,7 @@ final class PersistenceContainerTests: XCTestCase {
                 "FoodEntryRecord",
                 "HydrationEntryRecord",
                 "HydrationFavouriteRecord",
+                "HydrationFavouriteMigrationRecord",
                 "UnknownPeriodRecord",
             ]
         )

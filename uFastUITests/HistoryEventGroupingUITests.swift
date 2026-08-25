@@ -230,7 +230,7 @@ final class HistoryEventGroupingUITests: XCTestCase {
         app.buttons["history.event-group.add"].tap()
         XCTAssertTrue(app.navigationBars["Add to history"].waitForExistence(timeout: 3))
         app.buttons["history.add.drink"].tap()
-        app.buttons["drink.favourite.tea"].tap()
+        app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"].tap()
         app.buttons["drink.editor.save"].tap()
 
         let threeMemberGroup = app.buttons[groupMarkerIdentifier]

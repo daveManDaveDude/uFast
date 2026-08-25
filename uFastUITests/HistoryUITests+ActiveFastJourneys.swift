@@ -180,7 +180,7 @@ extension HistoryUITests {
         }
         XCTAssertTrue(addDrink.isHittable, addDrink.debugDescription)
         addDrink.tap()
-        let water = app.buttons["drink.favourite.water"]
+        let water = app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"]
         XCTAssertTrue(water.waitForExistence(timeout: 5), app.debugDescription)
         water.tap()
         XCTAssertTrue(

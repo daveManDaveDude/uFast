@@ -214,8 +214,8 @@ extension HistoryView {
         DirectHistoricalEntryView(
             presentation: presentation, clock: clock,
             activeFastStart: authoritativeActiveFast?.startDate,
-            favourites: HydrationFavouriteProvider.combined(
-                settings: authoritativeSettings, userCreated: model.hydrationFavouriteSnapshots
+            favourites: HydrationFavouriteProvider.favourites(
+                records: model.hydrationFavouriteSnapshots
             ),
             resolveFavouriteDraft: { favourite, occurredAt in
                 guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }

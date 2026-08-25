@@ -23,6 +23,7 @@ enum AppDataDeletionService {
         try context.fetch(FetchDescriptor<FoodEntryRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).forEach(context.delete)
         try LegacyHistoryDeletion.deleteSchemaOnlyRecords(in: context)
         do {
             try transaction.save()

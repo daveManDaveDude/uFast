@@ -28,13 +28,14 @@ extension HistoryPresentationModel {
                 referenceNow: referenceNow,
                 textResolver: textResolver
             )
-            let createdAt = SortDescriptor<HydrationFavouriteRecord>(\.createdAt)
             let creationOrder = SortDescriptor<HydrationFavouriteRecord>(\.creationOrder)
+            let createdAt = SortDescriptor<HydrationFavouriteRecord>(\.createdAt)
             let identifier = SortDescriptor<HydrationFavouriteRecord>(\.id)
-            let sortDescriptors = [createdAt, creationOrder, identifier]
-            hydrationFavouriteSnapshots = try modelContext.fetch(
+            let sortDescriptors = [creationOrder, createdAt, identifier]
+            let favouriteSnapshots = try modelContext.fetch(
                 FetchDescriptor<HydrationFavouriteRecord>(sortBy: sortDescriptors)
             ).map(\.snapshot)
+            hydrationFavouriteSnapshots = favouriteSnapshots
         } catch {
             // Retain the last complete projection. A later lifecycle or
             // mutation refresh can replace it atomically.
@@ -84,9 +85,23 @@ extension HistoryPresentationModel {
         let presentation = projectionState.presentation else {
             return false
         }
+        let creationOrder = SortDescriptor<HydrationFavouriteRecord>(\.creationOrder)
+        let createdAt = SortDescriptor<HydrationFavouriteRecord>(\.createdAt)
+        let identifier = SortDescriptor<HydrationFavouriteRecord>(\.id)
+        let favouriteSnapshots: [HydrationFavouriteSnapshot]
+        do {
+            favouriteSnapshots = try modelContext.fetch(
+                FetchDescriptor<HydrationFavouriteRecord>(
+                    sortBy: [creationOrder, createdAt, identifier]
+                )
+            ).map(\.snapshot)
+        } catch {
+            return false
+        }
         presentationCache.invalidate()
         historyData = data
         historyPresentation = presentation
+        hydrationFavouriteSnapshots = favouriteSnapshots
         historyDataRevision += 1
         motionGeneration = projectionState.generation
         motionLoadingEdges.removeAll()

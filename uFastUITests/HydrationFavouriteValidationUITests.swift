@@ -189,5 +189,37 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
             succeeded.buttons["Sparkling water"].waitForNonExistence(timeout: 5),
             succeeded.debugDescription
         )
+        tapTab("Today", in: succeeded)
+        tapDrinkAdd(in: succeeded)
+        let favouriteRows = succeeded.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "drink.favourite.")
+        )
+        XCTAssertEqual(favouriteRows.count, 1, succeeded.debugDescription)
+        let water = succeeded.buttons["drink.favourite.\(waterFavouriteID)"]
+        XCTAssertTrue(water.waitForExistence(timeout: 5), succeeded.debugDescription)
+        XCTAssertEqual(water.label, "Water")
+        XCTAssertEqual(water.value as? String, "330 millilitres, Non-caloric")
+        XCTAssertFalse(succeeded.buttons["drink.favourite.00000000-0000-0000-0000-000000000002"].exists)
+        XCTAssertFalse(succeeded.buttons["drink.favourite.00000000-0000-0000-0000-000000000003"].exists)
+        XCTAssertFalse(succeeded.staticTexts["drink.save-error"].exists)
+        succeeded.terminate()
+
+        let relaunched = XCUIApplication()
+        relaunched.launchArguments = UITestLaunchConfiguration(
+            resetData: false,
+            fixedNow: now
+        ).arguments
+        relaunched.launch()
+        tapDrinkAdd(in: relaunched)
+        let relaunchedFavouriteRows = relaunched.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "drink.favourite.")
+        )
+        XCTAssertEqual(relaunchedFavouriteRows.count, 1, relaunched.debugDescription)
+        let relaunchedWater = relaunched.buttons["drink.favourite.\(waterFavouriteID)"]
+        XCTAssertTrue(relaunchedWater.waitForExistence(timeout: 5), relaunched.debugDescription)
+        XCTAssertEqual(relaunchedWater.label, "Water")
+        XCTAssertEqual(relaunchedWater.value as? String, "330 millilitres, Non-caloric")
+        XCTAssertFalse(relaunched.buttons["drink.favourite.00000000-0000-0000-0000-000000000002"].exists)
+        XCTAssertFalse(relaunched.buttons["drink.favourite.00000000-0000-0000-0000-000000000003"].exists)
     }
 }

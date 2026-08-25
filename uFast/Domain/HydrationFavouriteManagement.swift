@@ -44,7 +44,6 @@ enum HydrationFavouriteValidationError: Error, Equatable {
     case blankName
     case nameTooLong
     case duplicateName
-    case reservedName
     case invalidAmount
 }
 
@@ -52,7 +51,6 @@ enum HydrationFavouriteStoreError: Error, Equatable {
     case invalidName
     case nameTooLong
     case duplicateName
-    case reservedName
     case invalidAmount
     case recordNotFound
     case conflictingAuthorities
@@ -90,16 +88,14 @@ enum HydrationFavouriteValidator {
         excluding excludedID: UUID? = nil
     ) -> HydrationFavouriteValidationError? {
         let trimmed = trimmedName(name)
-        guard !trimmed.isEmpty else { return .blankName }
+        guard !trimmed.isEmpty, HydrationEntryValidator.hasVisibleText(trimmed) else {
+            return .blankName
+        }
         guard trimmed.count <= nameLimit else { return .nameTooLong }
         guard let volume = Int(amount), (minimumAmount ... maximumAmount).contains(volume) else {
             return .invalidAmount
         }
         let normalized = normalizedName(trimmed)
-        let reserved = HydrationDrinkType.allCases
-            .filter { $0 != .custom }
-            .map { normalizedName($0.displayName) }
-        guard !reserved.contains(normalized) else { return .reservedName }
         guard !existing.contains(where: {
             $0.id != excludedID && normalizedName($0.name) == normalized
         }) else { return .duplicateName }
@@ -129,7 +125,6 @@ enum HydrationFavouriteValidator {
         case .blankName: throw HydrationFavouriteStoreError.invalidName
         case .nameTooLong: throw HydrationFavouriteStoreError.nameTooLong
         case .duplicateName: throw HydrationFavouriteStoreError.duplicateName
-        case .reservedName: throw HydrationFavouriteStoreError.reservedName
         case .invalidAmount: throw HydrationFavouriteStoreError.invalidAmount
         }
     }

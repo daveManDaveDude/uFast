@@ -45,14 +45,10 @@ final class FeatureControllerTests: XCTestCase {
         controller.connect(commands: commands)
         controller.load(SettingsFeatureSnapshot(settings: [
             AppSettingsSnapshot(
-                fastingGoal: FastingGoal(hours: 16) ?? .default,
-                waterFavouriteMillilitres: 750,
-                teaFavouriteMillilitres: 250,
-                coffeeFavouriteMillilitres: 200
+                fastingGoal: FastingGoal(hours: 16) ?? .default
             ),
         ]))
         XCTAssertEqual(controller.selection.hours, 16)
-        XCTAssertEqual(controller.waterAmount, "750")
 
         commands.error = TestFailure.requested
         controller.saveGoal(FastingGoal(hours: 18) ?? .default, previousGoal: controller.selection)
@@ -60,18 +56,11 @@ final class FeatureControllerTests: XCTestCase {
         XCTAssertEqual(controller.saveError, "Your goal couldn’t be saved. Please try again.")
     }
 
-    func testSettingsRestoresFavouritesAndReportsDeleteFailure() {
+    func testSettingsReportsDeleteFailure() {
         let commands = FeatureCommandSpy()
         commands.error = TestFailure.requested
         let controller = SettingsFeatureController()
         controller.connect(commands: commands)
-
-        controller.saveFavourites(
-            values: .init(water: 1, tea: 2, coffee: 3),
-            previous: .init(water: 500, tea: 300, coffee: 300)
-        )
-        XCTAssertEqual(controller.waterAmount, "500")
-        XCTAssertEqual(controller.saveError, "Your drink favourites couldn’t be saved. Please try again.")
 
         controller.deleteAllData()
         XCTAssertEqual(controller.deleteError, "Your data couldn’t be deleted. Please try again.")
@@ -148,10 +137,6 @@ private final class FeatureCommandSpy: TodayFeatureCommanding, SettingsFeatureCo
     }
 
     func settingsUpdateGoal(_: FastingGoal) throws {
-        try failIfRequested()
-    }
-
-    func settingsUpdateHydrationFavourites(water _: Int, tea _: Int, coffee _: Int) throws {
         try failIfRequested()
     }
 

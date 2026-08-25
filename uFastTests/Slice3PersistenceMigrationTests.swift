@@ -272,8 +272,21 @@ final class Slice3PersistenceMigrationTests: XCTestCase {
         XCTAssertEqual(unknown.createdAt, fixture.createdAt)
         XCTAssertEqual(unknown.updatedAt, fixture.updatedAt)
 
-        XCTAssertTrue(
-            try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty
+        let favourites = try context.fetch(FetchDescriptor<HydrationFavouriteRecord>())
+        XCTAssertEqual(favourites.count, 3)
+        let convertedByID = Dictionary(uniqueKeysWithValues: favourites.map { ($0.id, $0) })
+        XCTAssertEqual(convertedByID[HydrationFavouriteMigration.waterID]?.name, "Water")
+        XCTAssertEqual(convertedByID[HydrationFavouriteMigration.waterID]?.volumeMillilitres, 750)
+        XCTAssertFalse(convertedByID[HydrationFavouriteMigration.waterID]?.isCaloric ?? true)
+        XCTAssertEqual(convertedByID[HydrationFavouriteMigration.teaID]?.name, "Tea")
+        XCTAssertEqual(convertedByID[HydrationFavouriteMigration.teaID]?.volumeMillilitres, 425)
+        XCTAssertFalse(convertedByID[HydrationFavouriteMigration.teaID]?.isCaloric ?? true)
+        XCTAssertEqual(convertedByID[HydrationFavouriteMigration.coffeeID]?.name, "Coffee")
+        XCTAssertEqual(convertedByID[HydrationFavouriteMigration.coffeeID]?.volumeMillilitres, 225)
+        XCTAssertFalse(convertedByID[HydrationFavouriteMigration.coffeeID]?.isCaloric ?? true)
+        XCTAssertEqual(
+            try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).count,
+            1
         )
     }
 
@@ -315,6 +328,11 @@ final class Slice3PersistenceMigrationTests: XCTestCase {
                     volumeMillilitres: 330,
                     isCaloric: false,
                     createdAt: Date(timeIntervalSince1970: 1000)
+                )
+            )
+            context.insert(
+                HydrationFavouriteMigrationRecord(
+                    completedAt: Date(timeIntervalSince1970: 1000)
                 )
             )
             try context.save()

@@ -187,34 +187,58 @@ enum UFastSchemaV4: VersionedSchema {
     ]
 }
 
+enum UFastSchemaV5: VersionedSchema {
+    static let versionIdentifier = Schema.Version(5, 0, 0)
+
+    static let models: [any PersistentModel.Type] = [
+        AppSettingsRecord.self,
+        FastRecord.self,
+        FoodEntryRecord.self,
+        HydrationEntryRecord.self,
+        HydrationFavouriteRecord.self,
+        UnknownPeriodRecord.self,
+        HydrationFavouriteMigrationRecord.self,
+    ]
+}
+
 enum UFastMigrationPlan: SchemaMigrationPlan {
     static let schemas: [any VersionedSchema.Type] = [
         UFastSchemaV1.self,
         UFastSchemaV2.self,
         UFastSchemaV3.self,
         UFastSchemaV4.self,
+        UFastSchemaV5.self,
     ]
     static let stages: [MigrationStage] = [
         .lightweight(fromVersion: UFastSchemaV1.self, toVersion: UFastSchemaV2.self),
         .lightweight(fromVersion: UFastSchemaV2.self, toVersion: UFastSchemaV3.self),
         .lightweight(fromVersion: UFastSchemaV3.self, toVersion: UFastSchemaV4.self),
+        .lightweight(fromVersion: UFastSchemaV4.self, toVersion: UFastSchemaV5.self),
     ]
 }
 
 enum PersistenceContainer {
-    static let schema = Schema(versionedSchema: UFastSchemaV4.self)
+    static let schema = Schema(versionedSchema: UFastSchemaV5.self)
 
+    @MainActor
     static func make(
         inMemory: Bool = false,
-        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
+        now: Date = .now
     ) throws -> ModelContainer {
         let configuration = configuration(inMemory: inMemory)
         do {
-            return try ModelContainer(
+            let container = try ModelContainer(
                 for: schema,
                 migrationPlan: UFastMigrationPlan.self,
                 configurations: [configuration]
             )
+            try HydrationFavouriteMigration.run(
+                in: container.mainContext,
+                now: now,
+                diagnosticSink: diagnosticSink
+            )
+            return container
         } catch {
             recordMigrationFailure(to: diagnosticSink)
             throw PersistenceBootstrapError.migrationFailed(error)
@@ -229,9 +253,11 @@ enum PersistenceContainer {
         )
     }
 
+    @MainActor
     static func make(
         storeURL: URL,
-        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
+        now: Date = .now
     ) throws -> ModelContainer {
         let configuration = ModelConfiguration(
             schema: schema,
@@ -239,11 +265,17 @@ enum PersistenceContainer {
             cloudKitDatabase: .none
         )
         do {
-            return try ModelContainer(
+            let container = try ModelContainer(
                 for: schema,
                 migrationPlan: UFastMigrationPlan.self,
                 configurations: [configuration]
             )
+            try HydrationFavouriteMigration.run(
+                in: container.mainContext,
+                now: now,
+                diagnosticSink: diagnosticSink
+            )
+            return container
         } catch {
             recordMigrationFailure(to: diagnosticSink)
             throw PersistenceBootstrapError.migrationFailed(error)

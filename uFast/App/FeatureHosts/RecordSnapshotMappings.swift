@@ -7,9 +7,6 @@ extension AppSettingsSnapshot {
         fastingGoal = record.fastingGoal
         automaticLiveActivityPreference = record.automaticLiveActivityPreference
         inferredFastDetectionEnabled = record.inferredFastDetectionEnabled
-        waterFavouriteMillilitres = record.waterFavouriteMillilitres
-        teaFavouriteMillilitres = record.teaFavouriteMillilitres
-        coffeeFavouriteMillilitres = record.coffeeFavouriteMillilitres
     }
 }
 
