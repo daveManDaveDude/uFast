@@ -32,7 +32,18 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         XCTAssertFalse(app.buttons["drink.favourite.00000000-0000-0000-0000-000000000002"].exists)
         XCTAssertFalse(app.buttons["drink.favourite.00000000-0000-0000-0000-000000000003"].exists)
         tapWhenReady(water, in: picker, app: app)
-        XCTAssertEqual(app.staticTexts["drink.total"].label, "330 ml")
+        let total = app.staticTexts["drink.total"]
+        XCTAssertTrue(total.waitForExistence(timeout: 5), app.debugDescription)
+        let totalUpdated = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "330 ml"),
+            object: total
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [totalUpdated], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        XCTAssertEqual(total.label, "330 ml")
     }
 
     @MainActor

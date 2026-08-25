@@ -55,9 +55,6 @@ struct AddDrinkSheet: View {
                                 )
                             )
                         )
-                        .accessibilityHint(
-                            textResolver(.drinkPickerClassification(isCaloric: favourite.isCaloric))
-                        )
                         .accessibilityIdentifier(identifier(for: favourite))
                     }
 
