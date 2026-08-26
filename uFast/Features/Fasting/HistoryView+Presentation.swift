@@ -576,6 +576,7 @@ extension HistoryView {
         )
         .padding(.horizontal, UFastTheme.Spacing.standard)
         .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("history.carousel")
     }
 }

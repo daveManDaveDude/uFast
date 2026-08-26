@@ -11,6 +11,7 @@ struct FoodFavouriteEditorPresentation: Identifiable {
 }
 
 struct FoodFavouriteEditor: View {
+    @Environment(\.locale) private var locale
     @Environment(\.appTextResolver) private var textResolver
     @State private var description: String
     @State private var values: [FoodFavouriteNutritionField: String]
@@ -186,7 +187,7 @@ struct FoodFavouriteEditor: View {
         for field in FoodFavouriteNutritionField.allCases {
             guard let value = values[field],
                   !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-            guard let number = Double(value),
+            guard let number = FoodNutritionValueParser.value(value, locale: locale),
                   DomainValidation.isFinite(number, in: 0 ... FoodFavouriteValidator.maximumNutritionValue)
             else {
                 return field
@@ -198,7 +199,7 @@ struct FoodFavouriteEditor: View {
     private func number(_ field: FoodFavouriteNutritionField) -> Double? {
         guard let value = values[field],
               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        return Double(value)
+        return FoodNutritionValueParser.value(value, locale: locale)
     }
 
     private func binding(for field: FoodFavouriteNutritionField) -> Binding<String> {

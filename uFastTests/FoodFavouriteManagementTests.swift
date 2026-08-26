@@ -37,6 +37,16 @@ final class FoodFavouriteManagementTests: XCTestCase {
         )
     }
 
+    func testNutritionValueParserUsesLocaleDecimalSeparator() {
+        XCTAssertEqual(
+            FoodNutritionValueParser.value("1,5", locale: Locale(identifier: "fr_FR")),
+            1.5
+        )
+        XCTAssertNil(
+            FoodNutritionValueParser.value("not-a-number", locale: Locale(identifier: "fr_FR"))
+        )
+    }
+
     func testCreateUpdateKeepsOrderIdentityRevisionAndZeroValues() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let store = SwiftDataFoodFavouriteStore(modelContext: container.mainContext)

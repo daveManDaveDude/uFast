@@ -465,13 +465,10 @@ private struct FoodNutritionTextInput {
         guard !trimmed.isEmpty else {
             return .some(nil)
         }
-        let formatter = NumberFormatter()
-        formatter.locale = locale
-        formatter.numberStyle = .decimal
-        guard let number = formatter.number(from: trimmed) else {
+        guard let number = FoodNutritionValueParser.value(trimmed, locale: locale) else {
             return nil
         }
-        return .some(number.doubleValue)
+        return .some(number)
     }
 
     private static func text(_ value: Double?) -> String {

@@ -84,6 +84,30 @@ final class LocalizationTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testFoodFavouriteConfirmationPreservesBothImpactDetails() {
+        let resolve = AppTextResolver()
+        let context = CaloricEventConfirmationContext(
+            persistedImpact: CaloricEventImpact(
+                activeFastIDs: [UUID()],
+                completedFastIDs: [],
+                reconstructedFastIDs: [],
+                reconstructedReviewIDs: [UUID()]
+            ),
+            includesInferredInterval: true
+        )
+
+        let message = TodayGoalView.savingConfirmationMessage(
+            context: context,
+            noun: .food,
+            time: "10:30",
+            textResolver: resolve
+        )
+
+        XCTAssertTrue(message.contains(resolve(.reconstructedReviewDetail)))
+        XCTAssertTrue(message.contains(resolve(.inferredIntervalDetail)))
+    }
+
     func testPseudolocalizationIsDeterministicAndPreservesInterpolationTokens() {
         let source = "Save and update 3 recorded fasts at 10:30."
         let first = AppTextPseudolocalizer.resolve(source)

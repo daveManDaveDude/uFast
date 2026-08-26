@@ -16,15 +16,12 @@ extension TodayGoalView {
     }
 
     var foodFavouriteConfirmationMessage: String {
-        textResolver(
-            .confirmationMessage(
-                action: .saving,
-                kind: foodFavouriteConfirmationContext.kind,
-                noun: .food,
-                count: max(1, foodFavouriteConfirmationContext.affectedPersistedFastCount),
-                time: (foodFavouritePendingOperation?.occurredAt ?? clock.now)
-                    .formatted(date: .omitted, time: .shortened)
-            )
+        Self.savingConfirmationMessage(
+            context: foodFavouriteConfirmationContext,
+            noun: .food,
+            time: (foodFavouritePendingOperation?.occurredAt ?? clock.now)
+                .formatted(date: .omitted, time: .shortened),
+            textResolver: textResolver
         )
     }
 
@@ -75,20 +72,33 @@ extension TodayGoalView {
     }
 
     var caloricFavouriteConfirmationMessage: String {
-        let time = clock.now.formatted(date: .omitted, time: .shortened)
+        Self.savingConfirmationMessage(
+            context: caloricFavouriteConfirmationContext,
+            noun: .drink,
+            time: clock.now.formatted(date: .omitted, time: .shortened),
+            textResolver: textResolver
+        )
+    }
+
+    static func savingConfirmationMessage(
+        context: CaloricEventConfirmationContext,
+        noun: AppText.CaloricEventNoun,
+        time: String,
+        textResolver: AppTextResolver
+    ) -> String {
         var details = textResolver(
             .confirmationMessage(
                 action: .saving,
-                kind: caloricFavouriteConfirmationContext.kind,
-                noun: .drink,
-                count: max(1, caloricFavouriteConfirmationContext.affectedPersistedFastCount),
+                kind: context.kind,
+                noun: noun,
+                count: max(1, context.affectedPersistedFastCount),
                 time: time
             )
         )
-        if caloricFavouriteConfirmationContext.includesReconstructedReview {
+        if context.includesReconstructedReview {
             details += " " + textResolver(.reconstructedReviewDetail)
         }
-        if caloricFavouriteConfirmationContext.isCombined {
+        if context.isCombined {
             details += " " + textResolver(.inferredIntervalDetail)
         }
         return details

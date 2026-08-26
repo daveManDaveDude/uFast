@@ -350,25 +350,12 @@ extension TemporalRibbonView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(item.title)
                         .lineLimit(1)
-                    if showsLiveActiveDuration {
-                        TimelineView(.periodic(from: .now, by: 1)) { _ in
-                            Text(
-                                ActiveElapsedTimeFormatter.string(
-                                    from: activeFastNow().timeIntervalSince(item.start)
-                                )
-                            )
-                            .monospacedDigit()
-                            .lineLimit(1)
-                        }
-                    } else {
-                        Text(
-                            ActiveElapsedTimeFormatter.string(
-                                from: item.end.timeIntervalSince(item.start)
-                            )
-                        )
-                        .monospacedDigit()
-                        .lineLimit(1)
-                    }
+                    ActiveFastRibbonDurationLabel(
+                        start: item.start,
+                        fallbackEnd: item.end,
+                        isLive: showsLiveActiveDuration,
+                        now: activeFastNow
+                    )
                 }
             } else if layout == .compact {
                 let compactTitle = compactIntervalTitle(item)
@@ -442,5 +429,39 @@ extension TemporalRibbonView {
                 hasTrailingCap: !segment.continuesAfter
             )
         )
+    }
+}
+
+private struct ActiveFastRibbonDurationLabel: View {
+    let start: Date
+    let fallbackEnd: Date
+    let isLive: Bool
+    let now: () -> Date
+
+    @State private var displayedEnd: Date?
+
+    var body: some View {
+        let resolvedEnd = isLive ? displayedEnd ?? fallbackEnd : fallbackEnd
+
+        Text(
+            ActiveElapsedTimeFormatter.string(
+                from: resolvedEnd.timeIntervalSince(start)
+            )
+        )
+        .monospacedDigit()
+        .lineLimit(1)
+        .task(id: isLive) {
+            guard isLive else { return }
+
+            displayedEnd = now()
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: .seconds(1))
+                    displayedEnd = now()
+                }
+            } catch {
+                // Cancellation pauses live updates while the carousel is moving.
+            }
+        }
     }
 }
