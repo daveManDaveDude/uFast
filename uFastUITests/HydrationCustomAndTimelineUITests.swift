@@ -119,6 +119,9 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
     func testExistingFoodRowOpensFromItsOpenAreaDuringAnActiveFast() {
         let app = launch()
         app.buttons["food.add"].tap()
+        if app.buttons["food.custom"].waitForExistence(timeout: 5) {
+            app.buttons["food.custom"].tap()
+        }
         app.textFields["food.description"].typeText("Lunch")
         let saveFood = app.buttons["food.save"]
         XCTAssertTrue(saveFood.waitForExistence(timeout: 5), app.debugDescription)

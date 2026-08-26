@@ -63,6 +63,7 @@ enum UITestDataReset {
         try context.fetch(FetchDescriptor<HydrationEntryRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<FoodFavouriteRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).forEach(context.delete)
         try UserDefaultsLiveActivityLifecycleStore().clearAll()
     }
@@ -119,6 +120,18 @@ enum UITestDataReset {
         }
         if configuration.seedCaloricFavouriteActiveFast {
             UITestSeedFixtures.seedCaloricFavouriteActiveFast(in: context, clock: clock)
+        }
+        if configuration.seedFoodFavouritePopulated {
+            UITestSeedFixtures.seedFoodFavouritePopulated(in: context, clock: clock)
+        }
+        if configuration.seedFoodFavouriteDuplicateName {
+            UITestSeedFixtures.seedFoodFavouriteDuplicateName(in: context, clock: clock)
+        }
+        if configuration.seedFoodFavouriteValidation {
+            UITestSeedFixtures.seedFoodFavouriteValidation(in: context, clock: clock)
+        }
+        if configuration.seedFoodFavouriteActiveFast {
+            UITestSeedFixtures.seedFoodFavouriteActiveFast(in: context, clock: clock)
         }
         if configuration.seedInferredFast {
             UITestSeedFixtures.seedInferredFast(in: context, clock: clock)

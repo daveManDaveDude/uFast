@@ -12,6 +12,8 @@ final class AppLaunchConfigurationTests: XCTestCase {
             "--seed-multiple-active-fasts", "--seed-unknown-provenance",
             "--seed-favourite-populated", "--seed-favourite-duplicate-name",
             "--seed-favourite-validation", "--seed-caloric-favourite-active-fast",
+            "--seed-food-favourite-populated", "--seed-food-favourite-duplicate-name",
+            "--seed-food-favourite-validation", "--seed-food-favourite-active-fast",
             "--seed-inferred-fast", "--seed-today-multi-year", "--seed-caloric-boundary-multi-year",
             "--fixed-now", "1234.5",
             "--seed-active-fast-start", "1200",
@@ -20,6 +22,8 @@ final class AppLaunchConfigurationTests: XCTestCase {
             "--suppress-automatic-live-activity-offer", "--ui-testing-start-history",
             "--ui-testing-history-retry-fixture",
             "--simulate-persistence-bootstrap-failure",
+            "--simulate-food-favourite-migration-failure", "--simulate-food-favourite-save-failure",
+            "--simulate-food-favourite-stale", "--simulate-food-favourite-stale-after-confirmation",
             "--simulate-fast-save-failure", "--simulate-fast-history-failure",
             "--simulate-food-save-failure", "--simulate-drink-save-failure",
             "--simulate-favourite-save-failure",
@@ -50,6 +54,10 @@ final class AppLaunchConfigurationTests: XCTestCase {
             seedFavouriteDuplicateName: true,
             seedFavouriteValidation: true,
             seedCaloricFavouriteActiveFast: true,
+            seedFoodFavouritePopulated: true,
+            seedFoodFavouriteDuplicateName: true,
+            seedFoodFavouriteValidation: true,
+            seedFoodFavouriteActiveFast: true,
             seedInferredFast: true,
             seedTodayMultiYear: true,
             seedCaloricBoundaryMultiYear: true
@@ -64,6 +72,9 @@ final class AppLaunchConfigurationTests: XCTestCase {
             simulateFoodSaveFailure: true,
             simulateDrinkSaveFailure: true,
             simulateFavouriteSaveFailure: true,
+            simulateFoodFavouriteSaveFailure: true,
+            simulateFoodFavouriteStale: true,
+            simulateFoodFavStaleAfterConfirm: true,
             simulateGoalSaveFailure: true,
             simulateLiveActivitySettingsSaveFailure: true,
             simulateInferredFastDetectionSaveFailure: true,
@@ -76,6 +87,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             failEnds: true
         ))
         XCTAssertTrue(configuration.simulatePersistenceBootstrapFailure)
+        XCTAssertTrue(configuration.simulateFoodFavouriteMigrationFailure)
         XCTAssertTrue(configuration.suppressAutomaticLiveActivityOffer)
         XCTAssertTrue(configuration.startsOnHistory)
         XCTAssertTrue(configuration.historyMotionRetryFixture)

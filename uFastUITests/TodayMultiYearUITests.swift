@@ -21,6 +21,9 @@ final class TodayMultiYearUITests: XCTestCase {
             app.swipeUp()
         }
         foodAdd.tap()
+        if app.buttons["food.custom"].waitForExistence(timeout: 5) {
+            app.buttons["food.custom"].tap()
+        }
         XCTAssertTrue(app.navigationBars["Log food"].waitForExistence(timeout: 5), app.debugDescription)
         let description = app.textFields["food.description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5), app.debugDescription)

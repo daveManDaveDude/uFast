@@ -52,10 +52,24 @@ final class CaloricEventCommands {
         _ draft: FoodEntryDraft,
         replacing recordID: UUID?,
         goal: FastingGoal,
-        endingActiveFast: Bool
+        endingActiveFast: Bool,
+        operationID: UUID? = nil
     ) throws {
         let record = try recordID.flatMap { try foodRecord(id: $0) }
-        let eventReference = foodEventReference(for: draft, replacing: record)
+        // A favourite quick-add operation owns the normal event identifier for
+        // its one commit attempt. Once that event exists, replaying the same
+        // operation is an idempotent no-op. This check is deliberately inside
+        // the caloric command boundary so it covers both the event and any
+        // active-fast completion transaction, rather than relying on picker UI
+        // state.
+        if let operationID, try foodRecord(id: operationID) != nil {
+            return
+        }
+        let eventReference = foodEventReference(
+            for: draft,
+            replacing: record,
+            operationID: operationID
+        )
         let inferredImpact = try impactPresenter.presentedImpact(
             resultingEventReference: eventReference,
             resultingEventDate: draft.occurredAt,
@@ -210,11 +224,16 @@ final class CaloricEventCommands {
 
     private func foodEventReference(
         for draft: FoodEntryDraft,
-        replacing record: FoodEntryRecord?
+        replacing record: FoodEntryRecord?,
+        operationID: UUID? = nil
     ) -> CaloricBoundaryReference {
         if let record {
             pendingFoodRecordProposal = nil
             return .init(kind: .food, id: record.id)
+        }
+        if let operationID {
+            pendingFoodRecordProposal = PendingFoodRecordProposal(draft: draft, id: operationID)
+            return .init(kind: .food, id: operationID)
         }
         if let proposal = pendingFoodRecordProposal, proposal.draft == draft {
             return .init(kind: .food, id: proposal.id)

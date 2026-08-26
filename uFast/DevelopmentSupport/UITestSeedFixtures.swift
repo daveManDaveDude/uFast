@@ -300,3 +300,53 @@ enum UITestSeedFixtures {
         }
     }
 }
+
+extension UITestSeedFixtures {
+    static func seedFoodFavouritePopulated(in context: ModelContext, clock: any AppClock) {
+        guard let id = UUID(uuidString: "10300000-0000-0000-0000-000000000001") else { return }
+        context.insert(FoodFavouriteRecord(
+            id: id,
+            description: "Overnight oats",
+            nutrition: FoodNutrition(
+                energyKilocalories: 420,
+                proteinGrams: 20,
+                carbohydrateGrams: 50,
+                fatGrams: 12,
+                fibreGrams: 8,
+                sugarGrams: 0,
+                saltGrams: 0
+            ),
+            createdAt: clock.now.addingTimeInterval(-120),
+            creationOrder: 1
+        ))
+    }
+
+    static func seedFoodFavouriteDuplicateName(in context: ModelContext, clock: any AppClock) {
+        context.insert(FoodFavouriteRecord(
+            description: "Café",
+            nutrition: FoodNutrition(energyKilocalories: 2),
+            createdAt: clock.now.addingTimeInterval(-60),
+            creationOrder: 1
+        ))
+        context.insert(FoodFavouriteRecord(
+            description: "CAFE",
+            nutrition: FoodNutrition(energyKilocalories: 2),
+            createdAt: clock.now,
+            creationOrder: 2
+        ))
+    }
+
+    static func seedFoodFavouriteValidation(in context: ModelContext, clock: any AppClock) {
+        context.insert(FoodFavouriteRecord(
+            description: " ",
+            nutrition: FoodNutrition(energyKilocalories: -.infinity),
+            createdAt: clock.now,
+            creationOrder: 1
+        ))
+    }
+
+    static func seedFoodFavouriteActiveFast(in context: ModelContext, clock: any AppClock) {
+        seedFoodFavouritePopulated(in: context, clock: clock)
+        context.insert(FastRecord(startDate: clock.now.addingTimeInterval(-3600), goalAtStart: .default))
+    }
+}

@@ -3,7 +3,7 @@ import Foundation
 // swiftlint:disable blanket_disable_command superfluous_disable_command
 // swiftlint:disable trailing_comma
 
-struct FoodNutrition: Equatable {
+struct FoodNutrition: Equatable, Sendable {
     var energyKilocalories: Double?
     var proteinGrams: Double?
     var carbohydrateGrams: Double?

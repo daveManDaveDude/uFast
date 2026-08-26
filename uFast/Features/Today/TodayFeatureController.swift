@@ -99,11 +99,13 @@ final class TodayFeatureController {
     var liveActivityStatus: String?
 
     @ObservationIgnored private weak var commands: (any TodayFeatureCommanding)?
+    @ObservationIgnored weak var foodFavouriteCommands: (any TodayFoodFavouriteCommanding)?
     @ObservationIgnored private var textResolver = AppTextResolver()
     @ObservationIgnored private var outcomeRevision = 0
 
     func connect(commands: (any TodayFeatureCommanding)?) {
         self.commands = commands
+        foodFavouriteCommands = commands as? any TodayFoodFavouriteCommanding
     }
 
     func setTextResolver(_ resolver: AppTextResolver) {
@@ -184,6 +186,11 @@ final class TodayFeatureController {
     func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
         guard let commands else { throw ApplicationCommandError.recordNotFound }
         try commands.todayAddFavouriteDrink(favourite)
+    }
+
+    func addFoodFavourite(_ operation: FoodFavouriteQuickAddOperation, endingActiveFast: Bool) throws {
+        guard let commands = foodFavouriteCommands else { throw ApplicationCommandError.recordNotFound }
+        try commands.todayAddFoodFavourite(operation, endingActiveFast: endingActiveFast)
     }
 
     func addFavouriteDrink(

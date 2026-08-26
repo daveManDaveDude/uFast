@@ -125,11 +125,13 @@ final class SettingsFeatureController {
     var liveActivityStatus: String?
 
     @ObservationIgnored private weak var commands: (any SettingsFeatureCommanding)?
+    @ObservationIgnored weak var foodCommands: (any SettingsFoodFavouriteCommanding)?
     @ObservationIgnored private var textResolver = AppTextResolver()
     @ObservationIgnored private var outcomeRevision = 0
 
     func connect(commands: (any SettingsFeatureCommanding)?) {
         self.commands = commands
+        foodCommands = commands as? any SettingsFoodFavouriteCommanding
     }
 
     func setTextResolver(_ resolver: AppTextResolver) {

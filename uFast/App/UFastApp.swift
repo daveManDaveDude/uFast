@@ -35,7 +35,8 @@ struct UFastApp: App {
                 }
                 return try PersistenceContainer.make(
                     diagnosticSink: diagnosticSink,
-                    now: configuredClock.now
+                    now: configuredClock.now,
+                    simulateMigrationFailure: launchConfiguration.simulateFoodFavouriteMigrationFailure
                 )
             },
             diagnosticSink: diagnosticSink

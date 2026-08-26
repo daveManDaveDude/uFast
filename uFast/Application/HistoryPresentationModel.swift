@@ -53,6 +53,7 @@ final class HistoryPresentationModel {
     var motionLoadingEdges: Set<HistoryMotionEdge> = []
     var motionFailedEdges: Set<HistoryMotionEdge> = []
     var hydrationFavouriteSnapshots: [HydrationFavouriteSnapshot] = []
+    var foodFavouriteSnapshots: [FoodFavouriteSnapshot] = []
 
     init(
         modelContext: ModelContext,

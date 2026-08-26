@@ -174,6 +174,57 @@ struct SettingsFavouritesSection: View {
     }
 }
 
+struct SettingsFoodFavouritesSection: View {
+    @Environment(\.appTextResolver) private var textResolver
+    let favourites: [FoodFavouriteSnapshot]
+    let onAddFavourite: () -> Void
+    let onEditFavourite: (FoodFavouriteSnapshot) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+            UFastSectionHeading(textResolver(.settingsFoodFavouritesHeading))
+                .accessibilityIdentifier("settings.food-favourites")
+            Text(textResolver(.settingsFoodFavouritesDescription))
+                .font(.subheadline)
+                .foregroundStyle(UFastTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(favourites) { favourite in
+                Button { onEditFavourite(favourite) } label: {
+                    HStack(spacing: UFastTheme.Spacing.standard) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(favourite.description)
+                                .font(.headline)
+                                .foregroundStyle(UFastTheme.primary)
+                            Text(textResolver(.foodFavouriteDetail(hasNutrition: !favourite.nutrition.values.isEmpty)))
+                                .font(.subheadline)
+                                .foregroundStyle(UFastTheme.secondaryText)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(UFastTheme.secondaryText)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(UFastActionRowButtonStyle())
+                .accessibilityLabel(favourite.description)
+                .accessibilityValue(
+                    textResolver(
+                        .settingsFoodFavouriteAccessibilityValue(
+                            hasNutrition: !favourite.nutrition.values.isEmpty
+                        )
+                    )
+                )
+                .accessibilityIdentifier("settings.food-favourite.\(favourite.id.uuidString)")
+            }
+            Button(textResolver(.settingsAddFoodFavourite), action: onAddFavourite)
+                .buttonStyle(UFastSecondaryButtonStyle())
+                .accessibilityIdentifier("settings.food-favourite.add")
+        }
+        .uFastCard(accent: UFastTheme.sky)
+    }
+}
+
 struct SettingsDeleteSection: View {
     @Environment(\.appTextResolver) private var textResolver
     let error: String?

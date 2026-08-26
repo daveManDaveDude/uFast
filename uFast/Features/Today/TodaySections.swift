@@ -1,6 +1,59 @@
 import SwiftUI
 
 extension TodayGoalView {
+    var foodFavouriteConfirmationTitle: String {
+        textResolver(
+            .confirmationTitle(
+                foodFavouriteConfirmationContext.kind,
+                noun: .food,
+                count: max(1, foodFavouriteConfirmationContext.affectedPersistedFastCount)
+            )
+        )
+    }
+
+    var foodFavouriteConfirmationActionTitle: String {
+        textResolver(.confirmationAction(.saving, kind: foodFavouriteConfirmationContext.kind, noun: .food))
+    }
+
+    var foodFavouriteConfirmationMessage: String {
+        textResolver(
+            .confirmationMessage(
+                action: .saving,
+                kind: foodFavouriteConfirmationContext.kind,
+                noun: .food,
+                count: max(1, foodFavouriteConfirmationContext.affectedPersistedFastCount),
+                time: (foodFavouritePendingOperation?.occurredAt ?? clock.now)
+                    .formatted(date: .omitted, time: .shortened)
+            )
+        )
+    }
+
+    func savePendingFoodFavourite(endingActiveFast: Bool) {
+        guard let favourite = foodFavouritePending, let operation = foodFavouritePendingOperation else { return }
+        foodFavouriteCommitState = .saving
+        do {
+            try controller.addFoodFavourite(operation, endingActiveFast: endingActiveFast)
+            foodFavouriteSaveError = nil
+            foodFavouriteCommitState = .success
+            drinkAnnouncement = textResolver(.foodFavouriteAddedAnnouncement(name: favourite.description))
+            foodFavouritePending = nil
+            foodFavouritePendingOperation = nil
+            isFoodFavouriteConfirmationPresented = false
+        } catch let FoodFavouriteStoreError.stale {
+            isFoodFavouriteConfirmationPresented = false
+            foodFavouriteCommitState = .stale
+            foodFavouriteSaveError = textResolver(.foodFavouriteCommitState(.stale))
+        } catch let FoodFavouriteStoreError.recordNotFound {
+            isFoodFavouriteConfirmationPresented = false
+            foodFavouriteCommitState = .stale
+            foodFavouriteSaveError = textResolver(.foodFavouriteCommitState(.stale))
+        } catch {
+            isFoodFavouriteConfirmationPresented = false
+            foodFavouriteCommitState = .failure
+            foodFavouriteSaveError = textResolver(.foodFavouriteCommitState(.failure))
+        }
+    }
+
     var caloricFavouriteConfirmationTitle: String {
         textResolver(
             .confirmationTitle(
@@ -152,7 +205,10 @@ extension TodayGoalView {
     var foodSection: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
             Button {
-                foodEditor = FoodEditorPresentation(record: nil)
+                foodFavouriteSaveError = nil
+                foodFavouritePending = nil
+                foodFavouriteCommitState = nil
+                isFoodSheetPresented = true
             } label: {
                 HStack {
                     Label(textResolver(.todayFoodAdd), systemImage: "fork.knife")
@@ -164,6 +220,39 @@ extension TodayGoalView {
             }
             .buttonStyle(UFastSecondaryButtonStyle())
             .accessibilityIdentifier("food.add")
+
+            if let foodFavouriteSaveError {
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+                    Label(foodFavouriteSaveError, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(UFastTheme.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("food.favourite.save-error")
+                    if foodFavouritePending != nil, foodFavouritePendingOperation != nil {
+                        Button(textResolver(.foodFavouriteRetry)) {
+                            savePendingFoodFavourite(endingActiveFast: true)
+                        }
+                        .buttonStyle(UFastSecondaryButtonStyle())
+                        .accessibilityIdentifier("food.favourite.retry")
+                    }
+                }
+                .uFastCard(accent: UFastTheme.apricot)
+            }
+            if let foodFavouriteCommitState {
+                Text(textResolver(.foodFavouriteCommitState(foodFavouriteCommitState)))
+                    .foregroundStyle(
+                        foodFavouriteCommitState == .failure || foodFavouriteCommitState == .stale
+                            ? UFastTheme.error
+                            : UFastTheme.secondaryText
+                    )
+                    .accessibilityIdentifier("food.favourite.commit-state")
+                if foodFavouriteCommitState == .success {
+                    Text(textResolver(.foodFavouriteCommitState(.success)))
+                        .accessibilityIdentifier("food.favourite.success")
+                } else if foodFavouriteCommitState == .stale {
+                    Text(textResolver(.foodFavouriteCommitState(.stale)))
+                        .accessibilityIdentifier("food.favourite.stale")
+                }
+            }
 
             Button {
                 caloricFavouriteSaveError = nil

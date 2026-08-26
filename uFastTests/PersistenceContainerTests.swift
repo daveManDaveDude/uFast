@@ -18,14 +18,16 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(UFastSchemaV3.versionIdentifier, Schema.Version(3, 0, 0))
         XCTAssertEqual(UFastSchemaV4.versionIdentifier, Schema.Version(4, 0, 0))
         XCTAssertEqual(UFastSchemaV5.versionIdentifier, Schema.Version(5, 0, 0))
-        XCTAssertEqual(UFastMigrationPlan.schemas.count, 5)
+        XCTAssertEqual(UFastSchemaV6.versionIdentifier, Schema.Version(6, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 6)
         XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[2] == UFastSchemaV3.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[3] == UFastSchemaV4.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[4] == UFastSchemaV5.self)
-        XCTAssertEqual(UFastMigrationPlan.stages.count, 4)
-        XCTAssertEqual(PersistenceContainer.schema.entities.count, 7)
+        XCTAssertTrue(UFastMigrationPlan.schemas[5] == UFastSchemaV6.self)
+        XCTAssertEqual(UFastMigrationPlan.stages.count, 5)
+        XCTAssertEqual(PersistenceContainer.schema.entities.count, 8)
     }
 
     private func assertReleaseSchema() {
@@ -68,6 +70,7 @@ final class PersistenceContainerTests: XCTestCase {
                 "FoodEntryRecord",
                 "HydrationEntryRecord",
                 "HydrationFavouriteRecord",
+                "FoodFavouriteRecord",
                 "HydrationFavouriteMigrationRecord",
                 "UnknownPeriodRecord",
             ]
@@ -106,6 +109,72 @@ final class PersistenceContainerTests: XCTestCase {
         }
         XCTAssertFalse(failure.diagnosticDescription.isEmpty)
         XCTAssertEqual(try Data(contentsOf: storeURL), originalBytes)
+    }
+
+    func testV5StoreMigratesWithoutFabricatingFoodFavouritesAndPreservesRecords() throws {
+        let directory = try makeStoreDirectory(prefix: "uFast-v5-food-favourite")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "production.store")
+        let v5Schema = Schema(versionedSchema: UFastSchemaV5.self)
+        let v5Container = try ModelContainer(
+            for: v5Schema,
+            configurations: [ModelConfiguration(schema: v5Schema, url: storeURL, cloudKitDatabase: .none)]
+        )
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let settings = AppSettingsRecord(hasCompletedOnboarding: true)
+        let foodID = UUID()
+        let food = FoodEntryRecord(
+            id: foodID,
+            draft: .init(description: "V5 meal", occurredAt: now),
+            createdAt: now
+        )
+        let hydration = HydrationEntryRecord(
+            type: .water,
+            volumeMillilitres: 500,
+            occurredAt: now,
+            isCaloric: false,
+            createdAt: now
+        )
+        v5Container.mainContext.insert(settings)
+        v5Container.mainContext.insert(food)
+        v5Container.mainContext.insert(hydration)
+        try v5Container.mainContext.save()
+
+        let migrated = try PersistenceContainer.make(storeURL: storeURL, now: now)
+        let context = migrated.mainContext
+        XCTAssertTrue(try context.fetch(FetchDescriptor<FoodFavouriteRecord>()).isEmpty)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<FoodEntryRecord>()).map(\.id), [foodID])
+        XCTAssertEqual(
+            try context.fetch(FetchDescriptor<FoodEntryRecord>()).first?.foodDescription,
+            "V5 meal"
+        )
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 1)
+    }
+
+    func testSimulatedV5ToV6MigrationFailurePreservesStoreAndReturnsUnavailable() throws {
+        let directory = try makeStoreDirectory(prefix: "uFast-v5-food-favourite-failure")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "production.store")
+        let v5Schema = Schema(versionedSchema: UFastSchemaV5.self)
+        let v5Container = try ModelContainer(
+            for: v5Schema,
+            configurations: [ModelConfiguration(schema: v5Schema, url: storeURL, cloudKitDatabase: .none)]
+        )
+        v5Container.mainContext.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        try v5Container.mainContext.save()
+        let before = try storeContents(in: directory)
+
+        let result = PersistenceBootstrapResult.open {
+            try PersistenceContainer.make(
+                storeURL: storeURL,
+                simulateMigrationFailure: true
+            )
+        }
+        guard case .unavailable = result else {
+            return XCTFail("Expected migration failure to produce unavailable persistence")
+        }
+        XCTAssertEqual(try storeContents(in: directory), before)
     }
 
     func testProductionConfigurationIsLocalOnly() {
@@ -242,7 +311,9 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(storedFast.historicalGoal, sixteenHours)
         XCTAssertEqual(storedFast.duration, 16 * 60 * 60)
     }
+}
 
+extension PersistenceContainerTests {
     func testDeleteEverythingRemovesEveryPersistedModelType() throws {
         let container = try populatedContainer()
         let context = container.mainContext
@@ -254,6 +325,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<FoodEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationEntryRecord>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<FoodFavouriteRecord>()).isEmpty)
         XCTAssertTrue(
             try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).isEmpty
         )
@@ -277,6 +349,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<UnknownPeriodRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationFavouriteRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<FoodFavouriteRecord>()), 1)
         XCTAssertEqual(
             try context.fetchCount(FetchDescriptor<HydrationFavouriteMigrationRecord>()),
             1
@@ -288,13 +361,19 @@ final class PersistenceContainerTests: XCTestCase {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
+        insertCoreDeleteFixtures(in: context, now: now)
+        insertFavouriteDeleteFixtures(in: context, now: now)
+        try context.save()
+        return container
+    }
+
+    private func insertCoreDeleteFixtures(in context: ModelContext, now: Date) {
         let startBoundaryID = UUID()
         let endBoundaryID = UUID()
         let boundaries = ReconstructionBoundaryPair(
             start: .init(kind: .food, id: startBoundaryID),
             end: .init(kind: .hydration, id: endBoundaryID)
         )
-
         context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
         context.insert(FastRecord(startDate: now, goalAtStart: .default))
         context.insert(
@@ -323,6 +402,9 @@ final class PersistenceContainerTests: XCTestCase {
                 createdAt: now
             )
         )
+    }
+
+    private func insertFavouriteDeleteFixtures(in context: ModelContext, now: Date) {
         context.insert(
             HydrationFavouriteRecord(
                 name: "Sparkling water",
@@ -331,10 +413,39 @@ final class PersistenceContainerTests: XCTestCase {
                 createdAt: now
             )
         )
-        context.insert(HydrationFavouriteMigrationRecord(
-            migrationVersion: HydrationFavouriteMigration.migrationVersion, completedAt: now
-        ))
-        try context.save()
-        return container
+        context.insert(
+            HydrationFavouriteMigrationRecord(
+                migrationVersion: HydrationFavouriteMigration.migrationVersion,
+                completedAt: now
+            )
+        )
+        context.insert(
+            FoodFavouriteRecord(
+                description: "Saved template",
+                nutrition: FoodNutrition(energyKilocalories: 100),
+                createdAt: now
+            )
+        )
+    }
+
+    private func makeStoreDirectory(prefix: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "\(prefix)-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private func storeContents(in directory: URL) throws -> [String: Data] {
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey]
+        )
+        return try Dictionary(uniqueKeysWithValues: urls.compactMap { url in
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                return nil
+            }
+            let data = try Data(contentsOf: url)
+            return (url.lastPathComponent, data)
+        })
     }
 }

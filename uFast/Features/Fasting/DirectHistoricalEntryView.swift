@@ -19,6 +19,8 @@ struct DirectHistoricalEntryView: View {
     let activeFastStart: Date?
     let favourites: [HydrationFavourite]
     let resolveFavouriteDraft: (HydrationFavourite, Date) throws -> HydrationEntryDraft
+    let foodFavourites: [FoodFavouriteSnapshot]
+    let resolveFoodFavouriteDraft: (FoodFavouriteSnapshot, Date) throws -> FoodEntryDraft
     let onSaveFood: (FoodEntryDraft, Bool) throws -> Void
     let onSaveHydration: (HydrationEntryDraft, Bool) throws -> Void
     let onClose: () -> Void
@@ -29,6 +31,13 @@ struct DirectHistoricalEntryView: View {
         activeFastStart: Date?,
         favourites: [HydrationFavourite],
         resolveFavouriteDraft: @escaping (HydrationFavourite, Date) throws -> HydrationEntryDraft,
+        foodFavourites: [FoodFavouriteSnapshot] = [],
+        resolveFoodFavouriteDraft: @escaping (
+            FoodFavouriteSnapshot,
+            Date
+        ) throws -> FoodEntryDraft = { favourite, date in
+            FoodFavouriteProjection.foodDraft(from: favourite, occurredAt: date)
+        },
         onSaveFood: @escaping (FoodEntryDraft, Bool) throws -> Void,
         onSaveHydration: @escaping (HydrationEntryDraft, Bool) throws -> Void,
         onClose: @escaping () -> Void
@@ -38,6 +47,8 @@ struct DirectHistoricalEntryView: View {
         self.activeFastStart = activeFastStart
         self.favourites = favourites
         self.resolveFavouriteDraft = resolveFavouriteDraft
+        self.foodFavourites = foodFavourites
+        self.resolveFoodFavouriteDraft = resolveFoodFavouriteDraft
         self.onSaveFood = onSaveFood
         self.onSaveHydration = onSaveHydration
         self.onClose = onClose
@@ -48,6 +59,16 @@ struct DirectHistoricalEntryView: View {
         switch stage {
         case .confirmation:
             confirmation
+        case .foodChoice:
+            FoodFavouritePicker(
+                clock: clock,
+                favourites: foodFavourites,
+                onAdd: { favourite, _ in
+                    stage = try .foodDraft(resolveFoodFavouriteDraft(favourite, selectedInstant))
+                },
+                onChooseAnother: { stage = .food },
+                onCancel: onClose
+            )
         case .food:
             FoodEntryEditor(
                 record: nil,
@@ -57,6 +78,20 @@ struct DirectHistoricalEntryView: View {
                 allowedRange: presentation.allowedRange,
                 onSave: { draft, endingActiveFast in
                     try onSaveFood(draft, endingActiveFast)
+                    onClose()
+                },
+                onDelete: nil,
+                onCancel: onClose
+            )
+        case let .foodDraft(draft):
+            FoodEntryEditor(
+                record: nil,
+                clock: clock,
+                activeFastStart: activeFastStart,
+                initialDraft: draft,
+                allowedRange: presentation.allowedRange,
+                onSave: { savedDraft, endingActiveFast in
+                    try onSaveFood(savedDraft, endingActiveFast)
                     onClose()
                 },
                 onDelete: nil,
@@ -125,7 +160,7 @@ struct DirectHistoricalEntryView: View {
 
                 Section {
                     Button {
-                        stage = .food
+                        stage = .foodChoice
                     } label: {
                         Label(textResolver(.historyFood), systemImage: "fork.knife")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -182,7 +217,9 @@ struct DirectHistoricalEntryView: View {
 
 private enum Stage {
     case confirmation
+    case foodChoice
     case food
+    case foodDraft(FoodEntryDraft)
     case drinkChoice
     case hydration(HydrationEntryDraft)
 }
