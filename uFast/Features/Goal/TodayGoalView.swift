@@ -160,9 +160,9 @@ extension TodayGoalView {
             }
         }
         .onChange(of: drinkAnnouncement) { _, announcement in
-            if let announcement {
-                UIAccessibility.post(notification: .announcement, argument: announcement)
-            }
+            guard let announcement else { return }
+            UIAccessibility.post(notification: .announcement, argument: announcement)
+            drinkAnnouncement = nil
         }
         .alert(textResolver(.endFastConfirmationTitle), isPresented: $isEndConfirmationPresented) {
             Button(textResolver(.cancel), role: .cancel) {}

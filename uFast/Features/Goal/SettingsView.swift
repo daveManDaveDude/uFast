@@ -6,6 +6,7 @@ import UIKit
 
 struct SettingsView: View {
     @Environment(\.applicationCommands) private var applicationCommands
+    @Environment(\.locale) private var locale
     @Environment(\.appTextResolver) private var textResolver
     @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     let snapshot: SettingsFeatureSnapshot
@@ -146,6 +147,7 @@ struct SettingsView: View {
         .sheet(item: $foodFavouriteEditor) { presentation in
             FoodFavouriteEditor(
                 presentation: presentation,
+                locale: locale,
                 existingFavourites: snapshot.foodFavourites,
                 onSave: { description, nutrition in
                     if let favourite = presentation.favourite {

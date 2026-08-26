@@ -23,6 +23,7 @@ struct HistoryView: View {
     @State var eventGroupDisclosure: TemporalEventGroup?
     @State var isCalendarPresented = false
     @State var temporalMovementPhase = TemporalCarouselMovementPhase.settled
+    @State var coupledScrollPresentation = TemporalCoupledScrollPresentation()
     @State var historyInteractionRevision = 0
     @State var isDateRailMoving = false
     @State var settledVisibleWindow: TemporalRibbonWindow?

@@ -11,7 +11,6 @@ struct FoodFavouriteEditorPresentation: Identifiable {
 }
 
 struct FoodFavouriteEditor: View {
-    @Environment(\.locale) private var locale
     @Environment(\.appTextResolver) private var textResolver
     @State private var description: String
     @State private var values: [FoodFavouriteNutritionField: String]
@@ -22,6 +21,7 @@ struct FoodFavouriteEditor: View {
     @State private var isSaving = false
 
     let presentation: FoodFavouriteEditorPresentation
+    let locale: Locale
     let existingFavourites: [FoodFavouriteSnapshot]
     let onSave: (String, FoodNutrition) throws -> Void
     let onRemove: (() throws -> Void)?
@@ -29,12 +29,14 @@ struct FoodFavouriteEditor: View {
 
     init(
         presentation: FoodFavouriteEditorPresentation,
+        locale: Locale,
         existingFavourites: [FoodFavouriteSnapshot] = [],
         onSave: @escaping (String, FoodNutrition) throws -> Void,
         onRemove: (() throws -> Void)?,
         onCancel: @escaping () -> Void
     ) {
         self.presentation = presentation
+        self.locale = locale
         self.existingFavourites = existingFavourites
         self.onSave = onSave
         self.onRemove = onRemove
@@ -43,7 +45,7 @@ struct FoodFavouriteEditor: View {
         var initial: [FoodFavouriteNutritionField: String] = [:]
         for field in FoodFavouriteNutritionField.allCases {
             if let value = presentation.favourite?.nutrition.value(for: field) {
-                initial[field] = String(value)
+                initial[field] = FoodNutritionValueFormatter.string(value, locale: locale)
             } else {
                 initial[field] = ""
             }

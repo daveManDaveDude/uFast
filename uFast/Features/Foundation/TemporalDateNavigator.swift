@@ -32,7 +32,6 @@ struct TemporalDateNavigator: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            let coupledPreview = coupledPresentation?.preview
             ZStack {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 5) {
@@ -43,7 +42,6 @@ struct TemporalDateNavigator: View {
                 }
                 .contentMargins(.horizontal, navigatorEdgeMargin, for: .scrollContent)
                 .scrollIndicators(.hidden)
-                .opacity(coupledPreview == nil ? 1 : 0)
                 .onScrollPhaseChange { _, newPhase in
                     let isUserDriven = newPhase == .tracking
                         || newPhase == .interacting
@@ -80,10 +78,18 @@ struct TemporalDateNavigator: View {
                     keepSelectedChipVisible(using: proxy)
                 }
 
-                if let coupledPreview {
-                    coupledFollower(coupledPreview)
-                        .accessibilityHidden(true)
-                        .allowsHitTesting(false)
+                if let coupledPresentation {
+                    TemporalCoupledFollowerOverlay(presentation: coupledPresentation) { isCoupled in
+                        if isCoupled {
+                            coupledAnchorX = coupledAnchorX ?? selectedChipMidX
+                        } else {
+                            coupledAnchorX = nil
+                        }
+                    } content: { preview in
+                        coupledFollower(preview)
+                    }
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
                 }
             }
             .frame(height: navigatorHeight)
@@ -94,13 +100,6 @@ struct TemporalDateNavigator: View {
                         key: TemporalDateNavigatorWidthKey.self,
                         value: geometry.size.width
                     )
-                }
-            }
-            .onChange(of: coupledPreview != nil) { _, isCoupled in
-                if isCoupled {
-                    coupledAnchorX = coupledAnchorX ?? selectedChipMidX
-                } else {
-                    coupledAnchorX = nil
                 }
             }
         }
@@ -122,6 +121,25 @@ struct TemporalDateNavigator: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(textResolver(.historyCopy(.dateNavigator)))
         .accessibilityIdentifier("temporal.date-navigator")
+    }
+}
+
+private struct TemporalCoupledFollowerOverlay<Content: View>: View {
+    let presentation: TemporalCoupledScrollPresentation
+    let onActiveChange: (Bool) -> Void
+    let content: (TemporalDaySpaceProgress) -> Content
+
+    var body: some View {
+        let preview = presentation.preview
+        ZStack {
+            if let preview {
+                UFastTheme.canvas
+                content(preview)
+            }
+        }
+        .onChange(of: preview != nil) { _, isActive in
+            onActiveChange(isActive)
+        }
     }
 }
 

@@ -47,6 +47,18 @@ final class FoodFavouriteManagementTests: XCTestCase {
         )
     }
 
+    func testNutritionValueFormatterRoundTripsInCommaDecimalLocale() {
+        let locale = Locale(identifier: "fr_FR")
+        let formatted = FoodNutritionValueFormatter.string(420, locale: locale)
+
+        XCTAssertEqual(formatted, "420")
+        XCTAssertEqual(FoodNutritionValueParser.value(formatted, locale: locale), 420)
+
+        let decimal = FoodNutritionValueFormatter.string(12.5, locale: locale)
+        XCTAssertEqual(decimal, "12,5")
+        XCTAssertEqual(FoodNutritionValueParser.value(decimal, locale: locale), 12.5)
+    }
+
     func testCreateUpdateKeepsOrderIdentityRevisionAndZeroValues() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let store = SwiftDataFoodFavouriteStore(modelContext: container.mainContext)
