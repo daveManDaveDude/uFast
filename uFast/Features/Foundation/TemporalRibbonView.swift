@@ -28,6 +28,8 @@ struct TemporalRibbonView: View {
     var showsVisualRibbon = true
     var includesSemanticItems = true
     var hidesVisualEventAccessibility = false
+    var showsLiveActiveDuration = false
+    var activeFastNow: () -> Date = { .now }
     var windowOverride: TemporalRibbonWindow?
     var emptySemanticMessage: String?
     var futureReadOnlyFrom: Date?
@@ -344,7 +346,31 @@ extension TemporalRibbonView {
         HStack(spacing: layout == .compact ? 2 : 4) {
             Image(systemName: intervalSymbol(item.kind))
                 .accessibilityHidden(true)
-            if layout == .compact {
+            if item.kind == .active {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(item.title)
+                        .lineLimit(1)
+                    if showsLiveActiveDuration {
+                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                            Text(
+                                ActiveElapsedTimeFormatter.string(
+                                    from: activeFastNow().timeIntervalSince(item.start)
+                                )
+                            )
+                            .monospacedDigit()
+                            .lineLimit(1)
+                        }
+                    } else {
+                        Text(
+                            ActiveElapsedTimeFormatter.string(
+                                from: item.end.timeIntervalSince(item.start)
+                            )
+                        )
+                        .monospacedDigit()
+                        .lineLimit(1)
+                    }
+                }
+            } else if layout == .compact {
                 let compactTitle = compactIntervalTitle(item)
                 Text(compactTitle)
                     .lineLimit(1)

@@ -1159,8 +1159,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             allowsEmptySelection: false,
             showsTimelineDetails: false,
             readOnlyFromDate: now,
-            onMovementPhaseChange: { _ in },
-            onCoupledPresentationChange: { _ in }
+            onMovementPhaseChange: { _ in }
         )
         carousel.movementPhase = .decelerating
 

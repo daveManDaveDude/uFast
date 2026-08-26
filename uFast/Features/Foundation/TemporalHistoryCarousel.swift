@@ -26,7 +26,7 @@ struct TemporalHistoryCarousel: View {
     var presentationDay: Date?
     var readOnlyFromDate: Date?
     let onMovementPhaseChange: (TemporalCarouselMovementPhase) -> Void
-    let onCoupledPresentationChange: (TemporalCoupledPresentationUpdate) -> Void
+    var activeFastNow: () -> Date = { .now }
     var onSettledVisibleWindow: (TemporalRibbonWindow) -> Void = { _ in }
     /// Coarse edge intent only.  The callback is gated below so geometry
     /// frames never perform persistence work or rebuild the page arrays.
@@ -59,10 +59,9 @@ struct TemporalHistoryCarousel: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 0) {
                     ForEach(dates, id: \.self) { date in
-                        // Preserve deterministic page stacking at midnight;
-                        // interval labels remain clipped to their host page.
+                        // Interval labels are clipped to their host page, so
+                        // neighboring days need no explicit depth ordering.
                         daySegment(date)
-                            .zIndex(-date.timeIntervalSinceReferenceDate)
                             .containerRelativeFrame(
                                 .horizontal,
                                 count: 26,
@@ -114,7 +113,6 @@ struct TemporalHistoryCarousel: View {
                        )
                     {
                         emitPrefetchIntent(for: preview)
-                        onCoupledPresentationChange(.preview(preview))
                     } else if movementPhase == .settled,
                               geometrySnapshot.hasActiveMotion
                     {
@@ -149,9 +147,6 @@ struct TemporalHistoryCarousel: View {
                 reconcileAndCommitSelection(newDay)
             }
             .onChange(of: selection) { _, _ in
-                if movementPhase == .programmatic {
-                    onCoupledPresentationChange(.end)
-                }
                 alignToExternalSelection()
             }
             .onChange(of: dates) { _, newDates in
@@ -222,8 +217,6 @@ struct TemporalHistoryCarousel: View {
                 break
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("history.selected-date")
     }
 }
 
@@ -337,6 +330,8 @@ extension TemporalHistoryCarousel {
             usesContinuousSurface: true,
             includesSemanticItems: false,
             hidesVisualEventAccessibility: true,
+            showsLiveActiveDuration: movementPhase == .settled,
+            activeFastNow: activeFastNow,
             windowOverride: TemporalHistoryPresentation.calendarDayWindow(
                 containing: date,
                 calendar: calendar
@@ -351,7 +346,7 @@ extension TemporalHistoryCarousel {
                 )
             }
         }
-        .accessibilityHidden(!isSelected)
+        .accessibilityHidden(!isSelected || movementPhase != .settled)
         .scrollTransition(.identity, axis: .horizontal) { content, _ in
             content
         }
@@ -407,8 +402,6 @@ extension TemporalHistoryCarousel {
             } else {
                 reconcileAndCommitSelection(centeredDay)
             }
-        } else if newPhase == .programmatic {
-            onCoupledPresentationChange(.end)
         }
         onMovementPhaseChange(newPhase)
     }
@@ -440,13 +433,7 @@ extension TemporalHistoryCarousel {
 
     func reconcileAndCommitSelection(_ day: Date?) {
         let settledDay = resolvedSettledDay(day)
-        guard settledDay != canonicalSelection else {
-            onCoupledPresentationChange(.end)
-            return
-        }
-        onCoupledPresentationChange(
-            .reconcile(day: settledDay, dates: dates)
-        )
+        guard settledDay != canonicalSelection else { return }
         selection = settledDay
     }
 
@@ -462,25 +449,25 @@ extension TemporalHistoryCarousel {
         centeredDay = canonicalSelection
     }
 
-    /// Emits at most one intent per edge for the current date generation.  It
-    /// intentionally uses only the already-published progress and calendar
-    /// arithmetic; no query, projection, sorting, or array rebuild occurs on a
-    /// geometry callback.
+    /// Emits at most one intent per edge for the current date generation. The
+    /// runway is already a chronological array of consecutive calendar days,
+    /// so threshold dates can be compared directly without rebuilding calendar
+    /// components on every geometry frame.
     func emitPrefetchIntent(for progress: TemporalDaySpaceProgress) {
-        guard let first = dates.first, let last = dates.last else { return }
+        guard !dates.isEmpty, prefetchedEdges.count < 2 else { return }
         let threshold = HistoryMotionConfiguration.product.prefetchThreshold
-        let leadingDistance = calendar.dateComponents(
-            [.day], from: first, to: progress.leadingDay
-        ).day ?? Int.max
-        let trailingDistance = calendar.dateComponents(
-            [.day], from: progress.trailingDay, to: last
-        ).day ?? Int.max
-        if leadingDistance <= threshold, !prefetchedEdges.contains(.preceding) {
+        let precedingBoundary = dates[min(threshold, dates.count - 1)]
+        let followingBoundary = dates[max(dates.count - 1 - threshold, 0)]
+        if !prefetchedEdges.contains(.preceding),
+           progress.leadingDay <= precedingBoundary
+        {
             prefetchedEdges.insert(.preceding)
             onPrefetchIntent(.preceding)
             onPrefetchIntentAt(.preceding, progress.centeredCalendarDay)
         }
-        if trailingDistance <= threshold, !prefetchedEdges.contains(.following) {
+        if !prefetchedEdges.contains(.following),
+           progress.trailingDay >= followingBoundary
+        {
             prefetchedEdges.insert(.following)
             onPrefetchIntent(.following)
             onPrefetchIntentAt(.following, progress.centeredCalendarDay)

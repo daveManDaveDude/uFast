@@ -567,11 +567,7 @@ extension HistoryView {
             presentationDay: selectedDate,
             readOnlyFromDate: clock.now,
             onMovementPhaseChange: updateTemporalMovementPhase,
-            // The date rail intentionally remains on the settled day
-            // during lower-carousel motion, so there is no coupled
-            // preview consumer. Avoid publishing unused geometry frames
-            // into History view state.
-            onCoupledPresentationChange: { _ in },
+            activeFastNow: { clock.now },
             onSettledVisibleWindow: { window in
                 settledVisibleWindow = window
                 _ = model.reloadHistory(in: window.interval)
@@ -580,7 +576,6 @@ extension HistoryView {
         )
         .padding(.horizontal, UFastTheme.Spacing.standard)
         .allowsHitTesting(!isDateRailMoving && !motionInitialLoading)
-        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("history.carousel")
     }
 }
