@@ -379,8 +379,8 @@ extension TemporalRibbonView {
     }
 
     @ViewBuilder
-    func identifiedVisualContent<Content: View>(
-        _ content: Content,
+    func identifiedVisualContent(
+        _ content: some View,
         for item: TemporalRibbonIntervalItem
     ) -> some View {
         if showsVisualContentAccessibility {
