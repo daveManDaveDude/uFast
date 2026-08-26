@@ -28,6 +28,7 @@ struct TemporalRibbonView: View {
     var showsVisualRibbon = true
     var includesSemanticItems = true
     var hidesVisualEventAccessibility = false
+    var showsVisualContentAccessibility = true
     var showsLiveActiveDuration = false
     var activeFastNow: () -> Date = { .now }
     var windowOverride: TemporalRibbonWindow?
@@ -348,8 +349,10 @@ extension TemporalRibbonView {
                 .accessibilityHidden(true)
             if item.kind == .active {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(item.title)
-                        .lineLimit(1)
+                    identifiedVisualContent(
+                        Text(item.title).lineLimit(1),
+                        for: item
+                    )
                     ActiveFastRibbonDurationLabel(
                         start: item.start,
                         fallbackEnd: item.end,
@@ -359,18 +362,32 @@ extension TemporalRibbonView {
                 }
             } else if layout == .compact {
                 let compactTitle = compactIntervalTitle(item)
-                Text(compactTitle)
-                    .lineLimit(1)
-                    .minimumScaleFactor(item.compactTitle == nil ? 0.7 : 0.9)
-                    .allowsTightening(true)
+                identifiedVisualContent(
+                    Text(compactTitle)
+                        .lineLimit(1)
+                        .minimumScaleFactor(item.compactTitle == nil ? 0.7 : 0.9)
+                        .allowsTightening(true),
+                    for: item
+                )
             } else {
-                Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1)
+                identifiedVisualContent(
+                    Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1),
+                    for: item
+                )
             }
         }
-        // This identifies only the visible glyph/text region; the enclosing
-        // button still represents the full bar hit area.
-        .accessibilityElement(children: .ignore)
-        .accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
+    }
+
+    @ViewBuilder
+    func identifiedVisualContent<Content: View>(
+        _ content: Content,
+        for item: TemporalRibbonIntervalItem
+    ) -> some View {
+        if showsVisualContentAccessibility {
+            content.accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
+        } else {
+            content
+        }
     }
 
     func intervalVisualContentIdentifier(for item: TemporalRibbonIntervalItem) -> String {

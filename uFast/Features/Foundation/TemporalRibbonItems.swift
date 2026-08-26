@@ -21,13 +21,10 @@ struct TemporalRibbonIntervalItem: Identifiable, Equatable, Sendable {
     let accessibilityLabel: String
     let kind: Kind
 
-    /// Active Fast is deliberately not squeezed into the compact label slot.
-    /// Its longer state label needs the regular slot to remain full-sized and
-    /// readable; shorter interval labels can still use the compact treatment.
+    /// Active Fast can own a compact fragment with its short state label. The
+    /// full duration is rendered when a regular-width fragment is available.
     var visualContentMinimumWidth: Double {
-        kind == .active
-            ? TemporalRibbonGeometry.regularContentMinimumWidth
-            : TemporalRibbonGeometry.compactContentMinimumWidth
+        TemporalRibbonGeometry.compactContentMinimumWidth
     }
 
     init(

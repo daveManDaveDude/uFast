@@ -109,15 +109,16 @@ struct TemporalHistoryCarousel: View {
                         days: dates,
                         layoutDirection: direction
                     )
-                    if let progress {
-                        emitPrefetchIntent(for: progress)
-                        if movementPhase != .settled {
-                            onCoupledPresentationChange(.preview(progress))
-                        }
-                    }
-                    if movementPhase == .settled,
-                       geometrySnapshot.hasActiveMotion
+                    if movementPhase != .settled,
+                       let progress
                     {
+                        emitPrefetchIntent(for: progress)
+                        onCoupledPresentationChange(.preview(progress))
+                    }
+                    if movementPhase == .settled, geometrySnapshot.hasActiveMotion {
+                        if let progress {
+                            emitPrefetchIntent(for: progress)
+                        }
                         settleVisibleGeometry(geometry)
                     }
                 }
@@ -329,6 +330,7 @@ extension TemporalHistoryCarousel {
             usesContinuousSurface: true,
             includesSemanticItems: false,
             hidesVisualEventAccessibility: true,
+            showsVisualContentAccessibility: isSelected && movementPhase == .settled,
             showsLiveActiveDuration: isSelected && movementPhase == .settled,
             activeFastNow: activeFastNow,
             windowOverride: TemporalHistoryPresentation.calendarDayWindow(
@@ -455,20 +457,20 @@ extension TemporalHistoryCarousel {
     }
 
     func emitPrefetchIntent(for progress: TemporalDaySpaceProgress) {
-        guard !dates.isEmpty, prefetchedEdges.count < 2 else { return }
+        guard let first = dates.first, let last = dates.last else { return }
         let threshold = HistoryMotionConfiguration.product.prefetchThreshold
-        let precedingBoundary = dates[min(threshold, dates.count - 1)]
-        let followingBoundary = dates[max(dates.count - 1 - threshold, 0)]
-        if !prefetchedEdges.contains(.preceding),
-           progress.leadingDay <= precedingBoundary
-        {
+        let leadingDistance = calendar.dateComponents(
+            [.day], from: first, to: progress.leadingDay
+        ).day ?? Int.max
+        let trailingDistance = calendar.dateComponents(
+            [.day], from: progress.trailingDay, to: last
+        ).day ?? Int.max
+        if leadingDistance <= threshold, !prefetchedEdges.contains(.preceding) {
             prefetchedEdges.insert(.preceding)
             onPrefetchIntent(.preceding)
             onPrefetchIntentAt(.preceding, progress.centeredCalendarDay)
         }
-        if !prefetchedEdges.contains(.following),
-           progress.trailingDay >= followingBoundary
-        {
+        if trailingDistance <= threshold, !prefetchedEdges.contains(.following) {
             prefetchedEdges.insert(.following)
             onPrefetchIntent(.following)
             onPrefetchIntentAt(.following, progress.centeredCalendarDay)
