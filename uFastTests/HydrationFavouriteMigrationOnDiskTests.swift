@@ -82,9 +82,9 @@ final class HydrationFavouriteMigrationDiskTests: XCTestCase {
                 AppSettingsRecord(
                     id: higherID,
                     hasCompletedOnboarding: true,
-                    waterFavouriteMillilitres: 600,
-                    teaFavouriteMillilitres: 350,
-                    coffeeFavouriteMillilitres: 275
+                    waterFavouriteMillilitres: 750,
+                    teaFavouriteMillilitres: 425,
+                    coffeeFavouriteMillilitres: 225
                 )
             )
             legacy.mainContext.insert(
