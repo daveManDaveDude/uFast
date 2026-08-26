@@ -5,9 +5,11 @@ extension TemporalIntervalSegment {
     /// A continuation never gains content merely because its fragment is wider.
     func visualContentLayout(
         in window: TemporalRibbonWindow,
-        visibleWidth: Double
+        visibleWidth: Double,
+        minimumWidth: Double = TemporalRibbonGeometry.compactContentMinimumWidth
     ) -> TemporalIntervalContentLayout {
         guard ownsVisualContent(in: window) else { return .none }
+        guard visibleWidth >= minimumWidth else { return .none }
         let layout = TemporalRibbonGeometry.intervalContentLayout(for: visibleWidth)
         if layout != .none {
             return layout
@@ -21,20 +23,24 @@ extension TemporalIntervalSegment {
         in window: TemporalRibbonWindow,
         visibleWidth: Double,
         surfaceWidth: Double,
-        calendar: Calendar
+        calendar: Calendar,
+        minimumWidth: Double = TemporalRibbonGeometry.compactContentMinimumWidth
     ) -> TemporalIntervalContentLayout {
         guard isVisualContentFallbackHost(
             in: window,
             surfaceWidth: surfaceWidth,
-            calendar: calendar
+            calendar: calendar,
+            minimumWidth: minimumWidth
         ) else { return .none }
+        guard visibleWidth >= minimumWidth else { return .none }
         return TemporalRibbonGeometry.intervalContentLayout(for: visibleWidth)
     }
 
     private func isVisualContentFallbackHost(
         in window: TemporalRibbonWindow,
         surfaceWidth: Double,
-        calendar: Calendar
+        calendar: Calendar,
+        minimumWidth: Double
     ) -> Bool {
         guard !ownsVisualContent(in: window),
               continuesBefore,
@@ -54,6 +60,6 @@ extension TemporalIntervalSegment {
             / ownerDayDuration
         return ownerWidth.isFinite
             && ownerWidth > 0
-            && ownerWidth < TemporalRibbonGeometry.compactContentMinimumWidth
+            && ownerWidth < minimumWidth
     }
 }

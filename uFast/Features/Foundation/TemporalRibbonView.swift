@@ -264,14 +264,16 @@ extension TemporalRibbonView {
                 let markWidth = geometry.visualWidth
                 let contentLayout = segment.visualContentLayout(
                     in: window,
-                    visibleWidth: markWidth
+                    visibleWidth: markWidth,
+                    minimumWidth: item.visualContentMinimumWidth
                 )
                 let resolvedContentLayout = contentLayout == .none
                     ? segment.visualContentFallbackLayout(
                         in: window,
                         visibleWidth: markWidth,
                         surfaceWidth: policy.contentWidth,
-                        calendar: calendar
+                        calendar: calendar,
+                        minimumWidth: item.visualContentMinimumWidth
                     )
                     : contentLayout
                 let showsContent = resolvedContentLayout != .none
