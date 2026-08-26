@@ -28,6 +28,8 @@ struct TemporalRibbonView: View {
     var showsVisualRibbon = true
     var includesSemanticItems = true
     var hidesVisualEventAccessibility = false
+    var showsLiveActiveDuration = false
+    var activeFastNow: () -> Date = { .now }
     var windowOverride: TemporalRibbonWindow?
     var emptySemanticMessage: String?
     var futureReadOnlyFrom: Date?
@@ -264,14 +266,16 @@ extension TemporalRibbonView {
                 let markWidth = geometry.visualWidth
                 let contentLayout = segment.visualContentLayout(
                     in: window,
-                    visibleWidth: markWidth
+                    visibleWidth: markWidth,
+                    minimumWidth: item.visualContentMinimumWidth
                 )
                 let resolvedContentLayout = contentLayout == .none
                     ? segment.visualContentFallbackLayout(
                         in: window,
                         visibleWidth: markWidth,
                         surfaceWidth: policy.contentWidth,
-                        calendar: calendar
+                        calendar: calendar,
+                        minimumWidth: item.visualContentMinimumWidth
                     )
                     : contentLayout
                 let showsContent = resolvedContentLayout != .none
@@ -342,7 +346,18 @@ extension TemporalRibbonView {
         HStack(spacing: layout == .compact ? 2 : 4) {
             Image(systemName: intervalSymbol(item.kind))
                 .accessibilityHidden(true)
-            if layout == .compact {
+            if item.kind == .active {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(item.title)
+                        .lineLimit(1)
+                    ActiveFastRibbonDurationLabel(
+                        start: item.start,
+                        fallbackEnd: item.end,
+                        isLive: showsLiveActiveDuration,
+                        now: activeFastNow
+                    )
+                }
+            } else if layout == .compact {
                 let compactTitle = compactIntervalTitle(item)
                 Text(compactTitle)
                     .lineLimit(1)
@@ -414,5 +429,39 @@ extension TemporalRibbonView {
                 hasTrailingCap: !segment.continuesAfter
             )
         )
+    }
+}
+
+private struct ActiveFastRibbonDurationLabel: View {
+    let start: Date
+    let fallbackEnd: Date
+    let isLive: Bool
+    let now: () -> Date
+
+    @State private var displayedEnd: Date?
+
+    var body: some View {
+        let resolvedEnd = isLive ? displayedEnd ?? fallbackEnd : fallbackEnd
+
+        Text(
+            ActiveElapsedTimeFormatter.string(
+                from: resolvedEnd.timeIntervalSince(start)
+            )
+        )
+        .monospacedDigit()
+        .lineLimit(1)
+        .task(id: isLive) {
+            guard isLive else { return }
+
+            displayedEnd = now()
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: .seconds(1))
+                    displayedEnd = now()
+                }
+            } catch {
+                // Cancellation pauses live updates while the carousel is moving.
+            }
+        }
     }
 }

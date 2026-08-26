@@ -6,6 +6,7 @@ import UIKit
 
 struct SettingsView: View {
     @Environment(\.applicationCommands) private var applicationCommands
+    @Environment(\.locale) private var locale
     @Environment(\.appTextResolver) private var textResolver
     @Environment(\.liveActivityCoordinator) private var liveActivityCoordinator
     let snapshot: SettingsFeatureSnapshot
@@ -14,6 +15,7 @@ struct SettingsView: View {
     @State private var isFinalDeleteConfirmationPresented = false
     @State private var liveActivityAvailability: LiveActivityAvailability?
     @State private var favouriteEditor: HydrationFavouriteEditorPresentation?
+    @State private var foodFavouriteEditor: FoodFavouriteEditorPresentation?
 
     private var authoritativeSettings: AppSettingsSnapshot? {
         snapshot.settings.count == 1 ? snapshot.settings[0] : nil
@@ -53,6 +55,15 @@ struct SettingsView: View {
                             },
                             onEditFavourite: { favourite in
                                 favouriteEditor = HydrationFavouriteEditorPresentation(favourite: favourite)
+                            }
+                        )
+                        SettingsFoodFavouritesSection(
+                            favourites: snapshot.foodFavourites,
+                            onAddFavourite: {
+                                foodFavouriteEditor = FoodFavouriteEditorPresentation(favourite: nil)
+                            },
+                            onEditFavourite: { favourite in
+                                foodFavouriteEditor = FoodFavouriteEditorPresentation(favourite: favourite)
                             }
                         )
                         SettingsDeleteSection(error: controller.deleteError) {
@@ -131,6 +142,33 @@ struct SettingsView: View {
                     }
                 },
                 onCancel: { favouriteEditor = nil }
+            )
+        }
+        .sheet(item: $foodFavouriteEditor) { presentation in
+            FoodFavouriteEditor(
+                presentation: presentation,
+                locale: locale,
+                existingFavourites: snapshot.foodFavourites,
+                onSave: { description, nutrition in
+                    if let favourite = presentation.favourite {
+                        try controller.updateFoodFavourite(
+                            id: favourite.id,
+                            expectedRevision: favourite.revision,
+                            description: description,
+                            nutrition: nutrition
+                        )
+                    } else {
+                        try controller.createFoodFavourite(description: description, nutrition: nutrition)
+                    }
+                    foodFavouriteEditor = nil
+                },
+                onRemove: presentation.favourite.map { favourite in
+                    {
+                        try controller.deleteFoodFavourite(id: favourite.id, expectedRevision: favourite.revision)
+                        foodFavouriteEditor = nil
+                    }
+                },
+                onCancel: { foodFavouriteEditor = nil }
             )
         }
     }

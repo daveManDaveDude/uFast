@@ -159,6 +159,10 @@ final class CaloricFoodUITests: XCTestCase {
         }
         XCTAssertTrue(button.waitForExistence(timeout: 2))
         button.tap()
+        let custom = app.buttons["food.custom"]
+        if custom.waitForExistence(timeout: 2) {
+            custom.tap()
+        }
     }
 
     @MainActor

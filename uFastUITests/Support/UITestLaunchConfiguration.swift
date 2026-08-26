@@ -15,49 +15,89 @@ struct UITestLaunchConfiguration: Equatable {
         case preferredSizeCategoryMustNotBeEmpty
     }
 
-    let resetData: Bool
-    let pseudolocalization: Bool
-    let seedOnboarded: Bool
-    let fixedNow: Date?
-    let seedActiveFastStart: Date?
-    let seedSlice3History: Bool
-    let seedHistoryEventGrouping: Bool
-    let seedHistoryMidnightSeam: Bool
-    let seedHistoryMidnightSeamExtended: Bool
-    let seedUnknownProvenance: Bool
-    let seedInferredFast: Bool
-    let seedTodayMultiYear: Bool
-    let seedCaloricBoundaryMultiYear: Bool
-    let seedFavouritePopulated: Bool
-    let seedFavouriteDuplicateName: Bool
-    let seedFavouriteValidation: Bool
-    let seedCaloricFavouriteActiveFast: Bool
-    let seedMultipleActiveFasts: Bool
-    let seedLiveActivityRecovery: Bool
-    let liveActivityRelease: String?
-    let liveActivityBuild: String?
-    let suppressAutomaticLiveActivityOffer: Bool
-    let startsOnHistory: Bool
-    let historyMotionRetryFixture: Bool
-    let simulateFastSaveFailure: Bool
-    let simulateFastHistoryFailure: Bool
-    let simulateFoodSaveFailure: Bool
-    let simulateDrinkSaveFailure: Bool
-    let simulateFavouriteSaveFailure: Bool
-    let simulateGoalSaveFailure: Bool
-    let simulateLiveActivitySettingsSaveFailure: Bool
-    let simulateInferredFastDetectionSaveFailure: Bool
-    let simulateDeleteAllFailure: Bool
-    let simulateBoundaryReconciliationFailure: Bool
-    let simulatePersistenceBootstrapFailure: Bool
-    let simulateLiveActivityUnsupported: Bool
-    let simulateLiveActivityDisabled: Bool
-    let simulateLiveActivityRequestFailure: Bool
-    let simulateLiveActivityHideFailure: Bool
-    let appleLanguages: String?
-    let appleLocale: String?
-    let timeZone: String?
-    let preferredContentSizeCategory: String?
+    let core: CoreValues
+    let seeds: SeedValues
+    let flow: FlowValues
+    let failures: FailureValues
+    let environment: EnvironmentValues
+
+    private init(
+        core: CoreValues,
+        seeds: SeedValues,
+        flow: FlowValues,
+        failures: FailureValues,
+        environment: EnvironmentValues
+    ) {
+        self.core = core
+        self.seeds = seeds
+        self.flow = flow
+        self.failures = failures
+        self.environment = environment
+    }
+
+    static let completeForTesting = Self(
+        core: CoreValues(
+            resetData: true,
+            pseudolocalization: true,
+            seedOnboarded: true,
+            fixedNow: Date(timeIntervalSince1970: 1234.5),
+            seedActiveFastStart: Date(timeIntervalSince1970: 1200)
+        ),
+        seeds: SeedValues(
+            seedSlice3History: true,
+            seedHistoryEventGrouping: true,
+            seedHistoryMidnightSeam: true,
+            seedHistoryMidnightSeamExtended: true,
+            seedUnknownProvenance: true,
+            seedInferredFast: true,
+            seedTodayMultiYear: true,
+            seedCaloricBoundaryMultiYear: true,
+            seedFavouritePopulated: true,
+            seedFavouriteDuplicateName: true,
+            seedFavouriteValidation: true,
+            seedCaloricFavouriteActiveFast: true,
+            seedFoodFavouritePopulated: true,
+            seedFoodFavouriteDuplicateName: true,
+            seedFoodFavouriteValidation: true,
+            seedFoodFavouriteActiveFast: true,
+            seedMultipleActiveFasts: true,
+            seedLiveActivityRecovery: true
+        ),
+        flow: FlowValues(
+            suppressAutomaticLiveActivityOffer: true,
+            startsOnHistory: true,
+            historyMotionRetryFixture: true
+        ),
+        failures: FailureValues(
+            simulateFastSaveFailure: true,
+            simulateFastHistoryFailure: true,
+            simulateFoodSaveFailure: true,
+            simulateDrinkSaveFailure: true,
+            simulateFavouriteSaveFailure: true,
+            simulateGoalSaveFailure: true,
+            simulateLiveActivitySettingsSaveFailure: true,
+            simulateInferredFastDetectionSaveFailure: true,
+            simulateDeleteAllFailure: true,
+            simulateBoundaryReconciliationFailure: true,
+            simulatePersistenceBootstrapFailure: true,
+            simulateFoodFavouriteMigrationFailure: true,
+            simulateFoodFavouriteSaveFailure: true,
+            simulateFoodFavouriteStale: true,
+            simulateFoodFavStaleAfterConfirm: true,
+            simulateLiveActivityUnsupported: true,
+            simulateLiveActivityDisabled: false,
+            simulateLiveActivityRequestFailure: true,
+            simulateLiveActivityHideFailure: true
+        ),
+        environment: EnvironmentValues(
+            liveActivityRelease: "1.2.3",
+            liveActivityBuild: "B",
+            appleLanguages: "(ar)",
+            appleLocale: "ar_SA",
+            timeZone: "Europe/London",
+            preferredContentSizeCategory: nil
+        )
+    )
 
     init(
         resetData: Bool = false,
@@ -77,6 +117,10 @@ struct UITestLaunchConfiguration: Equatable {
         seedFavouriteDuplicateName: Bool = false,
         seedFavouriteValidation: Bool = false,
         seedCaloricFavouriteActiveFast: Bool = false,
+        seedFoodFavouritePopulated: Bool = false,
+        seedFoodFavouriteDuplicateName: Bool = false,
+        seedFoodFavouriteValidation: Bool = false,
+        seedFoodFavouriteActiveFast: Bool = false,
         seedMultipleActiveFasts: Bool = false,
         seedLiveActivityRecovery: Bool = false,
         liveActivityRelease: String? = nil,
@@ -95,6 +139,10 @@ struct UITestLaunchConfiguration: Equatable {
         simulateDeleteAllFailure: Bool = false,
         simulateBoundaryReconciliationFailure: Bool = false,
         simulatePersistenceBootstrapFailure: Bool = false,
+        simulateFoodFavouriteMigrationFailure: Bool = false,
+        simulateFoodFavouriteSaveFailure: Bool = false,
+        simulateFoodFavouriteStale: Bool = false,
+        simulateFoodFavStaleAfterConfirm: Bool = false,
         simulateLiveActivityUnsupported: Bool = false,
         simulateLiveActivityDisabled: Bool = false,
         simulateLiveActivityRequestFailure: Bool = false,
@@ -104,49 +152,49 @@ struct UITestLaunchConfiguration: Equatable {
         timeZone: String? = nil,
         preferredContentSizeCategory: String? = nil
     ) {
-        self.resetData = resetData
-        self.pseudolocalization = pseudolocalization
-        self.seedOnboarded = seedOnboarded
-        self.fixedNow = fixedNow
-        self.seedActiveFastStart = seedActiveFastStart
-        self.seedSlice3History = seedSlice3History
-        self.seedHistoryEventGrouping = seedHistoryEventGrouping
-        self.seedHistoryMidnightSeam = seedHistoryMidnightSeam
-        self.seedHistoryMidnightSeamExtended = seedHistoryMidnightSeamExtended
-        self.seedUnknownProvenance = seedUnknownProvenance
-        self.seedInferredFast = seedInferredFast
-        self.seedTodayMultiYear = seedTodayMultiYear
-        self.seedCaloricBoundaryMultiYear = seedCaloricBoundaryMultiYear
-        self.seedFavouritePopulated = seedFavouritePopulated
-        self.seedFavouriteDuplicateName = seedFavouriteDuplicateName
-        self.seedFavouriteValidation = seedFavouriteValidation
-        self.seedCaloricFavouriteActiveFast = seedCaloricFavouriteActiveFast
-        self.seedMultipleActiveFasts = seedMultipleActiveFasts
-        self.seedLiveActivityRecovery = seedLiveActivityRecovery
-        self.liveActivityRelease = liveActivityRelease
-        self.liveActivityBuild = liveActivityBuild
-        self.suppressAutomaticLiveActivityOffer = suppressAutomaticLiveActivityOffer
-        self.startsOnHistory = startsOnHistory
-        self.historyMotionRetryFixture = historyMotionRetryFixture
-        self.simulateFastSaveFailure = simulateFastSaveFailure
-        self.simulateFastHistoryFailure = simulateFastHistoryFailure
-        self.simulateFoodSaveFailure = simulateFoodSaveFailure
-        self.simulateDrinkSaveFailure = simulateDrinkSaveFailure
-        self.simulateFavouriteSaveFailure = simulateFavouriteSaveFailure
-        self.simulateGoalSaveFailure = simulateGoalSaveFailure
-        self.simulateLiveActivitySettingsSaveFailure = simulateLiveActivitySettingsSaveFailure
-        self.simulateInferredFastDetectionSaveFailure = simulateInferredFastDetectionSaveFailure
-        self.simulateDeleteAllFailure = simulateDeleteAllFailure
-        self.simulateBoundaryReconciliationFailure = simulateBoundaryReconciliationFailure
-        self.simulatePersistenceBootstrapFailure = simulatePersistenceBootstrapFailure
-        self.simulateLiveActivityUnsupported = simulateLiveActivityUnsupported
-        self.simulateLiveActivityDisabled = simulateLiveActivityDisabled
-        self.simulateLiveActivityRequestFailure = simulateLiveActivityRequestFailure
-        self.simulateLiveActivityHideFailure = simulateLiveActivityHideFailure
-        self.appleLanguages = appleLanguages
-        self.appleLocale = appleLocale
-        self.timeZone = timeZone
-        self.preferredContentSizeCategory = preferredContentSizeCategory
+        core = CoreValues(
+            resetData: resetData,
+            pseudolocalization: pseudolocalization,
+            seedOnboarded: seedOnboarded,
+            fixedNow: fixedNow,
+            seedActiveFastStart: seedActiveFastStart
+        )
+        seeds = SeedValues(
+            seedSlice3History, seedHistoryEventGrouping,
+            seedHistoryMidnightSeam, seedHistoryMidnightSeamExtended,
+            seedUnknownProvenance, seedInferredFast,
+            seedTodayMultiYear, seedCaloricBoundaryMultiYear,
+            seedFavouritePopulated, seedFavouriteDuplicateName,
+            seedFavouriteValidation, seedCaloricFavouriteActiveFast,
+            seedFoodFavouritePopulated, seedFoodFavouriteDuplicateName,
+            seedFoodFavouriteValidation, seedFoodFavouriteActiveFast,
+            seedMultipleActiveFasts, seedLiveActivityRecovery
+        )
+        flow = FlowValues(
+            suppressAutomaticLiveActivityOffer: suppressAutomaticLiveActivityOffer,
+            startsOnHistory: startsOnHistory,
+            historyMotionRetryFixture: historyMotionRetryFixture
+        )
+        failures = FailureValues(
+            simulateFastSaveFailure, simulateFastHistoryFailure,
+            simulateFoodSaveFailure, simulateDrinkSaveFailure,
+            simulateFavouriteSaveFailure, simulateGoalSaveFailure,
+            simulateLiveActivitySettingsSaveFailure, simulateInferredFastDetectionSaveFailure,
+            simulateDeleteAllFailure, simulateBoundaryReconciliationFailure,
+            simulatePersistenceBootstrapFailure, simulateFoodFavouriteMigrationFailure,
+            simulateFoodFavouriteSaveFailure, simulateFoodFavouriteStale,
+            simulateFoodFavStaleAfterConfirm, simulateLiveActivityUnsupported,
+            simulateLiveActivityDisabled, simulateLiveActivityRequestFailure,
+            simulateLiveActivityHideFailure
+        )
+        environment = EnvironmentValues(
+            liveActivityRelease: liveActivityRelease,
+            liveActivityBuild: liveActivityBuild,
+            appleLanguages: appleLanguages,
+            appleLocale: appleLocale,
+            timeZone: timeZone,
+            preferredContentSizeCategory: preferredContentSizeCategory
+        )
     }
 
     static let supportedFlags: Set<String> = [
@@ -158,6 +206,8 @@ struct UITestLaunchConfiguration: Equatable {
         "--seed-inferred-fast", "--seed-today-multi-year", "--seed-caloric-boundary-multi-year",
         "--seed-favourite-populated", "--seed-favourite-duplicate-name", "--seed-favourite-validation",
         "--seed-caloric-favourite-active-fast", "--seed-multiple-active-fasts",
+        "--seed-food-favourite-populated", "--seed-food-favourite-duplicate-name",
+        "--seed-food-favourite-validation", "--seed-food-favourite-active-fast",
         "--seed-live-activity-recovery", "--live-activity-release", "--live-activity-build",
         "--suppress-automatic-live-activity-offer", "--simulate-fast-save-failure",
         "--simulate-fast-history-failure", "--ui-testing-history-retry-fixture",
@@ -166,10 +216,14 @@ struct UITestLaunchConfiguration: Equatable {
         "--simulate-live-activity-settings-save-failure", "--simulate-inferred-fast-detection-save-failure",
         "--simulate-delete-all-failure", "--simulate-caloric-boundary-reconciliation-failure",
         "--simulate-persistence-bootstrap-failure", "--simulate-live-activity-unsupported",
+        "--simulate-food-favourite-migration-failure", "--simulate-food-favourite-save-failure",
+        "--simulate-food-favourite-stale", "--simulate-food-favourite-stale-after-confirmation",
         "--simulate-live-activity-disabled", "--simulate-live-activity-request-failure",
         "--simulate-live-activity-hide-failure",
     ]
+}
 
+extension UITestLaunchConfiguration {
     var validationError: ValidationError? {
         if let fixedNow, !fixedNow.timeIntervalSince1970.isFinite {
             return .fixedNowMustBeFinite
@@ -231,6 +285,10 @@ struct UITestLaunchConfiguration: Equatable {
         append("--seed-favourite-duplicate-name", when: seedFavouriteDuplicateName, to: &values)
         append("--seed-favourite-validation", when: seedFavouriteValidation, to: &values)
         append("--seed-caloric-favourite-active-fast", when: seedCaloricFavouriteActiveFast, to: &values)
+        append("--seed-food-favourite-populated", when: seedFoodFavouritePopulated, to: &values)
+        append("--seed-food-favourite-duplicate-name", when: seedFoodFavouriteDuplicateName, to: &values)
+        append("--seed-food-favourite-validation", when: seedFoodFavouriteValidation, to: &values)
+        append("--seed-food-favourite-active-fast", when: seedFoodFavouriteActiveFast, to: &values)
         append("--seed-multiple-active-fasts", when: seedMultipleActiveFasts, to: &values)
 
         append("--seed-live-activity-recovery", when: seedLiveActivityRecovery, to: &values)
@@ -263,6 +321,14 @@ struct UITestLaunchConfiguration: Equatable {
             to: &values
         )
         append("--simulate-persistence-bootstrap-failure", when: simulatePersistenceBootstrapFailure, to: &values)
+        append("--simulate-food-favourite-migration-failure", when: simulateFoodFavouriteMigrationFailure, to: &values)
+        append("--simulate-food-favourite-save-failure", when: simulateFoodFavouriteSaveFailure, to: &values)
+        append("--simulate-food-favourite-stale", when: simulateFoodFavouriteStale, to: &values)
+        append(
+            "--simulate-food-favourite-stale-after-confirmation",
+            when: simulateFoodFavStaleAfterConfirm,
+            to: &values
+        )
 
         append("--simulate-live-activity-unsupported", when: simulateLiveActivityUnsupported, to: &values)
         append("--simulate-live-activity-disabled", when: simulateLiveActivityDisabled, to: &values)

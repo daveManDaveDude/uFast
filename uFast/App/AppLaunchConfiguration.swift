@@ -15,6 +15,10 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedFavouriteDuplicateName = false
     var seedFavouriteValidation = false
     var seedCaloricFavouriteActiveFast = false
+    var seedFoodFavouritePopulated = false
+    var seedFoodFavouriteDuplicateName = false
+    var seedFoodFavouriteValidation = false
+    var seedFoodFavouriteActiveFast = false
     var seedInferredFast = false
     var seedTodayMultiYear = false
     var seedCaloricBoundaryMultiYear = false
@@ -40,6 +44,7 @@ struct AppLaunchConfiguration {
     let liveActivityAdapter: LiveActivityAdapterConfiguration
     let liveActivityBuildIdentity: LiveActivityBuildIdentity?
     let simulatePersistenceBootstrapFailure: Bool
+    let simulateFoodFavouriteMigrationFailure: Bool
     let suppressAutomaticLiveActivityOffer: Bool
     let startsOnHistory: Bool
     let historyMotionRetryFixture: Bool
@@ -60,6 +65,7 @@ struct AppLaunchConfiguration {
             liveActivityAdapter = .activityKit
             liveActivityBuildIdentity = LiveActivityBuildIdentity.production()
             simulatePersistenceBootstrapFailure = false
+            simulateFoodFavouriteMigrationFailure = false
             suppressAutomaticLiveActivityOffer = false
             startsOnHistory = false
             historyMotionRetryFixture = false
@@ -85,6 +91,10 @@ struct AppLaunchConfiguration {
             seedFavouriteDuplicateName: arguments.contains("--seed-favourite-duplicate-name"),
             seedFavouriteValidation: arguments.contains("--seed-favourite-validation"),
             seedCaloricFavouriteActiveFast: arguments.contains("--seed-caloric-favourite-active-fast"),
+            seedFoodFavouritePopulated: arguments.contains("--seed-food-favourite-populated"),
+            seedFoodFavouriteDuplicateName: arguments.contains("--seed-food-favourite-duplicate-name"),
+            seedFoodFavouriteValidation: arguments.contains("--seed-food-favourite-validation"),
+            seedFoodFavouriteActiveFast: arguments.contains("--seed-food-favourite-active-fast"),
             seedInferredFast: arguments.contains("--seed-inferred-fast"),
             seedTodayMultiYear: arguments.contains("--seed-today-multi-year"),
             seedCaloricBoundaryMultiYear: arguments.contains(
@@ -96,6 +106,9 @@ struct AppLaunchConfiguration {
         liveActivityBuildIdentity = Self.liveActivityBuildIdentity(from: arguments)
         simulatePersistenceBootstrapFailure = arguments.contains(
             "--simulate-persistence-bootstrap-failure"
+        )
+        simulateFoodFavouriteMigrationFailure = arguments.contains(
+            "--simulate-food-favourite-migration-failure"
         )
         suppressAutomaticLiveActivityOffer = arguments.contains(
             "--suppress-automatic-live-activity-offer"
@@ -111,6 +124,15 @@ struct AppLaunchConfiguration {
             simulateFoodSaveFailure: arguments.contains("--simulate-food-save-failure"),
             simulateDrinkSaveFailure: arguments.contains("--simulate-drink-save-failure"),
             simulateFavouriteSaveFailure: arguments.contains("--simulate-favourite-save-failure"),
+            simulateFoodFavouriteSaveFailure: arguments.contains(
+                "--simulate-food-favourite-save-failure"
+            ),
+            simulateFoodFavouriteStale: arguments.contains(
+                "--simulate-food-favourite-stale"
+            ),
+            simulateFoodFavStaleAfterConfirm: arguments.contains(
+                "--simulate-food-favourite-stale-after-confirmation"
+            ),
             simulateGoalSaveFailure: arguments.contains("--simulate-goal-save-failure"),
             simulateLiveActivitySettingsSaveFailure: arguments.contains(
                 "--simulate-live-activity-settings-save-failure"

@@ -1,6 +1,9 @@
 import Foundation
 import SwiftData
 
+// SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
+// swiftlint:disable trailing_comma
+
 extension HistoryPresentationModel {
     var historyDisplayMaximumDay: Date {
         calendar.date(
@@ -56,6 +59,19 @@ extension HistoryPresentationModel {
     }
 
     @discardableResult
+    func reloadFoodFavourites() -> Bool {
+        do {
+            let snapshots = try fetchFoodFavouriteSnapshots()
+            if snapshots != foodFavouriteSnapshots {
+                foodFavouriteSnapshots = snapshots
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    @discardableResult
     // swiftlint:disable:next function_body_length
     func refreshHistoryAfterCommittedMutation(in window: DateInterval? = nil) -> Bool {
         guard let requestedWindow = window ?? TemporalHistoryPresentation.calendarDayWindow(
@@ -96,11 +112,20 @@ extension HistoryPresentationModel {
         } catch {
             return false
         }
+        let foodFavouriteSnapshots: [FoodFavouriteSnapshot]
+        do {
+            foodFavouriteSnapshots = try fetchFoodFavouriteSnapshots()
+        } catch {
+            return false
+        }
         presentationCache.invalidate()
         historyData = data
         historyPresentation = presentation
         if favouriteSnapshots != hydrationFavouriteSnapshots {
             hydrationFavouriteSnapshots = favouriteSnapshots
+        }
+        if foodFavouriteSnapshots != self.foodFavouriteSnapshots {
+            self.foodFavouriteSnapshots = foodFavouriteSnapshots
         }
         historyDataRevision += 1
         motionGeneration = projectionState.generation
@@ -118,6 +143,18 @@ extension HistoryPresentationModel {
             _ = ensureMotionRunway(around: selectedDate, force: true)
         }
         return true
+    }
+
+    private func fetchFoodFavouriteSnapshots() throws -> [FoodFavouriteSnapshot] {
+        try modelContext.fetch(
+            FetchDescriptor<FoodFavouriteRecord>(
+                sortBy: [
+                    SortDescriptor(\FoodFavouriteRecord.creationOrder),
+                    SortDescriptor(\FoodFavouriteRecord.createdAt),
+                    SortDescriptor(\FoodFavouriteRecord.id),
+                ]
+            )
+        ).map(\.snapshot)
     }
 
     @discardableResult

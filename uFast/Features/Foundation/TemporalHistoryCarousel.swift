@@ -26,7 +26,8 @@ struct TemporalHistoryCarousel: View {
     var presentationDay: Date?
     var readOnlyFromDate: Date?
     let onMovementPhaseChange: (TemporalCarouselMovementPhase) -> Void
-    let onCoupledPresentationChange: (TemporalCoupledPresentationUpdate) -> Void
+    var onCoupledPresentationChange: (TemporalCoupledPresentationUpdate) -> Void = { _ in }
+    var activeFastNow: () -> Date = { .now }
     var onSettledVisibleWindow: (TemporalRibbonWindow) -> Void = { _ in }
     /// Coarse edge intent only.  The callback is gated below so geometry
     /// frames never perform persistence work or rebuild the page arrays.
@@ -59,10 +60,7 @@ struct TemporalHistoryCarousel: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 0) {
                     ForEach(dates, id: \.self) { date in
-                        // Preserve deterministic page stacking at midnight;
-                        // interval labels remain clipped to their host page.
                         daySegment(date)
-                            .zIndex(-date.timeIntervalSinceReferenceDate)
                             .containerRelativeFrame(
                                 .horizontal,
                                 count: 26,
@@ -107,23 +105,19 @@ struct TemporalHistoryCarousel: View {
                     let direction = layoutDirection == .rightToLeft
                         ? TemporalHorizontalLayoutDirection.rightToLeft
                         : .leftToRight
-                    if movementPhase != .settled,
-                       let preview = geometry.centerProgress(
-                           days: dates,
-                           layoutDirection: direction
-                       )
-                    {
-                        emitPrefetchIntent(for: preview)
-                        onCoupledPresentationChange(.preview(preview))
-                    } else if movementPhase == .settled,
-                              geometrySnapshot.hasActiveMotion
-                    {
-                        if let preview = geometry.centerProgress(
-                            days: dates,
-                            layoutDirection: direction
-                        ) {
-                            emitPrefetchIntent(for: preview)
+                    let progress = geometry.centerProgress(
+                        days: dates,
+                        layoutDirection: direction
+                    )
+                    if let progress {
+                        emitPrefetchIntent(for: progress)
+                        if movementPhase != .settled {
+                            onCoupledPresentationChange(.preview(progress))
                         }
+                    }
+                    if movementPhase == .settled,
+                       geometrySnapshot.hasActiveMotion
+                    {
                         settleVisibleGeometry(geometry)
                     }
                 }
@@ -222,8 +216,6 @@ struct TemporalHistoryCarousel: View {
                 break
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("history.selected-date")
     }
 }
 
@@ -337,6 +329,8 @@ extension TemporalHistoryCarousel {
             usesContinuousSurface: true,
             includesSemanticItems: false,
             hidesVisualEventAccessibility: true,
+            showsLiveActiveDuration: isSelected && movementPhase == .settled,
+            activeFastNow: activeFastNow,
             windowOverride: TemporalHistoryPresentation.calendarDayWindow(
                 containing: date,
                 calendar: calendar
@@ -351,7 +345,7 @@ extension TemporalHistoryCarousel {
                 )
             }
         }
-        .accessibilityHidden(!isSelected)
+        .accessibilityHidden(!isSelected || movementPhase != .settled)
         .scrollTransition(.identity, axis: .horizontal) { content, _ in
             content
         }
@@ -444,9 +438,7 @@ extension TemporalHistoryCarousel {
             onCoupledPresentationChange(.end)
             return
         }
-        onCoupledPresentationChange(
-            .reconcile(day: settledDay, dates: dates)
-        )
+        onCoupledPresentationChange(.reconcile(day: settledDay, dates: dates))
         selection = settledDay
     }
 
@@ -462,25 +454,21 @@ extension TemporalHistoryCarousel {
         centeredDay = canonicalSelection
     }
 
-    /// Emits at most one intent per edge for the current date generation.  It
-    /// intentionally uses only the already-published progress and calendar
-    /// arithmetic; no query, projection, sorting, or array rebuild occurs on a
-    /// geometry callback.
     func emitPrefetchIntent(for progress: TemporalDaySpaceProgress) {
-        guard let first = dates.first, let last = dates.last else { return }
+        guard !dates.isEmpty, prefetchedEdges.count < 2 else { return }
         let threshold = HistoryMotionConfiguration.product.prefetchThreshold
-        let leadingDistance = calendar.dateComponents(
-            [.day], from: first, to: progress.leadingDay
-        ).day ?? Int.max
-        let trailingDistance = calendar.dateComponents(
-            [.day], from: progress.trailingDay, to: last
-        ).day ?? Int.max
-        if leadingDistance <= threshold, !prefetchedEdges.contains(.preceding) {
+        let precedingBoundary = dates[min(threshold, dates.count - 1)]
+        let followingBoundary = dates[max(dates.count - 1 - threshold, 0)]
+        if !prefetchedEdges.contains(.preceding),
+           progress.leadingDay <= precedingBoundary
+        {
             prefetchedEdges.insert(.preceding)
             onPrefetchIntent(.preceding)
             onPrefetchIntentAt(.preceding, progress.centeredCalendarDay)
         }
-        if trailingDistance <= threshold, !prefetchedEdges.contains(.following) {
+        if !prefetchedEdges.contains(.following),
+           progress.trailingDay >= followingBoundary
+        {
             prefetchedEdges.insert(.following)
             onPrefetchIntent(.following)
             onPrefetchIntentAt(.following, progress.centeredCalendarDay)

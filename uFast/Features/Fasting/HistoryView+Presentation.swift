@@ -15,7 +15,7 @@ extension HistoryView {
             readOnlyAfterDate: clock.now,
             showsReadOnlyAppearance: showsFutureReadOnlyAppearance,
             automaticScrollEnabled: !temporalMovementPhase.suppressesAutomaticAlignment && !isDateRailMoving,
-            coupledPresentation: nil,
+            coupledPresentation: coupledScrollPresentation,
             presentationDay: selectedDate,
             onDirectScrollPhaseChange: updateDateRailMovement,
             onRailSettled: { day in selectDay(day, source: .dateRailSettlement) }
@@ -317,6 +317,8 @@ extension HistoryView {
         if source != .carousel {
             if temporalMovementPhase != .settled || isDateRailMoving {
                 interruptTemporalMotion()
+            } else {
+                coupledScrollPresentation.handle(.end)
             }
         }
         var coordinator = TemporalDaySelectionCoordinator(
@@ -370,7 +372,10 @@ extension HistoryView {
     func interruptTemporalMotion() {
         guard temporalMovementPhase != .settled
             || isDateRailMoving
+            || coupledScrollPresentation.preview != nil
+            || coupledScrollPresentation.isReconciling
         else { return }
+        coupledScrollPresentation.handle(.end)
         temporalMovementPhase = .settled
         isDateRailMoving = false
         historyInteractionRevision += 1
@@ -379,6 +384,9 @@ extension HistoryView {
 
     func updateDateRailMovement(_ isMoving: Bool) {
         isDateRailMoving = isMoving
+        if isMoving {
+            coupledScrollPresentation.handle(.end)
+        }
     }
 
     func ensureHistoryDayCoverage(around date: Date) {
@@ -567,11 +575,8 @@ extension HistoryView {
             presentationDay: selectedDate,
             readOnlyFromDate: clock.now,
             onMovementPhaseChange: updateTemporalMovementPhase,
-            // The date rail intentionally remains on the settled day
-            // during lower-carousel motion, so there is no coupled
-            // preview consumer. Avoid publishing unused geometry frames
-            // into History view state.
-            onCoupledPresentationChange: { _ in },
+            onCoupledPresentationChange: coupledScrollPresentation.handle,
+            activeFastNow: { clock.now },
             onSettledVisibleWindow: { window in
                 settledVisibleWindow = window
                 _ = model.reloadHistory(in: window.interval)

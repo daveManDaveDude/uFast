@@ -30,6 +30,7 @@ final class FixtureTests: XCTestCase {
             clock: clock
         )
         try assertOnlyDefaultWaterFavourite(in: container.mainContext)
+        XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<FoodFavouriteRecord>()).isEmpty)
 
         try UITestDataReset.runIfRequested(
             in: container,
@@ -38,6 +39,7 @@ final class FixtureTests: XCTestCase {
             clock: clock
         )
         try assertOnlyDefaultWaterFavourite(in: container.mainContext)
+        XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<FoodFavouriteRecord>()).isEmpty)
     }
 
     private func assertOnlyDefaultWaterFavourite(in context: ModelContext) throws {

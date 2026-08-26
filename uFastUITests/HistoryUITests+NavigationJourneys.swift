@@ -96,6 +96,10 @@ extension HistoryUITests {
         let addFood = app.buttons["history.add.food"]
         XCTAssertTrue(addFood.waitForExistence(timeout: 5), app.debugDescription)
         addFood.tap()
+        let customFood = app.buttons["food.custom"]
+        if customFood.waitForExistence(timeout: 5) {
+            customFood.tap()
+        }
         let description = app.textFields["food.description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5), app.debugDescription)
         description.tap()

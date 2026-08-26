@@ -563,6 +563,53 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         }
     }
 
+    func testActiveFastLabelUsesFullSizeFallbackForReportedLateStartGeometry() throws {
+        let calendar = try londonCalendar()
+        let start = try date(2026, 8, 25, 21, 3, calendar: calendar)
+        let end = try date(2026, 8, 26, 6, 27, calendar: calendar)
+        let input = TemporalIntervalInput(id: UUID(), start: start, end: end)
+        let ownerWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: start, calendar: calendar)
+        )
+        let continuationWindow = try XCTUnwrap(
+            TemporalHistoryPresentation.calendarDayWindow(containing: end, calendar: calendar)
+        )
+        let owner = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [input],
+                in: ownerWindow,
+                surfaceWidth: 360
+            ).first
+        )
+        let continuation = try XCTUnwrap(
+            TemporalHistoryPresentation.pageGeometry(
+                [input],
+                in: continuationWindow,
+                surfaceWidth: 360
+            ).first
+        )
+        let activeMinimumWidth = TemporalRibbonGeometry.regularContentMinimumWidth
+
+        XCTAssertEqual(
+            owner.segment.visualContentLayout(
+                in: ownerWindow,
+                visibleWidth: owner.visualWidth,
+                minimumWidth: activeMinimumWidth
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            continuation.segment.visualContentFallbackLayout(
+                in: continuationWindow,
+                visibleWidth: continuation.visualWidth,
+                surfaceWidth: 360,
+                calendar: calendar,
+                minimumWidth: activeMinimumWidth
+            ),
+            .regular
+        )
+    }
+
     func testLateNightFallbackRemainsAbsentWhenContinuationIsAlsoTooNarrow() throws {
         let calendar = try londonCalendar()
         let start = try date(2026, 8, 10, 23, 12, calendar: calendar)
@@ -1112,8 +1159,7 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             allowsEmptySelection: false,
             showsTimelineDetails: false,
             readOnlyFromDate: now,
-            onMovementPhaseChange: { _ in },
-            onCoupledPresentationChange: { _ in }
+            onMovementPhaseChange: { _ in }
         )
         carousel.movementPhase = .decelerating
 

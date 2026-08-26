@@ -81,6 +81,16 @@ enum AppText: Equatable {
     case drinkAddAnother
     case drinkAddError
 
+    case foodFavouritePickerTitle
+    case foodFavouritePickerHeading
+    case foodFavouriteAddAnother
+    case foodFavouriteDetail(hasNutrition: Bool)
+    case foodFavouriteAccessibilityValue(hasNutrition: Bool)
+    case foodFavouriteAddedAnnouncement(name: String)
+    case foodFavouriteAddError
+    case foodFavouriteCommitState(FoodFavouriteCommitState)
+    case foodFavouriteRetry
+
     case todayFoodAdd
     case todayDrinkAdd
     case todayDrinkRetry
@@ -155,6 +165,21 @@ enum AppText: Equatable {
     case settingsLiveActivitySaveError
     case settingsAmountPlaceholder
     case settingsAmountAccessibilityLabel(label: String)
+    case settingsFoodFavouritesHeading
+    case settingsFoodFavouritesDescription
+    case settingsFoodFavouriteDetail(hasNutrition: Bool)
+    case settingsFoodFavouriteAccessibilityValue(hasNutrition: Bool)
+    case settingsAddFoodFavourite
+    case settingsFoodFavouritePlaceholder
+    case settingsFoodFavouriteTitle(isEditing: Bool)
+    case settingsFoodFavouriteSave
+    case settingsFoodFavouriteRemove
+    case settingsFoodFavouriteRemoveConfirmation(name: String)
+    case settingsFoodFavouriteRemoveAction
+    case settingsFoodFavouriteValidation(FoodFavouriteValidationError)
+    case settingsFoodFavouriteSaveError
+    case settingsFoodFavouriteRemoveError
+    case settingsFoodFavouriteStale
 
     case privacyTitle
     case privacySection(PrivacySection)
@@ -661,6 +686,29 @@ enum AppText: Equatable {
             return resource("drink.picker.add-another", "Add another drink", "Open custom drink editor")
         case .drinkAddError:
             return resource("drink.error.add", "Your drink couldn’t be added. Please try again.", "Favourite drink save failure")
+        case .foodFavouritePickerTitle:
+            return resource("food.favourite.picker.title", "Add food", "Favourite food picker title")
+        case .foodFavouritePickerHeading:
+            return resource("food.favourite.picker.heading", "Favourite foods", "Favourite food picker heading")
+        case .foodFavouriteAddAnother:
+            return resource("food.favourite.picker.add-another", "Add another food", "Open custom food editor")
+        case let .foodFavouriteDetail(hasNutrition):
+            return resource(hasNutrition ? "food.favourite.detail.with-nutrition" : "food.favourite.detail.no-nutrition", hasNutrition ? "Nutrition details saved" : "No nutrition details", "Favourite food detail")
+        case let .foodFavouriteAccessibilityValue(hasNutrition):
+            return resource(hasNutrition ? "food.favourite.accessibility-value.with-nutrition" : "food.favourite.accessibility-value.no-nutrition", hasNutrition ? "Nutrition details saved" : "No nutrition details", "Favourite food VoiceOver value")
+        case let .foodFavouriteAddedAnnouncement(name):
+            return resource("food.favourite.added.announcement", "\(name) added.", "Favourite food VoiceOver announcement")
+        case .foodFavouriteAddError:
+            return resource("food.favourite.error.add", "Your favourite food couldn’t be added. Please try again.", "Favourite food add failure")
+        case let .foodFavouriteCommitState(state):
+            switch state {
+            case .saving: return resource("food.favourite.commit-state.saving", "Saving favourite food…", "Favourite food commit status")
+            case .success: return resource("food.favourite.commit-state.success", "Favourite food added.", "Favourite food commit status")
+            case .failure: return resource("food.favourite.commit-state.failure", "Favourite food could not be added.", "Favourite food commit status")
+            case .stale: return resource("food.favourite.commit-state.stale", "This favourite food is no longer available. Refresh and try again.", "Favourite food stale status")
+            }
+        case .foodFavouriteRetry:
+            return resource("food.favourite.retry", "Try again", "Favourite food retry action")
         case .todayFoodAdd:
             return resource("today.food.add", "Log food", "Today food entry action")
         case .todayDrinkAdd:
@@ -821,6 +869,50 @@ enum AppText: Equatable {
             return resource("settings.amount.placeholder", "Amount", "Settings amount input placeholder")
         case let .settingsAmountAccessibilityLabel(label):
             return resource("settings.amount.accessibility-label", "\(label) amount", "Settings amount input VoiceOver label")
+        case .settingsFoodFavouritesHeading:
+            return resource("settings.food-favourites.heading", "Food favourites", "Settings food favourites heading")
+        case .settingsFoodFavouritesDescription:
+            return resource("settings.food-favourites.description", "Save reusable food details for quick logging. Templates stay separate from your food history.", "Settings food favourites explanation")
+        case let .settingsFoodFavouriteDetail(hasNutrition):
+            return resource(hasNutrition ? "settings.food-favourites.detail.with-nutrition" : "settings.food-favourites.detail.no-nutrition", hasNutrition ? "Nutrition details saved" : "No nutrition details", "Settings food favourite detail")
+        case let .settingsFoodFavouriteAccessibilityValue(hasNutrition):
+            return resource(hasNutrition ? "settings.food-favourites.accessibility-value.with-nutrition" : "settings.food-favourites.accessibility-value.no-nutrition", hasNutrition ? "Nutrition details saved" : "No nutrition details", "Settings food favourite value")
+        case .settingsAddFoodFavourite:
+            return resource("settings.food-favourites.add", "Add food favourite", "Add food favourite action")
+        case .settingsFoodFavouritePlaceholder:
+            return resource("settings.food-favourites.description.placeholder", "What food do you want to reuse?", "Food favourite description placeholder")
+        case let .settingsFoodFavouriteTitle(isEditing):
+            return resource(isEditing ? "settings.food-favourites.title.edit" : "settings.food-favourites.title.add", isEditing ? "Edit food favourite" : "Add food favourite", "Food favourite editor title")
+        case .settingsFoodFavouriteSave:
+            return resource("settings.food-favourites.save", "Save", "Food favourite save action")
+        case .settingsFoodFavouriteRemove:
+            return resource("settings.food-favourites.remove", "Remove food favourite", "Food favourite removal action")
+        case let .settingsFoodFavouriteRemoveConfirmation(name):
+            return resource("settings.food-favourites.remove.confirmation", "Remove “\(name)” from food favourites?", "Food favourite removal confirmation")
+        case .settingsFoodFavouriteRemoveAction:
+            return resource("settings.food-favourites.remove.confirm", "Remove", "Food favourite removal confirmation action")
+        case let .settingsFoodFavouriteValidation(error):
+            switch error {
+            case .blankDescription: return resource("settings.food-favourites.validation.description", "Enter a food description.", "Food favourite description validation")
+            case .descriptionTooLong: return resource("settings.food-favourites.validation.description-too-long", "Keep the description to 200 characters or fewer.", "Food favourite description length validation")
+            case .duplicateDescription: return resource("settings.food-favourites.validation.duplicate", "Choose a description that isn’t already in your food favourites.", "Food favourite duplicate validation")
+            case let .invalidNutrition(field):
+                switch field {
+                case .energyKilocalories: return resource("settings.food-favourites.validation.nutrition.energy-kilocalories", "Enter a value from 0 to 1,000,000.", "Food favourite energy validation")
+                case .proteinGrams: return resource("settings.food-favourites.validation.nutrition.protein-grams", "Enter a value from 0 to 1,000,000.", "Food favourite protein validation")
+                case .carbohydrateGrams: return resource("settings.food-favourites.validation.nutrition.carbohydrate-grams", "Enter a value from 0 to 1,000,000.", "Food favourite carbohydrate validation")
+                case .fatGrams: return resource("settings.food-favourites.validation.nutrition.fat-grams", "Enter a value from 0 to 1,000,000.", "Food favourite fat validation")
+                case .fibreGrams: return resource("settings.food-favourites.validation.nutrition.fibre-grams", "Enter a value from 0 to 1,000,000.", "Food favourite fibre validation")
+                case .sugarGrams: return resource("settings.food-favourites.validation.nutrition.sugar-grams", "Enter a value from 0 to 1,000,000.", "Food favourite sugar validation")
+                case .saltGrams: return resource("settings.food-favourites.validation.nutrition.salt-grams", "Enter a value from 0 to 1,000,000.", "Food favourite salt validation")
+                }
+            }
+        case .settingsFoodFavouriteSaveError:
+            return resource("settings.food-favourites.error.save", "Your food favourite couldn’t be saved. Please try again.", "Food favourite save failure")
+        case .settingsFoodFavouriteRemoveError:
+            return resource("settings.food-favourites.error.remove", "Your food favourite couldn’t be removed. Please try again.", "Food favourite removal failure")
+        case .settingsFoodFavouriteStale:
+            return resource("settings.food-favourites.error.stale", "This food favourite changed or was removed. Close and reopen it, then try again.", "Food favourite stale error")
         case .privacyTitle:
             return resource("privacy.title", "Privacy and safety", "Privacy and safety screen title")
         case let .privacySection(section):
@@ -1170,6 +1262,12 @@ enum AppText: Equatable {
         .drinkPickerAccessibilityValue(volumeMillilitres: 300, isCaloric: true),
         .drinkPickerClassification(isCaloric: false),
         .drinkPickerClassification(isCaloric: true), .drinkAddAnother, .drinkAddError,
+        .foodFavouritePickerTitle, .foodFavouritePickerHeading, .foodFavouriteAddAnother,
+        .foodFavouriteDetail(hasNutrition: false), .foodFavouriteDetail(hasNutrition: true),
+        .foodFavouriteAccessibilityValue(hasNutrition: false), .foodFavouriteAccessibilityValue(hasNutrition: true),
+        .foodFavouriteAddedAnnouncement(name: "Food"), .foodFavouriteAddError,
+        .foodFavouriteCommitState(.saving), .foodFavouriteCommitState(.success),
+        .foodFavouriteCommitState(.failure), .foodFavouriteCommitState(.stale), .foodFavouriteRetry,
         .todayFoodAdd, .todayDrinkAdd, .todayDrinkRetry, .todayFluids, .todayFluidTotal(0),
         .todayTimelineEmpty, .todayTimelineHeading, .todayTimelineLoadError,
         .todayTimelineAccessibilityValue(detail: "Caloric", time: "10:30"), .todayTimelineEditHint,
@@ -1197,6 +1295,17 @@ enum AppText: Equatable {
         .settingsConflictError, .settingsInferredSaveError, .settingsGoalSaveError,
         .settingsFavouritesSaveError, .settingsDeleteError, .settingsLiveActivitySaveError,
         .settingsAmountPlaceholder, .settingsAmountAccessibilityLabel(label: "Water"),
+        .settingsFoodFavouritesHeading, .settingsFoodFavouritesDescription,
+        .settingsFoodFavouriteDetail(hasNutrition: false), .settingsFoodFavouriteDetail(hasNutrition: true),
+        .settingsFoodFavouriteAccessibilityValue(hasNutrition: false), .settingsFoodFavouriteAccessibilityValue(hasNutrition: true),
+        .settingsAddFoodFavourite, .settingsFoodFavouritePlaceholder,
+        .settingsFoodFavouriteTitle(isEditing: false), .settingsFoodFavouriteTitle(isEditing: true),
+        .settingsFoodFavouriteSave, .settingsFoodFavouriteRemove,
+        .settingsFoodFavouriteRemoveConfirmation(name: "Food"), .settingsFoodFavouriteRemoveAction,
+        .settingsFoodFavouriteValidation(.blankDescription), .settingsFoodFavouriteValidation(.descriptionTooLong),
+        .settingsFoodFavouriteValidation(.duplicateDescription),
+        .settingsFoodFavouriteValidation(.invalidNutrition(.energyKilocalories)),
+        .settingsFoodFavouriteSaveError, .settingsFoodFavouriteRemoveError, .settingsFoodFavouriteStale,
         .privacyTitle, .privacySection(.stored), .privacySection(.location), .privacySection(.collection),
         .privacySection(.liveActivities), .privacySection(.deletion), .privacySection(.safety),
         .privacyBody(.stored), .privacyBody(.location), .privacyBody(.collection),
@@ -1746,6 +1855,7 @@ private extension AppText {
             [name, String(volumeMillilitres)]
         case let .drinkPickerDetail(volumeMillilitres, _): [String(volumeMillilitres)]
         case let .drinkPickerAccessibilityValue(volumeMillilitres, _): [String(volumeMillilitres)]
+        case let .foodFavouriteAddedAnnouncement(name): [name]
         case let .todayFluidTotal(volumeMillilitres): [String(volumeMillilitres)]
         case let .todayTimelineAccessibilityValue(detail, time): [detail, time]
         case let .goalSelectionSummary(hours): [String(hours)]
@@ -1755,6 +1865,7 @@ private extension AppText {
         case let .settingsGoalSelected(hours): [String(hours)]
         case let .settingsFavouriteDetail(volumeMillilitres, _): [String(volumeMillilitres)]
         case let .settingsFavouriteAccessibilityValue(volumeMillilitres, _): [String(volumeMillilitres)]
+        case let .settingsFoodFavouriteRemoveConfirmation(name): [name]
         case let .settingsAmountAccessibilityLabel(label): [label]
         case let .favouriteRemoveConfirmation(name): [name]
         case let .inactiveGoalEyebrow(hours): [String(hours)]

@@ -31,6 +31,7 @@ struct FoodEntryEditor: View {
         clock: any AppClock,
         activeFastStart: Date?,
         initialOccurredAt: Date? = nil,
+        initialDraft: FoodEntryDraft? = nil,
         allowedRange: Range<Date>? = nil,
         onSave: @escaping (FoodEntryDraft, Bool) throws -> Void,
         onDelete: ((Bool) throws -> Void)?,
@@ -43,9 +44,11 @@ struct FoodEntryEditor: View {
         self.onSave = onSave
         self.onDelete = onDelete
         self.onCancel = onCancel
-        _descriptionText = State(initialValue: record?.foodDescription ?? "")
-        _occurredAt = State(initialValue: record?.occurredAt ?? initialOccurredAt ?? clock.now)
-        let input = FoodNutritionTextInput(nutrition: record?.nutrition ?? FoodNutrition())
+        _descriptionText = State(initialValue: record?.foodDescription ?? initialDraft?.description ?? "")
+        _occurredAt = State(
+            initialValue: record?.occurredAt ?? initialDraft?.occurredAt ?? initialOccurredAt ?? clock.now
+        )
+        let input = FoodNutritionTextInput(nutrition: record?.nutrition ?? initialDraft?.nutrition ?? FoodNutrition())
         _nutritionInput = State(initialValue: input)
         _showsDetails = State(initialValue: input.hasValues)
     }
@@ -462,13 +465,10 @@ private struct FoodNutritionTextInput {
         guard !trimmed.isEmpty else {
             return .some(nil)
         }
-        let formatter = NumberFormatter()
-        formatter.locale = locale
-        formatter.numberStyle = .decimal
-        guard let number = formatter.number(from: trimmed) else {
+        guard let number = FoodNutritionValueParser.value(trimmed, locale: locale) else {
             return nil
         }
-        return .some(number.doubleValue)
+        return .some(number)
     }
 
     private static func text(_ value: Double?) -> String {

@@ -7,6 +7,9 @@ struct ApplicationCommandConfiguration: Equatable {
     var simulateFoodSaveFailure = false
     var simulateDrinkSaveFailure = false
     var simulateFavouriteSaveFailure = false
+    var simulateFoodFavouriteSaveFailure = false
+    var simulateFoodFavouriteStale = false
+    var simulateFoodFavStaleAfterConfirm = false
     var simulateGoalSaveFailure = false
     var simulateLiveActivitySettingsSaveFailure = false
     var simulateInferredFastDetectionSaveFailure = false
@@ -35,6 +38,8 @@ final class ApplicationCommands {
     let observationSink: BoundaryQueryObservationSink
     let diagnosticSink: any DiagnosticEventSink
     private let caloricEventCommands: CaloricEventCommands
+    var hasSimulatedFoodFavouriteStale = false
+    var hasSimulatedFoodFavStaleAfterConfirm = false
 
     var historyPresentationInvalidation: HistoryPresentationInvalidation {
         projectionCoordinator.historyPresentationInvalidation
@@ -180,11 +185,28 @@ final class ApplicationCommands {
         goal: FastingGoal,
         endingActiveFast: Bool
     ) throws {
+        try saveFood(
+            draft,
+            replacing: recordID,
+            goal: goal,
+            endingActiveFast: endingActiveFast,
+            operationID: nil
+        )
+    }
+
+    func saveFood(
+        _ draft: FoodEntryDraft,
+        replacing recordID: UUID?,
+        goal: FastingGoal,
+        endingActiveFast: Bool,
+        operationID: UUID?
+    ) throws {
         try caloricEventCommands.saveFood(
             draft,
             replacing: recordID,
             goal: goal,
-            endingActiveFast: endingActiveFast
+            endingActiveFast: endingActiveFast,
+            operationID: operationID
         )
     }
 
@@ -374,7 +396,7 @@ extension ApplicationCommands {
     }
 }
 
-private extension ApplicationCommands {
+extension ApplicationCommands {
     func favouriteStore() -> SwiftDataHydrationFavouriteStore {
         SwiftDataHydrationFavouriteStore(
             modelContext: modelContext,

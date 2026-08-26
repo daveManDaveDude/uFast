@@ -128,6 +128,8 @@ extension HistoryUITests {
             identifier: stableIdentifier
         )
         XCTAssertEqual(preDrinkFrames.count, 2, app.debugDescription)
+        XCTAssertTrue(carousel.staticTexts["Active Fast"].exists, app.debugDescription)
+        XCTAssertTrue(carousel.staticTexts["11:40:00"].exists, app.debugDescription)
         let preDrinkMarkerIDs = historyMarkerIdentifiers(in: app)
         let preDrinkStructuredLabel = structuredFast.label
         captureScreenshot(named: "history-edited-active-fast-current-day", in: app)

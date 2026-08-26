@@ -96,6 +96,10 @@ final class FoodEntryUITests: XCTestCase {
         }
         XCTAssertTrue(addButton.waitForExistence(timeout: 2))
         addButton.tap()
+        let picker = app.buttons["food.custom"]
+        if picker.waitForExistence(timeout: 2) {
+            picker.tap()
+        }
     }
 
     @MainActor

@@ -35,6 +35,7 @@ extension HistoryView {
             ensureHistoryDayCoverage(around: selectedDate)
             resetToCurrentDayIfSelected()
             _ = model.reloadHydrationFavourites()
+            _ = model.reloadFoodFavourites()
             _ = model.reloadHistory()
         }
         .onChange(of: isTabSelected) { _, isSelected in
@@ -221,6 +222,11 @@ extension HistoryView {
             resolveFavouriteDraft: { favourite, occurredAt in
                 guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
                 return try applicationCommands.hydrationDraft(for: favourite, occurredAt: occurredAt)
+            },
+            foodFavourites: model.foodFavouriteSnapshots,
+            resolveFoodFavouriteDraft: { favourite, occurredAt in
+                guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
+                return try applicationCommands.foodDraft(for: favourite, occurredAt: occurredAt)
             },
             onSaveFood: { draft, endingActiveFast in
                 guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }

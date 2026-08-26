@@ -107,7 +107,8 @@ final class SwiftDataTodayDataProvider {
                 activeFasts: snapshot.activeFasts,
                 foodEntries: [],
                 hydrationEntries: [],
-                hydrationFavourites: snapshot.hydrationFavourites
+                hydrationFavourites: snapshot.hydrationFavourites,
+                foodFavourites: snapshot.foodFavourites
             )
             failure = .snapshotUnavailable
         }
@@ -143,13 +144,21 @@ final class SwiftDataTodayDataProvider {
                 SortDescriptor(\HydrationFavouriteRecord.id),
             ]
         )).map(\.snapshot)
+        let foodFavourites = try modelContext.fetch(FetchDescriptor<FoodFavouriteRecord>(
+            sortBy: [
+                SortDescriptor(\FoodFavouriteRecord.creationOrder),
+                SortDescriptor(\FoodFavouriteRecord.createdAt),
+                SortDescriptor(\FoodFavouriteRecord.id),
+            ]
+        )).map(\.snapshot)
 
         return TodayFeatureSnapshot(
             settings: settings,
             activeFasts: activeFasts,
             foodEntries: foods,
             hydrationEntries: drinks,
-            hydrationFavourites: favourites
+            hydrationFavourites: favourites,
+            foodFavourites: foodFavourites
         )
     }
 

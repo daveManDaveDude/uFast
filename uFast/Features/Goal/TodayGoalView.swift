@@ -18,6 +18,11 @@ struct TodayGoalView: View {
     @State var controller = TodayFeatureController()
     @State var endTimeEditor: EndTimeEditorPresentation?
     @State var foodEditor: FoodEditorPresentation?
+    @State var isFoodSheetPresented = false
+    @State var foodFavouritePending: FoodFavouriteSnapshot?
+    @State var foodFavouritePendingOperation: FoodFavouriteQuickAddOperation?
+    @State var foodFavouriteConfirmationContext = CaloricEventConfirmationContext(fallbackKind: .active)
+    @State var isFoodFavouriteConfirmationPresented = false
     @State var isDrinkSheetPresented = false
     @State var caloricFavouritePending: HydrationFavourite?
     @State var caloricFavouriteConfirmationContext = CaloricEventConfirmationContext(
@@ -27,6 +32,8 @@ struct TodayGoalView: View {
     @State var hydrationEditor: HydrationEditorPresentation?
     @State var drinkAnnouncement: String?
     @State var caloricFavouriteSaveError: String?
+    @State var foodFavouriteSaveError: String?
+    @State var foodFavouriteCommitState: FoodFavouriteCommitState?
     @State var isEndConfirmationPresented = false
     @State var isAutomaticLiveActivityOfferPresented = false
     @State var isLiveActivityDisclosurePresented = false
@@ -64,7 +71,9 @@ struct TodayGoalView: View {
         self.clock = clock
         self.previewTimelineFailure = previewTimelineFailure
     }
+}
 
+extension TodayGoalView {
     var body: some View {
         ScreenLayout(title: textResolver(.todayTitle), identifier: "today") {
             Group {
@@ -127,6 +136,12 @@ struct TodayGoalView: View {
             if oldID != newID {
                 caloricFavouritePending = nil
                 caloricFavouriteSaveError = nil
+                foodFavouritePending = nil
+                foodFavouritePendingOperation = nil
+                if foodFavouriteCommitState == .saving {
+                    foodFavouriteSaveError = nil
+                    foodFavouriteCommitState = nil
+                }
             }
         }
         .onAppear {
@@ -145,9 +160,9 @@ struct TodayGoalView: View {
             }
         }
         .onChange(of: drinkAnnouncement) { _, announcement in
-            if let announcement {
-                UIAccessibility.post(notification: .announcement, argument: announcement)
-            }
+            guard let announcement else { return }
+            UIAccessibility.post(notification: .announcement, argument: announcement)
+            drinkAnnouncement = nil
         }
         .alert(textResolver(.endFastConfirmationTitle), isPresented: $isEndConfirmationPresented) {
             Button(textResolver(.cancel), role: .cancel) {}
@@ -243,6 +258,60 @@ struct TodayGoalView: View {
                 onCancel: { isDrinkSheetPresented = false }
             )
         }
+        .sheet(isPresented: $isFoodSheetPresented) {
+            FoodFavouritePicker(
+                clock: clock,
+                favourites: snapshot.foodFavourites,
+                onAdd: { favourite, operation in
+                    try addFoodFavourite(operation)
+                    foodFavouriteSaveError = nil
+                    foodFavouriteCommitState = .success
+                    drinkAnnouncement = textResolver(.foodFavouriteAddedAnnouncement(name: favourite.description))
+                    isFoodSheetPresented = false
+                },
+                onConfirmationRequired: { favourite, operation, context in
+                    foodFavouriteSaveError = nil
+                    foodFavouriteCommitState = .saving
+                    foodFavouritePending = favourite
+                    foodFavouritePendingOperation = operation
+                    foodFavouriteConfirmationContext = context
+                    isFoodSheetPresented = false
+                    isFoodFavouriteConfirmationPresented = true
+                },
+                onChooseAnother: {
+                    isFoodSheetPresented = false
+                    foodEditor = FoodEditorPresentation(record: nil)
+                },
+                onCancel: { isFoodSheetPresented = false }
+            )
+        }
+        .sheet(
+            isPresented: $isFoodFavouriteConfirmationPresented,
+            onDismiss: {
+                if foodFavouriteCommitState != .failure, foodFavouriteCommitState != .stale {
+                    foodFavouritePending = nil
+                    foodFavouritePendingOperation = nil
+                }
+            },
+            content: {
+                FoodFavouriteActiveFastConfirmation(
+                    title: foodFavouriteConfirmationTitle,
+                    consequence: foodFavouriteConfirmationMessage,
+                    primaryActionTitle: foodFavouriteConfirmationActionTitle,
+                    cancelTitle: textResolver(.cancel),
+                    onCancel: {
+                        foodFavouritePending = nil
+                        foodFavouritePendingOperation = nil
+                        foodFavouriteSaveError = nil
+                        foodFavouriteCommitState = nil
+                        isFoodFavouriteConfirmationPresented = false
+                    },
+                    onConfirm: {
+                        savePendingFoodFavourite(endingActiveFast: true)
+                    }
+                )
+            }
+        )
         .alert(
             caloricFavouriteConfirmationTitle,
             isPresented: $isCaloricFavouriteConfirmationPresented
@@ -303,6 +372,43 @@ struct TodayGoalView: View {
                 .accessibilityIdentifier("fast.live-activity.disclosure.show")
         } message: {
             Text(textResolver(.liveActivityDisclosureMessage))
+        }
+    }
+}
+
+private struct FoodFavouriteActiveFastConfirmation: View {
+    let title: String
+    let consequence: String
+    let primaryActionTitle: String
+    let cancelTitle: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
+                    Text(title)
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(UFastTheme.primary)
+                    Text(consequence)
+                        .foregroundStyle(UFastTheme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("food.favourite.confirmation.consequence")
+                    Button(primaryActionTitle, action: onConfirm)
+                        .buttonStyle(UFastPrimaryButtonStyle())
+                        .accessibilityIdentifier("food.favourite.confirmation.primary")
+                    Button(cancelTitle, action: onCancel)
+                        .buttonStyle(UFastSecondaryButtonStyle())
+                        .accessibilityIdentifier("food.favourite.confirmation.cancel")
+                }
+                .padding(UFastTheme.Spacing.standard)
+            }
+            .accessibilityIdentifier("food.favourite.confirmation")
+            .background(UFastTheme.canvas)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled()
         }
     }
 }
@@ -463,6 +569,10 @@ extension TodayGoalView {
 
     private func addFavouriteDrink(_ favourite: HydrationFavourite) throws {
         try controller.addFavouriteDrink(favourite)
+    }
+
+    private func addFoodFavourite(_ operation: FoodFavouriteQuickAddOperation) throws {
+        try controller.addFoodFavourite(operation, endingActiveFast: false)
     }
 
     private func saveHydration(_ draft: HydrationEntryDraft, record: HydrationEntrySnapshot?, endingActiveFast: Bool) throws {

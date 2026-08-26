@@ -18,6 +18,7 @@ extension HistoryUITests {
     }
 
     @MainActor
+    // swiftlint:disable:next function_body_length
     func settledSeamState(
         in app: XCUIApplication,
         expectedSelectedDate: String,
