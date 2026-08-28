@@ -27,6 +27,10 @@ final class LocalizationTests: XCTestCase {
         let resolve = AppTextResolver()
 
         XCTAssertEqual(
+            resolve(.settingsFavouritesDescription),
+            "Save reusable drink details for quick logging. Templates stay separate from drink food history."
+        )
+        XCTAssertEqual(
             resolve(.foodValidation(.emptyDescription)),
             "Enter what you ate."
         )

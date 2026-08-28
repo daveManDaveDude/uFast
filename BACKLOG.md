@@ -31,6 +31,13 @@ matches the widget's short version to the app, makes History motion use the
 injected reference instant, and ends derived Live Activity state when
 active-fast authority is ambiguous. It is **Ready**.
 
+The inferred-suppression integrity follow-up from the 28 August 2026 code
+review is maintained in
+`docs/CODE_REVIEW_INFERRED_SUPPRESSION_INTEGRITY_SPRINT.md`. ISI-101 freezes
+historical inferred-setting schemas and preserves migration intent; ISI-102
+uses one indexed suppression projection and prevents clock-only launch writes.
+Both are **Ready**.
+
 The sprint-ready App Store packaging follow-up from the 14 August 2026 code
 review is maintained in `docs/CODE_REVIEW_APP_STORE_PACKAGING_STORY.md`.
 CR-202 adds the truthful required-reason declaration for app-private

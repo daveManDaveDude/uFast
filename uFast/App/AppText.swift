@@ -822,7 +822,7 @@ enum AppText: Equatable {
         case .settingsFavouritesHeading:
             return resource("settings.favourites.heading", "Drink favourites", "Settings drink favourites heading")
         case .settingsFavouritesDescription:
-            return resource("settings.favourites.description", "Save reusable drink details for quick logging. Templates stay separate from your drink history.", "Settings drink favourites explanation")
+            return resource("settings.favourites.description", "Save reusable drink details for quick logging. Templates stay separate from drink food history.", "Settings drink favourites explanation")
         case let .settingsFavouriteField(field):
             switch field {
             case .water: return resource("settings.favourites.field.water", "Water", "Water favourite field")

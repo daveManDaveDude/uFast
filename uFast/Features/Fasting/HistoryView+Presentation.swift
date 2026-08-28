@@ -222,6 +222,35 @@ extension HistoryView {
     // swiftlint:disable:next function_body_length
     func fastHistoryDetails(at now: Date) -> some View {
         let visibleFastItems = visibleFastItems(at: now)
+        if !visibleFastItems.isEmpty {
+            UFastSectionHeading(
+                textResolver(.historyCopy(.fastsInView)),
+                eyebrow: textResolver(.historyCopy(.detailsEyebrow))
+            )
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+        }
+        if let inferredRecoveryError {
+            Section {
+                Label(
+                    textResolver(
+                        .historyCopy(
+                            inferredRecoveryError == .unavailable
+                                ? .inferredReenableUnavailable
+                                : .inferredReenableError
+                        )
+                    ),
+                    systemImage: "exclamationmark.circle"
+                )
+                .foregroundStyle(UFastTheme.error)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(
+                    inferredRecoveryError == .unavailable
+                        ? "history.inferred.reenable-unavailable"
+                        : "history.inferred.reenable-error"
+                )
+            }
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+        }
         if visibleFastItems.isEmpty {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
@@ -253,33 +282,6 @@ extension HistoryView {
                 .accessibilityIdentifier("history.empty")
             }
         } else {
-            UFastSectionHeading(
-                textResolver(.historyCopy(.fastsInView)),
-                eyebrow: textResolver(.historyCopy(.detailsEyebrow))
-            )
-            .padding(.horizontal, UFastTheme.Spacing.standard)
-            if let inferredRecoveryError {
-                Section {
-                    Label(
-                        textResolver(
-                            .historyCopy(
-                                inferredRecoveryError == .unavailable
-                                    ? .inferredReenableUnavailable
-                                    : .inferredReenableError
-                            )
-                        ),
-                        systemImage: "exclamationmark.circle"
-                    )
-                    .foregroundStyle(UFastTheme.error)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier(
-                        inferredRecoveryError == .unavailable
-                            ? "history.inferred.reenable-unavailable"
-                            : "history.inferred.reenable-error"
-                    )
-                }
-                .padding(.horizontal, UFastTheme.Spacing.standard)
-            }
             LazyVStack(spacing: 12) {
                 ForEach(visibleFastItems, id: \.historyIdentity) { item in
                     if item.kind == .hiddenInferred {
