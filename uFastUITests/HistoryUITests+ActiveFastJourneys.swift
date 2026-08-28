@@ -112,7 +112,12 @@ extension HistoryUITests {
             of: "history.active-fast.",
             with: "history.fast."
         )
-        let structuredFast = app.buttons[structuredFastIdentifier]
+        // The detail card and the lower "Fasts in this view" list expose the
+        // same semantic identifier. Scope this lookup to the detail panel so
+        // the test does not rely on XCTest's ambiguous global query ordering.
+        let structuredFast = app.otherElements["history.event-info-panel"].buttons[
+            structuredFastIdentifier
+        ]
         XCTAssertTrue(structuredFast.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(
             structuredFast.label.contains("start 15 Aug at 21:00"),
@@ -212,7 +217,9 @@ extension HistoryUITests {
             carousel: postDrinkCarousel,
             expectedSelectedDate: sundaySelectedDate
         ), app.debugDescription)
-        let postDrinkStructuredFast = app.buttons[structuredFastIdentifier]
+        let postDrinkStructuredFast = app.otherElements["history.event-info-panel"].buttons[
+            structuredFastIdentifier
+        ]
         XCTAssertTrue(postDrinkStructuredFast.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(postDrinkStructuredFast.label, preDrinkStructuredLabel)
         let postDrinkFrames = visibleActiveFastFrames(

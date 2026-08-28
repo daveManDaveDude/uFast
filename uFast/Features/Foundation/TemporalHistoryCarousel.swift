@@ -315,7 +315,16 @@ extension TemporalHistoryCarousel {
             if allowsAddAtCenter {
                 Button {
                     guard let settledVisibleWindow else { return }
-                    onSelectEmpty(settledVisibleWindow.centerInstant)
+                    // The centred instant is noon for a day window. On the
+                    // current day that can still be in the future (for
+                    // example, when the clock is before noon), so clamp the
+                    // action to the read-only boundary instead of silently
+                    // dropping the tap.
+                    let centeredInstant = settledVisibleWindow.centerInstant
+                    let selectableInstant = readOnlyFromDate.map {
+                        min(centeredInstant, $0)
+                    } ?? centeredInstant
+                    onSelectEmpty(selectableInstant)
                 } label: {
                     Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus")
                 }

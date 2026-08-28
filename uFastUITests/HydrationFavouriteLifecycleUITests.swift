@@ -125,6 +125,17 @@ final class HydrationFavouriteLifecycleUITests: HydrationFavouriteUITestCase {
         relaunched.terminate()
         let historyApp = launch(resetData: false)
         tapTab("History", in: historyApp)
+        let historyCarousel = historyApp.scrollViews["history.day-carousel"]
+        XCTAssertTrue(historyCarousel.waitForExistence(timeout: 5), historyApp.debugDescription)
+        let settled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "Settled"),
+            object: historyCarousel
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [settled], timeout: 5),
+            .completed,
+            historyApp.debugDescription
+        )
         tapWhenReady(
             historyApp.buttons["history.add-at-selected-time"],
             in: historyApp.scrollViews["history.content"],

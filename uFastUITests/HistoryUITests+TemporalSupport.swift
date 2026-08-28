@@ -186,7 +186,10 @@ extension HistoryUITests {
                 "Active fast"
             )
         )
-        return Self.visibleElements(in: candidates, boundedBy: carousel)
+        return Self.visibleElementsWithMidpoint(
+            in: candidates,
+            boundedBy: carousel
+        )
     }
 
     @MainActor
@@ -204,14 +207,39 @@ extension HistoryUITests {
         )
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in
-                Self.visibleElement(in: candidates, boundedBy: carousel) != nil
+                Self.visibleElementWithMidpoint(in: candidates, boundedBy: carousel) != nil
             },
             object: app
         )
         guard XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed else {
             return nil
         }
-        return Self.visibleElement(in: candidates, boundedBy: carousel)
+        return Self.visibleElementWithMidpoint(in: candidates, boundedBy: carousel)
+    }
+
+    @MainActor
+    static func visibleElementWithMidpoint(
+        in query: XCUIElementQuery,
+        boundedBy container: XCUIElement
+    ) -> XCUIElement? {
+        visibleElementsWithMidpoint(in: query, boundedBy: container).first
+    }
+
+    @MainActor
+    static func visibleElementsWithMidpoint(
+        in query: XCUIElementQuery,
+        boundedBy container: XCUIElement
+    ) -> [XCUIElement] {
+        let bounds = container.frame
+        return (0 ..< query.count)
+            .map { query.element(boundBy: $0) }
+            .filter {
+                $0.exists
+                    && isVisibleFrame($0.frame, boundedBy: bounds)
+                    && bounds.contains(
+                        CGPoint(x: $0.frame.midX, y: $0.frame.midY)
+                    )
+            }
     }
 
     @MainActor
