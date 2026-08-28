@@ -13,6 +13,7 @@ struct SeedValues: Equatable {
     let seedHistoryEventGrouping: Bool
     let seedHistoryMidnightSeam: Bool
     let seedHistoryMidnightSeamExtended: Bool
+    let seedHistoryFastLabelLayout: Bool
     let seedUnknownProvenance: Bool
     let seedInferredFast: Bool
     let seedTodayMultiYear: Bool
@@ -85,13 +86,15 @@ extension SeedValues {
         _ seedFoodFavouriteValidation: Bool,
         _ seedFoodFavouriteActiveFast: Bool,
         _ seedMultipleActiveFasts: Bool,
-        _ seedLiveActivityRecovery: Bool
+        _ seedLiveActivityRecovery: Bool,
+        _ seedHistoryFastLabelLayout: Bool = false
     ) {
         self.init(
             seedSlice3History: seedSlice3History,
             seedHistoryEventGrouping: seedHistoryEventGrouping,
             seedHistoryMidnightSeam: seedHistoryMidnightSeam,
             seedHistoryMidnightSeamExtended: seedHistoryMidnightSeamExtended,
+            seedHistoryFastLabelLayout: seedHistoryFastLabelLayout,
             seedUnknownProvenance: seedUnknownProvenance,
             seedInferredFast: seedInferredFast,
             seedTodayMultiYear: seedTodayMultiYear,
@@ -191,6 +194,10 @@ extension UITestLaunchConfiguration {
 
     var seedHistoryMidnightSeamExtended: Bool {
         seeds.seedHistoryMidnightSeamExtended
+    }
+
+    var seedHistoryFastLabelLayout: Bool {
+        seeds.seedHistoryFastLabelLayout
     }
 
     var seedUnknownProvenance: Bool {

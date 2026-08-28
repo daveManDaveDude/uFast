@@ -24,6 +24,31 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
         )
     }
 
+    /// Shared vertical geometry for page-local bars and continuous labels.
+    /// Keeping the minimum hit/visual height here prevents the label layer and
+    /// clipped fragments from drifting apart when the policy lane is below
+    /// the platform's 44-point interaction minimum.
+    var intervalMarkHeight: Double {
+        max(44, intervalLaneHeight)
+    }
+
+    var intervalLaneTop: Double {
+        54
+    }
+
+    var intervalLaneSpacing: Double {
+        6
+    }
+
+    var intervalLaneStride: Double {
+        intervalLaneHeight + intervalLaneSpacing
+    }
+
+    /// Labels retain the bar step while keeping their own minimum lane height.
+    var intervalLabelLaneSpacing: Double {
+        intervalLaneStride - intervalMarkHeight
+    }
+
     static func intervalCornerRadius(
         visibleWidth: Double,
         preferredRadius: Double,
@@ -34,34 +59,9 @@ struct TemporalRibbonGeometry: Equatable, Sendable {
         let availableWidth = capCount > 1 ? visibleWidth / 2 : visibleWidth
         return min(max(availableWidth, 0), preferredRadius)
     }
-
-    static func intervalContentLayout(for visibleWidth: Double) -> TemporalIntervalContentLayout {
-        guard visibleWidth.isFinite, visibleWidth >= compactContentMinimumWidth else {
-            return .none
-        }
-        return visibleWidth >= regularContentMinimumWidth ? .regular : .compact
-    }
-
-    static let compactContentMinimumWidth = 36.0
-    static let regularContentMinimumWidth = 84.0
-}
-
-enum TemporalIntervalContentLayout: Equatable, Sendable {
-    case none
-    case compact
-    case regular
 }
 
 extension TemporalIntervalSegment {
-    /// The page containing the original start is the only visual content
-    /// owner for this interval. Page ownership is half-open so an interval
-    /// starting exactly at local midnight belongs to the day being entered.
-    func ownsVisualContent(in window: TemporalRibbonWindow) -> Bool {
-        let pageInterval = window.selectedDayInterval
-        return pageInterval.start <= originalStart
-            && originalStart < pageInterval.end
-    }
-
     func pageGeometry(
         in window: TemporalRibbonWindow,
         surfaceWidth: Double
@@ -340,17 +340,7 @@ enum TemporalHistoryPresentation {
         // Assign lanes from the original half-open intervals, not their page
         // fragments. A record therefore keeps its lane when a neighbouring
         // page clips another interval away at the seam.
-        var laneEnds: [Date] = []
-        var laneByID: [UUID: Int] = [:]
-        for input in validInputs {
-            let lane = laneEnds.firstIndex { $0 <= input.start } ?? laneEnds.count
-            if lane == laneEnds.count {
-                laneEnds.append(input.end)
-            } else {
-                laneEnds[lane] = input.end
-            }
-            laneByID[input.id] = lane
-        }
+        let laneByID = laneAssignments(for: validInputs)
 
         return validInputs.compactMap { input -> TemporalIntervalSegment? in
             guard input.end > window.interval.start,

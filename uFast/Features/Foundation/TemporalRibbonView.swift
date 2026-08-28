@@ -28,9 +28,6 @@ struct TemporalRibbonView: View {
     var showsVisualRibbon = true
     var includesSemanticItems = true
     var hidesVisualEventAccessibility = false
-    var showsVisualContentAccessibility = true
-    var showsLiveActiveDuration = false
-    var activeFastNow: () -> Date = { .now }
     var windowOverride: TemporalRibbonWindow?
     var emptySemanticMessage: String?
     var futureReadOnlyFrom: Date?
@@ -265,61 +262,16 @@ extension TemporalRibbonView {
             if let item = intervals.first(where: { $0.id == geometry.id }) {
                 let segment = geometry.segment
                 let markWidth = geometry.visualWidth
-                let contentLayout = segment.visualContentLayout(
-                    in: window,
-                    visibleWidth: markWidth,
-                    minimumWidth: item.visualContentMinimumWidth
-                )
-                let resolvedContentLayout = contentLayout == .none
-                    ? segment.visualContentFallbackLayout(
-                        in: window,
-                        visibleWidth: markWidth,
-                        surfaceWidth: policy.contentWidth,
-                        calendar: calendar,
-                        minimumWidth: item.visualContentMinimumWidth
-                    )
-                    : contentLayout
-                let showsContent = resolvedContentLayout != .none
-                let usesAvailableContinuationWidth = item.compactTitle != nil
-                    && segment.continuesAfter
                 Button {
                     onSelectInterval?(item.id)
                 } label: {
                     Color.clear
-                        .frame(width: markWidth, height: max(44, policy.intervalLaneHeight))
+                        .frame(width: markWidth, height: policy.intervalMarkHeight)
                         .background(intervalColour(item.kind))
                         .clipShape(intervalMarkShape(for: segment, visibleWidth: markWidth))
                         .overlay {
                             intervalOutlineShape(for: segment, visibleWidth: markWidth)
                                 .stroke(intervalStroke(item.kind), style: strokeStyle(item.kind))
-                        }
-                        .overlay(alignment: .leading) {
-                            if showsContent {
-                                Group {
-                                    if usesAvailableContinuationWidth {
-                                        intervalVisualContent(
-                                            item,
-                                            layout: .regular,
-                                            markWidth: markWidth
-                                        )
-                                        .fixedSize(horizontal: true, vertical: false)
-                                    } else {
-                                        intervalVisualContent(
-                                            item,
-                                            layout: resolvedContentLayout,
-                                            markWidth: markWidth
-                                        )
-                                        .frame(
-                                            width: max(markWidth - 4, 0),
-                                            alignment: .leading
-                                        )
-                                        .clipped()
-                                    }
-                                }
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(intervalForeground(item.kind))
-                                .padding(.horizontal, 2)
-                            }
                         }
                         .padding(.leading, geometry.leadingHitPadding)
                         .padding(.trailing, geometry.trailingHitPadding)
@@ -333,80 +285,10 @@ extension TemporalRibbonView {
                 )
                 .offset(
                     x: geometry.visualStartX - geometry.leadingHitPadding,
-                    y: 54 + Double(geometry.lane) * (policy.intervalLaneHeight + 6)
+                    y: policy.intervalLaneTop
+                        + Double(geometry.lane) * policy.intervalLaneStride
                 )
             }
-        }
-    }
-
-    func intervalVisualContent(
-        _ item: TemporalRibbonIntervalItem,
-        layout: TemporalIntervalContentLayout,
-        markWidth: Double
-    ) -> some View {
-        HStack(spacing: layout == .compact ? 2 : 4) {
-            Image(systemName: intervalSymbol(item.kind))
-                .accessibilityHidden(true)
-            if item.kind == .active {
-                VStack(alignment: .leading, spacing: 0) {
-                    identifiedVisualContent(
-                        Text(item.title).lineLimit(1),
-                        for: item
-                    )
-                    ActiveFastRibbonDurationLabel(
-                        start: item.start,
-                        fallbackEnd: item.end,
-                        isLive: showsLiveActiveDuration,
-                        now: activeFastNow
-                    )
-                }
-            } else if layout == .compact {
-                let compactTitle = compactIntervalTitle(item)
-                identifiedVisualContent(
-                    Text(compactTitle)
-                        .lineLimit(1)
-                        .minimumScaleFactor(item.compactTitle == nil ? 0.7 : 0.9)
-                        .allowsTightening(true),
-                    for: item
-                )
-            } else {
-                identifiedVisualContent(
-                    Text(intervalTitle(item, markWidth: markWidth)).lineLimit(1),
-                    for: item
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    func identifiedVisualContent(
-        _ content: some View,
-        for item: TemporalRibbonIntervalItem
-    ) -> some View {
-        if showsVisualContentAccessibility {
-            content.accessibilityIdentifier(intervalVisualContentIdentifier(for: item))
-        } else {
-            content
-        }
-    }
-
-    func intervalVisualContentIdentifier(for item: TemporalRibbonIntervalItem) -> String {
-        let prefix = item.kind == .active
-            ? "history.active-fast-content"
-            : "history.interval-content"
-        return "\(prefix).\(item.id.uuidString)"
-    }
-
-    func compactIntervalTitle(_ item: TemporalRibbonIntervalItem) -> String {
-        switch item.kind {
-        case .recorded, .automatic:
-            textResolver(.historyCopy(.fast))
-        case .inferred:
-            item.compactTitle ?? item.title
-        case .active:
-            textResolver(.historyCopy(.activeFast))
-        case .previouslySaved, .reconstructed, .needsReview, .unknown:
-            item.title
         }
     }
 
@@ -446,39 +328,5 @@ extension TemporalRibbonView {
                 hasTrailingCap: !segment.continuesAfter
             )
         )
-    }
-}
-
-private struct ActiveFastRibbonDurationLabel: View {
-    let start: Date
-    let fallbackEnd: Date
-    let isLive: Bool
-    let now: () -> Date
-
-    @State private var displayedEnd: Date?
-
-    var body: some View {
-        let resolvedEnd = isLive ? displayedEnd ?? fallbackEnd : fallbackEnd
-
-        Text(
-            ActiveElapsedTimeFormatter.string(
-                from: resolvedEnd.timeIntervalSince(start)
-            )
-        )
-        .monospacedDigit()
-        .lineLimit(1)
-        .task(id: isLive) {
-            guard isLive else { return }
-
-            displayedEnd = now()
-            do {
-                while !Task.isCancelled {
-                    try await Task.sleep(for: .seconds(1))
-                    displayedEnd = now()
-                }
-            } catch {
-                // Cancellation pauses live updates while the carousel is moving.
-            }
-        }
     }
 }

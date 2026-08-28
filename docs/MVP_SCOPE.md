@@ -13,9 +13,10 @@ historical scope contract for 1.0; post-MVP priorities are in `docs/ROADMAP.md`.
 - Food events are caloric; hydration events have an explicit
   caloric/non-caloric state.
 - Backdated food and hydration entry from History.
-- Opt-in inferred fasting history anchored to caloric food or explicitly
-  caloric hydration events after eight absolute hours, capped by the current
-  goal duration plus 12 absolute hours, with explicit save/start actions.
+- User-controlled inferred fasting history, enabled by default, anchored to
+  caloric food or explicitly caloric hydration events after eight absolute
+  hours, capped by the current goal duration plus 12 absolute hours, with
+  explicit save/start actions.
 - Fast history and supporting details scoped to the settled calendar view.
 - Local-only, offline manual use with app-created records stored in SwiftData on
   this iPhone.
@@ -46,8 +47,8 @@ post-MVP direction in `docs/ROADMAP.md`.
 1.5. Fasting experience: establish the visual system and make the complete
    fasting loop calm, glanceable and recognisably uFast before expanding it.
 2. Today: manual food and hydration timeline.
-3. History: backdate events and derive opt-in inferred fasting intervals from
-   caloric food or explicitly caloric hydration events.
+3. History: backdate events and derive user-controlled inferred fasting
+   intervals from caloric food or explicitly caloric hydration events.
 4. Deferred health and glanceability work: HealthKit, Live Activities,
    notifications and related permissions require a later product decision.
    The post-MVP Live Activity decision is now recorded in D-029 and D-030 and

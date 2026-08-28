@@ -207,7 +207,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertNil(PersistenceContainer.configuration(inMemory: true).cloudKitContainerIdentifier)
     }
 
-    func testV2SettingsStoreMigratesWithInferredDetectionOff() throws {
+    func testV2SettingsStoreMigratesWithInferredDetectionOn() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "uFast-v2-settings-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -233,7 +233,7 @@ final class PersistenceContainerTests: XCTestCase {
             migrated.mainContext.fetch(FetchDescriptor<AppSettingsRecord>()).first
         )
         XCTAssertTrue(settings.hasCompletedOnboarding)
-        XCTAssertFalse(settings.inferredFastDetectionEnabled)
+        XCTAssertTrue(settings.inferredFastDetectionEnabled)
     }
 
     func testV3StoreMigratesReconstructedReviewEvidenceFields() throws {
@@ -273,7 +273,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(storedSettings.count, 1)
         XCTAssertEqual(storedSettings.first?.fastingGoalHours, 16)
         XCTAssertEqual(storedSettings.first?.hasCompletedOnboarding, true)
-        XCTAssertEqual(storedSettings.first?.inferredFastDetectionEnabled, false)
+        XCTAssertEqual(storedSettings.first?.inferredFastDetectionEnabled, true)
     }
 
     func testChangedGoalPersistsWhenSettingsAreFetchedAgain() throws {

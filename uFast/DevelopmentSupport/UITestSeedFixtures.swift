@@ -302,6 +302,57 @@ enum UITestSeedFixtures {
 }
 
 extension UITestSeedFixtures {
+    static func seedHistoryFastLabelLayout(
+        in context: ModelContext,
+        clock: any AppClock
+    ) throws {
+        if try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty {
+            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_GB")
+        guard let london = TimeZone(identifier: "Europe/London") else { return }
+        calendar.timeZone = london
+        guard let recordedStart = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 25, hour: 20, minute: 42)
+        ), let recordedEnd = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 26, hour: 17, minute: 55)
+        ), let activeStart = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 26, hour: 20, minute: 26)
+        ), let foodAtEnd = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 26, hour: 17, minute: 55)
+        ), let drinkAt = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 26, hour: 19, minute: 54)
+        ), let recordedID = UUID(uuidString: "10400000-0000-0000-0000-000000000001"),
+        let activeID = UUID(uuidString: "10400000-0000-0000-0000-000000000002"),
+        let foodID = UUID(uuidString: "10400000-0000-0000-0000-000000000010"),
+        let drinkID = UUID(uuidString: "10400000-0000-0000-0000-000000000011")
+        else { return }
+
+        context.insert(FastRecord(
+            id: recordedID,
+            startDate: recordedStart,
+            endDate: recordedEnd,
+            goalAtStart: .default
+        ))
+        context.insert(FastRecord(id: activeID, startDate: activeStart, goalAtStart: .default))
+        context.insert(FoodEntryRecord(
+            id: foodID,
+            draft: .init(description: "Label fixture food", occurredAt: foodAtEnd),
+            createdAt: foodAtEnd
+        ))
+        context.insert(HydrationEntryRecord(
+            id: drinkID,
+            type: .custom,
+            customName: "Label fixture drink",
+            volumeMillilitres: 250,
+            occurredAt: drinkAt,
+            isCaloric: true,
+            createdAt: drinkAt
+        ))
+        _ = clock
+    }
+
     static func seedFoodFavouritePopulated(in context: ModelContext, clock: any AppClock) {
         guard let id = UUID(uuidString: "10300000-0000-0000-0000-000000000001") else { return }
         context.insert(FoodFavouriteRecord(

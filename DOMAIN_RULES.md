@@ -167,10 +167,10 @@
   eight-hour window ends. The exception never overrides **Hide for this fast**,
   global off, ActivityKit availability, request coalescing or duplicate
   prevention, and it does not apply to an ordinary same-build relaunch.
-- BR-44: Inferred-fast detection is an opt-in setting, off by default for new
-  and migrated installs. Turning it off does not delete source events or
-  recorded fasts; turning it on recomputes presentation from current local
-  state.
+- BR-44: Inferred-fast detection is a user-controlled setting enabled by
+  default for new and migrated installs. Turning it off does not delete source
+  events or recorded fasts; turning it on recomputes presentation from current
+  local state. An existing saved choice remains authoritative.
 - BR-45: Saving a historical inferred interval revalidates its generic
   caloric food or hydration source, boundaries, current goal and overlap rules,
   then creates one normal completed recorded fast using the current goal. It

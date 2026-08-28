@@ -435,8 +435,10 @@ enum AppText: Equatable {
         case recordedFast
         case activeFast
         case fast
+        case visualFast
+        case visualActiveFast
+        case visualInferredFast
         case inferredFastInProgress
-        case inferredFastInProgressCompact
         case inferredFast
         case previouslySavedFast
         case previouslySavedFastNeedsReview
@@ -1374,7 +1376,8 @@ enum AppText: Equatable {
         .historyCopy(.timelineEmpty), .historyCopy(.eventFood), .historyCopy(.eventDrink),
         .historyCopy(.caloric), .historyCopy(.nonCaloric), .historyCopy(.food), .historyCopy(.drink),
         .historyCopy(.recordedFast), .historyCopy(.activeFast), .historyCopy(.fast),
-        .historyCopy(.inferredFastInProgress), .historyCopy(.inferredFastInProgressCompact),
+        .historyCopy(.visualFast), .historyCopy(.visualActiveFast), .historyCopy(.visualInferredFast),
+        .historyCopy(.inferredFastInProgress),
         .historyCopy(.inferredFast),
         .historyCopy(.previouslySavedFast), .historyCopy(.previouslySavedFastNeedsReview),
         .historyCopy(.unavailableFast), .historyCopy(.startActionAvailable),
@@ -1562,8 +1565,10 @@ enum AppText: Equatable {
         case .recordedFast: resource("history.fast.recorded", "Recorded fast", "History recorded fast title")
         case .activeFast: resource("history.fast.active", "Active Fast", "History active fast title")
         case .fast: resource("history.fast.automatic", "Fast", "History automatic fast title")
+        case .visualFast: resource("history.fast.visual", "Fast", "Short visual History fast label")
+        case .visualActiveFast: resource("history.fast.active.visual", "Active fast", "Short visual History active-fast label")
+        case .visualInferredFast: resource("history.fast.inferred.visual", "Inferred fast", "Short visual History inferred-fast label")
         case .inferredFastInProgress: resource("history.fast.inferred.in-progress", "Inferred fast in progress", "History inferred fast in-progress title")
-        case .inferredFastInProgressCompact: resource("history.fast.inferred.in-progress.compact", "Est. now", "Compact History inferred fast in-progress title")
         case .inferredFast: resource("history.fast.inferred", "Inferred fast", "History inferred fast title")
         case .previouslySavedFast: resource("history.fast.previously-saved", "Previously saved fast", "History previously saved fast title")
         case .previouslySavedFastNeedsReview: resource("history.fast.previously-saved.needs-review", "Previously saved fast · Needs review", "History previously saved fast review title")

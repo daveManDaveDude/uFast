@@ -201,12 +201,12 @@ group-manager sheet, pencil controls, manager Done, bulk Delete group and
 returning from an item editor to the manager no longer exist. Add event remains
 bucket-constrained, and individual deletion remains available in each editor.
 
-## Slice 3.12 — Opt-in inferred fast detection
+## Slice 3.12 — Inferred fast detection
 
 The accepted contract and implementation-ready story are in
 `docs/OW-410_INFERRED_FAST_DETECTION_STORY.md`.
 
-- OW-410 P0 — Detect, present and explicitly convert opt-in inferred fasts.
+- OW-410 P0 — Detect, present and explicitly convert inferred fasts.
   **Implemented in source; focused baseline acceptance passed. OW-411
   supersedes its food-only boundary wording.**
 

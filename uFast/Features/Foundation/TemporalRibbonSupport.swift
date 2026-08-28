@@ -142,3 +142,41 @@ struct TemporalSelectedPageHeightKey: PreferenceKey {
         value = max(value, nextValue())
     }
 }
+
+struct TemporalCarouselViewportWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+/// Measured by the lazy stack itself, rather than reconstructed from the
+/// viewport's container-relative-frame formula. This value is a layout
+/// preference and is only updated when the content layout changes.
+struct TemporalCarouselContentLayout: Equatable, Sendable {
+    let contentWidth: CGFloat
+    let dayStride: CGFloat
+
+    static let zero = Self(contentWidth: 0, dayStride: 0)
+
+    var isValid: Bool {
+        contentWidth.isFinite && contentWidth > 0
+            && dayStride.isFinite && dayStride > 0
+    }
+}
+
+struct TemporalCarouselContentLayoutKey: PreferenceKey {
+    static let defaultValue = TemporalCarouselContentLayout.zero
+
+    static func reduce(
+        value: inout TemporalCarouselContentLayout,
+        nextValue: () -> TemporalCarouselContentLayout
+    ) {
+        let next = nextValue()
+        guard next.isValid else { return }
+        if !value.isValid || next.contentWidth > value.contentWidth {
+            value = next
+        }
+    }
+}

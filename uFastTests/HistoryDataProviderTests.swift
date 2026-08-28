@@ -6,32 +6,6 @@ import XCTest
 
 @MainActor
 final class HistoryDataProviderTests: XCTestCase {
-    func testCarouselUsesExactSourceOnlyForSelectedSettledPage() {
-        XCTAssertEqual(
-            TemporalHistoryCarousel.presentationSource(
-                isSelectedPage: true,
-                movementPhase: .settled
-            ),
-            .settled
-        )
-        for phase: TemporalCarouselMovementPhase in [.userDriven, .decelerating, .aligning, .programmatic] {
-            XCTAssertEqual(
-                TemporalHistoryCarousel.presentationSource(
-                    isSelectedPage: true,
-                    movementPhase: phase
-                ),
-                .motion
-            )
-        }
-        XCTAssertEqual(
-            TemporalHistoryCarousel.presentationSource(
-                isSelectedPage: false,
-                movementPhase: .settled
-            ),
-            .motion
-        )
-    }
-
     @MainActor
     private struct LegacyFixture {
         let container: ModelContainer

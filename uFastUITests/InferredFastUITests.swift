@@ -14,16 +14,16 @@ final class InferredFastUITests: XCTestCase {
 
         let toggle = app.switches["settings.inferred-fasts.toggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertEqual(toggle.value as? String, "1")
         toggle.tap()
-        let enabled = XCTNSPredicateExpectation(
+        let disabled = XCTNSPredicateExpectation(
             predicate: NSPredicate { object, _ in
-                (object as? XCUIElement)?.value as? String == "1"
+                (object as? XCUIElement)?.value as? String == "0"
             },
             object: toggle
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [enabled], timeout: 5),
+            XCTWaiter.wait(for: [disabled], timeout: 5),
             .completed,
             app.debugDescription
         )
@@ -35,7 +35,7 @@ final class InferredFastUITests: XCTestCase {
 
         let relaunchedToggle = app.switches["settings.inferred-fasts.toggle"]
         XCTAssertTrue(relaunchedToggle.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertEqual(relaunchedToggle.value as? String, "1")
+        XCTAssertEqual(relaunchedToggle.value as? String, "0")
     }
 
     @MainActor

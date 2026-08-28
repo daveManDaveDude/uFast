@@ -2,6 +2,7 @@ import XCTest
 
 extension HistoryUITests {
     @MainActor
+    // swiftlint:disable:next function_body_length
     func testLateStartActiveFastUsesReadableUntruncatedTimelineLabel() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "en_GB")
@@ -48,10 +49,25 @@ extension HistoryUITests {
             visibleActiveFast(in: app, carousel: carousel),
             app.debugDescription
         )
-        let label = activeFast.staticTexts["Active Fast"]
-
-        XCTAssertTrue(label.waitForExistence(timeout: 5), activeFast.debugDescription)
-        XCTAssertEqual(label.label, "Active Fast", label.debugDescription)
-        XCTAssertLessThanOrEqual(label.frame.maxX, activeFast.frame.maxX, activeFast.debugDescription)
+        let nextDay = app.buttons["history.next-day"]
+        XCTAssertTrue(nextDay.waitForExistence(timeout: 5), app.debugDescription)
+        nextDay.tap()
+        XCTAssertTrue(
+            waitForSettledHistory(
+                selectedDate: selectedDate,
+                carousel: carousel,
+                expectedSelectedDate: "Selected day, Wed 26 Aug"
+            ),
+            app.debugDescription
+        )
+        let label = try XCTUnwrap(
+            visibleActiveFastLabelProbe(in: app, carousel: carousel, timeout: 5),
+            app.debugDescription
+        )
+        XCTAssertEqual(label.label, "Active fast", label.debugDescription)
+        XCTAssertTrue(
+            Self.isVisibleFrame(label.frame, boundedBy: carousel.frame),
+            "The complete-bar label should be visible on the containing day.\n\(app.debugDescription)"
+        )
     }
 }

@@ -7,6 +7,7 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedHistoryEventGrouping = false
     var seedHistoryMidnightSeam = false
     var seedHistoryMidnightSeamExtended = false
+    var seedHistoryFastLabelLayout = false
     var seedActiveFastStart: Date?
     var seedLiveActivityRecovery = false
     var seedMultipleActiveFasts = false
@@ -82,6 +83,9 @@ struct AppLaunchConfiguration {
             seedHistoryMidnightSeam: arguments.contains("--seed-history-midnight-seam"),
             seedHistoryMidnightSeamExtended: arguments.contains(
                 "--seed-history-midnight-seam-extended"
+            ),
+            seedHistoryFastLabelLayout: arguments.contains(
+                "--seed-history-fast-label-layout"
             ),
             seedActiveFastStart: Self.date(after: "--seed-active-fast-start", in: arguments),
             seedLiveActivityRecovery: arguments.contains("--seed-live-activity-recovery"),

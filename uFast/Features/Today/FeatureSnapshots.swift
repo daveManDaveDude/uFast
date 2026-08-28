@@ -11,7 +11,7 @@ struct AppSettingsSnapshot: Equatable {
         id: UUID = UUID(),
         fastingGoal: FastingGoal = .default,
         automaticLiveActivityPreference: AutomaticLiveActivityPreference = .notAsked,
-        inferredFastDetectionEnabled: Bool = false
+        inferredFastDetectionEnabled: Bool = true
     ) {
         self.id = id
         self.fastingGoal = fastingGoal

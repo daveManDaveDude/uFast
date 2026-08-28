@@ -102,6 +102,9 @@ enum UITestDataReset {
                 extendsActiveFast: configuration.seedHistoryMidnightSeamExtended
             )
         }
+        if configuration.seedHistoryFastLabelLayout {
+            try UITestSeedFixtures.seedHistoryFastLabelLayout(in: context, clock: clock)
+        }
     }
 
     private static func seedFavouriteFixtures(

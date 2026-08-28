@@ -77,7 +77,7 @@ final class AppSettingsStoreTests: XCTestCase {
         XCTAssertEqual(try store.authoritativeRecord()?.id, settings.id)
     }
 
-    func testInferredFastDetectionDefaultsOffAndPersistsAcrossFetch() throws {
+    func testInferredFastDetectionDefaultsOnAndPersistsAcrossFetch() throws {
         let container = try PersistenceContainer.make(inMemory: true)
         let context = container.mainContext
         let settings = AppSettingsRecord(hasCompletedOnboarding: true)
@@ -85,14 +85,14 @@ final class AppSettingsStoreTests: XCTestCase {
         try context.save()
         let store = SwiftDataSettingsStore(modelContext: context)
 
-        XCTAssertFalse(settings.inferredFastDetectionEnabled)
-        try store.updateInferredFastDetectionEnabled(true)
-        XCTAssertTrue(try XCTUnwrap(
+        XCTAssertTrue(settings.inferredFastDetectionEnabled)
+        try store.updateInferredFastDetectionEnabled(false)
+        XCTAssertFalse(try XCTUnwrap(
             context.fetch(FetchDescriptor<AppSettingsRecord>()).first
         ).inferredFastDetectionEnabled)
 
-        try store.updateInferredFastDetectionEnabled(false)
-        XCTAssertFalse(try XCTUnwrap(
+        try store.updateInferredFastDetectionEnabled(true)
+        XCTAssertTrue(try XCTUnwrap(
             context.fetch(FetchDescriptor<AppSettingsRecord>()).first
         ).inferredFastDetectionEnabled)
     }

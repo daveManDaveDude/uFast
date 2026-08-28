@@ -576,7 +576,6 @@ extension HistoryView {
             readOnlyFromDate: clock.now,
             onMovementPhaseChange: updateTemporalMovementPhase,
             onCoupledPresentationChange: coupledScrollPresentation.handle,
-            activeFastNow: { clock.now },
             onSettledVisibleWindow: { window in
                 settledVisibleWindow = window
                 _ = model.reloadHistory(in: window.interval)
