@@ -194,7 +194,8 @@ extension HistoryUITests {
 
         let breakfastCandidates = app.otherElements["history.event-info-panel"].buttons.matching(
             NSPredicate(
-                format: "label CONTAINS %@ AND enabled == true",
+                format: "identifier BEGINSWITH %@ AND label CONTAINS %@ AND enabled == true",
+                "history.event.",
                 "Breakfast"
             )
         )

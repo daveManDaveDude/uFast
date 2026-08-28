@@ -381,6 +381,11 @@ enum AppText: Equatable {
         case inferredConflictError
         case inferredActiveFastError
         case inferredSaveError
+        case inferredDelete
+        case inferredDeleteConfirmationTitle
+        case inferredDeleteConfirmationMessage
+        case inferredDeleteConfirmationAction
+        case inferredDeleteError
     }
 
     enum HistoryCopy: Equatable, Sendable {
@@ -443,6 +448,11 @@ enum AppText: Equatable {
         case previouslySavedFast
         case previouslySavedFastNeedsReview
         case unavailableFast
+        case hiddenInferredFast
+        case hiddenInferredHint
+        case reenableInferredFast
+        case inferredReenableUnavailable
+        case inferredReenableError
         case startActionAvailable
         case saveActionAvailable
         case currentlyActive
@@ -1351,7 +1361,10 @@ enum AppText: Equatable {
         .fastingCopy(.durationLabel), .fastingCopy(.sourceFood), .fastingCopy(.sourceDrink),
         .fastingCopy(.inferredCancel), .fastingCopy(.inferredUnavailableError),
         .fastingCopy(.inferredConflictError), .fastingCopy(.inferredActiveFastError),
-        .fastingCopy(.inferredSaveError),
+        .fastingCopy(.inferredSaveError), .fastingCopy(.inferredDelete),
+        .fastingCopy(.inferredDeleteConfirmationTitle),
+        .fastingCopy(.inferredDeleteConfirmationMessage),
+        .fastingCopy(.inferredDeleteConfirmationAction), .fastingCopy(.inferredDeleteError),
         .historyCopy(.motionUnavailableTitle), .historyCopy(.motionUnavailableMessage),
         .historyCopy(.title), .historyCopy(.empty), .historyCopy(.loading), .historyCopy(.retry),
         .historyCopy(.carouselSettled), .historyCopy(.carouselMoving),
@@ -1382,6 +1395,9 @@ enum AppText: Equatable {
         .historyCopy(.previouslySavedFast), .historyCopy(.previouslySavedFastNeedsReview),
         .historyCopy(.unavailableFast), .historyCopy(.startActionAvailable),
         .historyCopy(.saveActionAvailable), .historyCopy(.currentlyActive),
+        .historyCopy(.hiddenInferredFast), .historyCopy(.hiddenInferredHint),
+        .historyCopy(.reenableInferredFast), .historyCopy(.inferredReenableUnavailable),
+        .historyCopy(.inferredReenableError),
         .historyCopy(.boundaryEvidenceUnavailable),
         .historyCopy(.formerBoundaryUnavailable), .historyCopy(.sourceLabel),
         .historyCopy(.durationLessThanMinute), .historyCopy(.durationDayAbbreviation),
@@ -1494,6 +1510,11 @@ enum AppText: Equatable {
         case .inferredConflictError: resource("history.inferred.error.conflict", "This interval conflicts with a recorded fast and was not saved.", "Inferred-fast conflict error")
         case .inferredActiveFastError: resource("history.inferred.error.active-fast", "An active fast already exists, so this inferred fast was not started.", "Inferred-fast active-fast error")
         case .inferredSaveError: resource("history.inferred.error.save", "This fast could not be saved. Your local records were unchanged.", "Inferred-fast save error")
+        case .inferredDelete: resource("history.inferred.delete", "Delete inferred fast", "Inferred-fast delete action")
+        case .inferredDeleteConfirmationTitle: resource("history.inferred.delete.confirmation.title", "Delete inferred fast?", "Inferred-fast delete confirmation title")
+        case .inferredDeleteConfirmationMessage: resource("history.inferred.delete.confirmation.message", "This hides the inferred fast from History. Your food or drink record will stay.", "Inferred-fast delete confirmation message")
+        case .inferredDeleteConfirmationAction: resource("history.inferred.delete.confirmation.action", "Delete inferred fast", "Inferred-fast delete confirmation action")
+        case .inferredDeleteError: resource("history.inferred.delete.error", "This inferred fast could not be hidden. Your local records were unchanged.", "Inferred-fast delete failure")
         }
     }
 
@@ -1573,6 +1594,11 @@ enum AppText: Equatable {
         case .previouslySavedFast: resource("history.fast.previously-saved", "Previously saved fast", "History previously saved fast title")
         case .previouslySavedFastNeedsReview: resource("history.fast.previously-saved.needs-review", "Previously saved fast · Needs review", "History previously saved fast review title")
         case .unavailableFast: resource("history.fast.unavailable", "Saved fast · Details unavailable", "History unavailable fast title")
+        case .hiddenInferredFast: resource("history.fast.inferred.hidden", "Hidden inferred fast", "History hidden inferred fast title")
+        case .hiddenInferredHint: resource("history.fast.inferred.hidden.hint", "Shows this inferred fast in History again.", "History hidden inferred fast recovery hint")
+        case .reenableInferredFast: resource("history.fast.inferred.reenable", "Re-enable inferred fast", "History hidden inferred fast recovery action")
+        case .inferredReenableUnavailable: resource("history.fast.inferred.reenable.unavailable", "This inferred fast is no longer available. History was refreshed.", "History inferred fast recovery unavailable feedback")
+        case .inferredReenableError: resource("history.fast.inferred.reenable.error", "This inferred fast could not be re-enabled. Your local records were unchanged.", "History inferred fast recovery failure")
         case .startActionAvailable: resource("history.fast.action.start", "Start fast available", "History inferred fast start action detail")
         case .saveActionAvailable: resource("history.fast.action.save", "Save fast available", "History inferred fast save action detail")
         case .currentlyActive: resource("history.fast.currently-active", "currently active", "History active fast accessibility detail")

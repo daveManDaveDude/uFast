@@ -97,6 +97,7 @@ extension FoodEntryRepository {
 }
 
 @MainActor
+// swiftlint:disable:next type_body_length
 final class SwiftDataFoodEntryRepository: FoodEntryRepository {
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
@@ -260,17 +261,35 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         )
         let fasts = bounded.fasts
         let snapshots = planner.snapshots(for: fasts)
+        let suppressionStore = InferredFastSuppressionStore(
+            modelContext: modelContext,
+            diagnosticSink: diagnosticSink
+        )
+        let suppressionSnapshot = try suppressionStore.snapshot()
         modelContext.delete(record)
         _ = planner.apply(bounded.mutation, to: fasts, currentGoal: .default)
-        try saveTransaction {
-            record.restore(from: FoodEntryRecordSnapshot(
-                draft: record.draft,
-                isCaloric: record.isCaloric,
-                updatedAt: record.updatedAt
-            ))
-            for fast in fasts {
-                snapshots[fast.id]?.restore(fast)
+        do {
+            if oldIsCaloric {
+                try reconcileSuppressions(
+                    suppressionStore,
+                    currentGoal: currentGoal(fallback: .default)
+                )
             }
+            try saveTransaction {
+                record.restore(from: FoodEntryRecordSnapshot(
+                    draft: record.draft,
+                    isCaloric: record.isCaloric,
+                    updatedAt: record.updatedAt
+                ))
+                for fast in fasts {
+                    snapshots[fast.id]?.restore(fast)
+                }
+                suppressionSnapshot.restore(in: self.modelContext)
+            }
+        } catch {
+            suppressionSnapshot.restore(in: modelContext)
+            modelContext.rollback()
+            throw error
         }
     }
 
@@ -353,6 +372,7 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         )
     }
 
+    // swiftlint:disable:next function_body_length
     private func saveCaloricEvent(
         _ draft: FoodEntryDraft,
         replacing record: FoodEntryRecord?,
@@ -388,6 +408,12 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
         )
         let fasts = bounded.fasts
         let snapshots = planner.snapshots(for: fasts)
+        let suppressionStore = InferredFastSuppressionStore(
+            modelContext: modelContext,
+            diagnosticSink: diagnosticSink
+        )
+        let suppressionSnapshot = try suppressionStore.snapshot()
+        let oldWasCaloric = record?.isCaloric ?? false
         let oldSnapshot = record?.snapshot
         if let record {
             record.update(from: draft, at: updatedAt)
@@ -395,18 +421,48 @@ final class SwiftDataFoodEntryRepository: FoodEntryRepository {
             modelContext.insert(createdRecord)
         }
         _ = planner.apply(bounded.mutation, to: fasts, currentGoal: goal)
-        try saveTransaction {
-            if let record, let oldSnapshot {
-                record.restore(from: oldSnapshot)
+        do {
+            if oldWasCaloric || newBoundary != nil {
+                try reconcileSuppressions(suppressionStore, currentGoal: goal)
             }
-            for fast in fasts {
-                snapshots[fast.id]?.restore(fast)
+            try saveTransaction {
+                if let record, let oldSnapshot {
+                    record.restore(from: oldSnapshot)
+                }
+                for fast in fasts {
+                    snapshots[fast.id]?.restore(fast)
+                }
+                suppressionSnapshot.restore(in: self.modelContext)
             }
+        } catch {
+            suppressionSnapshot.restore(in: modelContext)
+            modelContext.rollback()
+            throw error
         }
     }
 }
 
 private extension SwiftDataFoodEntryRepository {
+    func currentGoal(fallback: FastingGoal) throws -> FastingGoal {
+        try SwiftDataSettingsStore(modelContext: modelContext)
+            .authoritativeRecord()?.fastingGoal ?? fallback
+    }
+
+    func reconcileSuppressions(
+        _ store: InferredFastSuppressionStore,
+        currentGoal: FastingGoal
+    ) throws {
+        let enabled = try SwiftDataSettingsStore(modelContext: modelContext)
+            .authoritativeRecord()?.inferredFastDetectionEnabled ?? false
+        _ = try store.reconcileInMemory(
+            currentGoal: currentGoal,
+            enabled: enabled,
+            mode: .authoritativeMutation,
+            now: clock.now,
+            updatedAt: clock.now
+        )
+    }
+
     func saveTransaction(recovering recovery: @escaping () -> Void = {}) throws {
         do {
             try transaction.save(recovering: recovery)

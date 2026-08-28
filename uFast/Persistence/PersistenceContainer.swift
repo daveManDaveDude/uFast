@@ -216,6 +216,22 @@ enum UFastSchemaV6: VersionedSchema {
     ]
 }
 
+enum UFastSchemaV7: VersionedSchema {
+    static let versionIdentifier = Schema.Version(7, 0, 0)
+
+    static let models: [any PersistentModel.Type] = [
+        AppSettingsRecord.self,
+        FastRecord.self,
+        FoodEntryRecord.self,
+        HydrationEntryRecord.self,
+        HydrationFavouriteRecord.self,
+        FoodFavouriteRecord.self,
+        UnknownPeriodRecord.self,
+        HydrationFavouriteMigrationRecord.self,
+        InferredFastSuppressionRecord.self,
+    ]
+}
+
 enum UFastMigrationPlan: SchemaMigrationPlan {
     static let schemas: [any VersionedSchema.Type] = [
         UFastSchemaV1.self,
@@ -224,6 +240,7 @@ enum UFastMigrationPlan: SchemaMigrationPlan {
         UFastSchemaV4.self,
         UFastSchemaV5.self,
         UFastSchemaV6.self,
+        UFastSchemaV7.self,
     ]
     static let stages: [MigrationStage] = [
         .lightweight(fromVersion: UFastSchemaV1.self, toVersion: UFastSchemaV2.self),
@@ -231,11 +248,12 @@ enum UFastMigrationPlan: SchemaMigrationPlan {
         .lightweight(fromVersion: UFastSchemaV3.self, toVersion: UFastSchemaV4.self),
         .lightweight(fromVersion: UFastSchemaV4.self, toVersion: UFastSchemaV5.self),
         .lightweight(fromVersion: UFastSchemaV5.self, toVersion: UFastSchemaV6.self),
+        .lightweight(fromVersion: UFastSchemaV6.self, toVersion: UFastSchemaV7.self),
     ]
 }
 
 enum PersistenceContainer {
-    static let schema = Schema(versionedSchema: UFastSchemaV6.self)
+    static let schema = Schema(versionedSchema: UFastSchemaV7.self)
 
     @MainActor
     static func make(

@@ -21,6 +21,8 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedFoodFavouriteValidation = false
     var seedFoodFavouriteActiveFast = false
     var seedInferredFast = false
+    var seedInferredFastEligibility = false
+    var seedSuppressedInferredFast = false
     var seedTodayMultiYear = false
     var seedCaloricBoundaryMultiYear = false
 
@@ -100,6 +102,8 @@ struct AppLaunchConfiguration {
             seedFoodFavouriteValidation: arguments.contains("--seed-food-favourite-validation"),
             seedFoodFavouriteActiveFast: arguments.contains("--seed-food-favourite-active-fast"),
             seedInferredFast: arguments.contains("--seed-inferred-fast"),
+            seedInferredFastEligibility: arguments.contains("--seed-inferred-fast-eligibility"),
+            seedSuppressedInferredFast: arguments.contains("--seed-suppressed-inferred-fast"),
             seedTodayMultiYear: arguments.contains("--seed-today-multi-year"),
             seedCaloricBoundaryMultiYear: arguments.contains(
                 "--seed-caloric-boundary-multi-year"
@@ -147,6 +151,12 @@ struct AppLaunchConfiguration {
             simulateDeleteAllFailure: arguments.contains("--simulate-delete-all-failure"),
             simulateBoundaryReconciliationFailure: arguments.contains(
                 "--simulate-caloric-boundary-reconciliation-failure"
+            ),
+            simulateSuppressionSaveFailure: arguments.contains(
+                "--simulate-inferred-fast-suppression-save-failure"
+            ),
+            simulateSuppressionReenableStale: arguments.contains(
+                "--simulate-inferred-fast-suppression-reenable-stale"
             )
         )
     }

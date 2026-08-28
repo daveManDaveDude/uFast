@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 // SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
-// swiftlint:disable trailing_comma function_body_length
+// swiftlint:disable trailing_comma function_body_length type_body_length file_length
 enum UITestSeedFixtures {
     static func seedNewFavouriteDefault(in context: ModelContext, clock: any AppClock) {
         guard let settings = try? context.fetch(FetchDescriptor<AppSettingsRecord>()),
@@ -81,6 +81,136 @@ enum UITestSeedFixtures {
             id: secondID,
             draft: .init(description: "Inferred breakfast", occurredAt: currentDate),
             createdAt: currentDate
+        ))
+    }
+
+    /// OW-412-only fixture for food and explicitly caloric hydration boundary
+    /// transitions. The first suppression ends exactly at the default cap;
+    /// the last is exactly at the eight-hour eligibility boundary.
+    static func seedInferredFastEligibility(in context: ModelContext, clock: any AppClock) {
+        guard let settings = try? context.fetch(FetchDescriptor<AppSettingsRecord>()).first,
+              let capHydrationID = UUID(uuidString: "10400000-0000-0000-0000-000000000001"),
+              let capFoodID = UUID(uuidString: "10400000-0000-0000-0000-000000000002"),
+              let postFoodID = UUID(uuidString: "10400000-0000-0000-0000-000000000003"),
+              let eligibilityHydrationID = UUID(uuidString: "10400000-0000-0000-0000-000000000004")
+        else { return }
+
+        settings.setInferredFastDetectionEnabled(true)
+        let capHydrationDate = clock.now.addingTimeInterval(-60 * 60 * 60)
+        let capFoodDate = clock.now.addingTimeInterval(-32 * 60 * 60)
+        let postFoodDate = clock.now.addingTimeInterval(-20 * 60 * 60)
+        let eligibilityHydrationDate = clock.now.addingTimeInterval(-8 * 60 * 60)
+
+        context.insert(HydrationEntryRecord(
+            id: capHydrationID,
+            type: .coffee,
+            volumeMillilitres: 250,
+            occurredAt: capHydrationDate,
+            isCaloric: true,
+            createdAt: capHydrationDate
+        ))
+        context.insert(FoodEntryRecord(
+            id: capFoodID,
+            draft: .init(description: "Cap food", occurredAt: capFoodDate),
+            createdAt: capFoodDate
+        ))
+        context.insert(FoodEntryRecord(
+            id: postFoodID,
+            draft: .init(description: "Post food", occurredAt: postFoodDate),
+            createdAt: postFoodDate
+        ))
+        context.insert(HydrationEntryRecord(
+            id: eligibilityHydrationID,
+            type: .coffee,
+            volumeMillilitres: 250,
+            occurredAt: eligibilityHydrationDate,
+            isCaloric: true,
+            createdAt: eligibilityHydrationDate
+        ))
+
+        let candidates = [
+            InferredFastInterval(
+                sourceBoundaryReference: .init(kind: .hydration, id: capHydrationID),
+                sourceDate: capHydrationDate,
+                sourceDescription: "Coffee",
+                nextBoundaryReference: .init(kind: .food, id: capFoodID),
+                nextBoundaryDate: capFoodDate,
+                startDate: capHydrationDate,
+                endDate: capHydrationDate.addingTimeInterval(28 * 60 * 60),
+                goal: settings.fastingGoal,
+                state: .historical
+            ),
+            InferredFastInterval(
+                sourceBoundaryReference: .init(kind: .food, id: capFoodID),
+                sourceDate: capFoodDate,
+                sourceDescription: "Cap food",
+                nextBoundaryReference: .init(kind: .food, id: postFoodID),
+                nextBoundaryDate: postFoodDate,
+                startDate: capFoodDate,
+                endDate: postFoodDate,
+                goal: settings.fastingGoal,
+                state: .historical
+            ),
+            InferredFastInterval(
+                sourceBoundaryReference: .init(kind: .food, id: postFoodID),
+                sourceDate: postFoodDate,
+                sourceDescription: "Post food",
+                nextBoundaryReference: .init(kind: .hydration, id: eligibilityHydrationID),
+                nextBoundaryDate: eligibilityHydrationDate,
+                startDate: postFoodDate,
+                endDate: eligibilityHydrationDate,
+                goal: settings.fastingGoal,
+                state: .historical
+            ),
+            InferredFastInterval(
+                sourceBoundaryReference: .init(kind: .hydration, id: eligibilityHydrationID),
+                sourceDate: eligibilityHydrationDate,
+                sourceDescription: "Coffee",
+                nextBoundaryReference: nil,
+                nextBoundaryDate: nil,
+                startDate: eligibilityHydrationDate,
+                endDate: clock.now,
+                goal: settings.fastingGoal,
+                state: .inProgress
+            ),
+        ]
+        for candidate in candidates {
+            context.insert(InferredFastSuppressionRecord(
+                suppression: InferredFastSuppressionDecider.make(candidate: candidate, at: clock.now)
+            ))
+        }
+    }
+
+    static func seedSuppressedInferredFast(in context: ModelContext, clock: any AppClock) {
+        let settings: AppSettingsRecord
+        if let existing = try? context.fetch(FetchDescriptor<AppSettingsRecord>()).first {
+            settings = existing
+        } else {
+            let created = AppSettingsRecord(hasCompletedOnboarding: true)
+            context.insert(created)
+            settings = created
+        }
+        guard let sourceID = UUID(uuidString: "10300000-0000-0000-0000-000000000001") else { return }
+        settings.setInferredFastDetectionEnabled(true)
+        let sourceDate = clock.now.addingTimeInterval(-20 * 60 * 60)
+        context.insert(FoodEntryRecord(
+            id: sourceID,
+            draft: .init(description: "Hidden inferred supper", occurredAt: sourceDate),
+            createdAt: sourceDate
+        ))
+        let candidate = InferredFastInterval(
+            sourceBoundaryReference: .init(kind: .food, id: sourceID),
+            sourceDate: sourceDate,
+            sourceDescription: "Hidden inferred supper",
+            nextBoundaryReference: nil,
+            nextBoundaryDate: nil,
+            startDate: sourceDate,
+            endDate: clock.now,
+            goal: settings.fastingGoal,
+            state: .inProgress
+        )
+        context.insert(InferredFastSuppressionRecord(
+            suppression: InferredFastSuppressionDecider.make(candidate: candidate, at: clock.now)
         ))
     }
 

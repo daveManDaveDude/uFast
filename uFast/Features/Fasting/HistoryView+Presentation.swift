@@ -219,6 +219,7 @@ extension HistoryView {
     }
 
     @ViewBuilder
+    // swiftlint:disable:next function_body_length
     func fastHistoryDetails(at now: Date) -> some View {
         let visibleFastItems = visibleFastItems(at: now)
         if visibleFastItems.isEmpty {
@@ -257,13 +258,44 @@ extension HistoryView {
                 eyebrow: textResolver(.historyCopy(.detailsEyebrow))
             )
             .padding(.horizontal, UFastTheme.Spacing.standard)
+            if let inferredRecoveryError {
+                Section {
+                    Label(
+                        textResolver(
+                            .historyCopy(
+                                inferredRecoveryError == .unavailable
+                                    ? .inferredReenableUnavailable
+                                    : .inferredReenableError
+                            )
+                        ),
+                        systemImage: "exclamationmark.circle"
+                    )
+                    .foregroundStyle(UFastTheme.error)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier(
+                        inferredRecoveryError == .unavailable
+                            ? "history.inferred.reenable-unavailable"
+                            : "history.inferred.reenable-error"
+                    )
+                }
+                .padding(.horizontal, UFastTheme.Spacing.standard)
+            }
             LazyVStack(spacing: 12) {
-                ForEach(visibleFastItems) { item in
-                    Button { openVisibleFast(item) } label: {
-                        VisibleFastHistoryRow(item: item, calendar: calendar, locale: locale, timeZone: timeZone)
+                ForEach(visibleFastItems, id: \.historyIdentity) { item in
+                    if item.kind == .hiddenInferred {
+                        HiddenInferredFastRecoveryRow(
+                            item: item,
+                            onReenable: { reenableInferredFast(item) }
+                        )
+                    } else {
+                        let sourceAccessibilityID = item.inferredInterval?.sourceBoundaryReference.id.uuidString
+                            ?? item.id.uuidString
+                        Button { openVisibleFast(item) } label: {
+                            VisibleFastHistoryRow(item: item, calendar: calendar, locale: locale, timeZone: timeZone)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("history.fast.\(sourceAccessibilityID)")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("history.fast.\(item.id.uuidString)")
                 }
             }
             .padding(.horizontal, UFastTheme.Spacing.standard)
@@ -506,7 +538,7 @@ extension HistoryView {
             onSelectToday()
             return
         }
-        if let inferred = liveHistoryPresentation?.fastItems.first(where: { $0.id == id }),
+        if let inferred = liveHistoryPresentation?.fastItems.first(where: { $0.ribbonID == id }),
            inferred.kind == .inferred,
            let interval = inferred.inferredInterval
         {

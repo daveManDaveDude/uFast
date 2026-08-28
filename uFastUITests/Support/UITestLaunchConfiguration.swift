@@ -51,6 +51,8 @@ struct UITestLaunchConfiguration: Equatable {
             seedHistoryFastLabelLayout: true,
             seedUnknownProvenance: true,
             seedInferredFast: true,
+            seedInferredFastEligibility: true,
+            seedSuppressedInferredFast: true,
             seedTodayMultiYear: true,
             seedCaloricBoundaryMultiYear: true,
             seedFavouritePopulated: true,
@@ -78,6 +80,8 @@ struct UITestLaunchConfiguration: Equatable {
             simulateGoalSaveFailure: true,
             simulateLiveActivitySettingsSaveFailure: true,
             simulateInferredFastDetectionSaveFailure: true,
+            simulateSuppressionSaveFailure: true,
+            simulateSuppressionReenableStale: true,
             simulateDeleteAllFailure: true,
             simulateBoundaryReconciliationFailure: true,
             simulatePersistenceBootstrapFailure: true,
@@ -113,6 +117,8 @@ struct UITestLaunchConfiguration: Equatable {
         seedHistoryFastLabelLayout: Bool = false,
         seedUnknownProvenance: Bool = false,
         seedInferredFast: Bool = false,
+        seedInferredFastEligibility: Bool = false,
+        seedSuppressedInferredFast: Bool = false,
         seedTodayMultiYear: Bool = false,
         seedCaloricBoundaryMultiYear: Bool = false,
         seedFavouritePopulated: Bool = false,
@@ -138,6 +144,8 @@ struct UITestLaunchConfiguration: Equatable {
         simulateGoalSaveFailure: Bool = false,
         simulateLiveActivitySettingsSaveFailure: Bool = false,
         simulateInferredFastDetectionSaveFailure: Bool = false,
+        simulateSuppressionSaveFailure: Bool = false,
+        simulateSuppressionReenableStale: Bool = false,
         simulateDeleteAllFailure: Bool = false,
         simulateBoundaryReconciliationFailure: Bool = false,
         simulatePersistenceBootstrapFailure: Bool = false,
@@ -164,7 +172,8 @@ struct UITestLaunchConfiguration: Equatable {
         seeds = SeedValues(
             seedSlice3History, seedHistoryEventGrouping,
             seedHistoryMidnightSeam, seedHistoryMidnightSeamExtended,
-            seedUnknownProvenance, seedInferredFast,
+            seedUnknownProvenance, seedInferredFast, seedInferredFastEligibility,
+            seedSuppressedInferredFast,
             seedTodayMultiYear, seedCaloricBoundaryMultiYear,
             seedFavouritePopulated, seedFavouriteDuplicateName,
             seedFavouriteValidation, seedCaloricFavouriteActiveFast,
@@ -183,6 +192,7 @@ struct UITestLaunchConfiguration: Equatable {
             simulateFoodSaveFailure, simulateDrinkSaveFailure,
             simulateFavouriteSaveFailure, simulateGoalSaveFailure,
             simulateLiveActivitySettingsSaveFailure, simulateInferredFastDetectionSaveFailure,
+            simulateSuppressionSaveFailure, simulateSuppressionReenableStale,
             simulateDeleteAllFailure, simulateBoundaryReconciliationFailure,
             simulatePersistenceBootstrapFailure, simulateFoodFavouriteMigrationFailure,
             simulateFoodFavouriteSaveFailure, simulateFoodFavouriteStale,
@@ -206,7 +216,9 @@ struct UITestLaunchConfiguration: Equatable {
         "--fixed-now", "--seed-active-fast-start", "--seed-slice3-history",
         "--seed-history-event-grouping", "--seed-history-midnight-seam",
         "--seed-history-midnight-seam-extended", "--seed-history-fast-label-layout", "--seed-unknown-provenance",
-        "--seed-inferred-fast", "--seed-today-multi-year", "--seed-caloric-boundary-multi-year",
+        "--seed-inferred-fast", "--seed-inferred-fast-eligibility", "--seed-suppressed-inferred-fast",
+        "--seed-today-multi-year",
+        "--seed-caloric-boundary-multi-year",
         "--seed-favourite-populated", "--seed-favourite-duplicate-name", "--seed-favourite-validation",
         "--seed-caloric-favourite-active-fast", "--seed-multiple-active-fasts",
         "--seed-food-favourite-populated", "--seed-food-favourite-duplicate-name",
@@ -217,6 +229,7 @@ struct UITestLaunchConfiguration: Equatable {
         "--simulate-food-save-failure", "--simulate-drink-save-failure",
         "--simulate-favourite-save-failure", "--simulate-goal-save-failure",
         "--simulate-live-activity-settings-save-failure", "--simulate-inferred-fast-detection-save-failure",
+        "--simulate-inferred-fast-suppression-save-failure", "--simulate-inferred-fast-suppression-reenable-stale",
         "--simulate-delete-all-failure", "--simulate-caloric-boundary-reconciliation-failure",
         "--simulate-persistence-bootstrap-failure", "--simulate-live-activity-unsupported",
         "--simulate-food-favourite-migration-failure", "--simulate-food-favourite-save-failure",
@@ -282,6 +295,8 @@ extension UITestLaunchConfiguration {
         append("--seed-history-fast-label-layout", when: seedHistoryFastLabelLayout, to: &values)
         append("--seed-unknown-provenance", when: seedUnknownProvenance, to: &values)
         append("--seed-inferred-fast", when: seedInferredFast, to: &values)
+        append("--seed-inferred-fast-eligibility", when: seedInferredFastEligibility, to: &values)
+        append("--seed-suppressed-inferred-fast", when: seedSuppressedInferredFast, to: &values)
         append("--seed-today-multi-year", when: seedTodayMultiYear, to: &values)
         append("--seed-caloric-boundary-multi-year", when: seedCaloricBoundaryMultiYear, to: &values)
 
@@ -316,6 +331,16 @@ extension UITestLaunchConfiguration {
         append(
             "--simulate-inferred-fast-detection-save-failure",
             when: simulateInferredFastDetectionSaveFailure,
+            to: &values
+        )
+        append(
+            "--simulate-inferred-fast-suppression-save-failure",
+            when: simulateSuppressionSaveFailure,
+            to: &values
+        )
+        append(
+            "--simulate-inferred-fast-suppression-reenable-stale",
+            when: simulateSuppressionReenableStale,
             to: &values
         )
         append("--simulate-delete-all-failure", when: simulateDeleteAllFailure, to: &values)

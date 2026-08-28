@@ -27,6 +27,7 @@ enum AppDataDeletionService {
                 try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
                 try context.fetch(FetchDescriptor<FoodFavouriteRecord>()).forEach(context.delete)
                 try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).forEach(context.delete)
+                try context.fetch(FetchDescriptor<InferredFastSuppressionRecord>()).forEach(context.delete)
                 try LegacyHistoryDeletion.deleteSchemaOnlyRecords(in: context)
             }
         } catch {

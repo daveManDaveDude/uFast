@@ -149,6 +149,19 @@ extension HistoryView {
                 _ = model.reloadHistoryAfterMutation()
                 inferredConversion = nil
             },
+            onDelete: { interval in
+                guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
+                try applicationCommands.deleteInferredFast(
+                    sourceBoundaryReference: interval.sourceBoundaryReference,
+                    expectedStartDate: interval.startDate,
+                    expectedEndDate: interval.endDate,
+                    expectedSourceDescription: interval.sourceDescription,
+                    expectedGoal: interval.goal,
+                    expectedState: interval.state
+                )
+                _ = model.reloadHistoryAfterMutation()
+                inferredConversion = nil
+            },
             onCancel: { inferredConversion = nil },
             onFailure: { _ = model.reloadHistoryAfterMutation() }
         )

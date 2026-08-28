@@ -86,6 +86,41 @@ struct VisibleFastHistoryRow: View {
     }
 }
 
+struct HiddenInferredFastRecoveryRow: View {
+    let item: HistoryVisibleFastItem
+    let onReenable: () -> Void
+
+    var body: some View {
+        let sourceKind = item.inferredInterval?.sourceKind.rawValue ?? "unknown"
+        let sourceID = item.inferredInterval?.sourceBoundaryReference.id.uuidString ?? item.id.uuidString
+        VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
+            Text(item.title)
+                .font(.headline)
+                .foregroundStyle(UFastTheme.primary)
+            Text(item.textContext.textResolver(.historyCopy(.hiddenInferredHint)))
+                .font(.subheadline)
+                .foregroundStyle(UFastTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(
+                item.textContext.textResolver(.historyCopy(.reenableInferredFast)),
+                action: onReenable
+            )
+            .buttonStyle(UFastSecondaryButtonStyle())
+            .accessibilityIdentifier(
+                "history.inferred.reenable.\(sourceKind).\(sourceID)"
+            )
+            .accessibilityHint(item.textContext.textResolver(.historyCopy(.hiddenInferredHint)))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .uFastCard(accent: UFastTheme.sky)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(item.accessibilityLabel)
+        .accessibilityIdentifier(
+            "history.inferred.hidden.\(sourceKind).\(sourceID)"
+        )
+    }
+}
+
 struct HistoryFoodEditorPresentation: Identifiable {
     let record: FoodEntrySnapshot
     var id: UUID {

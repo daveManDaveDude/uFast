@@ -209,6 +209,8 @@ The accepted contract and implementation-ready story are in
 - OW-410 P0 — Detect, present and explicitly convert inferred fasts.
   **Implemented in source; focused baseline acceptance passed. OW-411
   supersedes its food-only boundary wording.**
+- OW-412 P0 — Delete and re-enable inferred fast visibility. **Ready; contract
+  in `docs/OW-412_DELETE_INFERRED_FAST_STORY.md`.**
 
 ## Slice 3.13 — Caloric-boundary integrity
 

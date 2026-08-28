@@ -15,6 +15,8 @@ struct ApplicationCommandConfiguration: Equatable {
     var simulateInferredFastDetectionSaveFailure = false
     var simulateDeleteAllFailure = false
     var simulateBoundaryReconciliationFailure = false
+    var simulateSuppressionSaveFailure = false
+    var simulateSuppressionReenableStale = false
 }
 
 struct ApplicationCommandOutcome: Equatable {
@@ -26,6 +28,12 @@ enum InferredFastConversionError: Error, Equatable {
     case candidateUnavailable
     case conflictingRecordedFast
     case activeFastAlreadyExists
+}
+
+enum InferredFastSuppressionError: Error, Equatable {
+    case candidateUnavailable
+    case suppressionUnavailable
+    case simulatedSaveFailure
 }
 
 @MainActor
@@ -316,7 +324,26 @@ final class ApplicationCommands {
     }
 
     func updateGoal(_ goal: FastingGoal) throws {
-        try settingsStore(simulateFailure: configuration.simulateGoalSaveFailure).updateGoal(goal)
+        let suppressionStore = InferredFastSuppressionStore(
+            modelContext: modelContext,
+            diagnosticSink: diagnosticSink
+        )
+        let suppressionSnapshot = try suppressionStore.snapshot()
+        try settingsStore(simulateFailure: configuration.simulateGoalSaveFailure).updateGoal(
+            goal,
+            additionalChanges: {
+                _ = try suppressionStore.reconcileInMemory(
+                    currentGoal: goal,
+                    enabled: self.authoritativeSettingsRecord()?.inferredFastDetectionEnabled ?? false,
+                    mode: .authoritativeMutation,
+                    now: self.clock.now,
+                    updatedAt: self.clock.now
+                )
+            },
+            additionalRecovery: {
+                suppressionSnapshot.restore(in: self.modelContext)
+            }
+        )
         if let activeFast = try? ActiveFastAuthority.fetch(
             in: modelContext,
             diagnosticSink: diagnosticSink
@@ -330,9 +357,27 @@ final class ApplicationCommands {
     }
 
     func updateInferredFastDetectionEnabled(_ enabled: Bool) throws {
+        let suppressionStore = InferredFastSuppressionStore(
+            modelContext: modelContext,
+            diagnosticSink: diagnosticSink
+        )
+        let suppressionSnapshot = try suppressionStore.snapshot()
         try settingsStore(
             simulateFailure: configuration.simulateInferredFastDetectionSaveFailure
-        ).updateInferredFastDetectionEnabled(enabled)
+        ).updateInferredFastDetectionEnabled(
+            enabled,
+            additionalChanges: {
+                _ = try suppressionStore.reconcileInMemory(
+                    currentGoal: self.authoritativeSettingsRecord()?.fastingGoal ?? .default,
+                    enabled: enabled,
+                    now: self.clock.now,
+                    updatedAt: self.clock.now
+                )
+            },
+            additionalRecovery: {
+                suppressionSnapshot.restore(in: self.modelContext)
+            }
+        )
         projectionCoordinator.enqueue(.inferredFastDetectionChanged(enabled))
     }
 
@@ -361,6 +406,7 @@ final class ApplicationCommands {
         SwiftDataActiveFastRepository(
             modelContext: modelContext,
             simulateSaveFailure: configuration.simulateFastSaveFailure,
+            clock: clock,
             observationSink: observationSink,
             diagnosticSink: diagnosticSink
         )
@@ -370,6 +416,7 @@ final class ApplicationCommands {
         SwiftDataActiveFastRepository(
             modelContext: modelContext,
             simulateSaveFailure: configuration.simulateFastHistoryFailure,
+            clock: clock,
             observationSink: observationSink,
             diagnosticSink: diagnosticSink
         )

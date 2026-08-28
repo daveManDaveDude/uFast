@@ -998,3 +998,33 @@ is shown.
 - **Consequence:** Future History changes must not restore original-start or
   first-continuation label ownership, fragment-width fallback or a per-second
   visual active-duration timer.
+
+## D-039 Source-bound inferred-fast suppression
+
+- **Status:** Accepted
+- **Accepted:** 28 August 2026 by user request for OW-412
+- **Decision:** Delete inferred fast means hide one derived candidate, not delete
+  or convert a record. Persist exactly one local suppression per complete
+  `CaloricBoundaryReference`, including food versus caloric hydration and the
+  source UUID. The row carries only the latest derived interval, punctuation
+  metadata, goal snapshot and audit timestamps. It is reconciled atomically
+  with authoritative food, hydration, goal and recorded-fast mutations, and
+  is removed when the source no longer produces a qualifying candidate. A
+  recorded-fast overlap temporarily suppresses presentation but does not erase
+  the person's hide choice.
+- **Decision:** History uses the same exact settled and moving visible-window
+  projection for hidden candidates. A hidden candidate contributes no timeline,
+  empty/Save/Start action or inferred `FastRecord`. On a selected settled day,
+  one source-bound recovery row may appear only when the current candidate
+  intersects the visible interval and has no recorded overlap. Re-enable is an
+  atomic, revalidated removal of that suppression; cancellation, stale state or
+  commit failure leaves local data unchanged and reports accessible feedback.
+- **Decision:** The suppression entity is an additive SwiftData V7 migration.
+  Detection-off preserves rows, detection-on reconciles them, relaunch restores
+  them, and Delete All Data removes them. No Today, WidgetKit, ActivityKit,
+  network, cloud, HealthKit, AI or coaching path is added.
+- **Consequence:** D-039 amends D-033 through D-035 and BR-44 through BR-55
+  for this explicit visibility state without erasing those historical
+  decisions. Inferred intervals remain derived, source events and recorded
+  fasts remain authoritative, and existing OW-410/OW-411 conversion and event
+  boundary behavior remains in force.

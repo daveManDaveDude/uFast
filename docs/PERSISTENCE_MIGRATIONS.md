@@ -20,3 +20,15 @@ To evolve the stored schema:
 
 Never edit a released schema in place, point production at a fresh replacement
 store, or enable CloudKit as part of a migration.
+
+## Version 7: inferred-fast suppression
+
+OW-412 adds `InferredFastSuppressionRecord` in an additive lightweight V6 to V7
+migration. The entity is keyed by a source `CaloricBoundaryReference` and
+stores derived projection metadata for local visibility recovery; it is not a
+`FastRecord` and does not fabricate inferred history during migration. Existing
+settings, events, fasts and legacy rows remain unchanged. Store-open
+reconciliation removes stale suppression rows and refreshes qualifying rows
+before History consumes them. Delete All Data includes this entity, and a
+failed save restores the suppression snapshot through the same local rollback
+boundary as the related mutation.

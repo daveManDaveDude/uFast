@@ -58,6 +58,15 @@ struct UFastApp: App {
                         ? { throw SimulatedPersistenceBootstrapError.requested }
                         : nil
                 ).reconcile()
+                _ = try InferredFastSuppressionStore(
+                    modelContext: container.mainContext,
+                    diagnosticSink: diagnosticSink
+                ).reconcile(
+                    currentGoal: currentGoal,
+                    enabled: settingsStore.authoritativeRecord()?.inferredFastDetectionEnabled ?? false,
+                    now: configuredClock.now,
+                    updatedAt: configuredClock.now
+                )
                 try Self.resetDataIfRequested(
                     in: container,
                     clock: configuredClock,

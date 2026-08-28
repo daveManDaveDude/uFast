@@ -93,12 +93,26 @@ final class SwiftDataSettingsStore {
         return settings
     }
 
-    func updateGoal(_ goal: FastingGoal) throws {
+    func updateGoal(
+        _ goal: FastingGoal,
+        additionalChanges: (() throws -> Void)? = nil,
+        additionalRecovery: (() -> Void)? = nil
+    ) throws {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
-        settings.setFastingGoal(goal)
-        try saveTransaction {
-            settings.restore(from: snapshot)
+        do {
+            settings.setFastingGoal(goal)
+            try additionalChanges?()
+            try saveTransaction {
+                settings.restore(from: snapshot)
+                additionalRecovery?()
+            }
+        } catch {
+            // PersistenceTransaction has already restored and rolled back
+            // save failures. For a preparation failure, perform the same
+            // rollback here without writing a second restoration afterward.
+            modelContext.rollback()
+            throw error
         }
     }
 
@@ -113,12 +127,23 @@ final class SwiftDataSettingsStore {
         }
     }
 
-    func updateInferredFastDetectionEnabled(_ enabled: Bool) throws {
+    func updateInferredFastDetectionEnabled(
+        _ enabled: Bool,
+        additionalChanges: (() throws -> Void)? = nil,
+        additionalRecovery: (() -> Void)? = nil
+    ) throws {
         let settings = try requiredAuthority()
         let snapshot = settings.userVisibleSnapshot
-        settings.setInferredFastDetectionEnabled(enabled)
-        try saveTransaction {
-            settings.restore(from: snapshot)
+        do {
+            settings.setInferredFastDetectionEnabled(enabled)
+            try additionalChanges?()
+            try saveTransaction {
+                settings.restore(from: snapshot)
+                additionalRecovery?()
+            }
+        } catch {
+            modelContext.rollback()
+            throw error
         }
     }
 
