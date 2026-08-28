@@ -27,6 +27,7 @@ struct TemporalHistoryCarousel: View {
     let onSelectEvent: (UUID) -> Void
     var onSelectEventGroup: ((TemporalEventGroup) -> Void)?
     let onSelectEmpty: (Date) -> Void
+    var allowsAddAtCenter = false
     let onNavigateDay: (Int) -> Void
     let canNavigateForward: Bool
     let allowsRecordActivation: Bool
@@ -287,14 +288,10 @@ extension TemporalHistoryCarousel {
             UFastSectionHeading(
                 dayPresentation.visualDay.formatted(
                     .dateTime.weekday(.abbreviated).day().month(.abbreviated)
-                ),
-                eyebrow: textResolver(.historyCopy(.selectedDay))
+                )
             )
             .accessibilityLabel(
-                textResolver(.historyCopy(.selectedDay))
-                    + textResolver(.historyCopy(.separatorComma))
-                    + textResolver(.historyCopy(.separatorSpace))
-                    + settledDayText
+                settledDayText
             )
             .accessibilityIdentifier("history.selected-date")
             .accessibilityAction(named: textResolver(.historyCopy(.previousDay))) {
@@ -315,6 +312,19 @@ extension TemporalHistoryCarousel {
                 }
             }
             Spacer()
+            if allowsAddAtCenter {
+                Button {
+                    guard let settledVisibleWindow else { return }
+                    onSelectEmpty(settledVisibleWindow.centerInstant)
+                } label: {
+                    Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!movementPhase.allowsTimelineInteraction || settledVisibleWindow == nil)
+                .accessibilityHint(textResolver(.historyCopy(.addAtSelectedTimeHint)))
+                .accessibilityIdentifier("history.add-at-selected-time")
+            }
             Button {
                 onNavigateDay(-1)
             } label: {

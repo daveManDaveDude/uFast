@@ -211,7 +211,7 @@ extension HistoryUITests {
             waitForSettledHistory(
                 selectedDate: selectedDate,
                 carousel: carousel,
-                expectedSelectedDate: "Selected day, Wed 26 Aug"
+                expectedSelectedDate: "Wed 26 Aug"
             ),
             app.debugDescription
         )

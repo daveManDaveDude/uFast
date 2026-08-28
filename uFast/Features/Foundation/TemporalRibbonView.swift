@@ -47,8 +47,7 @@ struct TemporalRibbonView: View {
                     UFastSectionHeading(
                         selectedDate.formatted(
                             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
-                        ),
-                        eyebrow: textResolver(.historyCopy(.selectedDay))
+                        )
                     )
                     .accessibilityIdentifier("\(accessibilityIdentifierPrefix).selected-date")
                     Spacer()

@@ -12,12 +12,6 @@ extension HistoryView {
                     if isFutureSelection {
                         futureReadOnlyNotice
                     }
-                    if !isFutureSelection {
-                        directAddAlternative
-                            .opacity(showsSettledHistoryDetails ? 1 : 0)
-                            .allowsHitTesting(showsSettledHistoryDetails)
-                            .accessibilityHidden(!showsSettledHistoryDetails)
-                    }
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         fastHistoryDetails(at: clock.now)
                             .opacity(showsSettledHistoryDetails ? 1 : 0)

@@ -90,8 +90,8 @@ extension HistoryUITests {
         XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
         let selectedDate = app.staticTexts["history.selected-date"]
         XCTAssertTrue(selectedDate.waitForExistence(timeout: 5), app.debugDescription)
-        let sundaySelectedDate = "Selected day, Sun 16 Aug"
-        let saturdaySelectedDate = "Selected day, Sat 15 Aug"
+        let sundaySelectedDate = "Sun 16 Aug"
+        let saturdaySelectedDate = "Sat 15 Aug"
         XCTAssertTrue(waitForSettledHistory(
             selectedDate: selectedDate,
             carousel: carousel,
@@ -278,7 +278,7 @@ extension HistoryUITests {
         let expectedSelectedDay = nextDay.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
-        let expectedSelectedDate = "Selected day, \(expectedSelectedDay)"
+        let expectedSelectedDate = expectedSelectedDay
         XCTAssertEqual(selectedDate.label, expectedSelectedDate)
         let carousel = app.scrollViews["history.day-carousel"]
         XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
@@ -315,7 +315,7 @@ extension HistoryUITests {
         let originalStartDayLabel = originalStartDay.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
-        let originalStartSelectedDate = "Selected day, \(originalStartDayLabel)"
+        let originalStartSelectedDate = originalStartDayLabel
         let previousOffsetState = try XCTUnwrap(settledSeamState(
             in: app,
             expectedSelectedDate: originalStartSelectedDate,
@@ -336,7 +336,7 @@ extension HistoryUITests {
         let midpointDayLabel = midpointDay.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
-        let midpointSelectedDate = "Selected day, \(midpointDayLabel)"
+        let midpointSelectedDate = midpointDayLabel
         let dateNavigator = app.descendants(matching: .any)["temporal.date-navigator"]
         let midpointDateButton = dateNavigator.buttons[
             "temporal.date.\(calendar.startOfDay(for: midpointDay).timeIntervalSince1970)"

@@ -474,7 +474,7 @@ final class TemporalRibbonLabelProjectionTests: XCTestCase {
                 metrics: ["Fast": metrics]
             ).first
         )
-        XCTAssertEqual(label.labelWidth, 15 + 4 + 28 + 12, accuracy: 0.000_001)
+        XCTAssertEqual(label.labelWidth, 15 + 4 + 28 + 4 + 10 + 12, accuracy: 0.000_001)
         XCTAssertEqual(metrics.glyphOnlyWidth, 27, accuracy: 0.000_001)
     }
 

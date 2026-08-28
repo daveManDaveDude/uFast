@@ -151,12 +151,14 @@ struct TemporalRibbonLabelInput: Equatable, Sendable {
 /// the localized title and presentation generation by its owner; the pure
 /// projector only needs the resulting widths.
 struct TemporalRibbonLabelMetrics: Equatable, Sendable {
+    static let disclosureWidth: Double = 10
+
     let title: String
     let glyphWidth: Double
     let textWidth: Double
 
     var fullLabelWidth: Double {
-        glyphWidth + 4 + textWidth + 12
+        glyphWidth + 4 + textWidth + 4 + Self.disclosureWidth + 12
     }
 
     var glyphOnlyWidth: Double {

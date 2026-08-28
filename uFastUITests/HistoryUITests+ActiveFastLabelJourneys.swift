@@ -54,7 +54,7 @@ extension HistoryUITests {
         XCTAssertTrue(waitForSettledHistory(
             selectedDate: selectedDate,
             carousel: carousel,
-            expectedSelectedDate: "Selected day, \(expectedSelectedDay)"
+            expectedSelectedDate: expectedSelectedDay
         ), app.debugDescription)
         XCTAssertEqual(
             visibleActiveFastLabelProbe(in: app, carousel: carousel).count,
@@ -72,7 +72,7 @@ extension HistoryUITests {
         XCTAssertTrue(waitForSettledHistory(
             selectedDate: selectedDate,
             carousel: carousel,
-            expectedSelectedDate: "Selected day, \(currentDay)"
+            expectedSelectedDate: currentDay
         ), app.debugDescription)
         XCTAssertEqual(visibleActiveFastLabelProbe(in: app, carousel: carousel).count, 1, app.debugDescription)
 
@@ -81,7 +81,7 @@ extension HistoryUITests {
         XCTAssertTrue(waitForSettledHistory(
             selectedDate: selectedDate,
             carousel: carousel,
-            expectedSelectedDate: "Selected day, \(expectedSelectedDay)"
+            expectedSelectedDate: expectedSelectedDay
         ), app.debugDescription)
         XCTAssertEqual(visibleActiveFastLabelProbe(in: app, carousel: carousel).count, 0, app.debugDescription)
         captureScreenshot(named: "history-active-fast-midnight-seam", in: app)

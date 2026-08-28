@@ -370,6 +370,10 @@ struct TemporalRibbonLabelLayer: View {
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
+            if descriptor.showsText {
+                Text(">")
+                    .frame(width: TemporalRibbonLabelMetrics.disclosureWidth)
+            }
         }
         .padding(.horizontal, 6)
         .font(.caption.weight(.semibold))

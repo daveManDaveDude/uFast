@@ -50,6 +50,8 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertEqual(calendar.component(.day, from: window.interval.end), 23)
         XCTAssertEqual(calendar.component(.hour, from: window.interval.end), 7)
         XCTAssertEqual(window.duration, 26 * 60 * 60)
+        let expectedCenter = try date(2026, 7, 22, 18, calendar: calendar)
+        XCTAssertEqual(window.centerInstant, expectedCenter)
         XCTAssertEqual(progress.leadingDay, days[1])
         XCTAssertEqual(progress.trailingDay, days[2])
         XCTAssertEqual(progress.fraction, 0.25, accuracy: 0.000_001)

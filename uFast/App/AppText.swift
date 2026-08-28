@@ -402,7 +402,6 @@ enum AppText: Equatable {
         case retry
         case motionExtensionMessage
         case extensionRetry
-        case eyebrow
         case chooseDate
         case chooseDateLabel
         case addAtSelectedTime
@@ -426,10 +425,8 @@ enum AppText: Equatable {
         case groupMemberDrinkHint
         case memberDetailHint
         case carouselLabel
-        case selectedDateLabel
         case previousDay
         case nextDay
-        case selectedDay
         case timelineEmpty
         case eventFood
         case eventDrink
@@ -1376,7 +1373,7 @@ enum AppText: Equatable {
         .historyCopy(.dateChipState(selected: false, future: false, inRange: false, selectable: true)),
         .historyCopy(.dateChipState(selected: false, future: false, inRange: false, selectable: false)),
         .historyCopy(.motionExtensionMessage), .historyCopy(.extensionRetry),
-        .historyCopy(.eyebrow), .historyCopy(.chooseDate), .historyCopy(.chooseDateLabel),
+        .historyCopy(.chooseDate), .historyCopy(.chooseDateLabel),
         .historyCopy(.addAtSelectedTime), .historyCopy(.addAtSelectedTimeHint),
         .historyCopy(.emptyEyebrow), .historyCopy(.emptyTitle), .historyCopy(.emptyMessage),
         .historyCopy(.detailsEyebrow), .historyCopy(.fastsInView), .historyCopy(.futureReadOnly),
@@ -1384,8 +1381,8 @@ enum AppText: Equatable {
         .historyCopy(.groupExactTimes), .historyCopy(.groupHint), .historyCopy(.groupCancel),
         .historyCopy(.groupAddEvent), .historyCopy(.groupAddHint), .historyCopy(.groupNoEligibleTime),
         .historyCopy(.groupMemberFoodHint), .historyCopy(.groupMemberDrinkHint),
-        .historyCopy(.memberDetailHint), .historyCopy(.carouselLabel), .historyCopy(.selectedDateLabel),
-        .historyCopy(.previousDay), .historyCopy(.nextDay), .historyCopy(.selectedDay),
+        .historyCopy(.memberDetailHint), .historyCopy(.carouselLabel),
+        .historyCopy(.previousDay), .historyCopy(.nextDay),
         .historyCopy(.timelineEmpty), .historyCopy(.eventFood), .historyCopy(.eventDrink),
         .historyCopy(.caloric), .historyCopy(.nonCaloric), .historyCopy(.food), .historyCopy(.drink),
         .historyCopy(.recordedFast), .historyCopy(.activeFast), .historyCopy(.fast),
@@ -1548,10 +1545,9 @@ enum AppText: Equatable {
         case .retry: resource("history.retry", "Try again", "History initial retry action")
         case .motionExtensionMessage: resource("history.motion.extension.message", "More history is still available to load.", "History motion extension error explanation")
         case .extensionRetry: resource("history.extension-retry", "Retry", "History motion extension retry action")
-        case .eyebrow: resource("history.eyebrow", "HISTORY", "History section eyebrow")
         case .chooseDate: resource("history.choose-date", "Choose date", "History choose-date action")
         case .chooseDateLabel: resource("history.choose-date.label", "Choose a date", "History choose-date VoiceOver label")
-        case .addAtSelectedTime: resource("history.add-at-selected-time", "Add at selected time", "History direct-entry action")
+        case .addAtSelectedTime: resource("history.add-at-selected-time", "Add", "History direct-entry action")
         case .addAtSelectedTimeHint: resource("history.add-at-selected-time.hint", "Opens native date and time controls before choosing food or drink.", "History direct-entry VoiceOver hint")
         case .emptyEyebrow: resource("history.empty.eyebrow", "Fasts in this view", "History empty-state eyebrow")
         case .emptyTitle: resource("history.empty.title", "No completed fasts", "History empty-state title")
@@ -1572,10 +1568,8 @@ enum AppText: Equatable {
         case .groupMemberDrinkHint: resource("history.group.member.drink.hint", "Opens this drink event for editing.", "History drink group member VoiceOver hint")
         case .memberDetailHint: resource("history.group.member.hint", "Opens details and available actions.", "History event member VoiceOver hint")
         case .carouselLabel: resource("history.carousel", "History day carousel", "History carousel VoiceOver label")
-        case .selectedDateLabel: resource("history.selected-date.label", "Selected day, %@", "History selected-day VoiceOver label")
         case .previousDay: resource("history.previous-day", "Previous day", "History carousel accessibility action")
         case .nextDay: resource("history.next-day", "Next day", "History carousel accessibility action")
-        case .selectedDay: resource("history.selected-day", "Selected day", "History selected-day label")
         case .timelineEmpty: resource("history.timeline.empty", "No recorded items in this time window.", "History empty timeline message")
         case .eventFood: resource("history.event.food", "Food", "History food event category")
         case .eventDrink: resource("history.event.drink", "Drink", "History drink event category")

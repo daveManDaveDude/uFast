@@ -79,12 +79,17 @@ extension HistoryUITests {
     @MainActor
     func testTodayAlternativeAllowsElapsedEntryWhileFutureHistoryRemainsReadOnly() {
         let app = launchHistory(
-            arguments: launchArguments(now: start, resetData: true, seedOnboarded: true)
+            arguments: launchArguments(
+                now: start.addingTimeInterval(8 * 60 * 60),
+                resetData: true,
+                seedOnboarded: true
+            )
         )
         selectHistoryTab(in: app)
 
         let add = app.buttons["history.add-at-selected-time"]
         XCTAssertTrue(add.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(add.label, "Add")
         if !add.isHittable {
             let historyContent = app.scrollViews["history.content"]
             XCTAssertTrue(historyContent.waitForExistence(timeout: 5), app.debugDescription)
@@ -116,6 +121,16 @@ extension HistoryUITests {
         XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
         XCTAssertTrue(app.staticTexts["history.future-read-only"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.buttons["history.add-at-selected-time"].waitForNonExistence(timeout: 5), app.debugDescription)
+
+        let adjacentFoodMarker = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                "history.visual-event.",
+                "Food event"
+            )
+        ).firstMatch
+        XCTAssertTrue(adjacentFoodMarker.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(adjacentFoodMarker.isEnabled, adjacentFoodMarker.debugDescription)
     }
 
     @MainActor

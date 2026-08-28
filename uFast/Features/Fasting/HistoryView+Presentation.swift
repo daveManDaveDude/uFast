@@ -77,10 +77,6 @@ extension HistoryView {
     var periodHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(textResolver(.historyCopy(.eyebrow)))
-                    .font(.caption.weight(.semibold))
-                    .tracking(1.2)
-                    .foregroundStyle(UFastTheme.secondaryText)
                 Text(historyDayPresentation.visualDay, format: .dateTime.month(.wide).year())
                     .font(.uFastDisplay(.title))
                     .foregroundStyle(UFastTheme.primary)
@@ -186,38 +182,6 @@ extension HistoryView {
         return "none"
     }
 
-    var directAddAlternative: some View {
-        Button {
-            beginHistoricalEntry(at: defaultHistoricalInstant)
-        } label: {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus.circle")
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(defaultHistoricalInstant, format: .dateTime.hour().minute())
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(UFastTheme.secondaryText)
-                    }
-                } else {
-                    HStack {
-                        Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus.circle")
-                        Spacer()
-                        Text(defaultHistoricalInstant, format: .dateTime.hour().minute())
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(UFastTheme.secondaryText)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        }
-        .buttonStyle(UFastSecondaryButtonStyle())
-        .disabled(!temporalMovementPhase.allowsTimelineInteraction)
-        .padding(.horizontal, UFastTheme.Spacing.standard)
-        .accessibilityHint(textResolver(.historyCopy(.addAtSelectedTimeHint)))
-        .accessibilityIdentifier("history.add-at-selected-time")
-    }
-
     @ViewBuilder
     // swiftlint:disable:next function_body_length
     func fastHistoryDetails(at now: Date) -> some View {
@@ -254,7 +218,7 @@ extension HistoryView {
         if visibleFastItems.isEmpty {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                    Text(textResolver(.historyCopy(.eyebrow)))
+                    Text(textResolver(.historyCopy(.emptyEyebrow)))
                         .font(.caption.weight(.semibold))
                         .tracking(1.2)
                         .foregroundStyle(UFastTheme.secondaryText)
@@ -324,14 +288,6 @@ extension HistoryView {
         .padding(.horizontal, UFastTheme.Spacing.standard)
         .accessibilityHint(textResolver(.historyCopy(.futureReadOnlyHint)))
         .accessibilityIdentifier("history.future-read-only")
-    }
-
-    var defaultHistoricalInstant: Date {
-        CatchUpRangeResolver.prefilledInstant(
-            on: selectedDate,
-            now: clock.now,
-            calendar: calendar
-        )
     }
 
     func historicalDayRange(containing instant: Date) -> Range<Date>? {
@@ -601,9 +557,14 @@ extension HistoryView {
             onSelectEmpty: { instant in
                 beginHistoricalEntry(at: instant)
             },
+            allowsAddAtCenter: !isFutureSelection,
             onNavigateDay: navigateDay,
             canNavigateForward: canNavigateForward,
-            allowsRecordActivation: !isFutureSelection,
+            // A future selection makes empty time read-only, but records from
+            // the visible look-back portion remain ordinary History records.
+            // Keep their fast, food, and drink controls active and fully
+            // coloured instead of inheriting the future-day disabled state.
+            allowsRecordActivation: true,
             allowsEmptySelection: !isFutureSelection,
             showsTimelineDetails: showsSettledHistoryDetails,
             presentationDay: selectedDate,
