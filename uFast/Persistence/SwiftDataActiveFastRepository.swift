@@ -11,16 +11,19 @@ enum ActiveFastPersistenceError: Error {
 final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundaryQuerying {
     private let modelContext: ModelContext
     private let transaction: PersistenceTransaction
+    private let clock: any AppClock
     private let observationSink: BoundaryQueryObservationSink
     private let diagnosticSink: any DiagnosticEventSink
 
     init(
         modelContext: ModelContext,
         simulateSaveFailure: Bool = false,
+        clock: any AppClock = SystemAppClock(),
         observationSink: BoundaryQueryObservationSink = NoOpBoundaryQueryObservationSink(),
         diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
     ) {
         self.modelContext = modelContext
+        self.clock = clock
         self.observationSink = observationSink
         self.diagnosticSink = diagnosticSink
         transaction = PersistenceTransaction(
@@ -106,14 +109,16 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundary
     }
 
     func saveNewActiveFast(_ fast: FastRecord) throws {
-        modelContext.insert(fast)
-        try saveTransaction()
+        try saveAtomic {
+            modelContext.insert(fast)
+        }
     }
 
     func updateStartDate(of fast: FastRecord, to startDate: Date) throws {
         let originalStartDate = fast.startDate
-        fast.correctStartDate(to: startDate)
-        try saveTransaction {
+        try saveAtomic {
+            fast.correctStartDate(to: startDate)
+        } recovery: {
             fast.correctStartDate(to: originalStartDate)
         }
     }
@@ -126,8 +131,9 @@ final class SwiftDataActiveFastRepository: ActiveFastRepository, CaloricBoundary
         guard let originalGoal = fast.historicalGoal else {
             throw FastRecordIntegrityError.invalidHistoricalGoal(rawHours: fast.goalHoursAtStart)
         }
-        fast.complete(at: endDate, goal: goal)
-        try saveTransaction {
+        try saveAtomic {
+            fast.complete(at: endDate, goal: goal)
+        } recovery: {
             fast.restoreActive(goal: originalGoal)
         }
     }
@@ -158,8 +164,9 @@ extension SwiftDataActiveFastRepository: CompletedFastRepository {
         guard let originalEndDate = fast.endDate else {
             throw ActiveFastPersistenceError.completedFastNotFound
         }
-        fast.correctBoundaries(startDate: startDate, endDate: endDate)
-        try saveTransaction {
+        try saveAtomic {
+            fast.correctBoundaries(startDate: startDate, endDate: endDate)
+        } recovery: {
             fast.correctBoundaries(startDate: originalStartDate, endDate: originalEndDate)
         }
         return fast
@@ -181,19 +188,52 @@ extension SwiftDataActiveFastRepository: CompletedFastRepository {
             fast = record
         }
 
-        modelContext.delete(fast)
-        try saveTransaction()
+        try saveAtomic {
+            modelContext.delete(fast)
+        }
     }
 }
 
 extension SwiftDataActiveFastRepository: CompletedFastCreationRepository {
     func saveCompletedFast(_ fast: FastRecord) throws {
-        modelContext.insert(fast)
-        try saveTransaction()
+        try saveAtomic {
+            modelContext.insert(fast)
+        }
     }
 }
 
 private extension SwiftDataActiveFastRepository {
+    func saveAtomic(
+        _ changes: () throws -> Void,
+        recovery: @escaping () -> Void = {}
+    ) throws {
+        let suppressionStore = InferredFastSuppressionStore(
+            modelContext: modelContext,
+            diagnosticSink: diagnosticSink
+        )
+        let suppressionSnapshot = try suppressionStore.snapshot()
+        do {
+            try changes()
+            let settings = try SwiftDataSettingsStore(modelContext: modelContext)
+                .authoritativeRecord()
+            _ = try suppressionStore.reconcileInMemory(
+                currentGoal: settings?.fastingGoal ?? .default,
+                enabled: settings?.inferredFastDetectionEnabled ?? false,
+                mode: .authoritativeMutation,
+                now: clock.now,
+                updatedAt: clock.now
+            )
+            try saveTransaction {
+                recovery()
+                suppressionSnapshot.restore(in: self.modelContext)
+            }
+        } catch {
+            suppressionSnapshot.restore(in: modelContext)
+            modelContext.rollback()
+            throw error
+        }
+    }
+
     func saveTransaction(recovering recovery: @escaping () -> Void = {}) throws {
         do {
             try transaction.save(recovering: recovery)

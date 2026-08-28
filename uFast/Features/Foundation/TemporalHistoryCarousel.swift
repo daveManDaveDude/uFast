@@ -1,12 +1,21 @@
 import SwiftUI
 
-// swiftlint:disable function_body_length opening_brace
+// swiftlint:disable function_body_length opening_brace file_length
+
+private struct TemporalAppearedSegmentDatesKey: PreferenceKey {
+    static let defaultValue: [Date] = []
+
+    static func reduce(value: inout [Date], nextValue: () -> [Date]) {
+        value.append(contentsOf: nextValue())
+    }
+}
 
 struct TemporalHistoryCarousel: View {
     @Environment(\.calendar) var calendar
     @Environment(\.appTextResolver) var textResolver
     @Environment(\.layoutDirection) var layoutDirection
     @Environment(\.scenePhase) var scenePhase
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
     let dates: [Date]
     @Binding var selection: Date
@@ -18,6 +27,7 @@ struct TemporalHistoryCarousel: View {
     let onSelectEvent: (UUID) -> Void
     var onSelectEventGroup: ((TemporalEventGroup) -> Void)?
     let onSelectEmpty: (Date) -> Void
+    var allowsAddAtCenter = false
     let onNavigateDay: (Int) -> Void
     let canNavigateForward: Bool
     let allowsRecordActivation: Bool
@@ -27,10 +37,7 @@ struct TemporalHistoryCarousel: View {
     var readOnlyFromDate: Date?
     let onMovementPhaseChange: (TemporalCarouselMovementPhase) -> Void
     var onCoupledPresentationChange: (TemporalCoupledPresentationUpdate) -> Void = { _ in }
-    var activeFastNow: () -> Date = { .now }
     var onSettledVisibleWindow: (TemporalRibbonWindow) -> Void = { _ in }
-    /// Coarse edge intent only.  The callback is gated below so geometry
-    /// frames never perform persistence work or rebuild the page arrays.
     var onPrefetchIntent: (HistoryMotionEdge) -> Void = { _ in }
     var onPrefetchIntentAt: (HistoryMotionEdge, Date) -> Void = { _, _ in }
 
@@ -41,18 +48,10 @@ struct TemporalHistoryCarousel: View {
     @State var settledVisibleWindow: TemporalRibbonWindow?
     @State var geometrySnapshot = TemporalCarouselGeometrySnapshot()
     @State var prefetchedEdges: Set<HistoryMotionEdge> = []
-
-    enum PresentationSource: Equatable, Sendable {
-        case settled
-        case motion
-    }
-
-    static func presentationSource(
-        isSelectedPage: Bool,
-        movementPhase: TemporalCarouselMovementPhase
-    ) -> PresentationSource {
-        isSelectedPage && movementPhase == .settled ? .settled : .motion
-    }
+    @State var viewportWidth: Double = 0
+    @State var measuredContentWidth: Double = 0
+    @State var measuredDayStride: Double = 0
+    @State var appearedSegmentDates: Set<Date> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
@@ -70,11 +69,57 @@ struct TemporalHistoryCarousel: View {
                             .id(date)
                     }
                 }
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: TemporalCarouselContentLayoutKey.self,
+                            value: TemporalCarouselContentLayout(
+                                contentWidth: proxy.size.width,
+                                dayStride: dates.isEmpty
+                                    ? 0
+                                    : proxy.size.width / CGFloat(dates.count)
+                            )
+                        )
+                    }
+                }
+                .overlay(alignment: .topLeading) { labelLayer }
                 .scrollTargetLayout()
             }
             .scrollIndicators(.hidden)
             .scrollPosition(id: $centeredDay, anchor: .center)
             .frame(height: selectedPageHeight)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: TemporalCarouselViewportWidthKey.self,
+                        value: proxy.size.width
+                    )
+                }
+            }
+            .onPreferenceChange(TemporalAppearedSegmentDatesKey.self) { dates in
+                let newlyAppearedDates = Set(dates).subtracting(appearedSegmentDates)
+                guard !newlyAppearedDates.isEmpty else { return }
+                for date in newlyAppearedDates {
+                    HistoryLabelWorkProbe.recordAppearedSegment(date)
+                }
+                appearedSegmentDates.formUnion(newlyAppearedDates)
+            }
+            .onPreferenceChange(TemporalCarouselViewportWidthKey.self) { width in
+                guard width > 0, viewportWidth != width else { return }
+                viewportWidth = width
+            }
+            .onPreferenceChange(TemporalCarouselContentLayoutKey.self) { layout in
+                guard layout.isValid,
+                      measuredContentWidth != Double(layout.contentWidth)
+                      || measuredDayStride != Double(layout.dayStride)
+                else { return }
+                measuredContentWidth = Double(layout.contentWidth)
+                measuredDayStride = Double(layout.dayStride)
+                HistoryLabelWorkProbe.recordMeasuredContentLayout(
+                    contentWidth: measuredContentWidth,
+                    dayStride: measuredDayStride
+                )
+            }
             .onPreferenceChange(TemporalSelectedPageHeightKey.self) { height in
                 guard height > 0, selectedPageHeight != height else { return }
                 selectedPageHeight = height
@@ -101,24 +146,30 @@ struct TemporalHistoryCarousel: View {
                     )
                 },
                 action: { _, geometry in
-                    geometrySnapshot.geometry = geometry
-                    let direction = layoutDirection == .rightToLeft
-                        ? TemporalHorizontalLayoutDirection.rightToLeft
-                        : .leftToRight
-                    let progress = geometry.centerProgress(
-                        days: dates,
-                        layoutDirection: direction
-                    )
-                    if let progress {
-                        emitPrefetchIntent(for: progress)
-                        if movementPhase != .settled {
+                    HistoryLabelWorkProbe.withScrollGeometryCallback {
+                        geometrySnapshot.geometry = geometry
+                        HistoryLabelWorkProbe.recordScrollGeometry(
+                            geometry
+                        )
+                        let direction = layoutDirection == .rightToLeft
+                            ? TemporalHorizontalLayoutDirection.rightToLeft
+                            : .leftToRight
+                        let progress = geometry.centerProgress(
+                            days: dates,
+                            layoutDirection: direction
+                        )
+                        if movementPhase != .settled,
+                           let progress
+                        {
+                            emitPrefetchIntent(for: progress)
                             onCoupledPresentationChange(.preview(progress))
                         }
-                    }
-                    if movementPhase == .settled,
-                       geometrySnapshot.hasActiveMotion
-                    {
-                        settleVisibleGeometry(geometry)
+                        if movementPhase == .settled, geometrySnapshot.hasActiveMotion {
+                            if let progress {
+                                emitPrefetchIntent(for: progress)
+                            }
+                            settleVisibleGeometry(geometry)
+                        }
                     }
                 }
             )
@@ -237,14 +288,10 @@ extension TemporalHistoryCarousel {
             UFastSectionHeading(
                 dayPresentation.visualDay.formatted(
                     .dateTime.weekday(.abbreviated).day().month(.abbreviated)
-                ),
-                eyebrow: textResolver(.historyCopy(.selectedDay))
+                )
             )
             .accessibilityLabel(
-                textResolver(.historyCopy(.selectedDay))
-                    + textResolver(.historyCopy(.separatorComma))
-                    + textResolver(.historyCopy(.separatorSpace))
-                    + settledDayText
+                settledDayText
             )
             .accessibilityIdentifier("history.selected-date")
             .accessibilityAction(named: textResolver(.historyCopy(.previousDay))) {
@@ -265,6 +312,28 @@ extension TemporalHistoryCarousel {
                 }
             }
             Spacer()
+            if allowsAddAtCenter {
+                Button {
+                    guard let settledVisibleWindow else { return }
+                    // The centred instant is noon for a day window. On the
+                    // current day that can still be in the future (for
+                    // example, when the clock is before noon), so clamp the
+                    // action to the read-only boundary instead of silently
+                    // dropping the tap.
+                    let centeredInstant = settledVisibleWindow.centerInstant
+                    let selectableInstant = readOnlyFromDate.map {
+                        min(centeredInstant, $0)
+                    } ?? centeredInstant
+                    onSelectEmpty(selectableInstant)
+                } label: {
+                    Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!movementPhase.allowsTimelineInteraction || settledVisibleWindow == nil)
+                .accessibilityHint(textResolver(.historyCopy(.addAtSelectedTimeHint)))
+                .accessibilityIdentifier("history.add-at-selected-time")
+            }
             Button {
                 onNavigateDay(-1)
             } label: {
@@ -289,12 +358,13 @@ extension TemporalHistoryCarousel {
 
     func daySegment(_ date: Date) -> some View {
         let isSelected = calendar.isDate(date, inSameDayAs: selection)
-        let source = Self.presentationSource(
-            isSelectedPage: isSelected,
-            movementPhase: movementPhase
-        )
-        let pageIntervals = source == .settled ? intervals : motionIntervals
-        let pageEvents = source == .settled ? events : motionEvents
+        let pageIntervals = motionIntervals
+        // The continuous interval layer stays motion-projected in every phase.
+        // Once the selected page settles, its visual event surface needs the
+        // complete snapshot so group titles, members, and details remain exact.
+        let pageEvents = isSelected && movementPhase == .settled
+            ? events
+            : motionEvents
         let interaction = Self.timelineInteractionState(
             movementPhase: movementPhase,
             allowsRecordActivation: allowsRecordActivation,
@@ -329,8 +399,6 @@ extension TemporalHistoryCarousel {
             usesContinuousSurface: true,
             includesSemanticItems: false,
             hidesVisualEventAccessibility: true,
-            showsLiveActiveDuration: isSelected && movementPhase == .settled,
-            activeFastNow: activeFastNow,
             windowOverride: TemporalHistoryPresentation.calendarDayWindow(
                 containing: date,
                 calendar: calendar
@@ -344,6 +412,12 @@ extension TemporalHistoryCarousel {
                     value: isSelected ? proxy.size.height : 0
                 )
             }
+        }
+        .background {
+            Color.clear.preference(
+                key: TemporalAppearedSegmentDatesKey.self,
+                value: [date]
+            )
         }
         .accessibilityHidden(!isSelected || movementPhase != .settled)
         .scrollTransition(.identity, axis: .horizontal) { content, _ in
@@ -455,20 +529,20 @@ extension TemporalHistoryCarousel {
     }
 
     func emitPrefetchIntent(for progress: TemporalDaySpaceProgress) {
-        guard !dates.isEmpty, prefetchedEdges.count < 2 else { return }
+        guard let first = dates.first, let last = dates.last else { return }
         let threshold = HistoryMotionConfiguration.product.prefetchThreshold
-        let precedingBoundary = dates[min(threshold, dates.count - 1)]
-        let followingBoundary = dates[max(dates.count - 1 - threshold, 0)]
-        if !prefetchedEdges.contains(.preceding),
-           progress.leadingDay <= precedingBoundary
-        {
+        let leadingDistance = calendar.dateComponents(
+            [.day], from: first, to: progress.leadingDay
+        ).day ?? Int.max
+        let trailingDistance = calendar.dateComponents(
+            [.day], from: progress.trailingDay, to: last
+        ).day ?? Int.max
+        if leadingDistance <= threshold, !prefetchedEdges.contains(.preceding) {
             prefetchedEdges.insert(.preceding)
             onPrefetchIntent(.preceding)
             onPrefetchIntentAt(.preceding, progress.centeredCalendarDay)
         }
-        if !prefetchedEdges.contains(.following),
-           progress.trailingDay >= followingBoundary
-        {
+        if trailingDistance <= threshold, !prefetchedEdges.contains(.following) {
             prefetchedEdges.insert(.following)
             onPrefetchIntent(.following)
             onPrefetchIntentAt(.following, progress.centeredCalendarDay)

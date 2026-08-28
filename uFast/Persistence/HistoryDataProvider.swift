@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+// swiftlint:disable function_body_length
+
 struct HistoryFastSnapshot: Equatable {
     let id: UUID
     let startDate: Date
@@ -36,6 +38,25 @@ struct HistoryDataSlice: Equatable {
     let foods: [FoodEntrySnapshot]
     let drinks: [HydrationEntrySnapshot]
     let settings: AppSettingsSnapshot?
+    let suppressedInferredFasts: [InferredFastSuppression]
+
+    init(
+        window: DateInterval,
+        completedFasts: [HistoryFastSnapshot],
+        activeFast: HistoryFastSnapshot?,
+        foods: [FoodEntrySnapshot],
+        drinks: [HydrationEntrySnapshot],
+        settings: AppSettingsSnapshot?,
+        suppressedInferredFasts: [InferredFastSuppression] = []
+    ) {
+        self.window = window
+        self.completedFasts = completedFasts
+        self.activeFast = activeFast
+        self.foods = foods
+        self.drinks = drinks
+        self.settings = settings
+        self.suppressedInferredFasts = suppressedInferredFasts
+    }
 
     var projectionInputCount: Int {
         completedFasts.count + (activeFast == nil ? 0 : 1) + foods.count + drinks.count
@@ -75,6 +96,7 @@ final class SwiftDataHistoryDataProvider {
         self.modelContext = modelContext
     }
 
+    // swiftlint:disable:next function_body_length
     func fetch(window: DateInterval) throws -> HistoryDataSlice {
         let active = try ActiveFastAuthority.fetch(in: modelContext).map(HistoryFastSnapshot.init)
         let settings = try SwiftDataSettingsStore(modelContext: modelContext)
@@ -85,19 +107,23 @@ final class SwiftDataHistoryDataProvider {
         let visibleFoods = try foods(in: window)
         let visibleDrinks = try drinks(in: window)
         let neighbours = try nearestCaloricNeighbours(outside: window)
+        let suppressions = try modelContext.fetch(FetchDescriptor<InferredFastSuppressionRecord>())
+            .compactMap(\.suppression)
         return HistoryDataSlice(
             window: window,
             completedFasts: completed,
             activeFast: active,
             foods: appendUnique(visibleFoods, neighbours.foods).map(FoodEntrySnapshot.init),
             drinks: appendUnique(visibleDrinks, neighbours.drinks).map(HydrationEntrySnapshot.init),
-            settings: settings
+            settings: settings,
+            suppressedInferredFasts: suppressions
         )
     }
 
-    /// Merge adjacent chunks by stable identity.  This is used before building
-    /// a presentation so an event or fast crossing a seam is projected once,
-    /// with recorded-fast precedence unchanged from the settled builder.
+    // Merge adjacent chunks by stable identity. This is used before building
+    // a presentation so an event or fast crossing a seam is projected once,
+    // with recorded-fast precedence unchanged from the settled builder.
+    // swiftlint:disable:next function_body_length
     nonisolated static func mergeMotionChunks(
         _ chunks: [HistoryMotionChunk],
         window: DateInterval
@@ -107,12 +133,18 @@ final class SwiftDataHistoryDataProvider {
         var events: [HistoryMotionEventPrimitive] = []
         var intervalIDs = Set<UUID>()
         var eventIDs = Set<UUID>()
+        var hiddenBySource: [CaloricBoundaryReference: HistoryVisibleFastItem] = [:]
         for chunk in chunks {
             for interval in chunk.presentation.intervals where intervalIDs.insert(interval.id).inserted {
                 intervals.append(interval)
             }
             for event in chunk.presentation.events where eventIDs.insert(event.id).inserted {
                 events.append(event)
+            }
+            for item in chunk.presentation.hiddenInferredFastItems {
+                if let source = item.inferredInterval?.sourceBoundaryReference {
+                    hiddenBySource[source] = item
+                }
             }
         }
         let inferredContexts = chunks.compactMap(\.presentation.inferredContext)
@@ -140,14 +172,31 @@ final class SwiftDataHistoryDataProvider {
                     .values
                     .sorted { $0.startDate < $1.startDate },
                 currentGoal: first.currentGoal,
-                enabled: first.enabled
+                enabled: first.enabled,
+                suppressions: inferredContexts
+                    .flatMap(\.suppressions)
+                    .reduce(into: [CaloricBoundaryReference: InferredFastSuppression]()) { result, suppression in
+                        result[suppression.sourceBoundaryReference] = suppression
+                    }
+                    .values
+                    .sorted { lhs, rhs in
+                        if lhs.sourceBoundaryReference.kind != rhs.sourceBoundaryReference.kind {
+                            return lhs.sourceBoundaryReference.kind.rawValue
+                                < rhs.sourceBoundaryReference.kind.rawValue
+                        }
+                        return lhs.sourceBoundaryReference.id.uuidString
+                            < rhs.sourceBoundaryReference.id.uuidString
+                    }
             )
         }
         return HistoryMotionPresentation(
             window: window,
             intervals: intervals.sorted { $0.start < $1.start },
             events: events.sorted { $0.occurredAt < $1.occurredAt },
-            inferredContext: inferredContext
+            inferredContext: inferredContext,
+            hiddenInferredFastItems: hiddenBySource.values.sorted {
+                $0.startDate == $1.startDate ? $0.id.uuidString < $1.id.uuidString : $0.startDate < $1.startDate
+            }
         )
     }
 
@@ -285,13 +334,16 @@ final class SwiftDataHistoryMotionDataProvider {
             sortBy: [SortDescriptor(\.occurredAt), SortDescriptor(\.id)]
         ))
         let neighbours = try nearestCaloricNeighbours(outside: window)
+        let suppressions = try modelContext.fetch(FetchDescriptor<InferredFastSuppressionRecord>())
+            .compactMap(\.suppression)
         return HistoryDataSlice(
             window: window,
             completedFasts: completed,
             activeFast: active,
             foods: appendUnique(foods, neighbours.foods).map(FoodEntrySnapshot.init),
             drinks: appendUnique(drinks, neighbours.drinks).map(HydrationEntrySnapshot.init),
-            settings: settings
+            settings: settings,
+            suppressedInferredFasts: suppressions
         )
     }
 

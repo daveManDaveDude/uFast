@@ -13,8 +13,11 @@ struct SeedValues: Equatable {
     let seedHistoryEventGrouping: Bool
     let seedHistoryMidnightSeam: Bool
     let seedHistoryMidnightSeamExtended: Bool
+    let seedHistoryFastLabelLayout: Bool
     let seedUnknownProvenance: Bool
     let seedInferredFast: Bool
+    let seedInferredFastEligibility: Bool
+    let seedSuppressedInferredFast: Bool
     let seedTodayMultiYear: Bool
     let seedCaloricBoundaryMultiYear: Bool
     let seedFavouritePopulated: Bool
@@ -44,6 +47,8 @@ struct FailureValues: Equatable {
     let simulateGoalSaveFailure: Bool
     let simulateLiveActivitySettingsSaveFailure: Bool
     let simulateInferredFastDetectionSaveFailure: Bool
+    let simulateSuppressionSaveFailure: Bool
+    let simulateSuppressionReenableStale: Bool
     let simulateDeleteAllFailure: Bool
     let simulateBoundaryReconciliationFailure: Bool
     let simulatePersistenceBootstrapFailure: Bool
@@ -74,6 +79,8 @@ extension SeedValues {
         _ seedHistoryMidnightSeamExtended: Bool,
         _ seedUnknownProvenance: Bool,
         _ seedInferredFast: Bool,
+        _ seedInferredFastEligibility: Bool,
+        _ seedSuppressedInferredFast: Bool,
         _ seedTodayMultiYear: Bool,
         _ seedCaloricBoundaryMultiYear: Bool,
         _ seedFavouritePopulated: Bool,
@@ -85,15 +92,19 @@ extension SeedValues {
         _ seedFoodFavouriteValidation: Bool,
         _ seedFoodFavouriteActiveFast: Bool,
         _ seedMultipleActiveFasts: Bool,
-        _ seedLiveActivityRecovery: Bool
+        _ seedLiveActivityRecovery: Bool,
+        _ seedHistoryFastLabelLayout: Bool = false
     ) {
         self.init(
             seedSlice3History: seedSlice3History,
             seedHistoryEventGrouping: seedHistoryEventGrouping,
             seedHistoryMidnightSeam: seedHistoryMidnightSeam,
             seedHistoryMidnightSeamExtended: seedHistoryMidnightSeamExtended,
+            seedHistoryFastLabelLayout: seedHistoryFastLabelLayout,
             seedUnknownProvenance: seedUnknownProvenance,
             seedInferredFast: seedInferredFast,
+            seedInferredFastEligibility: seedInferredFastEligibility,
+            seedSuppressedInferredFast: seedSuppressedInferredFast,
             seedTodayMultiYear: seedTodayMultiYear,
             seedCaloricBoundaryMultiYear: seedCaloricBoundaryMultiYear,
             seedFavouritePopulated: seedFavouritePopulated,
@@ -120,6 +131,8 @@ extension FailureValues {
         _ simulateGoalSaveFailure: Bool,
         _ simulateLiveActivitySettingsSaveFailure: Bool,
         _ simulateInferredFastDetectionSaveFailure: Bool,
+        _ simulateSuppressionSaveFailure: Bool,
+        _ simulateSuppressionReenableStale: Bool,
         _ simulateDeleteAllFailure: Bool,
         _ simulateBoundaryReconciliationFailure: Bool,
         _ simulatePersistenceBootstrapFailure: Bool,
@@ -141,6 +154,8 @@ extension FailureValues {
             simulateGoalSaveFailure: simulateGoalSaveFailure,
             simulateLiveActivitySettingsSaveFailure: simulateLiveActivitySettingsSaveFailure,
             simulateInferredFastDetectionSaveFailure: simulateInferredFastDetectionSaveFailure,
+            simulateSuppressionSaveFailure: simulateSuppressionSaveFailure,
+            simulateSuppressionReenableStale: simulateSuppressionReenableStale,
             simulateDeleteAllFailure: simulateDeleteAllFailure,
             simulateBoundaryReconciliationFailure: simulateBoundaryReconciliationFailure,
             simulatePersistenceBootstrapFailure: simulatePersistenceBootstrapFailure,
@@ -193,12 +208,24 @@ extension UITestLaunchConfiguration {
         seeds.seedHistoryMidnightSeamExtended
     }
 
+    var seedHistoryFastLabelLayout: Bool {
+        seeds.seedHistoryFastLabelLayout
+    }
+
     var seedUnknownProvenance: Bool {
         seeds.seedUnknownProvenance
     }
 
     var seedInferredFast: Bool {
         seeds.seedInferredFast
+    }
+
+    var seedInferredFastEligibility: Bool {
+        seeds.seedInferredFastEligibility
+    }
+
+    var seedSuppressedInferredFast: Bool {
+        seeds.seedSuppressedInferredFast
     }
 
     var seedTodayMultiYear: Bool {
@@ -299,6 +326,14 @@ extension UITestLaunchConfiguration {
 
     var simulateInferredFastDetectionSaveFailure: Bool {
         failures.simulateInferredFastDetectionSaveFailure
+    }
+
+    var simulateSuppressionSaveFailure: Bool {
+        failures.simulateSuppressionSaveFailure
+    }
+
+    var simulateSuppressionReenableStale: Bool {
+        failures.simulateSuppressionReenableStale
     }
 
     var simulateDeleteAllFailure: Bool {

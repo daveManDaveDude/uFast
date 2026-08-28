@@ -167,10 +167,10 @@
   eight-hour window ends. The exception never overrides **Hide for this fast**,
   global off, ActivityKit availability, request coalescing or duplicate
   prevention, and it does not apply to an ordinary same-build relaunch.
-- BR-44: Inferred-fast detection is an opt-in setting, off by default for new
-  and migrated installs. Turning it off does not delete source events or
-  recorded fasts; turning it on recomputes presentation from current local
-  state.
+- BR-44: Inferred-fast detection is a user-controlled setting enabled by
+  default for new and migrated installs. Turning it off does not delete source
+  events or recorded fasts; turning it on recomputes presentation from current
+  local state. An existing saved choice remains authoritative.
 - BR-45: Saving a historical inferred interval revalidates its generic
   caloric food or hydration source, boundaries, current goal and overlap rules,
   then creates one normal completed recorded fast using the current goal. It
@@ -207,6 +207,36 @@
 - BR-52: If a persisted recorded fast overlaps an inferred candidate, the
   entire inferred candidate is suppressed from presentation. It is not clipped
   into a partial interval and cannot be converted around the overlap.
+
+- BR-53 (added 28 August 2026 by OW-412): A person's decision to hide one
+  inferred candidate is a source-bound local suppression keyed by its complete
+  `CaloricBoundaryReference` (food or caloric hydration plus UUID). It stores
+  only the latest derived projection metadata, never an inferred `FastRecord`,
+  and never mutates the source event, a recorded fast or a system surface.
+  Suppressions survive inferred detection being turned off and are recomputed
+  when it is turned on. A source that no longer yields a qualifying candidate
+  removes its suppression; a qualifying candidate retains one row and updates
+  its projection metadata only when authoritative event or goal state changes.
+- BR-54 (added 28 August 2026 by OW-412): Delete inferred fast is an explicit
+  local hide action for either historical or in-progress candidates. Its
+  confirmation, cancellation, stale revalidation and save failure are
+  source-bound and atomic: cancellation or failure changes nothing. On the
+  exact selected settled History interval, a suppressed candidate may expose
+  one **Re-enable inferred fast** recovery row only when the current derived
+  candidate intersects that interval and no recorded fast overlaps it. The
+  recovery action removes only its suppression after the same source,
+  boundary, goal, setting and overlap revalidation; stale or failed recovery
+  leaves the suppression intact. History never projects the hidden candidate
+  as a timeline bar, empty-state action, Save fast or Start fast action.
+- BR-55 (added 28 August 2026 by OW-412): Food and explicitly caloric
+  hydration mutations reconcile affected suppressions in the same local
+  transaction. A later boundary before source-plus-eight-hours removes the
+  suppression; one at or after eligibility and before the current
+  source-plus-goal-plus-12-hour cap retains and updates it; one after the cap
+  leaves it unchanged. Non-caloric hydration has no effect. Equal-time food
+  and hydration boundaries use the shared deterministic kind-and-identifier
+  ordering, and Delete All Data removes suppression rows with every other
+  app-created local record.
 
 ## Slice 3.10 supersession
 

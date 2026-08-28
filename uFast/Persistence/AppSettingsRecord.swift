@@ -10,7 +10,7 @@ final class AppSettingsRecord {
     var teaFavouriteMillilitres: Int = 300
     var coffeeFavouriteMillilitres: Int = 300
     var automaticLiveActivityPreferenceRawValue: String = "notAsked"
-    var inferredFastDetectionEnabled: Bool = false
+    var inferredFastDetectionEnabled: Bool = true
 
     init(
         id: UUID = UUID(),
@@ -20,7 +20,7 @@ final class AppSettingsRecord {
         teaFavouriteMillilitres: Int = 300,
         coffeeFavouriteMillilitres: Int = 300,
         automaticLiveActivityPreference: AutomaticLiveActivityPreference = .notAsked,
-        inferredFastDetectionEnabled: Bool = false
+        inferredFastDetectionEnabled: Bool = true
     ) {
         self.id = id
         fastingGoalHours = fastingGoal.hours

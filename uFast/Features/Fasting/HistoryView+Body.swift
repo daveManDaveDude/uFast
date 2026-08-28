@@ -12,12 +12,6 @@ extension HistoryView {
                     if isFutureSelection {
                         futureReadOnlyNotice
                     }
-                    if !isFutureSelection {
-                        directAddAlternative
-                            .opacity(showsSettledHistoryDetails ? 1 : 0)
-                            .allowsHitTesting(showsSettledHistoryDetails)
-                            .accessibilityHidden(!showsSettledHistoryDetails)
-                    }
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         fastHistoryDetails(at: clock.now)
                             .opacity(showsSettledHistoryDetails ? 1 : 0)
@@ -146,6 +140,19 @@ extension HistoryView {
                         expectedSourceDescription: interval.sourceDescription, expectedGoal: interval.goal
                     )
                 }
+                _ = model.reloadHistoryAfterMutation()
+                inferredConversion = nil
+            },
+            onDelete: { interval in
+                guard let applicationCommands else { throw ApplicationCommandError.recordNotFound }
+                try applicationCommands.deleteInferredFast(
+                    sourceBoundaryReference: interval.sourceBoundaryReference,
+                    expectedStartDate: interval.startDate,
+                    expectedEndDate: interval.endDate,
+                    expectedSourceDescription: interval.sourceDescription,
+                    expectedGoal: interval.goal,
+                    expectedState: interval.state
+                )
                 _ = model.reloadHistoryAfterMutation()
                 inferredConversion = nil
             },

@@ -14,7 +14,8 @@ final class AppLaunchConfigurationTests: XCTestCase {
             "--seed-favourite-validation", "--seed-caloric-favourite-active-fast",
             "--seed-food-favourite-populated", "--seed-food-favourite-duplicate-name",
             "--seed-food-favourite-validation", "--seed-food-favourite-active-fast",
-            "--seed-inferred-fast", "--seed-today-multi-year", "--seed-caloric-boundary-multi-year",
+            "--seed-inferred-fast", "--seed-inferred-fast-eligibility", "--seed-today-multi-year",
+            "--seed-caloric-boundary-multi-year",
             "--fixed-now", "1234.5",
             "--seed-active-fast-start", "1200",
             "--seed-live-activity-recovery", "--live-activity-release", "1.2.3",
@@ -59,6 +60,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             seedFoodFavouriteValidation: true,
             seedFoodFavouriteActiveFast: true,
             seedInferredFast: true,
+            seedInferredFastEligibility: true,
             seedTodayMultiYear: true,
             seedCaloricBoundaryMultiYear: true
         ))

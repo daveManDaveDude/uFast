@@ -261,7 +261,7 @@ public enum InferredFastProjector {
         lhs.lowerBound < rhs.upperBound && rhs.lowerBound < lhs.upperBound
     }
 
-    private static func overlaps(
+    public static func overlaps(
         _ interval: Range<Date>,
         _ fast: RecordedFastInterval
     ) -> Bool {

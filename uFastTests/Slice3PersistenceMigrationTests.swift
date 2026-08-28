@@ -16,10 +16,19 @@ final class Slice3PersistenceMigrationTests: XCTestCase {
         )
         try writeIndependentReleaseFixture(fixture)
 
-        let migrated = try PersistenceContainer.make(storeURL: fixture.storeURL)
-        let context = migrated.mainContext
-        try assertSettingsAndFasts(in: context, fixture: fixture)
-        try assertFoodHydrationAndUnknowns(in: context, fixture: fixture)
+        do {
+            let migrated = try PersistenceContainer.make(storeURL: fixture.storeURL)
+            let context = migrated.mainContext
+            try assertSettingsAndFasts(in: context, fixture: fixture)
+            try assertFoodHydrationAndUnknowns(in: context, fixture: fixture)
+            try assertReleaseBaselineReopenGuards(in: context)
+        }
+
+        let reopened = try PersistenceContainer.make(storeURL: fixture.storeURL)
+        let reopenedContext = reopened.mainContext
+        try assertSettingsAndFasts(in: reopenedContext, fixture: fixture)
+        try assertFoodHydrationAndUnknowns(in: reopenedContext, fixture: fixture)
+        try assertReleaseBaselineReopenGuards(in: reopenedContext)
     }
 
     private func writeIndependentReleaseFixture(_ fixture: ReleaseFixture) throws {
@@ -173,7 +182,7 @@ final class Slice3PersistenceMigrationTests: XCTestCase {
         XCTAssertEqual(settings.teaFavouriteMillilitres, 425)
         XCTAssertEqual(settings.coffeeFavouriteMillilitres, 225)
         XCTAssertEqual(settings.automaticLiveActivityPreference, .notAsked)
-        XCTAssertFalse(settings.inferredFastDetectionEnabled)
+        XCTAssertTrue(settings.inferredFastDetectionEnabled)
 
         let fasts = try context.fetch(FetchDescriptor<FastRecord>())
         XCTAssertEqual(fasts.count, 3)
@@ -211,6 +220,15 @@ final class Slice3PersistenceMigrationTests: XCTestCase {
         XCTAssertEqual(reconstructed.startBoundaryID, fixture.foodID)
         XCTAssertEqual(reconstructed.endBoundaryKindRaw, "hydration")
         XCTAssertEqual(reconstructed.endBoundaryID, fixture.hydrationID)
+    }
+
+    private func assertReleaseBaselineReopenGuards(in context: ModelContext) throws {
+        let settings = try XCTUnwrap(context.fetch(FetchDescriptor<AppSettingsRecord>()).first)
+        XCTAssertTrue(settings.inferredFastDetectionEnabled)
+        XCTAssertEqual(
+            try context.fetch(FetchDescriptor<InferredFastSuppressionRecord>()).count,
+            0
+        )
     }
 
     private func assertFoodHydrationAndUnknowns(

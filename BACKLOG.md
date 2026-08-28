@@ -31,6 +31,13 @@ matches the widget's short version to the app, makes History motion use the
 injected reference instant, and ends derived Live Activity state when
 active-fast authority is ambiguous. It is **Ready**.
 
+The inferred-suppression integrity follow-up from the 28 August 2026 code
+review is maintained in
+`docs/CODE_REVIEW_INFERRED_SUPPRESSION_INTEGRITY_SPRINT.md`. ISI-101 freezes
+historical inferred-setting schemas and preserves migration intent; ISI-102
+uses one indexed suppression projection and prevents clock-only launch writes.
+Both are **Ready**.
+
 The sprint-ready App Store packaging follow-up from the 14 August 2026 code
 review is maintained in `docs/CODE_REVIEW_APP_STORE_PACKAGING_STORY.md`.
 CR-202 adds the truthful required-reason declaration for app-private
@@ -201,14 +208,16 @@ group-manager sheet, pencil controls, manager Done, bulk Delete group and
 returning from an item editor to the manager no longer exist. Add event remains
 bucket-constrained, and individual deletion remains available in each editor.
 
-## Slice 3.12 — Opt-in inferred fast detection
+## Slice 3.12 — Inferred fast detection
 
 The accepted contract and implementation-ready story are in
 `docs/OW-410_INFERRED_FAST_DETECTION_STORY.md`.
 
-- OW-410 P0 — Detect, present and explicitly convert opt-in inferred fasts.
+- OW-410 P0 — Detect, present and explicitly convert inferred fasts.
   **Implemented in source; focused baseline acceptance passed. OW-411
   supersedes its food-only boundary wording.**
+- OW-412 P0 — Delete and re-enable inferred fast visibility. **Ready; contract
+  in `docs/OW-412_DELETE_INFERRED_FAST_STORY.md`.**
 
 ## Slice 3.13 — Caloric-boundary integrity
 

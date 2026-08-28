@@ -90,8 +90,8 @@ extension HistoryUITests {
         XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
         let selectedDate = app.staticTexts["history.selected-date"]
         XCTAssertTrue(selectedDate.waitForExistence(timeout: 5), app.debugDescription)
-        let sundaySelectedDate = "Selected day, Sun 16 Aug"
-        let saturdaySelectedDate = "Selected day, Sat 15 Aug"
+        let sundaySelectedDate = "Sun 16 Aug"
+        let saturdaySelectedDate = "Sat 15 Aug"
         XCTAssertTrue(waitForSettledHistory(
             selectedDate: selectedDate,
             carousel: carousel,
@@ -112,7 +112,12 @@ extension HistoryUITests {
             of: "history.active-fast.",
             with: "history.fast."
         )
-        let structuredFast = app.buttons[structuredFastIdentifier]
+        // The detail card and the lower "Fasts in this view" list expose the
+        // same semantic identifier. Scope this lookup to the detail panel so
+        // the test does not rely on XCTest's ambiguous global query ordering.
+        let structuredFast = app.otherElements["history.event-info-panel"].buttons[
+            structuredFastIdentifier
+        ]
         XCTAssertTrue(structuredFast.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(
             structuredFast.label.contains("start 15 Aug at 21:00"),
@@ -128,12 +133,15 @@ extension HistoryUITests {
             identifier: stableIdentifier
         )
         XCTAssertEqual(preDrinkFrames.count, 2, app.debugDescription)
-        XCTAssertTrue(carousel.staticTexts["Active Fast"].exists, app.debugDescription)
-        XCTAssertTrue(carousel.staticTexts["11:40:00"].exists, app.debugDescription)
+        let activeFastVisualLabel = app.descendants(matching: .any)[
+            "history.fast-label-probe.\(stableIdentifier.replacingOccurrences(of: "history.active-fast.", with: ""))"
+        ]
+        XCTAssertTrue(activeFastVisualLabel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(activeFastVisualLabel.label, "Active fast", activeFastVisualLabel.debugDescription)
+        XCTAssertFalse(carousel.staticTexts["11:40:00"].exists, app.debugDescription)
         let preDrinkMarkerIDs = historyMarkerIdentifiers(in: app)
         let preDrinkStructuredLabel = structuredFast.label
         captureScreenshot(named: "history-edited-active-fast-current-day", in: app)
-
         let saturdayDateButton = app.buttons[
             "temporal.date.\(calendar.startOfDay(for: previousDay).timeIntervalSince1970)"
         ]
@@ -209,7 +217,9 @@ extension HistoryUITests {
             carousel: postDrinkCarousel,
             expectedSelectedDate: sundaySelectedDate
         ), app.debugDescription)
-        let postDrinkStructuredFast = app.buttons[structuredFastIdentifier]
+        let postDrinkStructuredFast = app.otherElements["history.event-info-panel"].buttons[
+            structuredFastIdentifier
+        ]
         XCTAssertTrue(postDrinkStructuredFast.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(postDrinkStructuredFast.label, preDrinkStructuredLabel)
         let postDrinkFrames = visibleActiveFastFrames(
@@ -234,64 +244,6 @@ extension HistoryUITests {
             "The saved water marker was not published to History.\n(app.debugDescription)"
         )
         captureScreenshot(named: "history-edited-active-fast-after-water", in: app)
-    }
-
-    @MainActor
-    func testHistoryKeepsActiveFastLabelOnSelectedPageAcrossMidnight() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Europe/London") ?? .current
-        let day = calendar.startOfDay(for: start)
-        let beforeMidnight = calendar.date(
-            bySettingHour: 19,
-            minute: 6,
-            second: 0,
-            of: day
-        ) ?? start
-        let nextDay = calendar.date(byAdding: .day, value: 1, to: day) ?? start
-        let afterMidnight = calendar.date(
-            bySettingHour: 13,
-            minute: 19,
-            second: 0,
-            of: nextDay
-        ) ?? start
-
-        let app = XCUIApplication()
-        app.launchArguments = launchArguments(now: beforeMidnight, resetData: true)
-            + ["-AppleInterfaceStyle", "Dark"]
-        app.launch()
-        completeOnboarding(in: app)
-        app.buttons["fast.start"].tap()
-
-        app.terminate()
-        app.launchArguments = launchArguments(now: afterMidnight)
-            + ["-AppleInterfaceStyle", "Dark"]
-        app.launch()
-        selectHistoryTab(in: app)
-
-        let carousel = app.scrollViews["history.day-carousel"]
-        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
-        XCTAssertEqual(visibleActiveFastVisualContent(in: app, carousel: carousel).count, 0, app.debugDescription)
-
-        let dateNavigator = app.descendants(matching: .any)["temporal.date-navigator"]
-        XCTAssertTrue(dateNavigator.waitForExistence(timeout: 5), app.debugDescription)
-        let originalStartDateButton = dateNavigator.buttons[
-            "temporal.date.\(calendar.startOfDay(for: day).timeIntervalSince1970)"
-        ]
-        XCTAssertTrue(originalStartDateButton.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(waitForHittable(originalStartDateButton, app: app), originalStartDateButton.debugDescription)
-        originalStartDateButton.tap()
-        let selectedDate = app.staticTexts["history.selected-date"]
-        let expectedSelectedDay = day.formatted(
-            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
-        )
-        XCTAssertTrue(waitForSettledHistory(
-            selectedDate: selectedDate,
-            carousel: carousel,
-            expectedSelectedDate: "Selected day, \(expectedSelectedDay)"
-        ), app.debugDescription)
-        XCTAssertEqual(visibleActiveFastVisualContent(in: app, carousel: carousel).count, 1, app.debugDescription)
-        captureScreenshot(named: "history-active-fast-midnight-seam", in: app)
     }
 
     @MainActor
@@ -333,7 +285,7 @@ extension HistoryUITests {
         let expectedSelectedDay = nextDay.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
-        let expectedSelectedDate = "Selected day, \(expectedSelectedDay)"
+        let expectedSelectedDate = expectedSelectedDay
         XCTAssertEqual(selectedDate.label, expectedSelectedDate)
         let carousel = app.scrollViews["history.day-carousel"]
         XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
@@ -349,7 +301,12 @@ extension HistoryUITests {
             ),
             app.debugDescription
         )
-        XCTAssertEqual(settledState.visualOwnerLabelCount, 0, app.debugDescription)
+        XCTAssertEqual(
+            settledState.labelProbeCount,
+            0,
+            "The continuous midpoint belongs to the intervening day, "
+                + "not the terminal-day fragment.\n\(app.debugDescription)"
+        )
         XCTAssertTrue(settledState.noonMarkerVisible, app.debugDescription)
         XCTAssertTrue(settledState.noonMarkerFrameIntersectsCarousel, app.debugDescription)
         let settledActiveFrame = settledState.activeFrame
@@ -357,7 +314,7 @@ extension HistoryUITests {
 
         carousel.swipeRight(velocity: .slow)
         XCTAssertLessThanOrEqual(
-            visibleActiveFastVisualContent(in: app, carousel: carousel).count,
+            visibleActiveFastLabelProbe(in: app, carousel: carousel).count,
             1,
             "More than one active-fast visual content region was visible during movement.\n\(app.debugDescription)"
         )
@@ -365,15 +322,15 @@ extension HistoryUITests {
         let originalStartDayLabel = originalStartDay.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
-        let originalStartSelectedDate = "Selected day, \(originalStartDayLabel)"
+        let originalStartSelectedDate = originalStartDayLabel
         let previousOffsetState = try XCTUnwrap(settledSeamState(
             in: app,
             expectedSelectedDate: originalStartSelectedDate,
-            expectedVisualOwnerLabelCount: 1
+            expectedLabelProbeCount: 0
         ), app.debugDescription)
         XCTAssertEqual(previousOffsetState.selectedDateLabel, originalStartSelectedDate)
         XCTAssertFalse(previousOffsetState.noonMarkerVisible, app.debugDescription)
-        XCTAssertEqual(previousOffsetState.visualOwnerLabelCount, 1, app.debugDescription)
+        XCTAssertEqual(previousOffsetState.labelProbeCount, 0, app.debugDescription)
         let previousOffsetActiveFrame = previousOffsetState.activeFrame
         XCTAssertGreaterThan(
             abs(previousOffsetActiveFrame.minX - settledActiveFrame.minX),
@@ -382,12 +339,32 @@ extension HistoryUITests {
         )
         captureScreenshot(named: "history-midnight-seam-previous-day", in: app)
 
-        carousel.swipeLeft(velocity: .slow)
-        XCTAssertLessThanOrEqual(
-            visibleActiveFastVisualContent(in: app, carousel: carousel).count,
-            1,
-            "More than one active-fast visual content region was visible during movement.\n\(app.debugDescription)"
+        let midpointDay = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: nextDay))
+        let midpointDayLabel = midpointDay.formatted(
+            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
+        let midpointSelectedDate = midpointDayLabel
+        let dateNavigator = app.descendants(matching: .any)["temporal.date-navigator"]
+        let midpointDateButton = dateNavigator.buttons[
+            "temporal.date.\(calendar.startOfDay(for: midpointDay).timeIntervalSince1970)"
+        ]
+        XCTAssertTrue(midpointDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForHittable(midpointDateButton, app: app), midpointDateButton.debugDescription)
+        midpointDateButton.tap()
+        let midpointState = try XCTUnwrap(settledSeamState(
+            in: app,
+            expectedSelectedDate: midpointSelectedDate,
+            expectedLabelProbeCount: 1
+        ), app.debugDescription)
+        XCTAssertEqual(midpointState.selectedDateLabel, midpointSelectedDate)
+        XCTAssertEqual(midpointState.labelProbeCount, 1, app.debugDescription)
+
+        let currentDateButton = dateNavigator.buttons[
+            "temporal.date.\(calendar.startOfDay(for: nextDay).timeIntervalSince1970)"
+        ]
+        XCTAssertTrue(currentDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForHittable(currentDateButton, app: app), currentDateButton.debugDescription)
+        currentDateButton.tap()
         let currentOffsetState = try XCTUnwrap(settledSeamState(
             in: app,
             expectedSelectedDate: expectedSelectedDate
@@ -401,7 +378,7 @@ extension HistoryUITests {
             ),
             app.debugDescription
         )
-        XCTAssertEqual(currentOffsetState.visualOwnerLabelCount, 0, app.debugDescription)
+        XCTAssertEqual(currentOffsetState.labelProbeCount, 0, app.debugDescription)
         let currentOffsetActiveFrame = currentOffsetState.activeFrame
         XCTAssertGreaterThan(
             abs(currentOffsetActiveFrame.minX - previousOffsetActiveFrame.minX),

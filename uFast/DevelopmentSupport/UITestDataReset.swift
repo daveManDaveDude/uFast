@@ -65,6 +65,7 @@ enum UITestDataReset {
         try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<FoodFavouriteRecord>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<InferredFastSuppressionRecord>()).forEach(context.delete)
         try UserDefaultsLiveActivityLifecycleStore().clearAll()
     }
 
@@ -102,8 +103,12 @@ enum UITestDataReset {
                 extendsActiveFast: configuration.seedHistoryMidnightSeamExtended
             )
         }
+        if configuration.seedHistoryFastLabelLayout {
+            try UITestSeedFixtures.seedHistoryFastLabelLayout(in: context, clock: clock)
+        }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private static func seedFavouriteFixtures(
         in context: ModelContext,
         configuration: DevelopmentFixtureConfiguration,
@@ -135,6 +140,12 @@ enum UITestDataReset {
         }
         if configuration.seedInferredFast {
             UITestSeedFixtures.seedInferredFast(in: context, clock: clock)
+        }
+        if configuration.seedInferredFastEligibility {
+            UITestSeedFixtures.seedInferredFastEligibility(in: context, clock: clock)
+        }
+        if configuration.seedSuppressedInferredFast {
+            UITestSeedFixtures.seedSuppressedInferredFast(in: context, clock: clock)
         }
     }
 

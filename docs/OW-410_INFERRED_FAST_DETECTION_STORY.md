@@ -1,6 +1,6 @@
-# OW-410 — Detect and explicitly convert opt-in inferred fasts
+# OW-410 — Detect and explicitly convert inferred fasts
 
-**Slice:** 3.12 — Opt-in inferred fast detection
+**Slice:** 3.12 — Inferred fast detection
 **Priority:** P0
 **Status:** Ready — Sol readiness gate passed
 **Story type:** Product feature
@@ -13,9 +13,10 @@ boundary,
 so that I can understand the gap in my History and choose whether to save it
 as a real completed fast or start it as a real active fast.
 
-Detection is opt-in. An inferred interval is a read-only projection until the
-person takes an explicit action. The feature must not silently create fasting
-history, change Today, or start a Lock Screen/Live Activity surface.
+Detection is enabled by default but remains user-controlled. An inferred
+interval is a read-only projection until the person takes an explicit action.
+The feature must not silently create fasting history, change Today, or start a
+Lock Screen/Live Activity surface.
 
 ## Why now
 
@@ -33,14 +34,15 @@ document says that only a caloric food event can source or punctuate an
 inferred interval, read it as **a caloric food or explicitly caloric hydration
 event**. The shared `CaloricBoundary` representation and extractor are now the
 authoritative source for both persisted-fast reconciliation and derived
-inference. OW-410 remains the delivered opt-in, derived, no-inferred-persistence
+inference. OW-410 remains the delivered derived, no-inferred-persistence
 baseline; it does not authorize a second persistence model or silent fast
 lengthening when an event is removed or moved later.
 
 The implementation must follow these repository contracts:
 
 - `PRODUCT.md` — calm, local-first product boundary and no health claims.
-- `MVP_SCOPE.md` — opt-in inferred fasting history is in the History scope.
+- `MVP_SCOPE.md` — user-controlled inferred fasting history is in the History
+  scope.
 - `DOMAIN_RULES.md` — BR-01 through BR-07, BR-12, BR-15 through BR-17,
   BR-22 through BR-26 and BR-44 through BR-49.
 - `DECISIONS.md` — D-001 remains the no-silent-start rule; D-024 documents
@@ -56,8 +58,9 @@ not rewrite or remove that data.
 
 ### Detection and presentation
 
-- Add a user-facing setting for inferred fast detection. It is off by default
-  for new and migrated installs and persists locally across relaunch.
+- Add a user-facing setting for inferred fast detection. It is enabled by
+  default for new and migrated installs, preserves an existing saved choice
+  and persists locally across relaunch.
 - When enabled, a saved caloric food or explicitly caloric hydration event can
   be a source. Non-caloric hydration and other non-boundary records cannot
   create or terminate an inferred interval.
@@ -115,7 +118,7 @@ not rewrite or remove that data.
 
 ## In scope
 
-- An opt-in setting with a safe default and migration behavior.
+- A user-controlled setting enabled by default with migration behavior.
 - A framework-independent inferred-fast projector over local caloric food and
   explicitly caloric hydration events,
   recorded fasts, the current goal, the setting and an injected `AppClock`.
@@ -185,9 +188,10 @@ not rewrite or remove that data.
 
 ## Acceptance criteria
 
-1. The inferred-fast setting is off by default for a new install and for a
+1. The inferred-fast setting is enabled by default for a new install and for a
    migrated release-baseline store, persists across relaunch, and can be
-   disabled without deleting source events or recorded fasts.
+   disabled without deleting source events or recorded fasts. An existing
+   saved disabled choice remains disabled.
 2. With the setting disabled, no inferred interval or inferred conversion
    action appears anywhere in History or fast detail.
 3. With the setting enabled, a caloric food or explicitly caloric hydration event at `T` produces no inferred
@@ -218,8 +222,8 @@ not rewrite or remove that data.
     inferred presentation. Failed or cancelled mutations do not partially
     update it.
 12. Migration preserves the release baseline and legacy rows, defaults the new
-    setting to off, and creates no inferred SwiftData rows, cache entries or
-    network records.
+   setting to on, and creates no inferred SwiftData rows, cache entries or
+   network records. An existing saved disabled choice remains disabled.
 13. Focused tests cover absolute time, DST/time-zone changes, exact threshold,
     goal-plus-12-hour transition to historical Save-only state, opt-out, empty and
     offline/no-network state, Dynamic Type, VoiceOver and stable UI interaction

@@ -7,6 +7,7 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedHistoryEventGrouping = false
     var seedHistoryMidnightSeam = false
     var seedHistoryMidnightSeamExtended = false
+    var seedHistoryFastLabelLayout = false
     var seedActiveFastStart: Date?
     var seedLiveActivityRecovery = false
     var seedMultipleActiveFasts = false
@@ -20,6 +21,8 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedFoodFavouriteValidation = false
     var seedFoodFavouriteActiveFast = false
     var seedInferredFast = false
+    var seedInferredFastEligibility = false
+    var seedSuppressedInferredFast = false
     var seedTodayMultiYear = false
     var seedCaloricBoundaryMultiYear = false
 
@@ -83,6 +86,9 @@ struct AppLaunchConfiguration {
             seedHistoryMidnightSeamExtended: arguments.contains(
                 "--seed-history-midnight-seam-extended"
             ),
+            seedHistoryFastLabelLayout: arguments.contains(
+                "--seed-history-fast-label-layout"
+            ),
             seedActiveFastStart: Self.date(after: "--seed-active-fast-start", in: arguments),
             seedLiveActivityRecovery: arguments.contains("--seed-live-activity-recovery"),
             seedMultipleActiveFasts: arguments.contains("--seed-multiple-active-fasts"),
@@ -96,6 +102,8 @@ struct AppLaunchConfiguration {
             seedFoodFavouriteValidation: arguments.contains("--seed-food-favourite-validation"),
             seedFoodFavouriteActiveFast: arguments.contains("--seed-food-favourite-active-fast"),
             seedInferredFast: arguments.contains("--seed-inferred-fast"),
+            seedInferredFastEligibility: arguments.contains("--seed-inferred-fast-eligibility"),
+            seedSuppressedInferredFast: arguments.contains("--seed-suppressed-inferred-fast"),
             seedTodayMultiYear: arguments.contains("--seed-today-multi-year"),
             seedCaloricBoundaryMultiYear: arguments.contains(
                 "--seed-caloric-boundary-multi-year"
@@ -143,6 +151,12 @@ struct AppLaunchConfiguration {
             simulateDeleteAllFailure: arguments.contains("--simulate-delete-all-failure"),
             simulateBoundaryReconciliationFailure: arguments.contains(
                 "--simulate-caloric-boundary-reconciliation-failure"
+            ),
+            simulateSuppressionSaveFailure: arguments.contains(
+                "--simulate-inferred-fast-suppression-save-failure"
+            ),
+            simulateSuppressionReenableStale: arguments.contains(
+                "--simulate-inferred-fast-suppression-reenable-stale"
             )
         )
     }

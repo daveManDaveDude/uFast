@@ -224,10 +224,6 @@ extension TemporalRibbonView {
         }
     }
 
-    func intervalForeground(_ kind: TemporalRibbonIntervalItem.Kind) -> Color {
-        kind == .needsReview ? UFastTheme.primary : UFastTheme.primary
-    }
-
     func intervalStroke(_ kind: TemporalRibbonIntervalItem.Kind) -> Color {
         switch kind {
         case .previouslySaved, .unknown: UFastTheme.secondaryText
@@ -245,31 +241,5 @@ extension TemporalRibbonView {
         case .caloricDrink: "cup.and.saucer.fill"
         case .nonCaloricDrink: "drop"
         }
-    }
-
-    func intervalTitle(
-        _ item: TemporalRibbonIntervalItem,
-        markWidth: Double
-    ) -> String {
-        switch item.kind {
-        case .recorded, .automatic:
-            return textResolver(.historyCopy(.fast))
-        case .inferred:
-            return item.title
-        case .active:
-            break
-        case .previouslySaved, .reconstructed, .needsReview, .unknown:
-            return item.title
-        }
-        guard markWidth >= 180 else {
-            return textResolver(.historyCopy(.activeFast))
-        }
-        let elapsed = HistoryTextFormatting.activeDisplay(
-            seconds: item.end.timeIntervalSince(item.start),
-            resolver: textResolver
-        )
-        return textResolver(.historyCopy(.activeFast))
-            + textResolver(.historyCopy(.separatorSpace))
-            + elapsed
     }
 }

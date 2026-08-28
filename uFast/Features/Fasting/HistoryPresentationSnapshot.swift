@@ -1,6 +1,35 @@
 import Foundation
 
-// swiftlint:disable file_length function_body_length function_parameter_count trailing_comma opening_brace
+// swiftlint:disable file_length function_body_length function_parameter_count trailing_comma opening_brace type_body_length
+
+private extension CaloricBoundaryReference {
+    /// Temporal History still transports interval IDs as UUIDs. Hash the full
+    /// kind-bound reference into that transport type so food and hydration
+    /// sources can never share a presentation identity merely because their
+    /// storage UUIDs match.
+    var historyPresentationID: UUID {
+        var first: UInt64 = 0xCBF2_9CE4_8422_2325
+        var second: UInt64 = 0x9E37_79B1_85EB_CA87
+        let kindByte: UInt8 = kind == .food ? 0x01 : 0x02
+        var sourceBytes: [UInt8] = []
+        let rawUUID = id.uuid
+        withUnsafeBytes(of: rawUUID) { sourceBytes.append(contentsOf: $0) }
+        for byte in [kindByte] + sourceBytes {
+            first ^= UInt64(byte)
+            first &*= 0x100_0000_01B3
+            second ^= UInt64(byte)
+            second &*= 0x9E37_79B1_85EB_CA87
+            second ^= first &>> 29
+        }
+        var bytes: [UInt8] = []
+        withUnsafeBytes(of: first) { bytes.append(contentsOf: $0) }
+        withUnsafeBytes(of: second) { bytes.append(contentsOf: $0) }
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+}
 
 struct HistoryTextContext: Equatable, Sendable {
     let locale: Locale
@@ -24,17 +53,20 @@ struct HistoryTextContext: Equatable, Sendable {
 struct HistoryPresentationSnapshot: Equatable {
     let window: DateInterval
     let fastItems: [HistoryVisibleFastItem]
+    let hiddenInferredFastItems: [HistoryVisibleFastItem]
     let events: [TemporalRibbonEventItem]
     let textContext: HistoryTextContext
 
     init(
         window: DateInterval,
         fastItems: [HistoryVisibleFastItem],
+        hiddenInferredFastItems: [HistoryVisibleFastItem] = [],
         events: [TemporalRibbonEventItem],
         textContext: HistoryTextContext = .init()
     ) {
         self.window = window
         self.fastItems = fastItems
+        self.hiddenInferredFastItems = hiddenInferredFastItems
         self.events = events
         self.textContext = textContext
     }
@@ -103,19 +135,22 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
     let recordedFasts: [RecordedFastInterval]
     let currentGoal: FastingGoal
     let enabled: Bool
+    let suppressions: [InferredFastSuppression]
 
     init(
         foodEvents: [FoodBoundarySnapshot],
         hydrationEvents: [HydrationBoundarySnapshot] = [],
         recordedFasts: [RecordedFastInterval],
         currentGoal: FastingGoal,
-        enabled: Bool
+        enabled: Bool,
+        suppressions: [InferredFastSuppression] = []
     ) {
         self.foodEvents = foodEvents
         self.hydrationEvents = hydrationEvents
         self.recordedFasts = recordedFasts
         self.currentGoal = currentGoal
         self.enabled = enabled
+        self.suppressions = suppressions
     }
 
     init(data: HistoryDataSlice) {
@@ -139,6 +174,7 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
             .map(\.recordedInterval)
         currentGoal = data.settings?.fastingGoal ?? .default
         enabled = data.settings?.inferredFastDetectionEnabled ?? false
+        suppressions = data.suppressedInferredFasts
     }
 
     func project(now: Date, visibleInterval: Range<Date>) -> [InferredFastInterval] {
@@ -152,7 +188,11 @@ struct HistoryMotionInferredContext: Equatable, Sendable {
             enabled: enabled,
             now: now,
             visibleInterval: visibleInterval
-        )
+        ).filter { candidate in
+            !suppressions.contains {
+                $0.sourceBoundaryReference == candidate.sourceBoundaryReference
+            }
+        }
     }
 }
 
@@ -161,6 +201,7 @@ struct HistoryMotionPresentation: Equatable, Sendable {
     let intervals: [HistoryMotionIntervalPrimitive]
     let events: [HistoryMotionEventPrimitive]
     let inferredContext: HistoryMotionInferredContext?
+    let hiddenInferredFastItems: [HistoryVisibleFastItem]
     let textContext: HistoryTextContext
 
     init(
@@ -170,7 +211,7 @@ struct HistoryMotionPresentation: Equatable, Sendable {
         window = snapshot.window
         intervals = snapshot.fastItems.map {
             HistoryMotionIntervalPrimitive(
-                id: $0.id,
+                id: $0.ribbonID,
                 start: $0.startDate,
                 end: $0.endDate,
                 kind: $0.ribbonKind,
@@ -182,6 +223,7 @@ struct HistoryMotionPresentation: Equatable, Sendable {
                 inferredInterval: $0.inferredInterval
             )
         }
+        hiddenInferredFastItems = snapshot.hiddenInferredFastItems
         events = snapshot.events.map {
             HistoryMotionEventPrimitive(id: $0.id, occurredAt: $0.occurredAt, kind: $0.kind)
         }
@@ -194,12 +236,14 @@ struct HistoryMotionPresentation: Equatable, Sendable {
         intervals: [HistoryMotionIntervalPrimitive],
         events: [HistoryMotionEventPrimitive],
         inferredContext: HistoryMotionInferredContext? = nil,
+        hiddenInferredFastItems: [HistoryVisibleFastItem] = [],
         textContext: HistoryTextContext = .init()
     ) {
         self.window = window
         self.intervals = intervals
         self.events = events
         self.inferredContext = inferredContext
+        self.hiddenInferredFastItems = hiddenInferredFastItems
         self.textContext = textContext
     }
 
@@ -219,7 +263,7 @@ struct HistoryMotionPresentation: Equatable, Sendable {
             return context.project(
                 now: now,
                 visibleInterval: window.start ..< window.end
-            ).first { $0.id == id }
+            ).first { HistoryVisibleFastItem.inferred($0).ribbonID == id }
         }
         return intervals.first { $0.id == id }?.currentInferredInterval(at: now)
     }
@@ -439,16 +483,38 @@ enum HistoryPresentationBuilder {
         let legacyAutomaticExclusions = (data.completedFasts + [data.activeFast].compactMap(\.self))
             .filter { $0.origin == .recorded || $0.presentationIntegrity == .unavailable }
             .map(\.recordedInterval)
-        let inferred = data.settings.map { settings in
+        let structuralInferred = data.settings.map { settings in
             InferredFastProjector.project(
                 boundaries: boundaries,
-                recordedFasts: inferredExclusions,
+                recordedFasts: [],
                 currentGoal: settings.fastingGoal,
                 enabled: settings.inferredFastDetectionEnabled,
-                now: referenceNow,
-                visibleInterval: window
-            ).map { HistoryVisibleFastItem.inferred($0, textContext: textContext) }
+                now: referenceNow
+            )
+        } ?? []
+        let hiddenInferred = structuralInferred.compactMap { candidate -> HistoryVisibleFastItem? in
+            guard data.suppressedInferredFasts.contains(where: {
+                $0.sourceBoundaryReference == candidate.sourceBoundaryReference
+            }),
+                InferredFastProjector.intersects(candidate.interval, window),
+                !inferredExclusions.contains(where: {
+                    InferredFastProjector.overlaps(candidate.interval, $0)
+                })
+            else { return nil }
+            return .hiddenInferred(candidate, textContext: textContext)
         }
+        let hiddenReferences = Set(
+            hiddenInferred.compactMap(\.inferredInterval?.sourceBoundaryReference)
+        )
+        let inferred = structuralInferred
+            .filter { !hiddenReferences.contains($0.sourceBoundaryReference) }
+            .filter { candidate in
+                !inferredExclusions.contains {
+                    InferredFastProjector.overlaps(candidate.interval, $0)
+                }
+            }
+            .filter { InferredFastProjector.intersects($0.interval, window) }
+            .map { HistoryVisibleFastItem.inferred($0, textContext: textContext) }
         let legacyAutomatic: [HistoryVisibleFastItem] = if data.settings == nil {
             AutomaticFastProjector.project(
                 boundaries: boundaries,
@@ -463,7 +529,8 @@ enum HistoryPresentationBuilder {
         }
         return HistoryPresentationSnapshot(
             window: data.window,
-            fastItems: recorded + active + legacy + unavailable + (inferred ?? legacyAutomatic),
+            fastItems: recorded + active + legacy + unavailable + (data.settings == nil ? legacyAutomatic : inferred),
+            hiddenInferredFastItems: hiddenInferred,
             events: makeEvents(
                 data: data,
                 locale: locale,
@@ -593,6 +660,7 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         case inferred
         case previouslySaved
         case unavailable
+        case hiddenInferred
     }
 
     let id: UUID
@@ -685,6 +753,21 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         )
     }
 
+    static func hiddenInferred(
+        _ interval: InferredFastInterval,
+        textContext: HistoryTextContext = .init()
+    ) -> Self {
+        Self(
+            id: interval.id,
+            startDate: interval.startDate,
+            endDate: interval.endDate,
+            kind: .hiddenInferred,
+            fast: nil,
+            inferredInterval: interval,
+            textContext: textContext
+        )
+    }
+
     func ending(at date: Date) -> Self {
         guard kind == .active else { return self }
         return Self(
@@ -718,6 +801,7 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
                 )
             )
         case .unavailable: textContext.textResolver(.historyCopy(.unavailableFast))
+        case .hiddenInferred: textContext.textResolver(.historyCopy(.hiddenInferredFast))
         }
     }
 
@@ -728,22 +812,32 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         case .automatic: .automatic
         case .inferred: .inferred
         case .previouslySaved, .unavailable: .previouslySaved
+        case .hiddenInferred: .inferred
         }
     }
 
     var ribbonItem: TemporalRibbonIntervalItem {
         TemporalRibbonIntervalItem(
-            id: id,
+            id: ribbonID,
             start: startDate,
             end: endDate,
             title: title,
-            compactTitle: inferredInterval?.isInProgress == true
-                ? textContext.textResolver(.historyCopy(.inferredFastInProgressCompact))
-                : nil,
             detail: detail,
             accessibilityLabel: accessibilityLabel,
             kind: ribbonKind
         )
+    }
+
+    var accessibilityID: UUID {
+        inferredInterval?.sourceBoundaryReference.id ?? id
+    }
+
+    var ribbonID: UUID {
+        inferredInterval?.sourceBoundaryReference.historyPresentationID ?? id
+    }
+
+    var historyIdentity: UUID {
+        ribbonID
     }
 
     var detail: String {
@@ -801,6 +895,9 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
                     : textContext.textResolver(.historyCopy(.saveActionAvailable))
             )
         }
+        if kind == .hiddenInferred {
+            components.append(textContext.textResolver(.historyCopy(.hiddenInferredHint)))
+        }
         return components.joined(
             separator: " \(textContext.textResolver(.historyCopy(.separatorMiddleDot))) "
         )
@@ -853,7 +950,7 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         if let reviewBoundaryUnavailableDescription {
             components.append(reviewBoundaryUnavailableDescription)
         }
-        if kind == .inferred {
+        if kind == .inferred || kind == .hiddenInferred {
             let sourceKind: AppText.HistoryEventFamily = inferredInterval.map {
                 $0.sourceKind == .hydration ? .drink : .food
             } ?? .food
@@ -866,7 +963,9 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
                 )
             )
             components.append(
-                inferredInterval?.isInProgress == true
+                kind == .hiddenInferred
+                    ? textContext.textResolver(.historyCopy(.hiddenInferredHint))
+                    : inferredInterval?.isInProgress == true
                     ? textContext.textResolver(.historyCopy(.startActionAvailable))
                     : textContext.textResolver(.historyCopy(.saveActionAvailable))
             )

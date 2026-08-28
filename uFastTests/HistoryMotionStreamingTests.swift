@@ -361,14 +361,12 @@ final class HistoryMotionStreamingTests: XCTestCase {
 
         let currentRibbon = try XCTUnwrap(motion.ribbonIntervals(activeEndingAt: eligible).first)
         XCTAssertEqual(currentRibbon.title, "Inferred fast in progress")
-        XCTAssertEqual(currentRibbon.compactTitle, "Est. now")
         XCTAssertTrue(currentRibbon.accessibilityLabel.contains("Start fast available"))
         let current = try XCTUnwrap(motion.inferredInterval(for: currentRibbon.id, at: eligible))
         XCTAssertTrue(current.offersStart)
 
         let cappedRibbon = try XCTUnwrap(motion.ribbonIntervals(activeEndingAt: cap).first)
         XCTAssertEqual(cappedRibbon.title, "Inferred fast")
-        XCTAssertNil(cappedRibbon.compactTitle)
         XCTAssertTrue(cappedRibbon.accessibilityLabel.contains("Save fast available"))
         let capped = try XCTUnwrap(motion.inferredInterval(for: currentRibbon.id, at: cap))
         XCTAssertEqual(capped.state, .historical)

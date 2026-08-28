@@ -8,10 +8,13 @@ struct InferredFastConversionView: View {
     let presentation: InferredFastConversionPresentation
     let clock: any AppClock
     let onConfirm: (InferredFastInterval) throws -> Void
+    let onDelete: (InferredFastInterval) throws -> Void
     let onCancel: () -> Void
     let onFailure: () -> Void
 
     @State private var errorMessage: String?
+    @State private var deleteFailure: DeleteFailure?
+    @State private var showDeleteConfirmation = false
 
     private var interval: InferredFastInterval {
         presentation.interval.refreshed(at: clock.now)
@@ -97,7 +100,10 @@ struct InferredFastConversionView: View {
                             Label(errorMessage, systemImage: "exclamationmark.circle")
                                 .foregroundStyle(UFastTheme.error)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("history.inferred.conversion-error")
+                                .accessibilityIdentifier(
+                                    deleteFailure?.accessibilityIdentifier
+                                        ?? "history.inferred.conversion-error"
+                                )
                         }
                     }
 
@@ -109,6 +115,13 @@ struct InferredFastConversionView: View {
                                     ? "history.inferred.start"
                                     : "history.inferred.save"
                             )
+                        Button(
+                            textResolver(.fastingCopy(.inferredDelete)),
+                            role: .destructive
+                        ) {
+                            showDeleteConfirmation = true
+                        }
+                        .accessibilityIdentifier("history.inferred.delete")
                     }
                 }
                 .navigationTitle(title)
@@ -122,6 +135,22 @@ struct InferredFastConversionView: View {
                     }
                 }
             }
+            .alert(
+                textResolver(.fastingCopy(.inferredDeleteConfirmationTitle)),
+                isPresented: $showDeleteConfirmation
+            ) {
+                Button(
+                    textResolver(.fastingCopy(.inferredDeleteConfirmationAction)),
+                    role: .destructive,
+                    action: delete
+                )
+                .accessibilityIdentifier("history.inferred.delete.confirm")
+                Button(textResolver(.cancel), role: .cancel) {}
+                    .accessibilityIdentifier("history.inferred.delete.cancel")
+            } message: {
+                Text(textResolver(.fastingCopy(.inferredDeleteConfirmationMessage)))
+                    .accessibilityIdentifier("history.inferred.delete.confirmation")
+            }
         }
     }
 
@@ -129,8 +158,26 @@ struct InferredFastConversionView: View {
         do {
             try onConfirm(interval)
             errorMessage = nil
+            deleteFailure = nil
         } catch {
             errorMessage = errorDescription(for: error)
+            deleteFailure = nil
+            onFailure()
+        }
+    }
+
+    private func delete() {
+        do {
+            try onDelete(interval)
+            errorMessage = nil
+            deleteFailure = nil
+        } catch {
+            let failure: DeleteFailure = error is InferredFastSuppressionError
+                && (error as? InferredFastSuppressionError) == .candidateUnavailable
+                ? .unavailable
+                : .save
+            errorMessage = deleteErrorDescription(for: failure)
+            deleteFailure = failure
             onFailure()
         }
     }
@@ -145,6 +192,27 @@ struct InferredFastConversionView: View {
             textResolver(.fastingCopy(.inferredActiveFastError))
         default:
             textResolver(.fastingCopy(.inferredSaveError))
+        }
+    }
+
+    private func deleteErrorDescription(for failure: DeleteFailure) -> String {
+        switch failure {
+        case .unavailable:
+            textResolver(.fastingCopy(.inferredUnavailableError))
+        case .save:
+            textResolver(.fastingCopy(.inferredDeleteError))
+        }
+    }
+
+    private enum DeleteFailure {
+        case unavailable
+        case save
+
+        var accessibilityIdentifier: String {
+            switch self {
+            case .unavailable: "history.inferred.delete-unavailable"
+            case .save: "history.inferred.delete-error"
+            }
         }
     }
 }

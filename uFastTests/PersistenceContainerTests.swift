@@ -3,6 +3,7 @@ import SwiftData
 import XCTest
 
 // swiftlint:disable trailing_comma
+// swiftlint:disable file_length
 
 @MainActor
 final class PersistenceContainerTests: XCTestCase {
@@ -19,15 +20,17 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(UFastSchemaV4.versionIdentifier, Schema.Version(4, 0, 0))
         XCTAssertEqual(UFastSchemaV5.versionIdentifier, Schema.Version(5, 0, 0))
         XCTAssertEqual(UFastSchemaV6.versionIdentifier, Schema.Version(6, 0, 0))
-        XCTAssertEqual(UFastMigrationPlan.schemas.count, 6)
+        XCTAssertEqual(UFastSchemaV7.versionIdentifier, Schema.Version(7, 0, 0))
+        XCTAssertEqual(UFastMigrationPlan.schemas.count, 7)
         XCTAssertTrue(UFastMigrationPlan.schemas[0] == UFastSchemaV1.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[1] == UFastSchemaV2.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[2] == UFastSchemaV3.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[3] == UFastSchemaV4.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[4] == UFastSchemaV5.self)
         XCTAssertTrue(UFastMigrationPlan.schemas[5] == UFastSchemaV6.self)
-        XCTAssertEqual(UFastMigrationPlan.stages.count, 5)
-        XCTAssertEqual(PersistenceContainer.schema.entities.count, 8)
+        XCTAssertTrue(UFastMigrationPlan.schemas[6] == UFastSchemaV7.self)
+        XCTAssertEqual(UFastMigrationPlan.stages.count, 6)
+        XCTAssertEqual(PersistenceContainer.schema.entities.count, 9)
     }
 
     private func assertReleaseSchema() {
@@ -73,6 +76,7 @@ final class PersistenceContainerTests: XCTestCase {
                 "FoodFavouriteRecord",
                 "HydrationFavouriteMigrationRecord",
                 "UnknownPeriodRecord",
+                "InferredFastSuppressionRecord",
             ]
         )
     }
@@ -121,7 +125,8 @@ final class PersistenceContainerTests: XCTestCase {
             configurations: [ModelConfiguration(schema: v5Schema, url: storeURL, cloudKitDatabase: .none)]
         )
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let settings = AppSettingsRecord(hasCompletedOnboarding: true)
+        let settings = UFastSchemaV5.AppSettingsRecord()
+        settings.hasCompletedOnboarding = true
         let foodID = UUID()
         let food = FoodEntryRecord(
             id: foodID,
@@ -150,6 +155,7 @@ final class PersistenceContainerTests: XCTestCase {
         )
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationEntryRecord>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<AppSettingsRecord>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<InferredFastSuppressionRecord>()), 0)
     }
 
     func testSimulatedV5ToV6MigrationFailurePreservesStoreAndReturnsUnavailable() throws {
@@ -161,7 +167,9 @@ final class PersistenceContainerTests: XCTestCase {
             for: v5Schema,
             configurations: [ModelConfiguration(schema: v5Schema, url: storeURL, cloudKitDatabase: .none)]
         )
-        v5Container.mainContext.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        let settings = UFastSchemaV5.AppSettingsRecord()
+        settings.hasCompletedOnboarding = true
+        v5Container.mainContext.insert(settings)
         try v5Container.mainContext.save()
         let before = try storeContents(in: directory)
 
@@ -207,7 +215,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertNil(PersistenceContainer.configuration(inMemory: true).cloudKitContainerIdentifier)
     }
 
-    func testV2SettingsStoreMigratesWithInferredDetectionOff() throws {
+    func testV2SettingsStoreMigratesWithInferredDetectionOn() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "uFast-v2-settings-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -233,7 +241,7 @@ final class PersistenceContainerTests: XCTestCase {
             migrated.mainContext.fetch(FetchDescriptor<AppSettingsRecord>()).first
         )
         XCTAssertTrue(settings.hasCompletedOnboarding)
-        XCTAssertFalse(settings.inferredFastDetectionEnabled)
+        XCTAssertTrue(settings.inferredFastDetectionEnabled)
     }
 
     func testV3StoreMigratesReconstructedReviewEvidenceFields() throws {
@@ -273,7 +281,7 @@ final class PersistenceContainerTests: XCTestCase {
         XCTAssertEqual(storedSettings.count, 1)
         XCTAssertEqual(storedSettings.first?.fastingGoalHours, 16)
         XCTAssertEqual(storedSettings.first?.hasCompletedOnboarding, true)
-        XCTAssertEqual(storedSettings.first?.inferredFastDetectionEnabled, false)
+        XCTAssertEqual(storedSettings.first?.inferredFastDetectionEnabled, true)
     }
 
     func testChangedGoalPersistsWhenSettingsAreFetchedAgain() throws {
@@ -314,6 +322,72 @@ final class PersistenceContainerTests: XCTestCase {
 }
 
 extension PersistenceContainerTests {
+    // swiftlint:disable:next function_body_length
+    func testSuppressionPersistsAcrossDiskReopenAtV7() throws {
+        let directory = try makeStoreDirectory(prefix: "uFast-v7-suppression-reopen")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "production.store")
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let sourceID = UUID()
+        let nextID = UUID()
+
+        func seedSuppression() throws {
+            let container = try PersistenceContainer.make(storeURL: storeURL, now: now)
+            let context = container.mainContext
+            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+            context.insert(
+                FoodEntryRecord(
+                    id: sourceID,
+                    draft: .init(
+                        description: "Dinner",
+                        occurredAt: now.addingTimeInterval(-20 * 60 * 60)
+                    ),
+                    createdAt: now
+                )
+            )
+            context.insert(
+                HydrationEntryRecord(
+                    id: nextID,
+                    type: .coffee,
+                    volumeMillilitres: 250,
+                    occurredAt: now.addingTimeInterval(-10 * 60 * 60),
+                    isCaloric: true,
+                    createdAt: now
+                )
+            )
+            try context.save()
+            let boundaries = try CaloricBoundaryPersistencePlanner(modelContext: context).allBoundaries()
+            let candidate = try XCTUnwrap(InferredFastProjector.project(
+                boundaries: boundaries,
+                currentGoal: .default,
+                enabled: true,
+                now: now
+            ).first { $0.sourceBoundaryReference == .init(kind: .food, id: sourceID) })
+            context.insert(
+                InferredFastSuppressionRecord(
+                    suppression: .init(candidate: candidate, createdAt: now, updatedAt: now)
+                )
+            )
+            try context.save()
+        }
+
+        try seedSuppression()
+        let reopened = try PersistenceContainer.make(storeURL: storeURL, now: now)
+        let suppression = try XCTUnwrap(
+            try reopened.mainContext.fetch(FetchDescriptor<InferredFastSuppressionRecord>()).first?.suppression
+        )
+        XCTAssertEqual(suppression.sourceBoundaryReference, .init(kind: .food, id: sourceID))
+        XCTAssertEqual(suppression.projectedStartDate, now.addingTimeInterval(-20 * 60 * 60))
+        XCTAssertEqual(suppression.projectedEndDate, now.addingTimeInterval(-10 * 60 * 60))
+        XCTAssertEqual(suppression.nextBoundaryReference, .init(kind: .hydration, id: nextID))
+        XCTAssertEqual(suppression.nextBoundaryDate, now.addingTimeInterval(-10 * 60 * 60))
+        XCTAssertEqual(suppression.goalHoursSnapshot, FastingGoal.default.hours)
+        XCTAssertEqual(
+            try reopened.mainContext.fetchCount(FetchDescriptor<InferredFastSuppressionRecord>()),
+            1
+        )
+    }
+
     func testDeleteEverythingRemovesEveryPersistedModelType() throws {
         let container = try populatedContainer()
         let context = container.mainContext
@@ -330,6 +404,7 @@ extension PersistenceContainerTests {
             try context.fetch(FetchDescriptor<HydrationFavouriteMigrationRecord>()).isEmpty
         )
         XCTAssertTrue(try context.fetch(FetchDescriptor<UnknownPeriodRecord>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<InferredFastSuppressionRecord>()).isEmpty)
     }
 
     func testDeleteEverythingFailureRollsBackEveryDeletion() throws {
@@ -354,6 +429,7 @@ extension PersistenceContainerTests {
             try context.fetchCount(FetchDescriptor<HydrationFavouriteMigrationRecord>()),
             1
         )
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<InferredFastSuppressionRecord>()), 1)
         XCTAssertFalse(context.hasChanges)
     }
 
@@ -400,6 +476,20 @@ extension PersistenceContainerTests {
                 boundaries: boundaries,
                 reason: .userChoice,
                 createdAt: now
+            )
+        )
+        context.insert(
+            InferredFastSuppressionRecord(
+                suppression: InferredFastSuppression(
+                    sourceBoundaryReference: .init(kind: .food, id: startBoundaryID),
+                    projectedStartDate: now,
+                    projectedEndDate: now.addingTimeInterval(60),
+                    nextBoundaryReference: .init(kind: .hydration, id: endBoundaryID),
+                    nextBoundaryDate: now.addingTimeInterval(60),
+                    goalHoursSnapshot: FastingGoal.default.hours,
+                    createdAt: now,
+                    updatedAt: now
+                )
             )
         )
     }

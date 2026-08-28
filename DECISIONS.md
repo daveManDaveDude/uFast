@@ -808,23 +808,25 @@ is shown.
   automatic-gap projector becomes the only source for new non-recorded fasting
   history.
 
-## D-033 Opt-in inferred fast detection
+## D-033 Inferred fast detection
 
 - **Status:** Accepted
 - **Accepted:** 16 August 2026
-- **Decision:** Replace D-024's new automatic-gap behavior with an opt-in
-  inferred-fast projection. The setting is off by default for new and migrated
-  installs. When enabled, a caloric food event becomes eligible exactly eight
-  absolute hours after its timestamp; the interval starts at that exact source
-  instant, ends at the first later caloric food event before the source instant
-  plus the current goal duration and 12 absolute hours, or at the current
-  instant while below that maximum, and is capped by that maximum. A later
-  food closes the current inference only when it punctuates before the maximum,
-  while a qualifying historical interval remains available for explicit saving.
+- **Amended:** 28 August 2026 by user request
+- **Decision:** Replace D-024's new automatic-gap behavior with an inferred-fast
+  projection. The setting is enabled by default for new and migrated installs
+  and remains user-controlled; an existing saved choice remains authoritative.
+  When enabled, a caloric food event becomes eligible exactly eight absolute
+  hours after its timestamp; the interval starts at that exact source instant,
+  ends at the first later caloric food event before the source instant plus the
+  current goal duration and 12 absolute hours, or at the current instant while
+  below that maximum, and is capped by that maximum. A later food closes the
+  current inference only when it punctuates before the maximum, while a
+  qualifying historical interval remains available for explicit saving.
 - **Decision:** Inferred intervals are presentation-only and recalculated from
-  local events, the current goal, the opt-in setting and injected time. They do
-  not create a persisted inferred record or cache, and a persisted real fast
-  takes presentation precedence over an overlap.
+  local events, the current goal, the user-controlled setting and injected time.
+  They do not create a persisted inferred record or cache, and a persisted real
+  fast takes presentation precedence over an overlap.
 - **Decision:** Tapping a historical inferred interval and confirming **Save
   fast** creates a normal completed recorded fast using the goal current at
   conversion. Tapping the current inferred interval and confirming **Start
@@ -839,10 +841,10 @@ is shown.
   using explicit inferred-fast copy and accessibility labels so color is not the
   only distinction.
 - **Consequence:** D-033 supersedes D-024 for new inferred-fast projections
-  and amends D-001 and BR-22 through BR-25. Existing legacy reconstructed or
-  automatic-history data remains available through its compatibility contract;
-  History's ordinary Add journey remains food/drink entry. D-034 clarifies the
-  candidate lifecycle and active-start boundary.
+  and amends D-001 and BR-22 through BR-25 and BR-44. Existing legacy
+  reconstructed or automatic-history data remains available through its
+  compatibility contract; History's ordinary Add journey remains food/drink
+  entry. D-034 clarifies the candidate lifecycle and active-start boundary.
 
 ## D-034 Inferred candidate lifecycle and conversion boundary
 
@@ -984,3 +986,45 @@ is shown.
   an operation or decide operation authority. A user-triggered diagnostic
   export requires a later decision defining preview, redaction, retention and
   cancellation semantics.
+
+## D-038 Continuous History fast-label placement
+
+- **Status:** Proposed by BF-104 implementation; pending independent story review
+- **Decision:** BF-104 supersedes BF-103 only for visual-content ownership and
+  placement. A fast interval's visual label is projected once in the complete
+  continuous day runway; page fragments retain bar geometry, lanes and hit
+  routing only. BF-103's stable interval identity, continuous bar, semantic
+  item and accessibility outcomes remain authoritative.
+- **Consequence:** Future History changes must not restore original-start or
+  first-continuation label ownership, fragment-width fallback or a per-second
+  visual active-duration timer.
+
+## D-039 Source-bound inferred-fast suppression
+
+- **Status:** Accepted
+- **Accepted:** 28 August 2026 by user request for OW-412
+- **Decision:** Delete inferred fast means hide one derived candidate, not delete
+  or convert a record. Persist exactly one local suppression per complete
+  `CaloricBoundaryReference`, including food versus caloric hydration and the
+  source UUID. The row carries only the latest derived interval, punctuation
+  metadata, goal snapshot and audit timestamps. It is reconciled atomically
+  with authoritative food, hydration, goal and recorded-fast mutations, and
+  is removed when the source no longer produces a qualifying candidate. A
+  recorded-fast overlap temporarily suppresses presentation but does not erase
+  the person's hide choice.
+- **Decision:** History uses the same exact settled and moving visible-window
+  projection for hidden candidates. A hidden candidate contributes no timeline,
+  empty/Save/Start action or inferred `FastRecord`. On a selected settled day,
+  one source-bound recovery row may appear only when the current candidate
+  intersects the visible interval and has no recorded overlap. Re-enable is an
+  atomic, revalidated removal of that suppression; cancellation, stale state or
+  commit failure leaves local data unchanged and reports accessible feedback.
+- **Decision:** The suppression entity is an additive SwiftData V7 migration.
+  Detection-off preserves rows, detection-on reconciles them, relaunch restores
+  them, and Delete All Data removes them. No Today, WidgetKit, ActivityKit,
+  network, cloud, HealthKit, AI or coaching path is added.
+- **Consequence:** D-039 amends D-033 through D-035 and BR-44 through BR-55
+  for this explicit visibility state without erasing those historical
+  decisions. Inferred intervals remain derived, source events and recorded
+  fasts remain authoritative, and existing OW-410/OW-411 conversion and event
+  boundary behavior remains in force.

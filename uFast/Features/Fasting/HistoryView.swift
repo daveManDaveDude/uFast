@@ -17,6 +17,7 @@ struct HistoryView: View {
     let model: HistoryPresentationModel
     @State var editor: CompletedFastEditorPresentation?
     @State var inferredConversion: InferredFastConversionPresentation?
+    @State var inferredRecoveryError: InferredFastRecoveryError?
     @State var foodEditor: HistoryFoodEditorPresentation?
     @State var hydrationEditor: HistoryHydrationEditorPresentation?
     @State var directHistoricalEntry: DirectHistoricalEntryPresentation?
@@ -116,9 +117,38 @@ struct HistoryView: View {
     func visibleFastItems(at now: Date) -> [HistoryVisibleFastItem] {
         guard let visible = settledVisibleWindow?.interval else { return [] }
         let window = visible.start ..< visible.end
-        return (liveHistoryPresentation?.visibleFastItems(activeEndingAt: now) ?? [])
+        let normalItems = liveHistoryPresentation?.visibleFastItems(activeEndingAt: now) ?? []
+        let hiddenItems = liveHistoryPresentation?.hiddenInferredFastItems ?? []
+        return (normalItems + hiddenItems)
             .filter { $0.intersects(window) }
             .sorted { $0.startDate < $1.startDate }
+    }
+
+    func reenableInferredFast(_ item: HistoryVisibleFastItem) {
+        guard let interval = item.inferredInterval,
+              let applicationCommands
+        else {
+            inferredRecoveryError = .unavailable
+            return
+        }
+        do {
+            try applicationCommands.reenableInferredFast(
+                sourceBoundaryReference: interval.sourceBoundaryReference,
+                expectedStartDate: interval.startDate,
+                expectedEndDate: interval.endDate,
+                expectedSourceDescription: interval.sourceDescription,
+                expectedGoal: interval.goal,
+                expectedState: interval.state
+            )
+            inferredRecoveryError = nil
+            _ = model.reloadHistoryAfterMutation()
+        } catch let error as InferredFastSuppressionError {
+            inferredRecoveryError = error == .candidateUnavailable ? .unavailable : .failed
+            _ = model.reloadHistoryAfterMutation()
+        } catch {
+            inferredRecoveryError = .failed
+            _ = model.reloadHistoryAfterMutation()
+        }
     }
 
     var motionIntervalsAtCurrentTime: [TemporalRibbonIntervalItem] {
@@ -128,8 +158,13 @@ struct HistoryView: View {
         guard let live = liveHistoryPresentation else { return motion }
         let inferred = live.visibleFastItems(activeEndingAt: now).filter { $0.kind == .inferred }
         guard !inferred.isEmpty else { return motion }
-        let inferredIDs = Set(inferred.map(\.id))
+        let inferredIDs = Set(inferred.map(\.ribbonID))
         return (motion.filter { !inferredIDs.contains($0.id) } + inferred.map(\.ribbonItem))
             .sorted { $0.start < $1.start }
     }
+}
+
+enum InferredFastRecoveryError: Equatable {
+    case unavailable
+    case failed
 }

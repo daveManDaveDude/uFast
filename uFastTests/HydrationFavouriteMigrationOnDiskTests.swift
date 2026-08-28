@@ -4,6 +4,23 @@ import XCTest
 
 // swiftlint:disable trailing_comma
 
+private extension UFastSchemaV4.AppSettingsRecord {
+    convenience init(
+        id: UUID = UUID(),
+        hasCompletedOnboarding: Bool = false,
+        waterFavouriteMillilitres: Int = 500,
+        teaFavouriteMillilitres: Int = 300,
+        coffeeFavouriteMillilitres: Int = 300
+    ) {
+        self.init()
+        self.id = id
+        self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.waterFavouriteMillilitres = waterFavouriteMillilitres
+        self.teaFavouriteMillilitres = teaFavouriteMillilitres
+        self.coffeeFavouriteMillilitres = coffeeFavouriteMillilitres
+    }
+}
+
 @MainActor
 final class HydrationFavouriteMigrationDiskTests: XCTestCase {
     private let migrationDate = Date(timeIntervalSince1970: 1_800_000_000)
@@ -79,16 +96,16 @@ final class HydrationFavouriteMigrationDiskTests: XCTestCase {
                 ]
             )
             legacy.mainContext.insert(
-                AppSettingsRecord(
+                UFastSchemaV4.AppSettingsRecord(
                     id: higherID,
                     hasCompletedOnboarding: true,
-                    waterFavouriteMillilitres: 600,
-                    teaFavouriteMillilitres: 350,
-                    coffeeFavouriteMillilitres: 275
+                    waterFavouriteMillilitres: 750,
+                    teaFavouriteMillilitres: 425,
+                    coffeeFavouriteMillilitres: 225
                 )
             )
             legacy.mainContext.insert(
-                AppSettingsRecord(
+                UFastSchemaV4.AppSettingsRecord(
                     id: lowerID,
                     hasCompletedOnboarding: true,
                     waterFavouriteMillilitres: 750,
@@ -154,7 +171,7 @@ final class HydrationFavouriteMigrationDiskTests: XCTestCase {
         )
         let context = container.mainContext
         context.insert(
-            AppSettingsRecord(
+            UFastSchemaV4.AppSettingsRecord(
                 hasCompletedOnboarding: true,
                 waterFavouriteMillilitres: 750,
                 teaFavouriteMillilitres: 425,
@@ -230,7 +247,9 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
         XCTAssertTrue(failure.diagnosticDescription.contains("conflictingFavouriteAuthority"))
         let unchanged = try currentContainer(at: storeURL)
         let context = unchanged.mainContext
-        XCTAssertTrue(try context.fetch(FetchDescriptor<AppSettingsRecord>()).isEmpty)
+        XCTAssertTrue(
+            try context.fetch(FetchDescriptor<UFastSchemaV5.AppSettingsRecord>()).isEmpty
+        )
         XCTAssertEqual(try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).count, 1)
         XCTAssertEqual(
             try context.fetch(FetchDescriptor<HydrationFavouriteRecord>()).first?.name,
@@ -246,7 +265,7 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
         let storeURL = directory.appending(path: "production.store")
         try writeV4Store(to: storeURL) { context in
             context.insert(
-                AppSettingsRecord(
+                UFastSchemaV4.AppSettingsRecord(
                     hasCompletedOnboarding: true,
                     waterFavouriteMillilitres: 0,
                     teaFavouriteMillilitres: 425,
@@ -270,7 +289,9 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
         }
         let unchanged = try currentContainer(at: storeURL)
         let context = unchanged.mainContext
-        let settings = try XCTUnwrap(context.fetch(FetchDescriptor<AppSettingsRecord>()).first)
+        let settings = try XCTUnwrap(
+            context.fetch(FetchDescriptor<UFastSchemaV5.AppSettingsRecord>()).first
+        )
         XCTAssertEqual(settings.waterFavouriteMillilitres, 0)
         XCTAssertEqual(settings.teaFavouriteMillilitres, 425)
         XCTAssertEqual(settings.coffeeFavouriteMillilitres, 225)
@@ -289,7 +310,7 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
         let storeURL = directory.appending(path: "production.store")
         try writeV4Store(to: storeURL) { context in
             context.insert(
-                AppSettingsRecord(
+                UFastSchemaV4.AppSettingsRecord(
                     hasCompletedOnboarding: true,
                     waterFavouriteMillilitres: 750,
                     teaFavouriteMillilitres: 425,
@@ -316,7 +337,9 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
         XCTAssertTrue(failure.diagnosticDescription.contains("conflictingFavouriteAuthority"))
         let unchanged = try currentContainer(at: storeURL)
         let context = unchanged.mainContext
-        let settings = try XCTUnwrap(context.fetch(FetchDescriptor<AppSettingsRecord>()).first)
+        let settings = try XCTUnwrap(
+            context.fetch(FetchDescriptor<UFastSchemaV5.AppSettingsRecord>()).first
+        )
         XCTAssertEqual(settings.waterFavouriteMillilitres, 750)
         XCTAssertEqual(settings.teaFavouriteMillilitres, 425)
         XCTAssertEqual(settings.coffeeFavouriteMillilitres, 225)
@@ -336,7 +359,7 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
             UUID(uuidString: "70300000-0000-0000-0000-000000000001")
         )
         try writeV4Store(to: storeURL) { context in
-            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+            context.insert(UFastSchemaV4.AppSettingsRecord())
             context.insert(
                 HydrationFavouriteRecord(
                     id: duplicateID,
@@ -376,7 +399,7 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let storeURL = directory.appending(path: "production.store")
         try writeV4Store(to: storeURL) { context in
-            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+            context.insert(UFastSchemaV4.AppSettingsRecord())
             context.insert(
                 HydrationFavouriteRecord(
                     name: "Corrupt order",
@@ -406,7 +429,7 @@ final class HydrationFavouriteMigrationFailureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let storeURL = directory.appending(path: "production.store")
         try writeV4Store(to: storeURL) { context in
-            context.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+            context.insert(UFastSchemaV4.AppSettingsRecord())
             context.insert(
                 HydrationFavouriteRecord(
                     name: "Corrupt maximum order",

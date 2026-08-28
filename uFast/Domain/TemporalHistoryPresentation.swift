@@ -24,6 +24,10 @@ struct TemporalRibbonWindow: Equatable, Sendable {
     func instant(at fraction: Double) -> Date {
         interval.start.addingTimeInterval(duration * min(max(fraction, 0), 1))
     }
+
+    var centerInstant: Date {
+        instant(at: 0.5)
+    }
 }
 
 struct TemporalIntervalInput: Equatable, Sendable {

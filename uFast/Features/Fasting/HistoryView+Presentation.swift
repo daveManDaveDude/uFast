@@ -77,10 +77,6 @@ extension HistoryView {
     var periodHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(textResolver(.historyCopy(.eyebrow)))
-                    .font(.caption.weight(.semibold))
-                    .tracking(1.2)
-                    .foregroundStyle(UFastTheme.secondaryText)
                 Text(historyDayPresentation.visualDay, format: .dateTime.month(.wide).year())
                     .font(.uFastDisplay(.title))
                     .foregroundStyle(UFastTheme.primary)
@@ -186,45 +182,43 @@ extension HistoryView {
         return "none"
     }
 
-    var directAddAlternative: some View {
-        Button {
-            beginHistoricalEntry(at: defaultHistoricalInstant)
-        } label: {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                        Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus.circle")
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(defaultHistoricalInstant, format: .dateTime.hour().minute())
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(UFastTheme.secondaryText)
-                    }
-                } else {
-                    HStack {
-                        Label(textResolver(.historyCopy(.addAtSelectedTime)), systemImage: "plus.circle")
-                        Spacer()
-                        Text(defaultHistoricalInstant, format: .dateTime.hour().minute())
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(UFastTheme.secondaryText)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        }
-        .buttonStyle(UFastSecondaryButtonStyle())
-        .disabled(!temporalMovementPhase.allowsTimelineInteraction)
-        .padding(.horizontal, UFastTheme.Spacing.standard)
-        .accessibilityHint(textResolver(.historyCopy(.addAtSelectedTimeHint)))
-        .accessibilityIdentifier("history.add-at-selected-time")
-    }
-
     @ViewBuilder
+    // swiftlint:disable:next function_body_length
     func fastHistoryDetails(at now: Date) -> some View {
         let visibleFastItems = visibleFastItems(at: now)
+        if !visibleFastItems.isEmpty {
+            UFastSectionHeading(
+                textResolver(.historyCopy(.fastsInView)),
+                eyebrow: textResolver(.historyCopy(.detailsEyebrow))
+            )
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+        }
+        if let inferredRecoveryError {
+            Section {
+                Label(
+                    textResolver(
+                        .historyCopy(
+                            inferredRecoveryError == .unavailable
+                                ? .inferredReenableUnavailable
+                                : .inferredReenableError
+                        )
+                    ),
+                    systemImage: "exclamationmark.circle"
+                )
+                .foregroundStyle(UFastTheme.error)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(
+                    inferredRecoveryError == .unavailable
+                        ? "history.inferred.reenable-unavailable"
+                        : "history.inferred.reenable-error"
+                )
+            }
+            .padding(.horizontal, UFastTheme.Spacing.standard)
+        }
         if visibleFastItems.isEmpty {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.compact) {
-                    Text(textResolver(.historyCopy(.eyebrow)))
+                    Text(textResolver(.historyCopy(.emptyEyebrow)))
                         .font(.caption.weight(.semibold))
                         .tracking(1.2)
                         .foregroundStyle(UFastTheme.secondaryText)
@@ -252,18 +246,22 @@ extension HistoryView {
                 .accessibilityIdentifier("history.empty")
             }
         } else {
-            UFastSectionHeading(
-                textResolver(.historyCopy(.fastsInView)),
-                eyebrow: textResolver(.historyCopy(.detailsEyebrow))
-            )
-            .padding(.horizontal, UFastTheme.Spacing.standard)
             LazyVStack(spacing: 12) {
-                ForEach(visibleFastItems) { item in
-                    Button { openVisibleFast(item) } label: {
-                        VisibleFastHistoryRow(item: item, calendar: calendar, locale: locale, timeZone: timeZone)
+                ForEach(visibleFastItems, id: \.historyIdentity) { item in
+                    if item.kind == .hiddenInferred {
+                        HiddenInferredFastRecoveryRow(
+                            item: item,
+                            onReenable: { reenableInferredFast(item) }
+                        )
+                    } else {
+                        let sourceAccessibilityID = item.inferredInterval?.sourceBoundaryReference.id.uuidString
+                            ?? item.id.uuidString
+                        Button { openVisibleFast(item) } label: {
+                            VisibleFastHistoryRow(item: item, calendar: calendar, locale: locale, timeZone: timeZone)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("history.fast.\(sourceAccessibilityID)")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("history.fast.\(item.id.uuidString)")
                 }
             }
             .padding(.horizontal, UFastTheme.Spacing.standard)
@@ -290,14 +288,6 @@ extension HistoryView {
         .padding(.horizontal, UFastTheme.Spacing.standard)
         .accessibilityHint(textResolver(.historyCopy(.futureReadOnlyHint)))
         .accessibilityIdentifier("history.future-read-only")
-    }
-
-    var defaultHistoricalInstant: Date {
-        CatchUpRangeResolver.prefilledInstant(
-            on: selectedDate,
-            now: clock.now,
-            calendar: calendar
-        )
     }
 
     func historicalDayRange(containing instant: Date) -> Range<Date>? {
@@ -506,7 +496,7 @@ extension HistoryView {
             onSelectToday()
             return
         }
-        if let inferred = liveHistoryPresentation?.fastItems.first(where: { $0.id == id }),
+        if let inferred = liveHistoryPresentation?.fastItems.first(where: { $0.ribbonID == id }),
            inferred.kind == .inferred,
            let interval = inferred.inferredInterval
         {
@@ -567,16 +557,20 @@ extension HistoryView {
             onSelectEmpty: { instant in
                 beginHistoricalEntry(at: instant)
             },
+            allowsAddAtCenter: !isFutureSelection,
             onNavigateDay: navigateDay,
             canNavigateForward: canNavigateForward,
-            allowsRecordActivation: !isFutureSelection,
+            // A future selection makes empty time read-only, but records from
+            // the visible look-back portion remain ordinary History records.
+            // Keep their fast, food, and drink controls active and fully
+            // coloured instead of inheriting the future-day disabled state.
+            allowsRecordActivation: true,
             allowsEmptySelection: !isFutureSelection,
             showsTimelineDetails: showsSettledHistoryDetails,
             presentationDay: selectedDate,
             readOnlyFromDate: clock.now,
             onMovementPhaseChange: updateTemporalMovementPhase,
             onCoupledPresentationChange: coupledScrollPresentation.handle,
-            activeFastNow: { clock.now },
             onSettledVisibleWindow: { window in
                 settledVisibleWindow = window
                 _ = model.reloadHistory(in: window.interval)

@@ -1,6 +1,9 @@
 @testable import uFast
 import XCTest
 
+// SwiftFormat requires multiline collection trailing commas; SwiftLint's repository rule forbids them.
+// swiftlint:disable trailing_comma
+
 final class LocalizationTests: XCTestCase {
     func testAppTextCatalogKeysCoverFormattingAndPluralCases() {
         XCTAssertGreaterThan(AppText.catalogKeys.count, 50)
@@ -23,6 +26,10 @@ final class LocalizationTests: XCTestCase {
     func testEnglishValidationAndAccessibilityCopyRemainExact() {
         let resolve = AppTextResolver()
 
+        XCTAssertEqual(
+            resolve(.settingsFavouritesDescription),
+            "Save reusable drink details for quick logging. Templates stay separate from drink food history."
+        )
         XCTAssertEqual(
             resolve(.foodValidation(.emptyDescription)),
             "Enter what you ate."
@@ -47,6 +54,43 @@ final class LocalizationTests: XCTestCase {
             resolve(.todayTimelineAccessibilityValue(detail: "250 ml · Non-caloric", time: "10:30")),
             "250 ml · Non-caloric, 10:30"
         )
+    }
+
+    func testInferredFastAccessibilityContractHasLocalizedStableCopyAndVariantEvidence() {
+        let resolve = AppTextResolver()
+        let affectedCopy = [
+            resolve(.fastingCopy(.inferredDelete)),
+            resolve(.fastingCopy(.inferredDeleteConfirmationTitle)),
+            resolve(.fastingCopy(.inferredDeleteConfirmationMessage)),
+            resolve(.fastingCopy(.inferredDeleteConfirmationAction)),
+            resolve(.fastingCopy(.inferredDeleteError)),
+            resolve(.historyCopy(.hiddenInferredFast)),
+            resolve(.historyCopy(.hiddenInferredHint)),
+            resolve(.historyCopy(.reenableInferredFast)),
+            resolve(.historyCopy(.inferredReenableUnavailable)),
+            resolve(.historyCopy(.inferredReenableError)),
+            resolve(.historyFastSource(kind: .food, description: "Oats")),
+            resolve(.historyFastSource(kind: .drink, description: "Coffee")),
+        ]
+
+        XCTAssertTrue(affectedCopy.allSatisfy { !$0.isEmpty })
+        XCTAssertTrue(AppText.catalogKeys.contains("history.inferred.delete"))
+        XCTAssertTrue(AppText.catalogKeys.contains("history.fast.inferred.hidden"))
+        XCTAssertTrue(AppText.catalogKeys.contains("history.fast.inferred.reenable"))
+        XCTAssertTrue(AppText.catalogKeys.contains("history.fast.source.food"))
+        XCTAssertEqual(affectedCopy[10], "source food Oats")
+        XCTAssertEqual(affectedCopy[11], "source drink Coffee")
+
+        // The XCTest harness does not execute VoiceOver/RTL runtime variants;
+        // this deterministic resolver check proves their localized source
+        // contract without claiming an environment-dependent UI run.
+        let pseudo = AppTextResolver(pseudolocalizationEnabled: true)
+        for copy in affectedCopy {
+            let localized = AppTextPseudolocalizer.resolve(copy)
+            XCTAssertTrue(localized.hasPrefix("［"), localized)
+            XCTAssertNotEqual(localized, copy)
+        }
+        XCTAssertTrue(pseudo(.historyCopy(.hiddenInferredHint)).hasPrefix("［"))
     }
 
     func testEnglishSingularImpactTitleRemainsExact() {

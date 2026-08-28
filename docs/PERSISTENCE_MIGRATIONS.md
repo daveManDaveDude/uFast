@@ -18,5 +18,26 @@ To evolve the stored schema:
    reset nor replaced. Production recovery must remain the calm unavailable state;
    test reset and seeding arguments are never a migration strategy.
 
+When a versioned model's stored declaration has changed, keep that model
+declared independently inside the version that wrote it. Preserve its entity
+name and stored property metadata, including defaults, rather than letting a
+current production model stand in for historical compatibility data. The V3
+through V6 settings declarations therefore remain separate from
+`AppSettingsRecord`; their inferred-detection default is the historical
+`false`, while the V2-to-V3 migration explicitly enables records arriving from
+the earlier no-field contract.
+
 Never edit a released schema in place, point production at a fresh replacement
 store, or enable CloudKit as part of a migration.
+
+## Version 7: inferred-fast suppression
+
+OW-412 adds `InferredFastSuppressionRecord` in an additive lightweight V6 to V7
+migration. The entity is keyed by a source `CaloricBoundaryReference` and
+stores derived projection metadata for local visibility recovery; it is not a
+`FastRecord` and does not fabricate inferred history during migration. Existing
+settings, events, fasts and legacy rows remain unchanged. Store-open
+reconciliation removes stale suppression rows and refreshes qualifying rows
+before History consumes them. Delete All Data includes this entity, and a
+failed save restores the suppression snapshot through the same local rollback
+boundary as the related mutation.

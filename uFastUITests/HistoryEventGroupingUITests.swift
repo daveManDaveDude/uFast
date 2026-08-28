@@ -32,7 +32,13 @@ final class HistoryEventGroupingUITests: XCTestCase {
         XCTAssertFalse(
             app.buttons["history.event-group.edit-member.39700000-0000-0000-0000-000000000012"].exists
         )
-        XCTAssertTrue(app.buttons[drinkMemberID].label.contains("Tea"))
+        let disclosure = app.otherElements["history.event-group.disclosure"]
+        let teaMember = disclosure.buttons[drinkMemberID]
+        let teaLabel = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Tea"),
+            object: teaMember
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [teaLabel], timeout: 3), .completed, app.debugDescription)
         captureScreenshot(named: "history-event-grouping-disclosure-en-GB", in: app)
     }
 

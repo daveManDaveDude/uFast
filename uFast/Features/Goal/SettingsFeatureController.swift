@@ -121,7 +121,7 @@ final class SettingsFeatureController {
     var saveError: String?
     var deleteError: String?
     var automaticallyShowLiveActivities = false
-    var inferredFastDetectionEnabled = false
+    var inferredFastDetectionEnabled = true
     var liveActivityStatus: String?
 
     @ObservationIgnored private weak var commands: (any SettingsFeatureCommanding)?

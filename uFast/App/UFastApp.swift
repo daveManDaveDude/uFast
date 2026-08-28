@@ -50,11 +50,11 @@ struct UFastApp: App {
                     diagnosticSink: diagnosticSink
                 )
                 try settingsStore.prepareForUse()
-                let currentGoal = try settingsStore.authoritativeRecord()?.fastingGoal ?? .default
-                _ = try CaloricBoundaryReconciler(
+                _ = try LaunchReconciliationCoordinator(
                     modelContext: container.mainContext,
-                    currentGoal: currentGoal,
-                    saveAction: launchConfiguration.commands.simulateBoundaryReconciliationFailure
+                    clock: configuredClock,
+                    diagnosticSink: diagnosticSink,
+                    boundarySaveAction: launchConfiguration.commands.simulateBoundaryReconciliationFailure
                         ? { throw SimulatedPersistenceBootstrapError.requested }
                         : nil
                 ).reconcile()

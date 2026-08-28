@@ -67,15 +67,29 @@ extension HistoryUITests {
         app.launch()
         selectHistoryTab(in: app)
 
-        let visualActiveFast = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "history.active-fast.")
-        ).firstMatch
-        XCTAssertTrue(visualActiveFast.waitForExistence(timeout: 5), app.debugDescription)
+        let carousel = app.scrollViews["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+        let visualActiveFast = try? XCTUnwrap(
+            visibleActiveFast(in: app, carousel: carousel),
+            app.debugDescription
+        )
+        guard let visualActiveFast else { return }
+        XCTAssertTrue(waitForHittable(visualActiveFast, app: app), visualActiveFast.debugDescription)
         XCTAssertTrue(visualActiveFast.isEnabled, visualActiveFast.debugDescription)
         XCTAssertGreaterThan(visualActiveFast.frame.width, 0, visualActiveFast.debugDescription)
         XCTAssertFalse(visualActiveFast.label.contains("end"))
 
-        visualActiveFast.tap()
+        // The visual bar verifies the timeline projection. Open the matching
+        // settled semantic detail to avoid the surface's empty-time gesture
+        // competing with a narrow one-hour interval hit target.
+        let detailIdentifier = visualActiveFast.identifier.replacingOccurrences(
+            of: "history.active-fast.",
+            with: "history.fast."
+        )
+        let detail = app.otherElements["history.event-info-panel"].buttons[detailIdentifier]
+        XCTAssertTrue(waitForHittable(detail, app: app), detail.debugDescription)
+        detail.tap()
         XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 5), app.debugDescription)
     }
 }
