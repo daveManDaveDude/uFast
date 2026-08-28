@@ -146,6 +146,23 @@ enum UFastSchemaV2: VersionedSchema {
 enum UFastSchemaV3: VersionedSchema {
     static let versionIdentifier = Schema.Version(3, 0, 0)
 
+    /// This is the settings contract written by V3. Keep this declaration
+    /// independent from the production model so later defaults cannot change
+    /// the checksum used to recognize a V3 store.
+    @Model
+    final class AppSettingsRecord {
+        var id: UUID = UUID()
+        var fastingGoalHours: Int = 12
+        var hasCompletedOnboarding: Bool = false
+        var waterFavouriteMillilitres: Int = 500
+        var teaFavouriteMillilitres: Int = 300
+        var coffeeFavouriteMillilitres: Int = 300
+        var automaticLiveActivityPreferenceRawValue: String = "notAsked"
+        var inferredFastDetectionEnabled: Bool = false
+
+        init() {}
+    }
+
     @Model
     final class FastRecord {
         var id: UUID = UUID()
@@ -165,7 +182,7 @@ enum UFastSchemaV3: VersionedSchema {
     }
 
     static let models: [any PersistentModel.Type] = [
-        AppSettingsRecord.self,
+        UFastSchemaV3.AppSettingsRecord.self,
         UFastSchemaV3.FastRecord.self,
         FoodEntryRecord.self,
         HydrationEntryRecord.self,
@@ -177,8 +194,24 @@ enum UFastSchemaV3: VersionedSchema {
 enum UFastSchemaV4: VersionedSchema {
     static let versionIdentifier = Schema.Version(4, 0, 0)
 
+    /// V4 stores the same settings fields as V3, including its frozen false
+    /// inferred-detection default. Do not replace this with AppSettingsRecord.
+    @Model
+    final class AppSettingsRecord {
+        var id: UUID = UUID()
+        var fastingGoalHours: Int = 12
+        var hasCompletedOnboarding: Bool = false
+        var waterFavouriteMillilitres: Int = 500
+        var teaFavouriteMillilitres: Int = 300
+        var coffeeFavouriteMillilitres: Int = 300
+        var automaticLiveActivityPreferenceRawValue: String = "notAsked"
+        var inferredFastDetectionEnabled: Bool = false
+
+        init() {}
+    }
+
     static let models: [any PersistentModel.Type] = [
-        AppSettingsRecord.self,
+        UFastSchemaV4.AppSettingsRecord.self,
         FastRecord.self,
         FoodEntryRecord.self,
         HydrationEntryRecord.self,
@@ -190,8 +223,24 @@ enum UFastSchemaV4: VersionedSchema {
 enum UFastSchemaV5: VersionedSchema {
     static let versionIdentifier = Schema.Version(5, 0, 0)
 
+    /// V5's settings metadata is immutable compatibility data. In particular,
+    /// its inferred-detection default must remain false.
+    @Model
+    final class AppSettingsRecord {
+        var id: UUID = UUID()
+        var fastingGoalHours: Int = 12
+        var hasCompletedOnboarding: Bool = false
+        var waterFavouriteMillilitres: Int = 500
+        var teaFavouriteMillilitres: Int = 300
+        var coffeeFavouriteMillilitres: Int = 300
+        var automaticLiveActivityPreferenceRawValue: String = "notAsked"
+        var inferredFastDetectionEnabled: Bool = false
+
+        init() {}
+    }
+
     static let models: [any PersistentModel.Type] = [
-        AppSettingsRecord.self,
+        UFastSchemaV5.AppSettingsRecord.self,
         FastRecord.self,
         FoodEntryRecord.self,
         HydrationEntryRecord.self,
@@ -204,8 +253,24 @@ enum UFastSchemaV5: VersionedSchema {
 enum UFastSchemaV6: VersionedSchema {
     static let versionIdentifier = Schema.Version(6, 0, 0)
 
+    /// V6's settings metadata is immutable compatibility data. In particular,
+    /// its inferred-detection default must remain false.
+    @Model
+    final class AppSettingsRecord {
+        var id: UUID = UUID()
+        var fastingGoalHours: Int = 12
+        var hasCompletedOnboarding: Bool = false
+        var waterFavouriteMillilitres: Int = 500
+        var teaFavouriteMillilitres: Int = 300
+        var coffeeFavouriteMillilitres: Int = 300
+        var automaticLiveActivityPreferenceRawValue: String = "notAsked"
+        var inferredFastDetectionEnabled: Bool = false
+
+        init() {}
+    }
+
     static let models: [any PersistentModel.Type] = [
-        AppSettingsRecord.self,
+        UFastSchemaV6.AppSettingsRecord.self,
         FastRecord.self,
         FoodEntryRecord.self,
         HydrationEntryRecord.self,
@@ -244,7 +309,18 @@ enum UFastMigrationPlan: SchemaMigrationPlan {
     ]
     static let stages: [MigrationStage] = [
         .lightweight(fromVersion: UFastSchemaV1.self, toVersion: UFastSchemaV2.self),
-        .lightweight(fromVersion: UFastSchemaV2.self, toVersion: UFastSchemaV3.self),
+        .custom(
+            fromVersion: UFastSchemaV2.self,
+            toVersion: UFastSchemaV3.self,
+            willMigrate: nil,
+            didMigrate: { context in
+                let settings = try context.fetch(
+                    FetchDescriptor<UFastSchemaV3.AppSettingsRecord>()
+                )
+                settings.forEach { $0.inferredFastDetectionEnabled = true }
+                try context.save()
+            }
+        ),
         .lightweight(fromVersion: UFastSchemaV3.self, toVersion: UFastSchemaV4.self),
         .lightweight(fromVersion: UFastSchemaV4.self, toVersion: UFastSchemaV5.self),
         .lightweight(fromVersion: UFastSchemaV5.self, toVersion: UFastSchemaV6.self),

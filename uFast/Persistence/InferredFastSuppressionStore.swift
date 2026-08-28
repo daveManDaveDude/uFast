@@ -35,17 +35,36 @@ struct SuppressionReconciliationResult: Equatable, Sendable {
     let changedCount: Int
 }
 
+typealias InferredFastProjection = @MainActor (
+    [CaloricBoundary], FastingGoal, Bool, Date
+) -> [InferredFastInterval]
+
+private typealias ValidSuppressionRecord = (
+    record: InferredFastSuppressionRecord,
+    suppression: InferredFastSuppression
+)
+
 @MainActor
 final class InferredFastSuppressionStore {
     private let modelContext: ModelContext
     private let diagnosticSink: any DiagnosticEventSink
+    private let projector: InferredFastProjection
 
     init(
         modelContext: ModelContext,
-        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink()
+        diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
+        projector: @escaping InferredFastProjection = { boundaries, goal, enabled, now in
+            InferredFastProjector.project(
+                boundaries: boundaries,
+                currentGoal: goal,
+                enabled: enabled,
+                now: now
+            )
+        }
     ) {
         self.modelContext = modelContext
         self.diagnosticSink = diagnosticSink
+        self.projector = projector
     }
 
     func all() throws -> [InferredFastSuppression] {
@@ -84,44 +103,99 @@ final class InferredFastSuppressionStore {
         updatedAt: Date
     ) throws -> SuppressionReconciliationResult {
         let records = try modelContext.fetch(FetchDescriptor<InferredFastSuppressionRecord>())
+            .sorted { $0.id.uuidString < $1.id.uuidString }
         let planner = CaloricBoundaryPersistencePlanner(modelContext: modelContext)
         let boundaries = try planner.allBoundaries()
-        let recordedFasts = try planner.fasts().map {
-            RecordedFastInterval(id: $0.id, startDate: $0.startDate, endDate: $0.endDate)
-        }
-        var changedCount = 0
+        let shouldReconcile = enabled || mode == .authoritativeMutation
+        // Recorded-fast overlap is a presentation concern. The source-bound
+        // row remains durable so it can reappear after the overlap ends.
+        let projection = shouldReconcile
+            ? InferredFastProjectionIndex(candidates: projector(
+                boundaries,
+                currentGoal,
+                true,
+                now
+            ))
+            : InferredFastProjectionIndex(candidates: [])
+        let validated = validatedRecords(from: records)
 
-        for record in records {
-            guard let suppression = record.suppression else {
-                modelContext.delete(record)
-                changedCount += 1
-                continue
-            }
-            switch InferredFastSuppressionDecider.decide(
-                suppression: suppression,
-                boundaries: boundaries,
-                recordedFasts: recordedFasts,
+        let batch = InferredFastSuppressionBatchReconciler.reconcile(
+            input: InferredFastSuppressionBatchInput(
+                suppressions: validated.records.map(\.suppression),
+                projection: projection,
                 currentGoal: currentGoal,
                 enabled: enabled,
                 mode: mode,
-                now: now,
                 updatedAt: updatedAt
-            ) {
-            case .remove:
-                modelContext.delete(record)
-                changedCount += 1
-            case let .retain(updated):
-                if updated != suppression {
-                    record.restore(from: updated)
-                    changedCount += 1
-                }
-            }
-        }
+            )
+        )
+        let changedCount = validated.removedCount + apply(
+            decisions: batch.decisions,
+            to: validated.records
+        )
 
         return SuppressionReconciliationResult(
             scannedCount: records.count,
             changedCount: changedCount
         )
+    }
+
+    private func validatedRecords(
+        from records: [InferredFastSuppressionRecord]
+    ) -> (records: [ValidSuppressionRecord], removedCount: Int) {
+        var valid: [ValidSuppressionRecord] = []
+        var removedCount = 0
+        var canonicalBySource: [CaloricBoundaryReference: InferredFastSuppressionRecord] = [:]
+        for record in records {
+            guard let suppression = record.suppression else {
+                modelContext.delete(record)
+                removedCount += 1
+                continue
+            }
+
+            // Records arrive in stable UUID order, so the first valid row for
+            // a source is the canonical survivor. Delete later duplicates in
+            // this same in-memory transaction; reconcile() saves the complete
+            // cleanup once alongside any other structural changes.
+            guard canonicalBySource[suppression.sourceBoundaryReference] == nil else {
+                modelContext.delete(record)
+                removedCount += 1
+                continue
+            }
+            canonicalBySource[suppression.sourceBoundaryReference] = record
+            valid.append((record: record, suppression: suppression))
+        }
+        return (records: valid, removedCount: removedCount)
+    }
+
+    private func apply(
+        decisions: [InferredFastSuppressionDecision],
+        to records: [ValidSuppressionRecord]
+    ) -> Int {
+        var changedCount = 0
+        for (entry, decision) in zip(records, decisions) {
+            switch decision {
+            case .remove:
+                modelContext.delete(entry.record)
+                changedCount += 1
+            case let .retain(updated):
+                // An open candidate's projected end is presentation-only. Do
+                // not dirty SwiftData when only the injected clock advanced;
+                // structural metadata still updates transactionally.
+                let durableStateChanged = updated.sourceBoundaryReference != entry.suppression.sourceBoundaryReference
+                    || updated.projectedStartDate != entry.suppression.projectedStartDate
+                    || (updated.nextBoundaryReference != nil
+                        && updated.projectedEndDate != entry.suppression.projectedEndDate)
+                    || updated.nextBoundaryReference != entry.suppression.nextBoundaryReference
+                    || updated.nextBoundaryDate != entry.suppression.nextBoundaryDate
+                    || updated.goalHoursSnapshot != entry.suppression.goalHoursSnapshot
+                if durableStateChanged {
+                    entry.record.restore(from: updated)
+                    changedCount += 1
+                }
+            }
+        }
+        return changedCount
     }
 
     func reconcile(

@@ -58,11 +58,14 @@ public struct InferredFastSuppression: Equatable, Hashable, Sendable {
         from candidate: InferredFastInterval,
         at updatedAt: Date
     ) -> Self {
-        let projectionChanged = projectedStartDate != candidate.startDate
-            || projectedEndDate != candidate.endDate
-            || nextBoundaryReference != candidate.nextBoundaryReference
-            || nextBoundaryDate != candidate.nextBoundaryDate
-            || goalHoursSnapshot != candidate.goal.hours
+        // The pure domain decision retains the complete current projection,
+        // including an open end that follows the clock. Persistence decides
+        // separately whether that presentation-only change is durable.
+        guard self != Self(
+            candidate: candidate,
+            createdAt: createdAt,
+            updatedAt: self.updatedAt
+        ) else { return self }
         return Self(
             sourceBoundaryReference: candidate.sourceBoundaryReference,
             projectedStartDate: candidate.startDate,
@@ -71,7 +74,94 @@ public struct InferredFastSuppression: Equatable, Hashable, Sendable {
             nextBoundaryDate: candidate.nextBoundaryDate,
             goalHoursSnapshot: candidate.goal.hours,
             createdAt: createdAt,
-            updatedAt: projectionChanged ? updatedAt : self.updatedAt
+            updatedAt: updatedAt
+        )
+    }
+}
+
+/// A deterministic lookup of the complete inferred projection by its
+/// source-bound identity. Suppression reconciliation builds this once and
+/// reuses it for every stored suppression.
+public struct InferredFastProjectionIndex: Equatable, Sendable {
+    public let candidates: [InferredFastInterval]
+    private let candidatesBySource: [CaloricBoundaryReference: InferredFastInterval]
+
+    public init(candidates: [InferredFastInterval]) {
+        let ordered = candidates.sorted { lhs, rhs in
+            if lhs.sourceDate != rhs.sourceDate {
+                return lhs.sourceDate < rhs.sourceDate
+            }
+            if lhs.sourceBoundaryReference.kind != rhs.sourceBoundaryReference.kind {
+                return lhs.sourceBoundaryReference.kind.rawValue
+                    < rhs.sourceBoundaryReference.kind.rawValue
+            }
+            return lhs.sourceBoundaryReference.id.uuidString
+                < rhs.sourceBoundaryReference.id.uuidString
+        }
+        var index: [CaloricBoundaryReference: InferredFastInterval] = [:]
+        self.candidates = ordered.filter { candidate in
+            guard index[candidate.sourceBoundaryReference] == nil else { return false }
+            index[candidate.sourceBoundaryReference] = candidate
+            return true
+        }
+        candidatesBySource = index
+    }
+
+    public func candidate(
+        for sourceBoundaryReference: CaloricBoundaryReference
+    ) -> InferredFastInterval? {
+        candidatesBySource[sourceBoundaryReference]
+    }
+}
+
+/// Framework-independent inputs for one source-bound suppression pass.
+public struct InferredFastSuppressionBatchInput: Sendable {
+    public let suppressions: [InferredFastSuppression]
+    public let projection: InferredFastProjectionIndex
+    public let currentGoal: FastingGoal
+    public let enabled: Bool
+    public let mode: InferredFastSuppressionMode
+    public let updatedAt: Date
+
+    public init(
+        suppressions: [InferredFastSuppression],
+        projection: InferredFastProjectionIndex,
+        currentGoal: FastingGoal,
+        enabled: Bool,
+        mode: InferredFastSuppressionMode,
+        updatedAt: Date
+    ) {
+        self.suppressions = suppressions
+        self.projection = projection
+        self.currentGoal = currentGoal
+        self.enabled = enabled
+        self.mode = mode
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct InferredFastSuppressionBatchResult: Equatable, Sendable {
+    public let decisions: [InferredFastSuppressionDecision]
+
+    public init(decisions: [InferredFastSuppressionDecision]) {
+        self.decisions = decisions
+    }
+}
+
+public enum InferredFastSuppressionBatchReconciler {
+    public static func reconcile(
+        input: InferredFastSuppressionBatchInput
+    ) -> InferredFastSuppressionBatchResult {
+        InferredFastSuppressionBatchResult(
+            decisions: input.suppressions.map { suppression in
+                InferredFastSuppressionDecider.decide(
+                    suppression: suppression,
+                    projection: input.projection,
+                    enabled: input.enabled,
+                    mode: input.mode,
+                    updatedAt: input.updatedAt
+                )
+            }
         )
     }
 }
@@ -92,7 +182,7 @@ public enum InferredFastSuppressionDecider {
     public static func decide(
         suppression: InferredFastSuppression,
         boundaries: [CaloricBoundary],
-        recordedFasts: [RecordedFastInterval] = [],
+        recordedFasts _: [RecordedFastInterval] = [],
         currentGoal: FastingGoal,
         enabled: Bool,
         mode: InferredFastSuppressionMode = .presentation,
@@ -103,21 +193,39 @@ public enum InferredFastSuppressionDecider {
         // user's explicit suppression decision. Preserve the row so turning
         // detection back on can reconcile it from current authoritative state.
         let shouldReconcile = enabled || mode == .authoritativeMutation
+        let projection = shouldReconcile
+            ? InferredFastProjectionIndex(candidates: InferredFastProjector.project(
+                boundaries: boundaries,
+                // Recorded-fast overlap changes presentation eligibility, not
+                // the user's explicit suppression decision. Keep the source
+                // row indexed so it can reappear when that overlap ends.
+                recordedFasts: [],
+                currentGoal: currentGoal,
+                enabled: true,
+                now: now
+            ))
+            : InferredFastProjectionIndex(candidates: [])
+        return decide(
+            suppression: suppression,
+            projection: projection,
+            enabled: enabled,
+            mode: mode,
+            updatedAt: updatedAt
+        )
+    }
+
+    public static func decide(
+        suppression: InferredFastSuppression,
+        projection: InferredFastProjectionIndex,
+        enabled: Bool,
+        mode: InferredFastSuppressionMode,
+        updatedAt: Date
+    ) -> InferredFastSuppressionDecision {
+        let shouldReconcile = enabled || mode == .authoritativeMutation
         guard shouldReconcile else { return .retain(suppression) }
-
-        // Recorded-fast overlap changes presentation eligibility, not the
-        // user's explicit suppression decision. Keep the row so it can
-        // reappear when that overlap ends.
-        _ = recordedFasts
-        let candidate = InferredFastProjector.project(
-            boundaries: boundaries,
-            recordedFasts: [],
-            currentGoal: currentGoal,
-            enabled: shouldReconcile,
-            now: now
-        ).first { $0.sourceBoundaryReference == suppression.sourceBoundaryReference }
-
-        guard let candidate else { return .remove }
+        guard let candidate = projection.candidate(
+            for: suppression.sourceBoundaryReference
+        ) else { return .remove }
         return .retain(suppression.updating(from: candidate, at: updatedAt))
     }
 

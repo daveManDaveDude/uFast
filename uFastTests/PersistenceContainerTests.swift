@@ -125,7 +125,8 @@ final class PersistenceContainerTests: XCTestCase {
             configurations: [ModelConfiguration(schema: v5Schema, url: storeURL, cloudKitDatabase: .none)]
         )
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let settings = AppSettingsRecord(hasCompletedOnboarding: true)
+        let settings = UFastSchemaV5.AppSettingsRecord()
+        settings.hasCompletedOnboarding = true
         let foodID = UUID()
         let food = FoodEntryRecord(
             id: foodID,
@@ -166,7 +167,9 @@ final class PersistenceContainerTests: XCTestCase {
             for: v5Schema,
             configurations: [ModelConfiguration(schema: v5Schema, url: storeURL, cloudKitDatabase: .none)]
         )
-        v5Container.mainContext.insert(AppSettingsRecord(hasCompletedOnboarding: true))
+        let settings = UFastSchemaV5.AppSettingsRecord()
+        settings.hasCompletedOnboarding = true
+        v5Container.mainContext.insert(settings)
         try v5Container.mainContext.save()
         let before = try storeContents(in: directory)
 

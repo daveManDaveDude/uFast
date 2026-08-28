@@ -18,6 +18,15 @@ To evolve the stored schema:
    reset nor replaced. Production recovery must remain the calm unavailable state;
    test reset and seeding arguments are never a migration strategy.
 
+When a versioned model's stored declaration has changed, keep that model
+declared independently inside the version that wrote it. Preserve its entity
+name and stored property metadata, including defaults, rather than letting a
+current production model stand in for historical compatibility data. The V3
+through V6 settings declarations therefore remain separate from
+`AppSettingsRecord`; their inferred-detection default is the historical
+`false`, while the V2-to-V3 migration explicitly enables records arriving from
+the earlier no-field contract.
+
 Never edit a released schema in place, point production at a fresh replacement
 store, or enable CloudKit as part of a migration.
 
