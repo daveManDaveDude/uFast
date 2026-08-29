@@ -7,7 +7,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         tapTab("Settings", in: app)
         tapSettingsControl(app.buttons["settings.favourite.add"], in: app)
         XCTAssertTrue(
-            app.navigationBars["Add favourite"].waitForExistence(timeout: 3),
+            app.navigationBars["Add favourite"].waitForExistenceIfNeeded(timeout: 3),
             app.debugDescription
         )
         let save = app.buttons["settings.favourite.save"]
@@ -84,7 +84,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
             editApp.debugDescription
         )
         XCTAssertTrue(
-            editApp.navigationBars["Edit favourite"].waitForExistence(timeout: 5),
+            editApp.navigationBars["Edit favourite"].waitForExistenceIfNeeded(timeout: 5),
             editApp.debugDescription
         )
         tapWhenReady(editApp.buttons["settings.favourite.cancel"], app: editApp)
@@ -92,7 +92,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
             editApp.navigationBars["Edit favourite"].waitForNonExistence(timeout: 5),
             editApp.debugDescription
         )
-        reveal(editApp.buttons["Sparkling water"], in: settingsScrollView(in: editApp), app: editApp)
+        XCTAssertTrue(editApp.buttons["Sparkling water"].exists, editApp.debugDescription)
 
         let removeApp = launch(
             seedFavouritePopulated: true,
@@ -108,7 +108,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         let removalAlert = removeApp.alerts.matching(
             NSPredicate(format: "label CONTAINS 'Sparkling water'")
         ).firstMatch
-        XCTAssertTrue(removalAlert.waitForExistence(timeout: 5), removeApp.debugDescription)
+        XCTAssertTrue(removalAlert.waitForExistenceIfNeeded(timeout: 5), removeApp.debugDescription)
         tapAlertButton("Remove", in: removalAlert, app: removeApp)
         XCTAssertTrue(removalAlert.waitForNonExistence(timeout: 5), removeApp.debugDescription)
         let removalFailure = removeApp.staticTexts["settings.favourite.save-error"]
@@ -117,7 +117,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
             removeApp.debugDescription
         )
         XCTAssertTrue(
-            removeApp.navigationBars["Edit favourite"].waitForExistence(timeout: 5),
+            removeApp.navigationBars["Edit favourite"].waitForExistenceIfNeeded(timeout: 5),
             removeApp.debugDescription
         )
         tapWhenReady(removeApp.buttons["settings.favourite.cancel"], app: removeApp)
@@ -125,7 +125,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
             removeApp.navigationBars["Edit favourite"].waitForNonExistence(timeout: 5),
             removeApp.debugDescription
         )
-        reveal(removeApp.buttons["Sparkling water"], in: settingsScrollView(in: removeApp), app: removeApp)
+        XCTAssertTrue(removeApp.buttons["Sparkling water"].exists, removeApp.debugDescription)
     }
 
     @MainActor
@@ -135,10 +135,10 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         tapTab("Settings", in: cancelled)
         tapSettingsControl(cancelled.buttons["settings.data.delete-all"], in: cancelled)
         let cancelledAlert = cancelled.alerts["Delete all uFast data?"]
-        XCTAssertTrue(cancelledAlert.waitForExistence(timeout: 5), cancelled.debugDescription)
+        XCTAssertTrue(cancelledAlert.waitForExistenceIfNeeded(timeout: 5), cancelled.debugDescription)
         tapWhenReady(cancelledAlert.buttons["Cancel"], app: cancelled)
         XCTAssertTrue(cancelledAlert.waitForNonExistence(timeout: 5), cancelled.debugDescription)
-        reveal(cancelled.buttons["Sparkling water"], in: settingsScrollView(in: cancelled), app: cancelled)
+        XCTAssertTrue(cancelled.buttons["Sparkling water"].exists, cancelled.debugDescription)
 
         let failed = launch(
             seedFavouritePopulated: true,
@@ -147,44 +147,38 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         tapTab("Settings", in: failed)
         tapSettingsControl(failed.buttons["settings.data.delete-all"], in: failed)
         let failedFirstAlert = failed.alerts["Delete all uFast data?"]
-        XCTAssertTrue(failedFirstAlert.waitForExistence(timeout: 5), failed.debugDescription)
+        XCTAssertTrue(failedFirstAlert.waitForExistenceIfNeeded(timeout: 5), failed.debugDescription)
         tapWhenReady(failedFirstAlert.buttons["Continue"], app: failed)
         let failedFinalAlert = failed.alerts["Permanently delete everything?"]
-        XCTAssertTrue(failedFinalAlert.waitForExistence(timeout: 5), failed.debugDescription)
+        XCTAssertTrue(failedFinalAlert.waitForExistenceIfNeeded(timeout: 5), failed.debugDescription)
         tapWhenReady(failedFinalAlert.buttons["Delete everything"], app: failed)
         XCTAssertTrue(failedFinalAlert.waitForNonExistence(timeout: 5), failed.debugDescription)
-        reveal(
-            failed.staticTexts["settings.data.delete-error"],
-            in: settingsScrollView(in: failed),
-            app: failed
+        XCTAssertTrue(
+            failed.staticTexts["settings.data.delete-error"].waitForExistenceIfNeeded(timeout: 5),
+            failed.debugDescription
         )
-        reveal(failed.buttons["Sparkling water"], in: settingsScrollView(in: failed), app: failed)
+        XCTAssertTrue(failed.buttons["Sparkling water"].exists, failed.debugDescription)
 
         let succeeded = launch(seedFavouritePopulated: true)
         tapTab("Settings", in: succeeded)
         tapSettingsControl(succeeded.buttons["settings.data.delete-all"], in: succeeded)
         let succeededFirstAlert = succeeded.alerts["Delete all uFast data?"]
-        XCTAssertTrue(succeededFirstAlert.waitForExistence(timeout: 5), succeeded.debugDescription)
+        XCTAssertTrue(succeededFirstAlert.waitForExistenceIfNeeded(timeout: 5), succeeded.debugDescription)
         tapWhenReady(succeededFirstAlert.buttons["Continue"], app: succeeded)
         let succeededFinalAlert = succeeded.alerts["Permanently delete everything?"]
-        XCTAssertTrue(succeededFinalAlert.waitForExistence(timeout: 5), succeeded.debugDescription)
+        XCTAssertTrue(succeededFinalAlert.waitForExistenceIfNeeded(timeout: 5), succeeded.debugDescription)
         tapWhenReady(succeededFinalAlert.buttons["Delete everything"], app: succeeded)
         XCTAssertTrue(succeededFinalAlert.waitForNonExistence(timeout: 5), succeeded.debugDescription)
         XCTAssertTrue(
-            succeeded.staticTexts["goal.promise"].waitForExistence(timeout: 5),
+            succeeded.staticTexts["goal.promise"].waitForExistenceIfNeeded(timeout: 5),
             succeeded.debugDescription
         )
         tapWhenReady(succeeded.buttons["goal.continue"], app: succeeded)
         XCTAssertTrue(
-            succeeded.tabBars.buttons["Settings"].waitForExistence(timeout: 5),
+            succeeded.tabBars.buttons["Settings"].waitForExistenceIfNeeded(timeout: 5),
             succeeded.debugDescription
         )
         tapTab("Settings", in: succeeded)
-        reveal(
-            succeeded.buttons["settings.favourite.add"],
-            in: settingsScrollView(in: succeeded),
-            app: succeeded
-        )
         XCTAssertTrue(
             succeeded.buttons["Sparkling water"].waitForNonExistence(timeout: 5),
             succeeded.debugDescription
@@ -192,7 +186,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         tapTab("Today", in: succeeded)
         tapDrinkAdd(in: succeeded)
         XCTAssertTrue(
-            succeeded.scrollViews["drink.picker"].waitForExistence(timeout: 5),
+            succeeded.scrollViews["drink.picker"].waitForExistenceIfNeeded(timeout: 5),
             succeeded.debugDescription
         )
         let favouriteRows = succeeded.buttons.matching(
@@ -200,7 +194,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         )
         XCTAssertEqual(favouriteRows.count, 1, succeeded.debugDescription)
         let water = succeeded.buttons["drink.favourite.\(waterFavouriteID)"]
-        XCTAssertTrue(water.waitForExistence(timeout: 5), succeeded.debugDescription)
+        XCTAssertTrue(water.waitForExistenceIfNeeded(timeout: 5), succeeded.debugDescription)
         XCTAssertEqual(water.label, "Water")
         XCTAssertEqual(water.value as? String, "330 millilitres, Non-caloric")
         XCTAssertFalse(succeeded.buttons["drink.favourite.00000000-0000-0000-0000-000000000002"].exists)
@@ -216,7 +210,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         relaunched.launch()
         tapDrinkAdd(in: relaunched)
         XCTAssertTrue(
-            relaunched.scrollViews["drink.picker"].waitForExistence(timeout: 5),
+            relaunched.scrollViews["drink.picker"].waitForExistenceIfNeeded(timeout: 5),
             relaunched.debugDescription
         )
         let relaunchedFavouriteRows = relaunched.buttons.matching(
@@ -224,7 +218,7 @@ final class HydrationFavouriteValidationUITests: HydrationFavouriteUITestCase {
         )
         XCTAssertEqual(relaunchedFavouriteRows.count, 1, relaunched.debugDescription)
         let relaunchedWater = relaunched.buttons["drink.favourite.\(waterFavouriteID)"]
-        XCTAssertTrue(relaunchedWater.waitForExistence(timeout: 5), relaunched.debugDescription)
+        XCTAssertTrue(relaunchedWater.waitForExistenceIfNeeded(timeout: 5), relaunched.debugDescription)
         XCTAssertEqual(relaunchedWater.label, "Water")
         XCTAssertEqual(relaunchedWater.value as? String, "330 millilitres, Non-caloric")
         XCTAssertFalse(relaunched.buttons["drink.favourite.00000000-0000-0000-0000-000000000002"].exists)

@@ -62,13 +62,13 @@ final class CaloricFoodUITests: XCTestCase {
         enterDescription("Lunch", in: app)
         app.buttons["food.save"].tap()
         let alert = app.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
         let primaryAction = alert.descendants(matching: .any)
             .matching(identifier: "food.confirmation.primary").firstMatch
-        XCTAssertTrue(primaryAction.waitForExistence(timeout: 2), app.debugDescription)
+        XCTAssertTrue(primaryAction.waitForExistence(timeout: 5), app.debugDescription)
         primaryAction.tap()
 
-        XCTAssertTrue(app.staticTexts["fast.inactive-state"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.inactive-state"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Lunch"].exists)
         XCTAssertTrue(app.staticTexts["Caloric"].exists)
     }

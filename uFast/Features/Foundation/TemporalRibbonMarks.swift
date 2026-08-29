@@ -118,7 +118,8 @@ extension TemporalRibbonView {
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(UFastTheme.secondaryText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.6)
+                    .allowsTightening(true)
                     .frame(height: metrics.labelBandHeight)
             } else {
                 Color.clear.frame(height: metrics.labelBandHeight)

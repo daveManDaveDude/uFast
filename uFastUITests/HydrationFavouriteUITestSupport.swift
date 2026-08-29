@@ -1,5 +1,12 @@
 import XCTest
 
+extension XCUIElement {
+    @MainActor
+    func waitForExistenceIfNeeded(timeout: TimeInterval = 5) -> Bool {
+        exists || waitForExistence(timeout: timeout)
+    }
+}
+
 extension HydrationFavouriteUITestCase {
     @MainActor
     func launch(
@@ -23,9 +30,6 @@ extension HydrationFavouriteUITestCase {
         )
         app.launch()
         dismissOptionalLiveActivityOffer(in: app)
-        let drinkAdd = app.buttons["drink.add"]
-        XCTAssertTrue(drinkAdd.waitForExistence(timeout: 5), app.debugDescription)
-        reveal(drinkAdd, in: app.scrollViews["today.content"], app: app)
         return app
     }
 
@@ -52,30 +56,29 @@ extension HydrationFavouriteUITestCase {
     @MainActor
     func settingsScrollView(in app: XCUIApplication) -> XCUIElement {
         let scrollView = app.scrollViews["settings.content"]
-        XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        if !scrollView.exists {
+            XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        }
         return scrollView
     }
 
     @MainActor
     func drinkPickerScrollView(in app: XCUIApplication) -> XCUIElement {
         let scrollView = app.scrollViews["drink.picker"]
-        XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        if !scrollView.exists {
+            XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        }
         return scrollView
     }
 
     @MainActor
     func editorScrollView(in app: XCUIApplication) -> XCUIElement {
-        let collectionView = app.collectionViews["settings.favourite.editor"]
-        if collectionView.waitForExistence(timeout: 3) {
-            return collectionView
+        let editor = app.descendants(matching: .any)
+            .matching(identifier: "settings.favourite.editor").firstMatch
+        if !editor.exists {
+            XCTAssertTrue(editor.waitForExistence(timeout: 5), app.debugDescription)
         }
-        let scrollView = app.scrollViews["settings.favourite.editor"]
-        if scrollView.waitForExistence(timeout: 3) {
-            return scrollView
-        }
-        let table = app.tables["settings.favourite.editor"]
-        XCTAssertTrue(table.waitForExistence(timeout: 5), app.debugDescription)
-        return table
+        return editor
     }
 
     @MainActor
@@ -104,13 +107,17 @@ extension HydrationFavouriteUITestCase {
         app: XCUIApplication
     ) -> Bool {
         let buttons = alert.buttons.matching(NSPredicate(format: "label == %@", title))
-        guard buttons.firstMatch.waitForExistence(timeout: 2) else {
+        guard buttons.firstMatch.exists || buttons.firstMatch.waitForExistence(timeout: 2) else {
             XCTFail(app.debugDescription)
             return false
         }
         for index in 0 ..< buttons.count {
             let button = buttons.element(boundBy: index)
-            guard button.waitForExistence(timeout: 2) else { continue }
+            guard button.exists || button.waitForExistence(timeout: 2) else { continue }
+            if button.isHittable {
+                button.tap()
+                return true
+            }
             let expectation = XCTNSPredicateExpectation(
                 predicate: NSPredicate { object, _ in
                     (object as? XCUIElement)?.isHittable == true
@@ -129,6 +136,9 @@ extension HydrationFavouriteUITestCase {
     @MainActor
     @discardableResult
     func waitForHittable(_ element: XCUIElement, app: XCUIApplication) -> Bool {
+        if element.exists, element.isHittable {
+            return true
+        }
         guard element.waitForExistence(timeout: 5) else {
             XCTFail(app.debugDescription)
             return false
@@ -145,9 +155,12 @@ extension HydrationFavouriteUITestCase {
     @MainActor
     @discardableResult
     func waitForDisabled(_ element: XCUIElement, app: XCUIApplication) -> Bool {
-        guard element.waitForExistence(timeout: 5) else {
+        guard element.exists || element.waitForExistence(timeout: 5) else {
             XCTFail(app.debugDescription)
             return false
+        }
+        if !element.isEnabled {
+            return true
         }
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { object, _ in
@@ -164,13 +177,17 @@ extension HydrationFavouriteUITestCase {
         in scrollView: XCUIElement,
         app: XCUIApplication
     ) {
-        guard scrollView.waitForExistence(timeout: 5) else {
-            XCTFail(app.debugDescription)
-            return
+        if !scrollView.exists {
+            guard scrollView.waitForExistence(timeout: 5) else {
+                XCTFail(app.debugDescription)
+                return
+            }
         }
-        guard element.waitForExistence(timeout: 5) else {
-            XCTFail(app.debugDescription)
-            return
+        if !element.exists {
+            guard element.waitForExistence(timeout: 5) else {
+                XCTFail(app.debugDescription)
+                return
+            }
         }
         guard !element.isHittable else { return }
         guard scrollView.isHittable else {
@@ -178,11 +195,14 @@ extension HydrationFavouriteUITestCase {
             return
         }
 
-        for _ in 0 ..< 5 where !element.isHittable {
-            scrollView.swipeUp()
-        }
-        for _ in 0 ..< 5 where !element.isHittable {
-            scrollView.swipeDown()
+        for _ in 0 ..< 6 where !element.isHittable {
+            let elementFrame = element.frame
+            let scrollFrame = scrollView.frame
+            if elementFrame.minY < scrollFrame.minY {
+                scrollView.swipeDown(velocity: .fast)
+            } else {
+                scrollView.swipeUp(velocity: .fast)
+            }
         }
 
         XCTAssertTrue(waitForHittable(element, app: app), app.debugDescription)

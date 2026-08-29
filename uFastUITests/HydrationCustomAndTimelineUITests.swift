@@ -186,10 +186,8 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
 
 private extension XCUIElement {
     func clearAndType(_ text: String) {
-        tap(); press(forDuration: 0.7)
-        if XCUIApplication().menuItems["Select All"].waitForExistence(timeout: 1) {
-            XCUIApplication().menuItems["Select All"].tap()
-        }
+        tap()
+        tap(withNumberOfTaps: 3, numberOfTouches: 1)
         typeText(text)
     }
 }
