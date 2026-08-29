@@ -15,22 +15,34 @@ extension FoodFavouriteLifecycleUITests {
 
     @MainActor
     func reveal(_ element: XCUIElement, in scrollView: XCUIElement, app: XCUIApplication) {
-        XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        if !scrollView.exists {
+            XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        }
         guard scrollView.isHittable else {
             XCTFail(scrollView.debugDescription)
             return
         }
 
-        // Large Dynamic Type can place a target thousands of points below the
-        // viewport. Scroll the identified container by a fixed amount so each
-        // attempt is bounded and deterministic without depending on swipe
-        // velocity or an app-wide gesture.
-        for _ in 0 ..< 20 {
-            guard !element.exists || !element.isHittable else { return }
-            scrollView.swipeUp(velocity: .slow)
+        if element.exists, element.isHittable {
+            return
+        }
+        if !element.exists {
+            XCTAssertTrue(element.waitForExistence(timeout: 5), app.debugDescription)
         }
 
-        XCTAssertTrue(element.waitForExistence(timeout: 5), app.debugDescription)
+        // Large Dynamic Type can place a target below the viewport. Use a
+        // direction-aware, bounded scroll so each attempt stays deterministic
+        // without paying for a long sequence of slow swipes.
+        for _ in 0 ..< 20 where !element.isHittable {
+            let elementFrame = element.frame
+            let scrollFrame = scrollView.frame
+            if elementFrame.minY < scrollFrame.minY {
+                scrollView.swipeDown(velocity: .fast)
+            } else {
+                scrollView.swipeUp(velocity: .fast)
+            }
+        }
+
         XCTAssertTrue(element.isHittable, element.debugDescription)
     }
 
@@ -103,19 +115,23 @@ extension FoodFavouriteLifecycleUITests {
         )
         app.launch()
         let launchTarget = startsOnHistory ? "history.previous-day" : "food.add"
-        XCTAssertTrue(app.buttons[launchTarget].waitForExistence(timeout: 5), app.debugDescription)
+        if !app.buttons[launchTarget].exists {
+            XCTAssertTrue(app.buttons[launchTarget].waitForExistence(timeout: 5), app.debugDescription)
+        }
         return app
     }
 
     @MainActor
     func tapSettings(in app: XCUIApplication) {
         let tab = app.tabBars.buttons["Settings"]
-        XCTAssertTrue(tab.waitForExistence(timeout: 5), app.debugDescription)
+        if !tab.exists {
+            XCTAssertTrue(tab.waitForExistence(timeout: 5), app.debugDescription)
+        }
         tab.tap()
-        XCTAssertTrue(
-            app.staticTexts["screen-title.settings"].waitForExistence(timeout: 5),
-            app.debugDescription
-        )
+        let title = app.staticTexts["screen-title.settings"]
+        if !title.exists {
+            XCTAssertTrue(title.waitForExistence(timeout: 5), app.debugDescription)
+        }
     }
 
     func launchArguments(
@@ -150,11 +166,10 @@ extension FoodFavouriteLifecycleUITests {
     }
 
     @MainActor
-    func replaceText(_ value: String, in element: XCUIElement, app: XCUIApplication) {
+    func replaceText(_ value: String, in element: XCUIElement, app _: XCUIApplication) {
         element.tap()
-        element.press(forDuration: 0.7)
-        if app.menuItems["Select All"].waitForExistence(timeout: 1) {
-            app.menuItems["Select All"].tap()
+        if let currentValue = element.value as? String, !currentValue.isEmpty {
+            element.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         }
         element.typeText(value)
     }

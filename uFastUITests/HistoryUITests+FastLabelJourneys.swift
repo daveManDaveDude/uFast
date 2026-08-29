@@ -55,23 +55,23 @@ extension HistoryUITests {
             "history.fast-label-trace"
         ]
         XCTAssertTrue(
-            baselineSnapshotElement.waitForExistence(timeout: 5),
+            waitForExistenceIfNeeded(baselineSnapshotElement),
             baselineApp.debugDescription
         )
         XCTAssertTrue(
-            baselineAppearedSegmentElement.waitForExistence(timeout: 5),
+            waitForExistenceIfNeeded(baselineAppearedSegmentElement),
             baselineApp.debugDescription
         )
         XCTAssertTrue(
-            baselineProjectionElement.waitForExistence(timeout: 5),
+            waitForExistenceIfNeeded(baselineProjectionElement),
             baselineApp.debugDescription
         )
         XCTAssertTrue(
-            baselineMetricsElement.waitForExistence(timeout: 5),
+            waitForExistenceIfNeeded(baselineMetricsElement),
             baselineApp.debugDescription
         )
         XCTAssertTrue(
-            baselineTraceElement.waitForExistence(timeout: 5),
+            waitForExistenceIfNeeded(baselineTraceElement),
             baselineApp.debugDescription
         )
         let baselineSnapshot = baselineSnapshotElement.value as? String ?? ""
@@ -150,14 +150,14 @@ extension HistoryUITests {
         let appearedSegmentCount = app.descendants(matching: .any)[
             "history.fast-label-appeared-segment-count"
         ]
-        XCTAssertTrue(snapshot.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(projectionCount.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(metricsCount.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(inputCount.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(titleCount.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(traceElement.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(callbackOverlapCount.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(appearedSegmentCount.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(snapshot), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(projectionCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(metricsCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(inputCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(titleCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(traceElement), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(callbackOverlapCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(appearedSegmentCount), app.debugDescription)
 
         let candidateInitialSnapshot = snapshot.value as? String ?? ""
         let candidateInitialLayout = try XCTUnwrap(
@@ -204,7 +204,7 @@ extension HistoryUITests {
         // fragment which happened to be materialised at launch.
         let selectedDate = app.staticTexts["history.selected-date"]
         let previousDay = app.buttons["history.previous-day"]
-        XCTAssertTrue(selectedDate.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(selectedDate), app.debugDescription)
         XCTAssertTrue(waitForHittable(previousDay, app: app), previousDay.debugDescription)
         previousDay.tap()
         XCTAssertTrue(
@@ -222,8 +222,8 @@ extension HistoryUITests {
         let activeProbe = app.descendants(matching: .any)[
             "history.fast-label-probe.10400000-0000-0000-0000-000000000002"
         ]
-        XCTAssertTrue(recordedProbe.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(activeProbe.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(recordedProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(activeProbe), app.debugDescription)
         XCTAssertEqual(recordedProbe.label, "Fast", recordedProbe.debugDescription)
         XCTAssertEqual(activeProbe.label, "Active fast", activeProbe.debugDescription)
 
@@ -345,8 +345,8 @@ extension HistoryUITests {
             )
         }
         XCTAssertEqual(selectedDate.label, selectedDateBaseline, app.debugDescription)
-        XCTAssertTrue(recordedProbe.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(activeProbe.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(recordedProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(activeProbe), app.debugDescription)
         let recordedFragmentsAfterSwipes = intervalFragments(
             in: app,
             identifier: "history.interval.10400000-0000-0000-0000-000000000001"

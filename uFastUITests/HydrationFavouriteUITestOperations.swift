@@ -6,7 +6,10 @@ extension HydrationFavouriteUITestCase {
         _ element: XCUIElement,
         containing message: String
     ) -> Bool {
-        guard element.waitForExistence(timeout: 5) else { return false }
+        guard element.exists || element.waitForExistence(timeout: 5) else { return false }
+        if element.label.contains(message) {
+            return true
+        }
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { object, _ in
                 (object as? XCUIElement)?.label.contains(message) == true
@@ -20,11 +23,7 @@ extension HydrationFavouriteUITestCase {
     func replaceText(_ value: String, in field: XCUIElement, app: XCUIApplication) {
         XCTAssertTrue(waitForHittable(field, app: app), app.debugDescription)
         field.tap()
-        field.press(forDuration: 0.7)
-        let selectAll = app.menuItems["Select All"]
-        if selectAll.waitForExistence(timeout: 1) {
-            tapWhenReady(selectAll, app: app)
-        } else {
+        if let currentValue = field.value as? String, !currentValue.isEmpty {
             field.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         }
         field.typeText(value)
@@ -47,7 +46,7 @@ extension HydrationFavouriteUITestCase {
     @MainActor
     func dismissOptionalLiveActivityOffer(in app: XCUIApplication) {
         let alert = app.alerts["See your fast at a glance?"]
-        guard alert.waitForExistence(timeout: 1) else { return }
+        guard alert.exists || alert.waitForExistence(timeout: 0.25) else { return }
         tapWhenReady(alert.buttons["Not Now"], app: app)
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), app.debugDescription)
     }

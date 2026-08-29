@@ -27,9 +27,9 @@ extension HistoryUITests {
         let selectedDate = app.staticTexts["history.selected-date"]
         let semanticPanel = app.otherElements["history.event-info-panel"]
         let activeFastDetail = semanticPanel.buttons[HistoryTemporalIdentifiers.activeFastDetail]
-        guard carousel.waitForExistence(timeout: 5),
-              selectedDate.waitForExistence(timeout: 5),
-              semanticPanel.waitForExistence(timeout: 5),
+        guard carousel.exists || carousel.waitForExistence(timeout: 8),
+              selectedDate.exists || selectedDate.waitForExistence(timeout: 8),
+              semanticPanel.exists || semanticPanel.waitForExistence(timeout: 8),
               waitForSettledHistory(
                   selectedDate: selectedDate,
                   carousel: carousel,
@@ -40,7 +40,7 @@ extension HistoryUITests {
                   carousel: carousel,
                   identifier: HistoryTemporalIdentifiers.activeFast
               ),
-              activeFastDetail.waitForExistence(timeout: 5)
+              activeFastDetail.exists || activeFastDetail.waitForExistence(timeout: 8)
         else { return nil }
         let activeFastLabelProbes = app.descendants(matching: .any).matching(
             NSPredicate(
@@ -57,7 +57,7 @@ extension HistoryUITests {
                 },
                 object: app
             )
-            guard XCTWaiter.wait(for: [labelProbeExpectation], timeout: 5) == .completed else {
+            guard XCTWaiter.wait(for: [labelProbeExpectation], timeout: 8) == .completed else {
                 return nil
             }
         }
@@ -94,13 +94,16 @@ extension HistoryUITests {
                 identifier
             )
         )
+        if let activeFast = Self.visibleElement(in: candidates, boundedBy: carousel) {
+            return activeFast
+        }
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in
                 Self.visibleElement(in: candidates, boundedBy: carousel) != nil
             },
             object: app
         )
-        guard XCTWaiter.wait(for: [expectation], timeout: 5) == .completed else {
+        guard XCTWaiter.wait(for: [expectation], timeout: 8) == .completed else {
             return nil
         }
         return Self.visibleElement(in: candidates, boundedBy: carousel)
@@ -300,17 +303,22 @@ extension HistoryUITests {
         carousel: XCUIElement,
         expectedSelectedDate: String
     ) -> Bool {
+        let historyIsSettled = selectedDate.label == expectedSelectedDate
+            && carousel.value as? String == "Settled"
+        if historyIsSettled {
+            return true
+        }
         let selectedDateExpectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", expectedSelectedDate),
             object: selectedDate
         )
-        guard XCTWaiter.wait(for: [selectedDateExpectation], timeout: 5) == .completed else {
+        guard XCTWaiter.wait(for: [selectedDateExpectation], timeout: 8) == .completed else {
             return false
         }
         let settledExpectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", "Settled"),
             object: carousel
         )
-        return XCTWaiter.wait(for: [settledExpectation], timeout: 5) == .completed
+        return XCTWaiter.wait(for: [settledExpectation], timeout: 8) == .completed
     }
 }

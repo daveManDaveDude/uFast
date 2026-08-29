@@ -17,12 +17,12 @@ final class FastEndUITests: XCTestCase {
         app.buttons["fast.end"].tap()
 
         let alert = app.alerts["End this fast?"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        XCTAssertTrue(alert.waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(alert.staticTexts["This will record the end time as now."].exists)
         XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
         alert.buttons["Cancel"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.buttons["fast.end"].exists)
         XCTAssertFalse(app.staticTexts["fast.recorded"].exists)
     }
@@ -38,10 +38,10 @@ final class FastEndUITests: XCTestCase {
 
         app.buttons["fast.end"].tap()
         let alert = app.alerts["End this fast?"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        XCTAssertTrue(alert.waitForExistenceIfNeeded(timeout: 2))
         alert.buttons["End fast"].tap()
 
-        XCTAssertTrue(app.buttons["fast.start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.staticTexts["fast.recorded"].exists)
         XCTAssertFalse(app.staticTexts["fast.elapsed"].exists)
 
@@ -51,7 +51,7 @@ final class FastEndUITests: XCTestCase {
         )
         app.launch()
 
-        XCTAssertTrue(app.buttons["fast.start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertFalse(app.staticTexts["fast.recorded"].exists)
         XCTAssertFalse(app.staticTexts["fast.elapsed"].exists)
     }
@@ -67,14 +67,14 @@ final class FastEndUITests: XCTestCase {
 
         app.buttons["fast.end-past"].tap()
 
-        XCTAssertTrue(app.navigationBars["End time"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["End time"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.datePickers["fast.end-date"].exists)
         XCTAssertTrue(app.datePickers["fast.end-time"].exists)
         XCTAssertTrue(app.buttons["fast.end-confirm"].isEnabled)
         let selectedTime = app.datePickers["fast.end-time"].value as? String
         app.buttons["fast.end-confirm"].tap()
 
-        XCTAssertTrue(app.buttons["fast.start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.staticTexts["fast.recorded"].exists)
         XCTAssertNotNil(selectedTime)
     }
@@ -91,10 +91,10 @@ final class FastEndUITests: XCTestCase {
 
         app.buttons["fast.end"].tap()
         let alert = app.alerts["End this fast?"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 2))
+        XCTAssertTrue(alert.waitForExistenceIfNeeded(timeout: 2))
         alert.buttons["End fast"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.end-error"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.end-error"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(
             app.staticTexts["fast.end-error"].label,
             "Your fast couldn’t be ended. Please try again."
@@ -113,13 +113,13 @@ final class FastEndUITests: XCTestCase {
         )
         app.launch()
         app.buttons["fast.end-past"].tap()
-        XCTAssertTrue(app.buttons["fast.end-confirm"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.end-confirm"].waitForExistenceIfNeeded(timeout: 2))
         let selectedDate = app.datePickers["fast.end-date"].value as? String
         let selectedTime = app.datePickers["fast.end-time"].value as? String
 
         app.buttons["fast.end-confirm"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.end-save-error"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.end-save-error"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(
             app.staticTexts["fast.end-save-error"].label,
             "Your end time couldn’t be saved. Please try again."
@@ -141,7 +141,7 @@ final class FastEndUITests: XCTestCase {
 
         app.buttons["fast.end-past"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.end-validation"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.end-validation"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(
             app.staticTexts["fast.end-validation"].label,
             "End time must be after the start time."
@@ -161,16 +161,20 @@ final class FastEndUITests: XCTestCase {
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start"].tap()
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
         return app
     }
 
     @MainActor
     private func completeOnboarding(in app: XCUIApplication) {
+        let todayTab = app.tabBars.buttons["Today"]
+        if todayTab.exists || todayTab.waitForExistence(timeout: 0.25) {
+            return
+        }
         let continueButton = app.buttons["goal.continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 2))
         continueButton.tap()
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 2))
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 2))
     }
 
     private func fixedLaunchArguments(
@@ -180,6 +184,7 @@ final class FastEndUITests: XCTestCase {
     ) -> [String] {
         UITestLaunchConfiguration(
             resetData: resetData,
+            seedOnboarded: true,
             fixedNow: now,
             suppressAutomaticLiveActivityOffer: true,
             simulateFastSaveFailure: simulateSaveFailure

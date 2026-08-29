@@ -11,7 +11,7 @@ final class LiveActivityUITests: XCTestCase {
         startFast(in: app)
 
         let show = app.buttons["fast.live-activity.show"]
-        XCTAssertTrue(show.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(show.exists, app.debugDescription)
         show.tap()
 
         let alert = app.alerts["Show Live Activity?"]
@@ -156,6 +156,7 @@ final class LiveActivityUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             fixedNow: fixedNow,
             seedActiveFastStart: fixedNow.addingTimeInterval(-60 * 60),
             seedLiveActivityRecovery: true,
@@ -193,6 +194,7 @@ final class LiveActivityUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             fixedNow: fixedNow,
             simulateLiveActivityDisabled: simulateLiveActivityDisabled,
             simulateLiveActivityRequestFailure: simulateLiveActivityRequestFailure
@@ -204,11 +206,15 @@ final class LiveActivityUITests: XCTestCase {
 
     @MainActor
     private func completeOnboarding(in app: XCUIApplication) {
+        let todayTab = app.tabBars.buttons["Today"]
+        if todayTab.exists || todayTab.waitForExistence(timeout: 0.25) {
+            return
+        }
         let continueButton = app.buttons["goal.continue"]
         if continueButton.waitForExistence(timeout: 5) {
             continueButton.tap()
         }
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor

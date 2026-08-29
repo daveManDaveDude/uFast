@@ -1,53 +1,51 @@
-# uFast 1.0.0 (build 10)
+# uFast 1.0.0 — TestFlight release candidate
 
-**Status:** uploaded to App Store Connect; awaiting final submission
-**Prepared:** 18 August 2026
+uFast is a calm, private iPhone companion for recording fasting, food,
+hydration and the shape of your week. This build keeps the tracker free,
+offline and local-first: no account, advertising, analytics, tracking,
+subscription, HealthKit integration, cloud sync or developer-operated backend.
 
-uFast 1.0 is a calm, free and private iPhone companion for recording fasting,
-food and hydration. It works offline without an account, advertising,
-analytics, tracking, HealthKit or a developer-operated service. App-created
-records stay on the iPhone.
+## What’s included
 
-## Highlights
-
-- Start, correct, end, edit and delete user-recorded fasts.
-- Record food, water and other drinks, including reusable custom drink
-  favourites.
-- Review and directly edit a grouped, time-based History presentation.
-- See automatic fasting gaps between consecutive recorded caloric events when
-  the absolute gap is greater than eight hours.
-- Add optional Lock Screen and Home Screen widgets for an active fast.
+- Start a fast now or record when it began, then follow elapsed time, goal
+  progress and target time.
+- End, correct, edit and delete your own fasting records.
+- Record meals with optional nutrition details, plus reusable food favourites.
+- Quickly add water, tea, coffee and custom drink favourites.
+- Mark custom drinks caloric or non-caloric. Food and explicitly caloric drinks
+  share one fasting-boundary model; non-caloric drinks do not punctuate it.
+- Browse a grouped, time-based History view and open individual food or drink
+  entries for direct editing or deletion.
+- See clearly labelled inferred fasting intervals derived from recorded caloric
+  events after the eligibility threshold. Save the interval as a regular fast,
+  start the current one, hide it from History or re-enable it later. Source
+  records remain separate and unchanged.
+- Add optional read-only Lock Screen and Home Screen widgets for an active fast.
 - Show an optional Live Activity on the Lock Screen and Dynamic Island. The
-  automatic setting is user-controlled, reversible and uses no server or push
-  notifications.
+  automatic setting is user-controlled and reversible, with no server, timer
+  chain or push notification.
 - Delete all locally stored uFast data through a two-step confirmation.
 
 ## Reliability and privacy
 
-- Preserves the original release-store schema through an explicit SwiftData
-  migration when adding settings and hydration favourites.
-- Keeps app and embedded-widget version metadata aligned and includes the
-  required-reason privacy declaration for app-private UserDefaults access.
-- Uses local-only WidgetKit and ActivityKit projections; no fasting record is
-  created, changed or inferred by a system surface.
-- Improves History ordering, temporal consistency, persistence failure states
-  and retry handling.
-- Treats food and explicitly caloric drinks as one deterministic boundary
-  stream for inferred fasting gaps; non-caloric drinks do not start or
-  punctuate those gaps.
-- Fails closed for invalid or ambiguous caloric-boundary overlaps without
-  rewriting saved records.
+This release improves History ordering and temporal consistency, local
+persistence migrations, retry and failure states, caloric-boundary
+reconciliation, and the distinction between recorded and inferred fasting.
+Invalid or ambiguous overlaps fail closed without silently rewriting saved
+records. Widgets and Live Activities remain disposable projections: they never
+create or change a fasting record.
 
-## Release checklist
+uFast is a personal record-keeping tool, not medical advice. It does not
+diagnose, treat or guarantee health outcomes. Records stay on the iPhone and
+may be permanently lost if the app is deleted or the iPhone is lost.
 
-- [ ] Fresh release screenshots approved and uploaded.
-- [x] Full build, unit, UI, lint and release-verification gates pass.
-- [ ] Signed archive entitlements and privacy report reviewed.
-- [ ] TestFlight build installed and smoke-tested on a supported iPhone.
-- [ ] App Store Connect metadata, App Privacy and updated age-rating answers
-      confirmed.
-- [ ] App Review accepts the selected build.
-- [ ] Release owner manually publishes the approved version.
+Privacy policy: https://github.com/daveManDaveDude/uFast/blob/main/PRIVACY.md
 
-The intended Git tag is `v1.0.0`. Do not create the tag or publish this note as
-a GitHub release until build 10 is the accepted App Store binary.
+Support: https://github.com/daveManDaveDude/uFast/blob/main/SUPPORT.md
+
+## Screenshot set
+
+Eight current-build App Store screenshots are included in
+[`docs/APP_STORE_SCREENSHOTS.md`](docs/APP_STORE_SCREENSHOTS.md). They are
+native 1320 × 2868 iPhone 17 Pro Max portrait captures using fictional data
+dated 29 August 2026 or earlier.

@@ -23,15 +23,15 @@ extension HistoryUITests {
         completeOnboarding(in: app)
 
         app.buttons["fast.start"].tap()
-        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         app.buttons["fast.edit-start"].tap()
         let startTimeEditor = app.navigationBars["Start time"]
-        XCTAssertTrue(startTimeEditor.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(startTimeEditor.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let datePicker = app.datePickers["fast.start-date"]
-        XCTAssertTrue(datePicker.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(datePicker.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         datePicker.tap()
         let correctedDate = app.buttons["Saturday 15 August"]
-        XCTAssertTrue(correctedDate.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(correctedDate.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         correctedDate.tap()
         let datePopoverDismissRegion = app.buttons["PopoverDismissRegion"]
         if datePopoverDismissRegion.exists {
@@ -42,17 +42,17 @@ extension HistoryUITests {
             app.debugDescription
         )
         let correctedDateButton = datePicker.buttons["Date Picker"]
-        XCTAssertTrue(correctedDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(correctedDateButton.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let dateValue = correctedDateButton.value as? String ?? ""
         XCTAssertTrue(
             dateValue.contains("15") && dateValue.contains("2026"),
             "Unexpected corrected date: \(dateValue)\n\(app.debugDescription)"
         )
         let timePicker = app.datePickers["fast.start-time"]
-        XCTAssertTrue(timePicker.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(timePicker.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         if !timePicker.isHittable {
             let form = app.tables.firstMatch
-            XCTAssertTrue(form.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(form.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
             form.swipeUp()
         }
         let timePickerHittable = XCTNSPredicateExpectation(
@@ -70,11 +70,11 @@ extension HistoryUITests {
         timeWheels.element(boundBy: 0).adjust(toPickerWheelValue: "21")
         timeWheels.element(boundBy: 1).adjust(toPickerWheelValue: "00")
         let timePopoverDismissRegion = app.buttons["PopoverDismissRegion"]
-        XCTAssertTrue(timePopoverDismissRegion.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(timePopoverDismissRegion.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         timePopoverDismissRegion.tap()
         XCTAssertTrue(timePopoverDismissRegion.waitForNonExistence(timeout: 5), app.debugDescription)
         let correctedTimeButton = timePicker.buttons["Time Picker"]
-        XCTAssertTrue(correctedTimeButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(correctedTimeButton.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let timeValue = correctedTimeButton.value as? String ?? ""
         XCTAssertTrue(
             timeValue.contains("21:00"),
@@ -82,14 +82,14 @@ extension HistoryUITests {
         )
         app.buttons["fast.start-confirm"].tap()
         XCTAssertTrue(startTimeEditor.waitForNonExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
 
         selectHistoryTab(in: app)
         openHistory(in: app)
         let carousel = app.scrollViews["history.day-carousel"]
-        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(carousel.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let selectedDate = app.staticTexts["history.selected-date"]
-        XCTAssertTrue(selectedDate.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(selectedDate.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let sundaySelectedDate = "Sun 16 Aug"
         let saturdaySelectedDate = "Sat 15 Aug"
         XCTAssertTrue(waitForSettledHistory(
@@ -118,7 +118,7 @@ extension HistoryUITests {
         let structuredFast = app.otherElements["history.event-info-panel"].buttons[
             structuredFastIdentifier
         ]
-        XCTAssertTrue(structuredFast.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(structuredFast.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(
             structuredFast.label.contains("start 15 Aug at 21:00"),
             structuredFast.debugDescription
@@ -136,7 +136,7 @@ extension HistoryUITests {
         let activeFastVisualLabel = app.descendants(matching: .any)[
             "history.fast-label-probe.\(stableIdentifier.replacingOccurrences(of: "history.active-fast.", with: ""))"
         ]
-        XCTAssertTrue(activeFastVisualLabel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(activeFastVisualLabel.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertEqual(activeFastVisualLabel.label, "Active fast", activeFastVisualLabel.debugDescription)
         XCTAssertFalse(carousel.staticTexts["11:40:00"].exists, app.debugDescription)
         let preDrinkMarkerIDs = historyMarkerIdentifiers(in: app)
@@ -145,7 +145,7 @@ extension HistoryUITests {
         let saturdayDateButton = app.buttons[
             "temporal.date.\(calendar.startOfDay(for: previousDay).timeIntervalSince1970)"
         ]
-        XCTAssertTrue(saturdayDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(saturdayDateButton.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(waitForHittable(saturdayDateButton, app: app), saturdayDateButton.debugDescription)
         saturdayDateButton.tap()
         XCTAssertTrue(waitForSettledHistory(
@@ -164,7 +164,7 @@ extension HistoryUITests {
         let sundayDateButton = app.buttons[
             "temporal.date.\(calendar.startOfDay(for: now).timeIntervalSince1970)"
         ]
-        XCTAssertTrue(sundayDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(sundayDateButton.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(waitForHittable(sundayDateButton, app: app), sundayDateButton.debugDescription)
         sundayDateButton.tap()
         XCTAssertTrue(waitForSettledHistory(
@@ -182,16 +182,16 @@ extension HistoryUITests {
 
         selectTodayTab(in: app)
         let addDrink = app.buttons["drink.add"]
-        XCTAssertTrue(addDrink.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(addDrink.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         if !addDrink.isHittable {
             let todayScroll = app.scrollViews["today.content"]
-            XCTAssertTrue(todayScroll.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(todayScroll.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
             todayScroll.swipeUp()
         }
         XCTAssertTrue(addDrink.isHittable, addDrink.debugDescription)
         addDrink.tap()
         let water = app.buttons["drink.favourite.00000000-0000-0000-0000-000000000001"]
-        XCTAssertTrue(water.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(water.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         water.tap()
         XCTAssertTrue(
             app.navigationBars["Add a drink"].waitForNonExistence(timeout: 5),
@@ -204,14 +204,14 @@ extension HistoryUITests {
                 "Drink, Water"
             )
         ).firstMatch
-        XCTAssertTrue(waterEntry.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waterEntry.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let waterID = waterEntry.identifier.replacingOccurrences(of: "timeline.entry.", with: "")
         selectHistoryTab(in: app)
         openHistory(in: app)
         let postDrinkCarousel = app.scrollViews["history.day-carousel"]
-        XCTAssertTrue(postDrinkCarousel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(postDrinkCarousel.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let postDrinkSelectedDate = app.staticTexts["history.selected-date"]
-        XCTAssertTrue(postDrinkSelectedDate.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(postDrinkSelectedDate.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(waitForSettledHistory(
             selectedDate: postDrinkSelectedDate,
             carousel: postDrinkCarousel,
@@ -220,7 +220,7 @@ extension HistoryUITests {
         let postDrinkStructuredFast = app.otherElements["history.event-info-panel"].buttons[
             structuredFastIdentifier
         ]
-        XCTAssertTrue(postDrinkStructuredFast.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(postDrinkStructuredFast.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertEqual(postDrinkStructuredFast.label, preDrinkStructuredLabel)
         let postDrinkFrames = visibleActiveFastFrames(
             in: app,
@@ -281,14 +281,14 @@ extension HistoryUITests {
         openHistory(in: app)
 
         let selectedDate = app.staticTexts["history.selected-date"]
-        XCTAssertTrue(selectedDate.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(selectedDate.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let expectedSelectedDay = nextDay.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
         let expectedSelectedDate = expectedSelectedDay
         XCTAssertEqual(selectedDate.label, expectedSelectedDate)
         let carousel = app.scrollViews["history.day-carousel"]
-        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(carousel.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let settledState = try XCTUnwrap(settledSeamState(
             in: app,
             expectedSelectedDate: expectedSelectedDate
@@ -348,7 +348,7 @@ extension HistoryUITests {
         let midpointDateButton = dateNavigator.buttons[
             "temporal.date.\(calendar.startOfDay(for: midpointDay).timeIntervalSince1970)"
         ]
-        XCTAssertTrue(midpointDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(midpointDateButton.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(waitForHittable(midpointDateButton, app: app), midpointDateButton.debugDescription)
         midpointDateButton.tap()
         let midpointState = try XCTUnwrap(settledSeamState(
@@ -362,7 +362,7 @@ extension HistoryUITests {
         let currentDateButton = dateNavigator.buttons[
             "temporal.date.\(calendar.startOfDay(for: nextDay).timeIntervalSince1970)"
         ]
-        XCTAssertTrue(currentDateButton.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(currentDateButton.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(waitForHittable(currentDateButton, app: app), currentDateButton.debugDescription)
         currentDateButton.tap()
         let currentOffsetState = try XCTUnwrap(settledSeamState(
@@ -442,9 +442,9 @@ extension HistoryUITests {
             openHistory(in: app)
 
             let selectedDate = app.staticTexts["history.selected-date"]
-            XCTAssertTrue(selectedDate.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(selectedDate.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
             let carousel = app.scrollViews["history.day-carousel"]
-            XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(carousel.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
             let state = try XCTUnwrap(settledSeamState(
                 in: app,
                 expectedSelectedDate: selectedDate.label
@@ -455,7 +455,7 @@ extension HistoryUITests {
             let structuredDetail = app.buttons[
                 "history.fast.10200000-0000-0000-0000-000000000002"
             ]
-            XCTAssertTrue(structuredDetail.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(structuredDetail.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
             XCTAssertTrue(structuredDetail.label.contains("Active Fast"))
             XCTAssertTrue(structuredDetail.label.contains("duration 18 hours 13 minutes 0 seconds"))
             if let timeFragment = configuration.timeFragment {

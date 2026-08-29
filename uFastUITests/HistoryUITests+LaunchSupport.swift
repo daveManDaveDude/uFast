@@ -18,15 +18,21 @@ extension HistoryUITests {
     @MainActor
     func selectYesterday(in app: XCUIApplication) {
         let previous = app.buttons["history.previous-day"]
-        XCTAssertTrue(previous.waitForExistence(timeout: 5), app.debugDescription)
+        if !previous.exists {
+            XCTAssertTrue(previous.waitForExistence(timeout: 5), app.debugDescription)
+        }
         XCTAssertTrue(waitForHittable(previous, app: app), previous.debugDescription)
         previous.tap()
         XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
         let add = app.buttons["history.add-at-selected-time"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5), app.debugDescription)
+        if !add.exists {
+            XCTAssertTrue(add.waitForExistence(timeout: 5), app.debugDescription)
+        }
         if !add.isHittable {
             let content = app.scrollViews["history.content"]
-            XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+            if !content.exists {
+                XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+            }
             content.swipeUp()
         }
         XCTAssertTrue(waitForHittable(add, app: app), add.debugDescription)

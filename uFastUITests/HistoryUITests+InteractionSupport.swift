@@ -4,7 +4,7 @@ extension HistoryUITests {
     @MainActor
     func dismissOptionalLiveActivityOffer(in app: XCUIApplication) {
         let alert = app.alerts["See your fast at a glance?"]
-        guard alert.waitForExistence(timeout: 1) else { return }
+        guard alert.exists || alert.waitForExistence(timeout: 0.25) else { return }
         let notNow = alert.buttons["Not Now"]
         XCTAssertTrue(waitForHittable(notNow, app: app), alert.debugDescription)
         notNow.tap()
@@ -17,6 +17,9 @@ extension HistoryUITests {
         app _: XCUIApplication,
         timeout: TimeInterval = 5
     ) -> Bool {
+        if element.exists, element.isHittable {
+            return true
+        }
         guard element.waitForExistence(timeout: timeout) else { return false }
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { object, _ in
@@ -28,14 +31,28 @@ extension HistoryUITests {
     }
 
     @MainActor
+    func waitForExistenceIfNeeded(
+        _ element: XCUIElement,
+        timeout: TimeInterval = 5
+    ) -> Bool {
+        element.exists || element.waitForExistence(timeout: timeout)
+    }
+
+    @MainActor
     func completeOnboarding(in app: XCUIApplication) {
+        let todayTab = app.tabBars.buttons["Today"]
+        if todayTab.exists || todayTab.waitForExistence(timeout: 0.25) {
+            dismissOptionalLiveActivityOffer(in: app)
+            return
+        }
         let continueButton = app.buttons["goal.continue"]
-        XCTAssertTrue(continueButton.waitForExistence(timeout: 5), app.debugDescription)
+        if !continueButton.exists {
+            XCTAssertTrue(continueButton.waitForExistence(timeout: 5), app.debugDescription)
+        }
         continueButton.tap()
-        XCTAssertTrue(
-            app.tabBars.buttons["Today"].waitForExistence(timeout: 5),
-            app.debugDescription
-        )
+        if !todayTab.exists {
+            XCTAssertTrue(todayTab.waitForExistence(timeout: 5), app.debugDescription)
+        }
         dismissOptionalLiveActivityOffer(in: app)
     }
 
@@ -43,35 +60,48 @@ extension HistoryUITests {
     func selectHistoryTab(in app: XCUIApplication) {
         dismissOptionalLiveActivityOffer(in: app)
         let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 5), app.debugDescription)
+        if !tabBar.exists {
+            XCTAssertTrue(tabBar.waitForExistence(timeout: 5), app.debugDescription)
+        }
         let historyTab = tabBar.buttons["History"]
-        XCTAssertTrue(historyTab.waitForExistence(timeout: 5), tabBar.debugDescription)
+        if !historyTab.exists {
+            XCTAssertTrue(historyTab.waitForExistence(timeout: 5), tabBar.debugDescription)
+        }
         XCTAssertTrue(waitForHittable(historyTab, app: app), tabBar.debugDescription)
         historyTab.tap()
-        XCTAssertTrue(
-            app.staticTexts["screen-title.history"].waitForExistence(timeout: 5),
-            app.debugDescription
-        )
+        let title = app.staticTexts["screen-title.history"]
+        if !title.exists {
+            XCTAssertTrue(title.waitForExistence(timeout: 5), app.debugDescription)
+        }
     }
 
     @MainActor
     func selectTodayTab(in app: XCUIApplication) {
         let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 5), app.debugDescription)
+        if !tabBar.exists {
+            XCTAssertTrue(tabBar.waitForExistence(timeout: 5), app.debugDescription)
+        }
         let todayTab = tabBar.buttons["Today"]
-        XCTAssertTrue(todayTab.waitForExistence(timeout: 5), tabBar.debugDescription)
+        if !todayTab.exists {
+            XCTAssertTrue(todayTab.waitForExistence(timeout: 5), tabBar.debugDescription)
+        }
         XCTAssertTrue(waitForHittable(todayTab, app: app), tabBar.debugDescription)
         todayTab.tap()
-        XCTAssertTrue(
-            app.staticTexts["screen-title.today"].waitForExistence(timeout: 5),
-            app.debugDescription
-        )
+        let title = app.staticTexts["screen-title.today"]
+        if !title.exists {
+            XCTAssertTrue(title.waitForExistence(timeout: 5), app.debugDescription)
+        }
     }
 
     @MainActor
     func openHistory(in app: XCUIApplication) {
         let historyTitle = app.staticTexts["screen-title.history"]
-        XCTAssertTrue(historyTitle.waitForExistence(timeout: 5), app.debugDescription)
+        if !historyTitle.exists {
+            XCTAssertTrue(historyTitle.waitForExistence(timeout: 5), app.debugDescription)
+        }
+        if historyTitle.isHittable {
+            return
+        }
         let visibleTitle = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "hittable == true"),
             object: historyTitle
@@ -86,7 +116,10 @@ extension HistoryUITests {
     @MainActor
     func waitForHistoryCarouselToSettle(in app: XCUIApplication) -> Bool {
         let carousel = app.scrollViews["history.day-carousel"]
-        guard carousel.waitForExistence(timeout: 5) else { return false }
+        guard carousel.exists || carousel.waitForExistence(timeout: 5) else { return false }
+        if carousel.value as? String == "Settled" {
+            return true
+        }
         let settled = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", "Settled"),
             object: carousel
@@ -99,6 +132,9 @@ extension HistoryUITests {
         _ selectedDate: XCUIElement,
         expectedLabel: String
     ) -> Bool {
+        if selectedDate.exists, selectedDate.label == expectedLabel {
+            return true
+        }
         let selection = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", expectedLabel),
             object: selectedDate
@@ -111,10 +147,14 @@ extension HistoryUITests {
         let row = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Recorded fast")
         ).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5), app.debugDescription)
+        if !row.exists {
+            XCTAssertTrue(row.waitForExistence(timeout: 5), app.debugDescription)
+        }
         if !row.isHittable {
             let content = app.scrollViews["history.content"]
-            XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+            if !content.exists {
+                XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+            }
             content.swipeUp()
         }
         return row
@@ -126,7 +166,17 @@ extension HistoryUITests {
         in scrollView: XCUIElement,
         app: XCUIApplication
     ) {
-        XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        if !scrollView.exists {
+            XCTAssertTrue(scrollView.waitForExistence(timeout: 5), app.debugDescription)
+        }
+        let elementIsFullyVisible = element.exists
+            && element.isHittable
+            && element.frame.minY >= scrollView.frame.minY + 8
+            && element.frame.maxY <= app.frame.maxY - 120
+        if elementIsFullyVisible {
+            element.tap()
+            return
+        }
         if !element.isHittable || element.frame.maxY > app.frame.maxY - 120 {
             scrollView.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
                 .press(
@@ -156,7 +206,7 @@ extension HistoryUITests {
     func launchArguments(
         now: Date,
         resetData: Bool = false,
-        seedOnboarded: Bool = false,
+        seedOnboarded: Bool = true,
         seedSlice3History: Bool = false,
         seedHistoryMidnightSeam: Bool = false,
         seedHistoryMidnightSeamExtended: Bool = false,

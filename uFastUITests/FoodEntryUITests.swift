@@ -104,24 +104,29 @@ final class FoodEntryUITests: XCTestCase {
 
     @MainActor
     private func completeOnboarding(in app: XCUIApplication) {
+        let todayTab = app.tabBars.buttons["Today"]
+        if todayTab.exists || todayTab.waitForExistence(timeout: 0.25) {
+            return
+        }
         let continueButton = app.buttons["goal.continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 2))
         continueButton.tap()
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 2))
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 2))
     }
 
     private func launchArguments(resetData: Bool = false) -> [String] {
-        UITestLaunchConfiguration(resetData: resetData, fixedNow: now).arguments
+        UITestLaunchConfiguration(
+            resetData: resetData,
+            seedOnboarded: true,
+            fixedNow: now
+        ).arguments
     }
 }
 
 private extension XCUIElement {
     func clearAndEnterText(_ text: String) {
         tap()
-        press(forDuration: 0.7)
-        if XCUIApplication().menuItems["Select All"].waitForExistence(timeout: 1) {
-            XCUIApplication().menuItems["Select All"].tap()
-        }
+        typeKey("a", modifierFlags: .command)
         typeText(text)
     }
 }

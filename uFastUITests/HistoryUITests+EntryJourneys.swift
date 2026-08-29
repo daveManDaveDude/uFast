@@ -121,10 +121,7 @@ extension HistoryUITests {
         let sparklingVolume = app.textFields["drink.volume"]
         XCTAssertTrue(sparklingVolume.waitForExistence(timeout: 5), app.debugDescription)
         sparklingVolume.tap()
-        sparklingVolume.press(forDuration: 0.7)
-        if app.menuItems["Select All"].waitForExistence(timeout: 1) {
-            app.menuItems["Select All"].tap()
-        }
+        sparklingVolume.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         sparklingVolume.typeText("330")
         let drinkSave = app.buttons["drink.editor.save"]
         XCTAssertTrue(drinkSave.waitForExistence(timeout: 5), app.debugDescription)
@@ -145,10 +142,7 @@ extension HistoryUITests {
         let orangeVolume = app.textFields["drink.volume"]
         XCTAssertTrue(orangeVolume.waitForExistence(timeout: 5), app.debugDescription)
         orangeVolume.tap()
-        orangeVolume.press(forDuration: 0.7)
-        if app.menuItems["Select All"].waitForExistence(timeout: 1) {
-            app.menuItems["Select All"].tap()
-        }
+        orangeVolume.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         orangeVolume.typeText("200")
         let caloricClassification = app.buttons["drink.classification.caloric"]
         XCTAssertTrue(caloricClassification.waitForExistence(timeout: 5), app.debugDescription)

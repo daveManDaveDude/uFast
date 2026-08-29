@@ -32,7 +32,7 @@ extension HistoryUITests {
         XCTAssertTrue(waitForHistorySelection(selectedDate, expectedLabel: todayLabel), app.debugDescription)
 
         let carousel = app.scrollViews["history.day-carousel"]
-        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(carousel), app.debugDescription)
         carousel.swipeRight(velocity: .slow)
         XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
         XCTAssertNotEqual(selectedDate.label, todayLabel)
@@ -292,7 +292,7 @@ extension HistoryUITests {
             carousel.swipeRight(velocity: .fast)
             XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
             XCTAssertTrue(
-                carousel.waitForExistence(timeout: 5),
+                waitForExistenceIfNeeded(carousel),
                 "carousel disappeared during runway extension: \(app.debugDescription)"
             )
         }

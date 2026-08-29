@@ -330,7 +330,9 @@ final class HistoryEventGroupingUITests: XCTestCase {
     @MainActor
     private func tapMember(_ identifier: String, in app: XCUIApplication) {
         let member = app.buttons[identifier].firstMatch
-        XCTAssertTrue(member.waitForExistence(timeout: 3), app.debugDescription)
+        if !member.exists {
+            XCTAssertTrue(member.waitForExistence(timeout: 3), app.debugDescription)
+        }
         let disclosure = app.otherElements["history.event-group.disclosure"]
         let scrollView = disclosure.scrollViews.firstMatch
         for _ in 0 ..< 4 where !member.isHittable {
@@ -347,20 +349,28 @@ final class HistoryEventGroupingUITests: XCTestCase {
     @MainActor
     private func tapUngroupedEvent(_ identifier: String, in app: XCUIApplication) {
         let panel = app.otherElements["history.event-info-panel"]
-        XCTAssertTrue(panel.waitForExistence(timeout: 5), app.debugDescription)
+        if !panel.exists {
+            XCTAssertTrue(panel.waitForExistence(timeout: 5), app.debugDescription)
+        }
         let event = panel.buttons[identifier].firstMatch
-        XCTAssertTrue(event.waitForExistence(timeout: 5), app.debugDescription)
-        let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "isHittable == true"),
-            object: event
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [expectation], timeout: 5),
-            .completed,
-            app.debugDescription
-        )
+        if !event.exists {
+            XCTAssertTrue(event.waitForExistence(timeout: 5), app.debugDescription)
+        }
+        if !event.isHittable {
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "isHittable == true"),
+                object: event
+            )
+            XCTAssertEqual(
+                XCTWaiter.wait(for: [expectation], timeout: 5),
+                .completed,
+                app.debugDescription
+            )
+        }
         let content = app.scrollViews["history.content"]
-        XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+        if !content.exists {
+            XCTAssertTrue(content.waitForExistence(timeout: 5), app.debugDescription)
+        }
         for _ in 0 ..< 3 where event.frame.maxY > app.frame.maxY - 120 {
             content.swipeUp(velocity: .slow)
         }
@@ -369,17 +379,9 @@ final class HistoryEventGroupingUITests: XCTestCase {
     }
 
     @MainActor
-    private func replaceText(_ value: String, in element: XCUIElement, app: XCUIApplication) {
+    private func replaceText(_ value: String, in element: XCUIElement, app _: XCUIApplication) {
         element.tap()
-        element.press(forDuration: 0.7)
-        let selectAll = app.menuItems["Select All"]
-        if selectAll.waitForExistence(timeout: 5) {
-            XCTAssertTrue(selectAll.isHittable, app.debugDescription)
-            selectAll.tap()
-            XCTAssertTrue(selectAll.waitForNonExistence(timeout: 5), app.debugDescription)
-        } else {
-            element.tap(withNumberOfTaps: 3, numberOfTouches: 1)
-        }
+        element.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         element.typeText(value)
     }
 

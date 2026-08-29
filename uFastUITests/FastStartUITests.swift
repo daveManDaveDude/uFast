@@ -20,7 +20,7 @@ final class FastStartUITests: XCTestCase {
         app.buttons["fast.start"].tap()
 
         let elapsed = app.staticTexts["fast.elapsed"]
-        XCTAssertTrue(elapsed.waitForExistence(timeout: 2))
+        XCTAssertTrue(elapsed.waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(elapsed.value as? String, "0 seconds")
         XCTAssertEqual(app.staticTexts["fast.goal"].value as? String, "12 hours")
         XCTAssertTrue(app.staticTexts["fast.target"].exists)
@@ -60,7 +60,7 @@ final class FastStartUITests: XCTestCase {
         completeOnboarding(in: app)
 
         let startButton = app.buttons["fast.start"]
-        XCTAssertTrue(startButton.waitForExistence(timeout: 2))
+        XCTAssertTrue(startButton.waitForExistenceIfNeeded(timeout: 2))
         if !startButton.isHittable {
             app.swipeUp()
         }
@@ -79,7 +79,7 @@ final class FastStartUITests: XCTestCase {
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start"].tap()
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
 
         app.terminate()
         app.launchArguments = fixedLaunchArguments(
@@ -88,7 +88,7 @@ final class FastStartUITests: XCTestCase {
         app.launch()
 
         let elapsed = app.staticTexts["fast.elapsed"]
-        XCTAssertTrue(elapsed.waitForExistence(timeout: 2))
+        XCTAssertTrue(elapsed.waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(elapsed.value as? String, "13 hours 0 minutes 0 seconds")
         XCTAssertEqual(
             app.progressIndicators["fast.progress"].value as? String,
@@ -102,6 +102,7 @@ final class FastStartUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             suppressAutomaticLiveActivityOffer: true
         ).arguments
         app.launch()
@@ -109,7 +110,7 @@ final class FastStartUITests: XCTestCase {
         app.buttons["fast.start"].tap()
 
         let elapsed = app.staticTexts["fast.elapsed"]
-        XCTAssertTrue(elapsed.waitForExistence(timeout: 2))
+        XCTAssertTrue(elapsed.waitForExistenceIfNeeded(timeout: 2))
         let initialValue = elapsed.value as? String
 
         let valueChanged = NSPredicate { evaluatedObject, _ in
@@ -134,16 +135,17 @@ final class FastStartUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             suppressAutomaticLiveActivityOffer: true
         ).arguments
         app.launch()
         completeOnboarding(in: app)
 
         let startButton = app.buttons["fast.start"]
-        XCTAssertTrue(startButton.waitForExistence(timeout: 2))
+        XCTAssertTrue(startButton.waitForExistenceIfNeeded(timeout: 2))
         startButton.tap()
 
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(app.staticTexts["fast.goal"].value as? String, "12 hours")
         XCTAssertTrue(app.staticTexts["fast.target"].exists)
 
@@ -151,7 +153,7 @@ final class FastStartUITests: XCTestCase {
         app.launchArguments = UITestLaunchConfiguration().arguments
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertFalse(app.buttons["fast.start"].exists)
         XCTAssertTrue(app.buttons["fast.edit-start"].exists)
     }
@@ -161,6 +163,7 @@ final class FastStartUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             suppressAutomaticLiveActivityOffer: true,
             simulateFastSaveFailure: true
         ).arguments
@@ -169,7 +172,7 @@ final class FastStartUITests: XCTestCase {
 
         app.buttons["fast.start"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.start-error"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.start-error"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(app.buttons["fast.start"].label, "Try again")
         XCTAssertFalse(app.staticTexts["fast.elapsed"].exists)
     }
@@ -179,21 +182,22 @@ final class FastStartUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             suppressAutomaticLiveActivityOffer: true
         ).arguments
         app.launch()
         completeOnboarding(in: app)
 
-        XCTAssertTrue(app.buttons["fast.start-past"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start-past"].waitForExistenceIfNeeded(timeout: 2))
         app.buttons["fast.start-past"].tap()
 
-        XCTAssertTrue(app.navigationBars["Start time"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Start time"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.datePickers["fast.start-date"].exists)
         XCTAssertTrue(app.datePickers["fast.start-time"].exists)
         XCTAssertEqual(app.buttons["fast.start-confirm"].label, "Start fast")
         app.buttons["fast.start-cancel"].tap()
 
-        XCTAssertTrue(app.buttons["fast.start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertFalse(app.staticTexts["fast.elapsed"].exists)
     }
 
@@ -202,20 +206,21 @@ final class FastStartUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             suppressAutomaticLiveActivityOffer: true
         ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
-        XCTAssertTrue(app.buttons["fast.start-confirm"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start-confirm"].waitForExistenceIfNeeded(timeout: 2))
 
         app.buttons["fast.start-confirm"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
         app.terminate()
         app.launchArguments = UITestLaunchConfiguration().arguments
         app.launch()
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.buttons["fast.edit-start"].exists)
     }
 
@@ -224,19 +229,20 @@ final class FastStartUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             suppressAutomaticLiveActivityOffer: true,
             simulateFastSaveFailure: true
         ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
-        XCTAssertTrue(app.buttons["fast.start-confirm"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start-confirm"].waitForExistenceIfNeeded(timeout: 2))
         let selectedDate = app.datePickers["fast.start-date"].value as? String
         let selectedTime = app.datePickers["fast.start-time"].value as? String
 
         app.buttons["fast.start-confirm"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.start-save-error"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.start-save-error"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.navigationBars["Start time"].exists)
         XCTAssertEqual(app.datePickers["fast.start-date"].value as? String, selectedDate)
         XCTAssertEqual(app.datePickers["fast.start-time"].value as? String, selectedTime)
@@ -249,6 +255,7 @@ final class FastStartUITests: XCTestCase {
         let startOfToday = Calendar.current.startOfDay(for: Date())
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             fixedNow: startOfToday,
             suppressAutomaticLiveActivityOffer: true,
             appleLocale: "en_GB"
@@ -256,11 +263,11 @@ final class FastStartUITests: XCTestCase {
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start-past"].tap()
-        XCTAssertTrue(app.datePickers["fast.start-time"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.datePickers["fast.start-time"].waitForExistenceIfNeeded(timeout: 2))
         let latestAllowedTime = app.datePickers["fast.start-time"].value as? String
 
         app.datePickers["fast.start-time"].tap()
-        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistenceIfNeeded(timeout: 2))
         app.pickerWheels.element(boundBy: 0).adjust(toPickerWheelValue: "01")
 
         XCTAssertEqual(app.datePickers["fast.start-time"].value as? String, latestAllowedTime)
@@ -273,23 +280,24 @@ final class FastStartUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = UITestLaunchConfiguration(
             resetData: true,
+            seedOnboarded: true,
             suppressAutomaticLiveActivityOffer: true
         ).arguments
         app.launch()
         completeOnboarding(in: app)
         app.buttons["fast.start"].tap()
-        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistenceIfNeeded(timeout: 2))
         let originalTarget = app.staticTexts["fast.target"].value as? String
 
         app.buttons["fast.edit-start"].tap()
 
-        XCTAssertTrue(app.navigationBars["Start time"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Start time"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(app.buttons["fast.start-confirm"].label, "Save")
         XCTAssertTrue(app.datePickers["fast.start-date"].exists)
         XCTAssertTrue(app.datePickers["fast.start-time"].exists)
         app.buttons["fast.start-cancel"].tap()
 
-        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertEqual(
             app.staticTexts["fast.target"].value as? String,
             originalTarget
@@ -312,10 +320,10 @@ final class FastStartUITests: XCTestCase {
         ).arguments
         app.launch()
 
-        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistenceIfNeeded(timeout: 2))
         app.buttons["fast.edit-start"].tap()
 
-        XCTAssertTrue(app.navigationBars["Start time"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Start time"].waitForExistenceIfNeeded(timeout: 2))
         assertDatePicker(
             in: app,
             app.datePickers["fast.start-date"],
@@ -331,11 +339,11 @@ final class FastStartUITests: XCTestCase {
         XCTAssertTrue(app.buttons["fast.start-use-earliest"].exists)
 
         app.buttons["fast.start-cancel"].tap()
-        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistenceIfNeeded(timeout: 2))
         assertDateDisplay(app.staticTexts["fast.started"], containsTime: "8:00")
 
         app.buttons["fast.edit-start"].tap()
-        XCTAssertTrue(app.buttons["fast.start-use-earliest"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start-use-earliest"].waitForExistenceIfNeeded(timeout: 2))
         assertDatePicker(
             in: app,
             app.datePickers["fast.start-date"],
@@ -344,13 +352,13 @@ final class FastStartUITests: XCTestCase {
         assertDatePicker(in: app, app.datePickers["fast.start-time"], contains: ["8:00"])
         app.buttons["fast.start-use-earliest"].tap()
 
-        XCTAssertTrue(app.buttons["fast.start-confirm"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.start-confirm"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertTrue(app.buttons["fast.start-confirm"].isEnabled)
         assertDatePicker(in: app, app.datePickers["fast.start-time"], contains: ["20:00"])
         XCTAssertFalse(app.staticTexts["fast.start-validation"].exists)
         app.buttons["fast.start-confirm"].tap()
 
-        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistenceIfNeeded(timeout: 2))
         XCTAssertFalse(app.staticTexts["fast.start-validation"].exists)
         assertDateDisplay(app.staticTexts["fast.started"], containsTime: "20:00")
 
@@ -358,10 +366,10 @@ final class FastStartUITests: XCTestCase {
         app.launchArguments = londonLaunchArguments(now: fixedStart)
         app.launch()
 
-        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fast.edit-start"].waitForExistenceIfNeeded(timeout: 2))
         assertDateDisplay(app.staticTexts["fast.started"], containsTime: "20:00")
         app.buttons["fast.edit-start"].tap()
-        XCTAssertTrue(app.navigationBars["Start time"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Start time"].waitForExistenceIfNeeded(timeout: 2))
         assertDatePicker(in: app, app.datePickers["fast.start-date"], contains: ["13", "2027"])
         assertDatePicker(in: app, app.datePickers["fast.start-time"], contains: ["20:00"])
         app.buttons["fast.start-cancel"].tap()
@@ -425,10 +433,14 @@ final class FastStartUITests: XCTestCase {
 
     @MainActor
     private func completeOnboarding(in app: XCUIApplication) {
+        let todayTab = app.tabBars.buttons["Today"]
+        if todayTab.exists || todayTab.waitForExistence(timeout: 0.25) {
+            return
+        }
         let continueButton = app.buttons["goal.continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 2))
         continueButton.tap()
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 2))
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 2))
     }
 
     private func fixedLaunchArguments(
@@ -439,6 +451,7 @@ final class FastStartUITests: XCTestCase {
     ) -> [String] {
         UITestLaunchConfiguration(
             resetData: resetData,
+            seedOnboarded: true,
             fixedNow: now,
             suppressAutomaticLiveActivityOffer: true,
             appleLocale: appleLocale,

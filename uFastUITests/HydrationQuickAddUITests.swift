@@ -11,7 +11,7 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         water.doubleTap()
 
         XCTAssertTrue(
-            app.staticTexts["drink.total"].waitForExistence(timeout: 2),
+            app.staticTexts["drink.total"].waitForExistenceIfNeeded(timeout: 2),
             app.debugDescription
         )
         XCTAssertEqual(app.staticTexts["drink.total"].label, "330 ml")
@@ -27,13 +27,13 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         tapDrinkAdd(in: app)
         let water = app.buttons["drink.favourite.\(waterFavouriteID)"]
         let picker = drinkPickerScrollView(in: app)
-        XCTAssertTrue(water.waitForExistence(timeout: 2), app.debugDescription)
+        XCTAssertTrue(water.waitForExistenceIfNeeded(timeout: 2), app.debugDescription)
         XCTAssertEqual(water.value as? String, "330 millilitres, Non-caloric")
         XCTAssertFalse(app.buttons["drink.favourite.00000000-0000-0000-0000-000000000002"].exists)
         XCTAssertFalse(app.buttons["drink.favourite.00000000-0000-0000-0000-000000000003"].exists)
         tapWhenReady(water, in: picker, app: app)
         let total = app.staticTexts["drink.total"]
-        XCTAssertTrue(total.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(total.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         let totalUpdated = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "330 ml"),
             object: total
@@ -55,7 +55,7 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         )
         app.launch()
         XCTAssertTrue(
-            app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2),
+            app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2),
             app.debugDescription
         )
         dismissOptionalLiveActivityOffer(in: app)
@@ -66,7 +66,7 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
             app: app
         )
         XCTAssertTrue(
-            app.staticTexts["fast.elapsed"].waitForExistence(timeout: 2),
+            app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 2),
             app.debugDescription
         )
     }
@@ -90,7 +90,7 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         tapTab("Today", in: app)
         tapDrinkAdd(in: app)
         let water = app.buttons["drink.favourite.\(waterFavouriteID)"]
-        XCTAssertTrue(water.waitForExistence(timeout: 2), water.debugDescription)
+        XCTAssertTrue(water.waitForExistenceIfNeeded(timeout: 2), water.debugDescription)
         XCTAssertEqual(water.value as? String, "650 millilitres, Non-caloric")
         tapWhenReady(water, in: drinkPickerScrollView(in: app), app: app)
         XCTAssertEqual(app.staticTexts["drink.total"].label, "650 ml")
@@ -103,7 +103,7 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         let add = app.buttons["settings.favourite.add"]
         tapSettingsControl(add, in: app)
         XCTAssertTrue(
-            app.navigationBars["Add favourite"].waitForExistence(timeout: 2),
+            app.navigationBars["Add favourite"].waitForExistenceIfNeeded(timeout: 2),
             app.debugDescription
         )
 
@@ -111,13 +111,13 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         replaceText("330", in: app.textFields["settings.favourite.amount"], app: app)
         tapWhenReady(app.buttons["settings.favourite.save"], app: app)
         let saved = app.buttons["Sparkling water"]
-        XCTAssertTrue(saved.waitForExistence(timeout: 3), saved.debugDescription)
+        XCTAssertTrue(saved.waitForExistenceIfNeeded(timeout: 3), saved.debugDescription)
         XCTAssertEqual(saved.value as? String, "330 millilitres, Non-caloric")
 
         tapTab("Today", in: app)
         tapDrinkAdd(in: app)
         let custom = app.buttons["Sparkling water"]
-        XCTAssertTrue(custom.waitForExistence(timeout: 3), custom.debugDescription)
+        XCTAssertTrue(custom.waitForExistenceIfNeeded(timeout: 3), custom.debugDescription)
         XCTAssertTrue(custom.label.contains("Sparkling water"))
         tapWhenReady(custom, in: drinkPickerScrollView(in: app), app: app)
         XCTAssertEqual(app.staticTexts["drink.total"].label, "330 ml")
@@ -126,55 +126,68 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
     @MainActor
     func testCaloricFavouriteAddsImmediatelyWithoutFastAndUsesActiveFastChoice() {
         let noFast = launch()
-        tapTab("Settings", in: noFast)
-        tapSettingsControl(noFast.buttons["settings.favourite.add"], in: noFast)
-        XCTAssertTrue(noFast.navigationBars["Add favourite"].waitForExistence(timeout: 3), noFast.debugDescription)
-        replaceText("Juice", in: noFast.textFields["settings.favourite.name"], app: noFast)
-        replaceText("250", in: noFast.textFields["settings.favourite.amount"], app: noFast)
-        tapWhenReady(noFast.switches["settings.favourite.caloric"], app: noFast)
-        tapWhenReady(noFast.buttons["settings.favourite.save"], app: noFast)
-        XCTAssertTrue(noFast.navigationBars["Add favourite"].waitForNonExistence(timeout: 3), noFast.debugDescription)
-        reveal(noFast.buttons["Juice"], in: settingsScrollView(in: noFast), app: noFast)
-        tapTab("Today", in: noFast)
-        tapDrinkAdd(in: noFast)
-        tapWhenReady(noFast.buttons["Juice"], in: drinkPickerScrollView(in: noFast), app: noFast)
-        XCTAssertTrue(noFast.staticTexts["drink.total"].waitForExistence(timeout: 3), noFast.debugDescription)
-        XCTAssertTrue(noFast.navigationBars["Add a drink"].waitForNonExistence(timeout: 3), noFast.debugDescription)
-        XCTAssertEqual(noFast.staticTexts["drink.total"].label, "250 ml")
+        addCaloricFavouriteWithoutFast(in: noFast)
 
         let active = launch(seedCaloricFavouriteActiveFast: true)
+        addCaloricFavouriteDuringActiveFast(in: active)
+    }
+
+    @MainActor
+    private func addCaloricFavouriteWithoutFast(in app: XCUIApplication) {
+        tapTab("Settings", in: app)
+        tapSettingsControl(app.buttons["settings.favourite.add"], in: app)
         XCTAssertTrue(
-            active.staticTexts["fast.elapsed"].waitForExistence(timeout: 3),
-            active.debugDescription
+            app.navigationBars["Add favourite"].waitForExistenceIfNeeded(timeout: 3),
+            app.debugDescription
         )
-        tapDrinkAdd(in: active)
-        tapWhenReady(active.buttons["Juice"], in: drinkPickerScrollView(in: active), app: active)
-        let alert = active.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 3), alert.debugDescription)
+        replaceText("Juice", in: app.textFields["settings.favourite.name"], app: app)
+        replaceText("250", in: app.textFields["settings.favourite.amount"], app: app)
+        tapWhenReady(app.switches["settings.favourite.caloric"], app: app)
+        tapWhenReady(app.buttons["settings.favourite.save"], app: app)
+        XCTAssertTrue(app.navigationBars["Add favourite"].waitForNonExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.buttons["Juice"].waitForExistenceIfNeeded(timeout: 3), app.debugDescription)
+        tapTab("Today", in: app)
+        tapDrinkAdd(in: app)
+        tapWhenReady(app.buttons["Juice"], in: drinkPickerScrollView(in: app), app: app)
+        XCTAssertTrue(app.staticTexts["drink.total"].waitForExistenceIfNeeded(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.navigationBars["Add a drink"].waitForNonExistence(timeout: 3), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["drink.total"].label, "250 ml")
+    }
+
+    @MainActor
+    private func addCaloricFavouriteDuringActiveFast(in app: XCUIApplication) {
+        XCTAssertTrue(
+            app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 3),
+            app.debugDescription
+        )
+        tapDrinkAdd(in: app)
+        tapWhenReady(app.buttons["Juice"], in: drinkPickerScrollView(in: app), app: app)
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistenceIfNeeded(timeout: 3), alert.debugDescription)
         tapWhenReady(
             alert.descendants(matching: .any)
                 .matching(identifier: "drink.caloric-favourite.confirmation.cancel").firstMatch,
-            app: active
+            app: app
         )
-        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), active.debugDescription)
-        XCTAssertEqual(active.staticTexts["drink.total"].label, "0 ml")
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["drink.total"].label, "0 ml")
 
-        tapDrinkAdd(in: active)
-        tapWhenReady(active.buttons["Juice"], in: drinkPickerScrollView(in: active), app: active)
-        XCTAssertTrue(alert.waitForExistence(timeout: 3), alert.debugDescription)
+        tapDrinkAdd(in: app)
+        tapWhenReady(app.buttons["Juice"], in: drinkPickerScrollView(in: app), app: app)
+        XCTAssertTrue(alert.waitForExistenceIfNeeded(timeout: 3), alert.debugDescription)
         tapWhenReady(
             alert.descendants(matching: .any)
                 .matching(identifier: "drink.caloric-favourite.confirmation.primary").firstMatch,
-            app: active
+            app: app
         )
         XCTAssertTrue(
-            active.staticTexts["drink.total"].waitForExistence(timeout: 3),
-            active.debugDescription
+            app.staticTexts["drink.total"].waitForExistenceIfNeeded(timeout: 3),
+            app.debugDescription
         )
-        XCTAssertEqual(active.staticTexts["drink.total"].label, "250 ml")
+        XCTAssertEqual(app.staticTexts["drink.total"].label, "250 ml")
         XCTAssertTrue(
-            active.staticTexts["fast.elapsed"].waitForNonExistence(timeout: 3),
-            active.debugDescription
+            app.staticTexts["fast.elapsed"].waitForNonExistence(timeout: 3),
+            app.debugDescription
         )
     }
 
@@ -185,14 +198,14 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
             simulateDrinkSaveFailure: true
         )
         XCTAssertTrue(
-            app.staticTexts["fast.elapsed"].waitForExistence(timeout: 3),
+            app.staticTexts["fast.elapsed"].waitForExistenceIfNeeded(timeout: 3),
             app.debugDescription
         )
 
         tapDrinkAdd(in: app)
         tapWhenReady(app.buttons["Juice"], in: drinkPickerScrollView(in: app), app: app)
         let confirmation = app.alerts.firstMatch
-        XCTAssertTrue(confirmation.waitForExistence(timeout: 3), confirmation.debugDescription)
+        XCTAssertTrue(confirmation.waitForExistenceIfNeeded(timeout: 3), confirmation.debugDescription)
         tapWhenReady(
             confirmation.descendants(matching: .any)
                 .matching(identifier: "drink.caloric-favourite.confirmation.primary").firstMatch,
@@ -200,14 +213,14 @@ final class HydrationQuickAddUITests: HydrationFavouriteUITestCase {
         )
 
         let error = app.staticTexts["drink.caloric-favourite.save-error"]
-        XCTAssertTrue(error.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(error.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(error.label.contains("drink and fast couldn’t be saved"))
         XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
         XCTAssertEqual(app.staticTexts["drink.total"].label, "0 ml")
 
         let retry = app.buttons["drink.caloric-favourite.retry"]
         tapWhenReady(retry, in: app.scrollViews["today.content"], app: app)
-        XCTAssertTrue(error.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(error.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
         XCTAssertTrue(retry.exists)
         XCTAssertTrue(app.staticTexts["fast.elapsed"].exists)
     }
