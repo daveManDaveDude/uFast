@@ -23,6 +23,10 @@ struct TemporalHistoryCarousel: View {
     let events: [TemporalRibbonEventItem]
     let motionIntervals: [TemporalRibbonIntervalItem]
     let motionEvents: [TemporalRibbonEventItem]
+    /// Stable reference boundary. The carousel passes this identity through
+    /// without reading its observable values; only duration leaves observe it.
+    let durationPulse: HistoryDurationPulse?
+    var inputGeneration: Int?
     let onSelectInterval: (UUID) -> Void
     let onSelectEvent: (UUID) -> Void
     var onSelectEventGroup: ((TemporalEventGroup) -> Void)?
@@ -54,7 +58,11 @@ struct TemporalHistoryCarousel: View {
     @State var appearedSegmentDates: Set<Date> = []
 
     var body: some View {
-        VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
+        _ = HistoryLabelWorkProbe.recordCarouselBodyEvaluation()
+        if let inputGeneration {
+            HistoryScrollDiagnosticProbe.recordCoarseInputGeneration(inputGeneration)
+        }
+        return VStack(alignment: .leading, spacing: UFastTheme.Spacing.standard) {
             dayHeader
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 0) {
@@ -125,6 +133,16 @@ struct TemporalHistoryCarousel: View {
                 selectedPageHeight = height
             }
             .onScrollPhaseChange { _, newPhase in
+                switch newPhase {
+                case .tracking, .interacting:
+                    HistoryScrollDiagnosticProbe.recordNativePhase(.tracking)
+                case .decelerating:
+                    HistoryScrollDiagnosticProbe.recordNativePhase(.decelerating)
+                case .idle:
+                    HistoryScrollDiagnosticProbe.recordNativePhase(.idle)
+                case .animating:
+                    break
+                }
                 if newPhase == .tracking || newPhase == .interacting || newPhase == .decelerating {
                     lowerMotionInFlight = true
                 }
@@ -147,6 +165,11 @@ struct TemporalHistoryCarousel: View {
                 },
                 action: { _, geometry in
                     HistoryLabelWorkProbe.withScrollGeometryCallback {
+                        HistoryScrollDiagnosticProbe.recordGeometry(
+                            offset: geometry.contentOffset,
+                            width: geometry.containerWidth,
+                            contentWidth: geometry.contentWidth
+                        )
                         geometrySnapshot.geometry = geometry
                         HistoryLabelWorkProbe.recordScrollGeometry(
                             geometry
@@ -161,8 +184,11 @@ struct TemporalHistoryCarousel: View {
                         if movementPhase != .settled,
                            let progress
                         {
+                            HistoryScrollDiagnosticProbe.recordFractionalMotion()
                             emitPrefetchIntent(for: progress)
-                            onCoupledPresentationChange(.preview(progress))
+                            HistoryScrollDiagnosticProbe.withWork(.followerUpdate) {
+                                onCoupledPresentationChange(.preview(progress))
+                            }
                         }
                         if movementPhase == .settled, geometrySnapshot.hasActiveMotion {
                             if let progress {
@@ -201,6 +227,7 @@ struct TemporalHistoryCarousel: View {
             }
             .onChange(of: dates) { _, newDates in
                 guard newDates.contains(canonicalSelection) else { return }
+                HistoryScrollDiagnosticProbe.recordWork(.runwayPublication)
                 prefetchedEdges.removeAll()
                 alignToExternalSelection()
             }
@@ -249,6 +276,9 @@ struct TemporalHistoryCarousel: View {
                 .allowsHitTesting(movementPhase == .settled && allowsRecordActivation)
                 .accessibilityHidden(movementPhase != .settled)
             }
+        }
+        .overlay(alignment: .topLeading) {
+            HistoryScrollDiagnosticControls()
         }
         .accessibilityAction(named: textResolver(.historyCopy(.previousDay))) {
             onNavigateDay(-1)
@@ -362,9 +392,7 @@ extension TemporalHistoryCarousel {
         // The continuous interval layer stays motion-projected in every phase.
         // Once the selected page settles, its visual event surface needs the
         // complete snapshot so group titles, members, and details remain exact.
-        let pageEvents = isSelected && movementPhase == .settled
-            ? events
-            : motionEvents
+        let pageEvents = isSelected && movementPhase == .settled ? events : motionEvents
         let interaction = Self.timelineInteractionState(
             movementPhase: movementPhase,
             allowsRecordActivation: allowsRecordActivation,
@@ -374,37 +402,39 @@ extension TemporalHistoryCarousel {
             guard interaction.allowsRecordActivation else { return }
             onSelectInterval(id)
         } : nil
-        return TemporalRibbonView(
-            selectedDate: date,
-            intervals: pageIntervals,
-            events: pageEvents,
-            onSelectInterval: selectInterval,
-            onSelectEvent: { id in
-                guard interaction.allowsRecordActivation else { return }
-                onSelectEvent(id)
-            },
-            onSelectGroup: { group in
-                guard interaction.allowsRecordActivation else { return }
-                onSelectEventGroup?(group)
-            },
-            onSelectEmpty: interaction.allowsEmptySelection ? onSelectEmpty : nil,
-            onNavigateDay: nil,
-            canNavigateForward: true,
-            accessibilityIdentifierPrefix: "history",
-            showsDayHeader: false,
-            // Preserve the resting control appearance during motion. Actions
-            // remain gated by the movement-aware callbacks until idle.
-            isInteractive: interaction.isVisuallyEnabled,
-            showsSemanticItems: false,
-            usesContinuousSurface: true,
-            includesSemanticItems: false,
-            hidesVisualEventAccessibility: true,
-            windowOverride: TemporalHistoryPresentation.calendarDayWindow(
-                containing: date,
-                calendar: calendar
-            ),
-            futureReadOnlyFrom: futureReadOnlyFromDate
-        )
+        return Group {
+            TemporalRibbonView(
+                selectedDate: date,
+                intervals: pageIntervals,
+                events: pageEvents,
+                onSelectInterval: selectInterval,
+                onSelectEvent: { id in
+                    guard interaction.allowsRecordActivation else { return }
+                    onSelectEvent(id)
+                },
+                onSelectGroup: { group in
+                    guard interaction.allowsRecordActivation else { return }
+                    onSelectEventGroup?(group)
+                },
+                onSelectEmpty: interaction.allowsEmptySelection ? onSelectEmpty : nil,
+                onNavigateDay: nil,
+                canNavigateForward: true,
+                accessibilityIdentifierPrefix: "history",
+                showsDayHeader: false,
+                // Preserve the resting control appearance during motion. Actions
+                // remain gated by the movement-aware callbacks until idle.
+                isInteractive: interaction.isVisuallyEnabled,
+                showsSemanticItems: false,
+                usesContinuousSurface: true,
+                includesSemanticItems: false,
+                hidesVisualEventAccessibility: true,
+                windowOverride: TemporalHistoryPresentation.calendarDayWindow(
+                    containing: date,
+                    calendar: calendar
+                ),
+                futureReadOnlyFrom: futureReadOnlyFromDate
+            )
+        }
         .background {
             GeometryReader { proxy in
                 Color.clear.preference(
@@ -469,6 +499,7 @@ extension TemporalHistoryCarousel {
     func setMovementPhase(_ newPhase: TemporalCarouselMovementPhase) {
         guard movementPhase.requiresPresentationUpdate(to: newPhase) else { return }
         movementPhase = newPhase
+        HistoryLabelWorkProbe.recordMovementPhase(newPhase)
         if newPhase == .settled {
             if let geometry = geometrySnapshot.geometry {
                 settleVisibleGeometry(geometry)
@@ -491,7 +522,9 @@ extension TemporalHistoryCarousel {
             layoutDirection: direction
         ) else { return }
         settledVisibleWindow = window
-        onSettledVisibleWindow(window)
+        HistoryScrollDiagnosticProbe.withWork(.settlementReconciliation) {
+            onSettledVisibleWindow(window)
+        }
         geometrySnapshot.hasActiveMotion = false
         reconcileAndCommitSelection(window.selectedDay)
     }

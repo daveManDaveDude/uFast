@@ -20,6 +20,8 @@ final class LocalizationTests: XCTestCase {
         XCTAssertTrue(AppText.catalogKeys.contains("history.retry"))
         XCTAssertTrue(AppText.catalogKeys.contains("history.extension-retry"))
         XCTAssertTrue(AppText.catalogKeys.contains("duration.minute"))
+        XCTAssertTrue(AppText.catalogKeys.contains("duration.hour.abbreviation"))
+        XCTAssertTrue(AppText.catalogKeys.contains("duration.minute.abbreviation"))
         XCTAssertTrue(AppText.catalogKeys.contains("history.group.food.title"))
     }
 

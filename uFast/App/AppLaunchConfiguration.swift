@@ -8,6 +8,7 @@ struct DevelopmentFixtureConfiguration: Equatable {
     var seedHistoryMidnightSeam = false
     var seedHistoryMidnightSeamExtended = false
     var seedHistoryFastLabelLayout = false
+    var seedBF106BusyHistory = false
     var seedActiveFastStart: Date?
     var seedLiveActivityRecovery = false
     var seedMultipleActiveFasts = false
@@ -51,6 +52,8 @@ struct AppLaunchConfiguration {
     let suppressAutomaticLiveActivityOffer: Bool
     let startsOnHistory: Bool
     let historyMotionRetryFixture: Bool
+    let historyClockControlEnabled: Bool
+    let historyClockAdvance: TimeInterval
 
     static func current() -> Self {
         Self(arguments: ProcessInfo.processInfo.arguments)
@@ -72,6 +75,8 @@ struct AppLaunchConfiguration {
             suppressAutomaticLiveActivityOffer = false
             startsOnHistory = false
             historyMotionRetryFixture = false
+            historyClockControlEnabled = false
+            historyClockAdvance = 1
             return
         }
 
@@ -88,6 +93,9 @@ struct AppLaunchConfiguration {
             ),
             seedHistoryFastLabelLayout: arguments.contains(
                 "--seed-history-fast-label-layout"
+            ),
+            seedBF106BusyHistory: arguments.contains(
+                "--seed-bf106-busy-history"
             ),
             seedActiveFastStart: Self.date(after: "--seed-active-fast-start", in: arguments),
             seedLiveActivityRecovery: arguments.contains("--seed-live-activity-recovery"),
@@ -123,6 +131,13 @@ struct AppLaunchConfiguration {
         )
         startsOnHistory = arguments.contains("--ui-testing-start-history")
         historyMotionRetryFixture = arguments.contains("--ui-testing-history-retry-fixture")
+        historyClockControlEnabled = arguments.contains("--ui-testing-history-clock")
+        let configuredClockAdvance = Self.double(after: "--ui-testing-history-clock-advance", in: arguments)
+        if let configuredClockAdvance, configuredClockAdvance.isFinite {
+            historyClockAdvance = configuredClockAdvance
+        } else {
+            historyClockAdvance = 1
+        }
     }
 
     private static func commandConfiguration(from arguments: [String]) -> ApplicationCommandConfiguration {
@@ -201,6 +216,13 @@ struct AppLaunchConfiguration {
               let interval = TimeInterval(arguments[index + 1])
         else { return nil }
         return Date(timeIntervalSince1970: interval)
+    }
+
+    private static func double(after option: String, in arguments: [String]) -> TimeInterval? {
+        guard let index = arguments.firstIndex(of: option), arguments.indices.contains(index + 1) else {
+            return nil
+        }
+        return TimeInterval(arguments[index + 1])
     }
 
     private static func string(after option: String, in arguments: [String]) -> String? {

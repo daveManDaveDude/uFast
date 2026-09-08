@@ -145,6 +145,25 @@ struct TemporalRibbonLabelInput: Equatable, Sendable {
     let kind: TemporalRibbonIntervalItem.Kind
     let title: String
     let glyphName: String
+    let duration: HistoryDurationSpec?
+
+    init(
+        id: UUID,
+        start: Date,
+        end: Date,
+        kind: TemporalRibbonIntervalItem.Kind,
+        title: String,
+        glyphName: String,
+        duration: HistoryDurationSpec? = nil
+    ) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.kind = kind
+        self.title = title
+        self.glyphName = glyphName
+        self.duration = duration
+    }
 }
 
 /// Platform measurement supplied to the pure fit policy. A value is keyed by
@@ -156,6 +175,19 @@ struct TemporalRibbonLabelMetrics: Equatable, Sendable {
     let title: String
     let glyphWidth: Double
     let textWidth: Double
+    let durationTemplateWidths: [Int: Double]
+
+    init(
+        title: String,
+        glyphWidth: Double,
+        textWidth: Double,
+        durationTemplateWidths: [Int: Double] = [:]
+    ) {
+        self.title = title
+        self.glyphWidth = glyphWidth
+        self.textWidth = textWidth
+        self.durationTemplateWidths = durationTemplateWidths
+    }
 
     var fullLabelWidth: Double {
         glyphWidth + 4 + textWidth + 4 + Self.disclosureWidth + 12
@@ -165,8 +197,17 @@ struct TemporalRibbonLabelMetrics: Equatable, Sendable {
         glyphWidth + 12
     }
 
+    func fullLabelWidth(durationWidth: Double) -> Double {
+        glyphWidth + 4 + textWidth + 4 + durationWidth + 4 + Self.disclosureWidth + 12
+    }
+
+    func durationOnlyWidth(durationWidth: Double) -> Double {
+        durationWidth + 12
+    }
+
     var isFinite: Bool {
         glyphWidth.isFinite && glyphWidth >= 0 && textWidth.isFinite && textWidth >= 0
+            && durationTemplateWidths.values.allSatisfy { $0.isFinite && $0 >= 0 }
     }
 }
 
@@ -196,6 +237,7 @@ struct TemporalRibbonLabelDescriptor: Identifiable, Equatable, Sendable {
     let kind: TemporalRibbonIntervalItem.Kind
     let title: String?
     let glyphName: String?
+    let duration: HistoryDurationSpec?
     let lane: Int
     let projectedStartX: Double
     let projectedEndX: Double
@@ -204,18 +246,25 @@ struct TemporalRibbonLabelDescriptor: Identifiable, Equatable, Sendable {
     let glyphWidth: Double
     let showsText: Bool
     let showsGlyph: Bool
+    let showsDuration: Bool
+    let durationTemplateDayDigits: Int?
+    let durationSlotWidth: Double?
 }
 
 private struct TemporalRibbonLabelFit: Equatable, Sendable {
     let showsText: Bool
     let showsGlyph: Bool
     let width: Double
+    let showsDuration: Bool
+    let durationTemplateDayDigits: Int?
+    let durationSlotWidth: Double?
 }
 
 enum TemporalRibbonLabelProjector {
-    /// Produces at most one stable descriptor for each interval identity. The
-    /// lane map is the same original-interval allocator used by `clip`, so a
-    /// page fragment and its continuous decoration cannot diverge vertically.
+    // Produces at most one stable descriptor for each interval identity. The
+    // lane map is the same original-interval allocator used by `clip`, so a
+    // page fragment and its continuous decoration cannot diverge vertically.
+    // swiftlint:disable:next function_body_length
     static func project(
         _ inputs: [TemporalRibbonLabelInput],
         days: [Date],
@@ -267,6 +316,7 @@ enum TemporalRibbonLabelProjector {
                 kind: input.kind,
                 title: fit.showsText ? input.title : nil,
                 glyphName: fit.showsGlyph ? input.glyphName : nil,
+                duration: input.duration,
                 lane: lane,
                 projectedStartX: projection.projectedStartX,
                 projectedEndX: projection.projectedEndX,
@@ -274,30 +324,112 @@ enum TemporalRibbonLabelProjector {
                 labelWidth: fit.width,
                 glyphWidth: inputMetrics.glyphWidth,
                 showsText: fit.showsText,
-                showsGlyph: fit.showsGlyph
+                showsGlyph: fit.showsGlyph,
+                showsDuration: fit.showsDuration,
+                durationTemplateDayDigits: fit.durationTemplateDayDigits,
+                durationSlotWidth: fit.durationSlotWidth
             )
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private static func fit(
         for input: TemporalRibbonLabelInput,
         projection: TemporalContinuousIntervalProjection,
         metrics: TemporalRibbonLabelMetrics
     ) -> TemporalRibbonLabelFit {
+        if input.duration != nil, !metrics.durationTemplateWidths.isEmpty {
+            let fittingTitleTemplate = successiveFittingTemplate(
+                metrics.durationTemplateWidths
+            ) { width in
+                metrics.fullLabelWidth(durationWidth: width) <= projection.width
+            }
+            if let fittingTitleTemplate {
+                return TemporalRibbonLabelFit(
+                    showsText: !input.title.isEmpty,
+                    showsGlyph: true,
+                    width: metrics.fullLabelWidth(durationWidth: fittingTitleTemplate.value),
+                    showsDuration: true,
+                    durationTemplateDayDigits: fittingTitleTemplate.key,
+                    durationSlotWidth: fittingTitleTemplate.value
+                )
+            }
+
+            let fittingDurationTemplate = successiveFittingTemplate(
+                metrics.durationTemplateWidths
+            ) { width in
+                metrics.durationOnlyWidth(durationWidth: width) <= projection.width
+            }
+            if let fittingDurationTemplate {
+                return TemporalRibbonLabelFit(
+                    showsText: false,
+                    showsGlyph: false,
+                    width: metrics.durationOnlyWidth(durationWidth: fittingDurationTemplate.value),
+                    showsDuration: true,
+                    durationTemplateDayDigits: fittingDurationTemplate.key,
+                    durationSlotWidth: fittingDurationTemplate.value
+                )
+            }
+
+            guard projection.width >= metrics.glyphOnlyWidth else {
+                return TemporalRibbonLabelFit(
+                    showsText: false,
+                    showsGlyph: false,
+                    width: 0,
+                    showsDuration: false,
+                    durationTemplateDayDigits: nil,
+                    durationSlotWidth: nil
+                )
+            }
+            return TemporalRibbonLabelFit(
+                showsText: false,
+                showsGlyph: true,
+                width: metrics.glyphOnlyWidth,
+                showsDuration: false,
+                durationTemplateDayDigits: nil,
+                durationSlotWidth: nil
+            )
+        }
+
         guard projection.width >= metrics.glyphOnlyWidth else {
-            return TemporalRibbonLabelFit(showsText: false, showsGlyph: false, width: 0)
+            return TemporalRibbonLabelFit(
+                showsText: false,
+                showsGlyph: false,
+                width: 0,
+                showsDuration: false,
+                durationTemplateDayDigits: nil,
+                durationSlotWidth: nil
+            )
         }
         guard !input.title.isEmpty, projection.width >= metrics.fullLabelWidth else {
             return TemporalRibbonLabelFit(
                 showsText: false,
                 showsGlyph: true,
-                width: metrics.glyphOnlyWidth
+                width: metrics.glyphOnlyWidth,
+                showsDuration: false,
+                durationTemplateDayDigits: nil,
+                durationSlotWidth: nil
             )
         }
         return TemporalRibbonLabelFit(
             showsText: true,
             showsGlyph: true,
-            width: metrics.fullLabelWidth
+            width: metrics.fullLabelWidth,
+            showsDuration: false,
+            durationTemplateDayDigits: nil,
+            durationSlotWidth: nil
         )
+    }
+
+    private static func successiveFittingTemplate(
+        _ widths: [Int: Double],
+        fits: (Double) -> Bool
+    ) -> (key: Int, value: Double)? {
+        var selected: (key: Int, value: Double)?
+        for entry in widths.sorted(by: { $0.key < $1.key }) {
+            guard fits(entry.value) else { break }
+            selected = entry
+        }
+        return selected
     }
 }

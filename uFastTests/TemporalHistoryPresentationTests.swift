@@ -583,6 +583,8 @@ final class TemporalHistoryPresentationTests: XCTestCase {
             events: [],
             motionIntervals: [],
             motionEvents: [],
+            durationPulse: nil,
+            inputGeneration: nil,
             onSelectInterval: { _ in },
             onSelectEvent: { _ in },
             onSelectEmpty: { _ in },
@@ -1547,6 +1549,27 @@ final class TemporalHistoryPresentationTests: XCTestCase {
         XCTAssertFalse(markers.contains { calendar.component(.hour, from: $0) == 1 })
         XCTAssertTrue(markers.contains { calendar.component(.hour, from: $0) == 2 })
         XCTAssertEqual(Set(markers).count, markers.count)
+    }
+
+    func testScrollDiagnosticCaptureLeavesMotionPhaseSemanticsUntouched() {
+        let configuration = HistoryScrollDiagnosticConfiguration(
+            arguments: ["--ui-testing", HistoryScrollDiagnosticConfiguration.diagnosticArgument]
+        )
+        var capture = HistoryScrollDiagnosticCapture(configuration: configuration)
+        capture.recordNativePhase(.decelerating, at: 10)
+        capture.recordNativePhase(.idle, at: 10.4)
+        let report = capture.endCapture(at: 10.65)
+
+        XCTAssertEqual(report.outcome, .captured)
+        XCTAssertEqual(report.phases[0].start, 10, accuracy: 0.000_001)
+        XCTAssertFalse(
+            TemporalCarouselMovementPhase.userDriven
+                .requiresPresentationUpdate(to: .decelerating)
+        )
+        XCTAssertTrue(
+            TemporalCarouselMovementPhase.decelerating
+                .requiresPresentationUpdate(to: .settled)
+        )
     }
 
     private func londonCalendar() throws -> Calendar {

@@ -28,6 +28,8 @@ struct HistoryView: View {
     @State var historyInteractionRevision = 0
     @State var isDateRailMoving = false
     @State var settledVisibleWindow: TemporalRibbonWindow?
+    @State var durationPulse: HistoryDurationPulse
+    @State var capTransitionPending = false
 
     let clock: any AppClock
     let isTabSelected: Bool
@@ -82,20 +84,7 @@ struct HistoryView: View {
     }
 
     var liveHistoryPresentation: HistoryPresentationSnapshot? {
-        // Geometry updates can invalidate History while the carousel is in
-        // motion. Rebuilding the complete localized presentation during those
-        // updates can make native deceleration miss a frame even though moving
-        // pages render from `motionSnapshot` and settled details are hidden.
-        // Resume the live projection at rest so inferred-fast timing remains
-        // current without putting that work on the scroll path.
-        guard temporalMovementPhase == .settled, !isDateRailMoving else {
-            return historyPresentation
-        }
-        guard let historyData else { return historyPresentation }
-        return HistoryPresentationBuilder.build(
-            data: historyData, locale: locale, calendar: calendar,
-            timeZone: timeZone, referenceNow: clock.now, textResolver: textResolver
-        )
+        historyPresentation
     }
 
     init(
@@ -108,6 +97,14 @@ struct HistoryView: View {
         self.clock = clock
         self.isTabSelected = isTabSelected
         self.onSelectToday = onSelectToday
+        _durationPulse = State(
+            initialValue: HistoryDurationPulse(
+                clock: clock,
+                driver: clock is MutableAppClock
+                    ? ManualHistoryDurationCadence()
+                    : SystemHistoryDurationCadence()
+            )
+        )
     }
 
     var body: some View {
@@ -152,15 +149,31 @@ struct HistoryView: View {
     }
 
     var motionIntervalsAtCurrentTime: [TemporalRibbonIntervalItem] {
-        let now = clock.now
-        let motion = motionSnapshot?.presentation.ribbonIntervals(activeEndingAt: now)
-            ?? historyPresentation?.intervals(activeEndingAt: now) ?? []
-        guard let live = liveHistoryPresentation else { return motion }
-        let inferred = live.visibleFastItems(activeEndingAt: now).filter { $0.kind == .inferred }
-        guard !inferred.isEmpty else { return motion }
-        let inferredIDs = Set(inferred.map(\.ribbonID))
-        return (motion.filter { !inferredIDs.contains($0.id) } + inferred.map(\.ribbonItem))
-            .sorted { $0.start < $1.start }
+        motionSnapshot?.presentation.loadedRibbonIntervals
+            ?? historyPresentation?.loadedIntervals
+            ?? []
+    }
+
+    /// Keeps the single duration pulse scoped to a visible History
+    /// presentation that actually contains a current interval. The cap is a
+    /// separate one-shot deadline; ordinary pulses never enter this path.
+    func syncDurationPulseLifecycle() {
+        guard isTabSelected,
+              scenePhase == .active,
+              presentedHistorySheetID == "none",
+              let presentation = historyPresentation,
+              presentation.fastItems.contains(where: \.durationSpec.isCurrent)
+        else {
+            durationPulse.stop()
+            return
+        }
+
+        durationPulse.start()
+        let capDate = presentation.fastItems
+            .filter(\.durationSpec.isCurrent)
+            .compactMap(\.durationSpec.capDate)
+            .min()
+        durationPulse.armCapDeadline(at: capDate)
     }
 }
 

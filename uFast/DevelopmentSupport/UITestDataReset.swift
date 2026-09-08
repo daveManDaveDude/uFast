@@ -103,7 +103,9 @@ enum UITestDataReset {
                 extendsActiveFast: configuration.seedHistoryMidnightSeamExtended
             )
         }
-        if configuration.seedHistoryFastLabelLayout {
+        if configuration.seedBF106BusyHistory {
+            try UITestSeedFixtures.seedBF106BusyHistory(in: context, clock: clock)
+        } else if configuration.seedHistoryFastLabelLayout {
             try UITestSeedFixtures.seedHistoryFastLabelLayout(in: context, clock: clock)
         }
     }

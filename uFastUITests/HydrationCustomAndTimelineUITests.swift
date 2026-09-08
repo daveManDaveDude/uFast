@@ -35,8 +35,20 @@ final class HydrationCustomAndTimelineUITests: XCTestCase {
         XCTAssertTrue(deleteAlert.waitForExistence(timeout: 2), app.debugDescription)
         deleteAlert.descendants(matching: .any)
             .matching(identifier: "drink.delete.confirm").firstMatch.tap()
-        XCTAssertEqual(app.staticTexts["drink.total"].label, "0 ml")
-        XCTAssertTrue(app.staticTexts["timeline.empty"].exists)
+        let emptyTimeline = app.staticTexts["timeline.empty"]
+        XCTAssertTrue(emptyTimeline.waitForExistence(timeout: 5), app.debugDescription)
+        let total = app.staticTexts["drink.total"]
+        let zeroTotal = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "0 ml"),
+            object: total
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [zeroTotal], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        XCTAssertEqual(total.label, "0 ml")
+        XCTAssertTrue(emptyTimeline.exists)
     }
 
     @MainActor

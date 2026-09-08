@@ -38,7 +38,9 @@ extension TemporalHistoryCarousel {
                     calendar: calendar,
                     layoutDirection: direction,
                     textResolver: textResolver,
-                    appearedSegmentCount: appearedSegmentDates.count
+                    appearedSegmentCount: appearedSegmentDates.count,
+                    durationPulse: durationPulse,
+                    movementPhase: movementPhase
                 )
             }
         }

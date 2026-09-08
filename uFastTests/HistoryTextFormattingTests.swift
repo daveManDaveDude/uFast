@@ -65,10 +65,11 @@ final class HistoryTextFormattingTests: XCTestCase {
             item: item,
             calendar: context.calendar,
             locale: context.locale,
-            timeZone: context.timeZone
+            timeZone: context.timeZone,
+            durationPulse: nil
         )
 
-        XCTAssertEqual(row.durationText, "1 hour 30 minutes")
+        XCTAssertEqual(row.durationText, "1 h 30 min")
         XCTAssertTrue(row.historyAccessibilityLabel.contains("duration 1 hour 30 minutes"))
     }
 

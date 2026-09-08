@@ -381,6 +381,8 @@ enum AppText: Equatable {
         case inferredConflictError
         case inferredActiveFastError
         case inferredSaveError
+        case inferredCapReached
+        case inferredReturnToHistory
         case inferredDelete
         case inferredDeleteConfirmationTitle
         case inferredDeleteConfirmationMessage
@@ -458,6 +460,8 @@ enum AppText: Equatable {
         case sourceLabel
         case durationLessThanMinute
         case durationDayAbbreviation
+        case durationHourAbbreviation
+        case durationMinuteAbbreviation
         case separatorMiddleDot
         case separatorArrow
         case separatorRange
@@ -1358,7 +1362,8 @@ enum AppText: Equatable {
         .fastingCopy(.durationLabel), .fastingCopy(.sourceFood), .fastingCopy(.sourceDrink),
         .fastingCopy(.inferredCancel), .fastingCopy(.inferredUnavailableError),
         .fastingCopy(.inferredConflictError), .fastingCopy(.inferredActiveFastError),
-        .fastingCopy(.inferredSaveError), .fastingCopy(.inferredDelete),
+        .fastingCopy(.inferredSaveError), .fastingCopy(.inferredCapReached),
+        .fastingCopy(.inferredReturnToHistory), .fastingCopy(.inferredDelete),
         .fastingCopy(.inferredDeleteConfirmationTitle),
         .fastingCopy(.inferredDeleteConfirmationMessage),
         .fastingCopy(.inferredDeleteConfirmationAction), .fastingCopy(.inferredDeleteError),
@@ -1398,6 +1403,7 @@ enum AppText: Equatable {
         .historyCopy(.boundaryEvidenceUnavailable),
         .historyCopy(.formerBoundaryUnavailable), .historyCopy(.sourceLabel),
         .historyCopy(.durationLessThanMinute), .historyCopy(.durationDayAbbreviation),
+        .historyCopy(.durationHourAbbreviation), .historyCopy(.durationMinuteAbbreviation),
         .historyCopy(.separatorMiddleDot),
         .historyCopy(.separatorArrow), .historyCopy(.separatorComma),
         .historyCopy(.separatorRange), .historyCopy(.separatorSpace), .historyCopy(.to),
@@ -1507,6 +1513,8 @@ enum AppText: Equatable {
         case .inferredConflictError: resource("history.inferred.error.conflict", "This interval conflicts with a recorded fast and was not saved.", "Inferred-fast conflict error")
         case .inferredActiveFastError: resource("history.inferred.error.active-fast", "An active fast already exists, so this inferred fast was not started.", "Inferred-fast active-fast error")
         case .inferredSaveError: resource("history.inferred.error.save", "This fast could not be saved. Your local records were unchanged.", "Inferred-fast save error")
+        case .inferredCapReached: resource("history.inferred.cap-reached", "This inferred fast reached its maximum duration. It was not started or saved.", "BF-105 inferred-fast cap stale message")
+        case .inferredReturnToHistory: resource("history.inferred.return-to-history", "Return to History", "BF-105 inferred-fast cap return action")
         case .inferredDelete: resource("history.inferred.delete", "Delete inferred fast", "Inferred-fast delete action")
         case .inferredDeleteConfirmationTitle: resource("history.inferred.delete.confirmation.title", "Delete inferred fast?", "Inferred-fast delete confirmation title")
         case .inferredDeleteConfirmationMessage: resource("history.inferred.delete.confirmation.message", "This hides the inferred fast from History. Your food or drink record will stay.", "Inferred-fast delete confirmation message")
@@ -1601,6 +1609,8 @@ enum AppText: Equatable {
         case .sourceLabel: resource("history.fast.source.label", "source", "History inferred-fast source label")
         case .durationLessThanMinute: resource("duration.less-than-minute", "Less than 1 minute", "Localized duration below one minute")
         case .durationDayAbbreviation: resource("duration.day.abbreviation", "d", "Localized active-duration day abbreviation")
+        case .durationHourAbbreviation: resource("duration.hour.abbreviation", "h", "Localized compact duration hour abbreviation")
+        case .durationMinuteAbbreviation: resource("duration.minute.abbreviation", "min", "Localized compact duration minute abbreviation")
         case .separatorMiddleDot: resource("history.separator.middle-dot", "·", "History detail separator")
         case .separatorArrow: resource("history.separator.arrow", "→", "History fast range separator")
         case .separatorRange: resource("history.separator.range", "–", "History event time range separator")

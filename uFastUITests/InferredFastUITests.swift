@@ -97,10 +97,61 @@ final class InferredFastUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Inferred fast in progress"].exists)
         let currentDuration = app.staticTexts["history.inferred.duration"]
         XCTAssertTrue(currentDuration.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertEqual(currentDuration.label, "Duration, 8 hours")
+        XCTAssertEqual(currentDuration.label, "Duration, 08:00:00")
         XCTAssertTrue(start.isHittable, start.debugDescription)
         app.buttons["history.inferred.cancel"].tap()
         XCTAssertTrue(start.waitForNonExistence(timeout: 5), app.debugDescription)
+    }
+
+    @MainActor
+    func testCurrentInferredFastCapFailsClosedWithInjectedClock() {
+        let app = XCUIApplication()
+        app.launchArguments = launchArguments(
+            resetData: true,
+            seedOnboarded: true,
+            seedInferredFast: true,
+            startsOnHistory: true,
+            historyClockControlEnabled: true,
+            historyClockAdvance: 72 * 60 * 60
+        )
+        app.launch()
+
+        let historyContent = app.scrollViews["history.content"]
+        let details = app.otherElements["history.event-info-panel"]
+        XCTAssertTrue(details.waitForExistence(timeout: 5), app.debugDescription)
+        let current = fastButton(in: details, containing: "Start fast available")
+        XCTAssertTrue(current.waitForExistence(timeout: 5), app.debugDescription)
+        tapFullyVisible(current, in: historyContent, app: app)
+
+        let start = app.buttons["history.inferred.start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5), app.debugDescription)
+        let advance = app.buttons["history.inferred.clock-advance"]
+        XCTAssertTrue(advance.waitForExistence(timeout: 5), app.debugDescription)
+        let advanceIsHittable = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                (object as? XCUIElement)?.isHittable == true
+            },
+            object: advance
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [advanceIsHittable], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        advance.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        let capMessage = app.descendants(matching: .any)["history.inferred.cap-reached"]
+        XCTAssertTrue(capMessage.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(start.exists, app.debugDescription)
+        XCTAssertEqual(
+            app.staticTexts["history.inferred.duration"].label,
+            "Duration, 1d 00:00:00"
+        )
+
+        let returnToHistory = app.buttons["history.inferred.return-to-history"]
+        XCTAssertTrue(returnToHistory.waitForExistence(timeout: 5), app.debugDescription)
+        returnToHistory.tap()
+        XCTAssertTrue(returnToHistory.waitForNonExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor
@@ -513,6 +564,8 @@ final class InferredFastUITests: XCTestCase {
         seedInferredFastEligibility: Bool = false,
         seedSuppressedInferredFast: Bool = false,
         startsOnHistory: Bool = false,
+        historyClockControlEnabled: Bool = false,
+        historyClockAdvance: TimeInterval? = nil,
         simulateSuppressionSaveFailure: Bool = false,
         simulateSuppressionReenableStale: Bool = false
     ) -> [String] {
@@ -524,6 +577,8 @@ final class InferredFastUITests: XCTestCase {
             seedInferredFastEligibility: seedInferredFastEligibility,
             seedSuppressedInferredFast: seedSuppressedInferredFast,
             startsOnHistory: startsOnHistory,
+            historyClockControlEnabled: historyClockControlEnabled,
+            historyClockAdvance: historyClockAdvance,
             simulateSuppressionSaveFailure: simulateSuppressionSaveFailure,
             simulateSuppressionReenableStale: simulateSuppressionReenableStale
         ).arguments

@@ -483,6 +483,127 @@ extension UITestSeedFixtures {
         _ = clock
     }
 
+    /// BF-106-only busy fixture. It keeps the stable label-layout scenario and
+    /// adds deterministic local records without changing any ordinary fixture.
+    /// The frozen totals are 6 fasts, 16 foods, 73 hydrations and 89 events.
+    static func seedBF106BusyHistory(
+        in context: ModelContext,
+        clock: any AppClock
+    ) throws {
+        try seedHistoryFastLabelLayout(in: context, clock: clock)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_GB")
+        guard let london = TimeZone(identifier: "Europe/London") else { return }
+        calendar.timeZone = london
+        guard let firstDay = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 21)
+        ) else { return }
+
+        seedBF106CompletedFasts(in: context, calendar: calendar, firstDay: firstDay)
+        seedBF106Hydrations(in: context, calendar: calendar, firstDay: firstDay)
+        seedBF106Foods(in: context, calendar: calendar, firstDay: firstDay)
+    }
+
+    private static func seedBF106CompletedFasts(
+        in context: ModelContext,
+        calendar: Calendar,
+        firstDay: Date
+    ) {
+        for dayIndex in 0 ..< 4 {
+            guard let startDay = calendar.date(byAdding: .day, value: dayIndex, to: firstDay),
+                  let endDay = calendar.date(byAdding: .day, value: dayIndex + 1, to: firstDay),
+                  let start = calendar.date(
+                      bySettingHour: 21,
+                      minute: 10,
+                      second: 0,
+                      of: startDay
+                  ),
+                  let end = calendar.date(
+                      bySettingHour: 5,
+                      minute: 45,
+                      second: 0,
+                      of: endDay
+                  ),
+                  let id = bf106FixtureID(section: 1, index: dayIndex + 1)
+            else { return }
+            context.insert(FastRecord(
+                id: id,
+                startDate: start,
+                endDate: end,
+                goalAtStart: .default
+            ))
+        }
+    }
+
+    private static func seedBF106Hydrations(
+        in context: ModelContext,
+        calendar: Calendar,
+        firstDay: Date
+    ) {
+        var hydrationIndex = 1
+        for dayIndex in 0 ... 5 {
+            guard let day = calendar.date(byAdding: .day, value: dayIndex, to: firstDay)
+            else { return }
+            for hour in stride(from: 1, through: 23, by: 2) {
+                guard let occurredAt = calendar.date(
+                    bySettingHour: hour,
+                    minute: 40,
+                    second: 0,
+                    of: day
+                ), let id = bf106FixtureID(section: 3, index: hydrationIndex)
+                else { return }
+                context.insert(HydrationEntryRecord(
+                    id: id,
+                    type: .tea,
+                    volumeMillilitres: 300,
+                    occurredAt: occurredAt,
+                    isCaloric: false,
+                    createdAt: occurredAt
+                ))
+                hydrationIndex += 1
+            }
+        }
+    }
+
+    private static func seedBF106Foods(
+        in context: ModelContext,
+        calendar: Calendar,
+        firstDay: Date
+    ) {
+        var foodIndex = 1
+        for dayIndex in 0 ..< 5 {
+            guard let day = calendar.date(byAdding: .day, value: dayIndex, to: firstDay)
+            else { return }
+            for hour in [8, 13, 18] {
+                guard let occurredAt = calendar.date(
+                    bySettingHour: hour,
+                    minute: 15,
+                    second: 0,
+                    of: day
+                ), let id = bf106FixtureID(section: 2, index: foodIndex)
+                else { return }
+                context.insert(FoodEntryRecord(
+                    id: id,
+                    draft: .init(
+                        description: String(format: "BF-106 meal %02d", foodIndex),
+                        occurredAt: occurredAt
+                    ),
+                    createdAt: occurredAt
+                ))
+                foodIndex += 1
+            }
+        }
+    }
+
+    private static func bf106FixtureID(section: Int, index: Int) -> UUID? {
+        UUID(uuidString: String(
+            format: "10600000-0000-%04d-0000-%012d",
+            section,
+            index
+        ))
+    }
+
     static func seedFoodFavouritePopulated(in context: ModelContext, clock: any AppClock) {
         guard let id = UUID(uuidString: "10300000-0000-0000-0000-000000000001") else { return }
         context.insert(FoodFavouriteRecord(

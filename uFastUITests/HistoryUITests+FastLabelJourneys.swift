@@ -534,6 +534,444 @@ extension HistoryUITests {
     }
 }
 
+extension HistoryUITests {
+    @MainActor
+    // swiftlint:disable:next function_body_length
+    func testHistoryDurationClockPulseUpdatesLeafWithoutRelayout() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_GB")
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/London"))
+        let now = try XCTUnwrap(
+            calendar.date(
+                from: DateComponents(year: 2026, month: 8, day: 27, hour: 10, minute: 0)
+            )
+        )
+        let app = launchHistory(
+            arguments: UITestLaunchConfiguration(
+                resetData: true,
+                seedOnboarded: true,
+                fixedNow: now,
+                seedHistoryFastLabelLayout: true,
+                suppressAutomaticLiveActivityOffer: true,
+                startsOnHistory: true,
+                historyClockControlEnabled: true,
+                historyClockAdvance: 1,
+                appleLocale: "en_GB",
+                timeZone: "Europe/London"
+            ).arguments
+        )
+        openHistory(in: app)
+        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+
+        let durationProbe = app.descendants(matching: .any)[
+            "history.fast-label-rendered-duration-probe.10400000-0000-0000-0000-000000000002"
+        ]
+        let labelProbe = app.descendants(matching: .any)[
+            "history.fast-label-probe.10400000-0000-0000-0000-000000000002"
+        ]
+        let labelGroupProbe = app.descendants(matching: .any)[
+            "history.fast-label-group-probe.10400000-0000-0000-0000-000000000002"
+        ]
+        let disclosureProbe = app.descendants(matching: .any)[
+            "history.fast-label-disclosure-probe.10400000-0000-0000-0000-000000000002"
+        ]
+        let projectionCount = app.descendants(matching: .any)[
+            "history.fast-label-projection-count"
+        ]
+        let metricsCount = app.descendants(matching: .any)[
+            "history.fast-label-metrics-resolution-count"
+        ]
+        let durationTickCount = app.descendants(matching: .any)[
+            "history.fast-duration-tick-count"
+        ]
+        let leafInvalidationCount = app.descendants(matching: .any)[
+            "history.fast-duration-leaf-invalidation-count"
+        ]
+        let parentBodyEvaluationCount = app.descendants(matching: .any)[
+            "history.fast-parent-invalidation-count"
+        ]
+        let carouselBodyEvaluationCount = app.descendants(matching: .any)[
+            "history.fast-carousel-invalidation-count"
+        ]
+        let cardBodyEvaluationCount = app.descendants(matching: .any)[
+            "history.fast-card-body-evaluation-count"
+        ]
+        let settledDurationLeafInvalidationCount = app.descendants(matching: .any)[
+            "history.fast-settled-duration-leaf-invalidation-count"
+        ]
+        let card = app.otherElements["history.list"].buttons[
+            "history.fast.10400000-0000-0000-0000-000000000002"
+        ]
+        let clockProbe = app.descendants(matching: .any)["history.clock-probe"]
+        XCTAssertTrue(waitForExistenceIfNeeded(durationProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(labelProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(labelGroupProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(disclosureProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(projectionCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(metricsCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(durationTickCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(leafInvalidationCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(parentBodyEvaluationCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(carouselBodyEvaluationCount), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(cardBodyEvaluationCount), app.debugDescription)
+        XCTAssertTrue(
+            waitForExistenceIfNeeded(settledDurationLeafInvalidationCount),
+            app.debugDescription
+        )
+        XCTAssertTrue(waitForExistenceIfNeeded(card), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(clockProbe), app.debugDescription)
+
+        let geometryProbes = FastLabelGeometryProbes(
+            pill: labelProbe,
+            group: labelGroupProbe,
+            duration: durationProbe,
+            disclosure: disclosureProbe
+        )
+        let initialDuration = try XCTUnwrap(durationProbe.value as? String)
+        XCTAssertEqual(initialDuration, "13:34:00", app.debugDescription)
+        let initialFrames = FastLabelGeometryFrames(probes: geometryProbes)
+        assertCompactLabelGeometry(
+            probes: geometryProbes,
+            app: app
+        )
+        let projectionBaseline = try XCTUnwrap(projectionCount.value as? String)
+        let metricsBaseline = try XCTUnwrap(metricsCount.value as? String)
+        let initialLeafInvalidations = Int(leafInvalidationCount.value as? String ?? "") ?? 0
+        let initialTickCount = Int(durationTickCount.value as? String ?? "") ?? 0
+        let initialCardBodyEvaluations = try XCTUnwrap(
+            Int(cardBodyEvaluationCount.value as? String ?? ""),
+            cardBodyEvaluationCount.debugDescription
+        )
+        let initialSettledLeafInvalidations = try XCTUnwrap(
+            Int(settledDurationLeafInvalidationCount.value as? String ?? ""),
+            settledDurationLeafInvalidationCount.debugDescription
+        )
+        let initialClock = try XCTUnwrap(
+            Double(clockProbe.value as? String ?? ""),
+            clockProbe.debugDescription
+        )
+
+        let clockAdvance = app.buttons["history.clock-advance"]
+        XCTAssertTrue(waitForHittable(clockAdvance, app: app), app.debugDescription)
+        let clockScript = app.buttons["history.clock-script-arm"]
+        XCTAssertTrue(waitForHittable(clockScript, app: app), app.debugDescription)
+        XCTAssertTrue(waitForHittable(clockAdvance, app: app), app.debugDescription)
+
+        // Exercise the visible settled card before hiding details for motion.
+        // Its duration leaf should update while the card body stays stable.
+        clockAdvance.tap()
+        let settledCardDurationUpdated = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                Int((object as? XCUIElement)?.value as? String ?? "")
+                    ?? 0 > initialSettledLeafInvalidations
+            },
+            object: settledDurationLeafInvalidationCount
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [settledCardDurationUpdated], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        XCTAssertEqual(
+            cardBodyEvaluationCount.value as? String,
+            String(initialCardBodyEvaluations),
+            app.debugDescription
+        )
+        let cardAccessibility = "\(card.label) \(card.value as? String ?? "")"
+        XCTAssertTrue(
+            cardAccessibility.contains("13 hours 34 minutes 1 second"),
+            card.debugDescription
+        )
+        assertStableLabelFrames(
+            initialFrames: initialFrames,
+            probes: geometryProbes,
+            app: app
+        )
+
+        // Arm five exact logical advances before native motion. The app-owned
+        // cadence script runs them after motion begins, so this test never
+        // issues an XCTest command while the gesture is active.
+        clockScript.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let carousel = app.scrollViews["history.day-carousel"]
+        XCTAssertTrue(waitForHittable(carousel, app: app), app.debugDescription)
+        carousel.swipeLeft(velocity: .slow)
+        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+
+        let finalDuration = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                (object as? XCUIElement)?.value as? String == "13:34:06"
+            },
+            object: durationProbe
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [finalDuration], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        XCTAssertEqual(durationProbe.value as? String, "13:34:06", app.debugDescription)
+        assertCompactLabelGeometry(
+            probes: geometryProbes,
+            app: app
+        )
+        let motionSettledFrames = FastLabelGeometryFrames(probes: geometryProbes)
+        XCTAssertEqual(projectionCount.value as? String, projectionBaseline, app.debugDescription)
+        XCTAssertEqual(metricsCount.value as? String, metricsBaseline, app.debugDescription)
+        XCTAssertEqual(
+            try XCTUnwrap(Double(clockProbe.value as? String ?? ""), clockProbe.debugDescription),
+            initialClock + 6,
+            accuracy: 0.001,
+            app.debugDescription
+        )
+        // Motion legitimately reevaluates these containers at phase changes.
+        // Capture that settled baseline, then prove a settled cadence pulse
+        // does not reevaluate either container body. The five-step script
+        // above remains the deterministic pulse-count proof.
+        let settledParentBodyEvaluations = parentBodyEvaluationCount.value as? String
+        let settledCarouselBodyEvaluations = carouselBodyEvaluationCount.value as? String
+        clockAdvance.tap()
+        let postMotionDuration = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                (object as? XCUIElement)?.value as? String == "13:34:07"
+            },
+            object: durationProbe
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [postMotionDuration], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        XCTAssertEqual(durationProbe.value as? String, "13:34:07", app.debugDescription)
+        assertStableLabelFrames(
+            initialFrames: motionSettledFrames,
+            probes: geometryProbes,
+            app: app
+        )
+        XCTAssertEqual(
+            parentBodyEvaluationCount.value as? String,
+            settledParentBodyEvaluations,
+            app.debugDescription
+        )
+        XCTAssertEqual(
+            carouselBodyEvaluationCount.value as? String,
+            settledCarouselBodyEvaluations,
+            app.debugDescription
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(Double(clockProbe.value as? String ?? ""), clockProbe.debugDescription),
+            initialClock + 7,
+            accuracy: 0.001,
+            app.debugDescription
+        )
+
+        let finalTickCount = try XCTUnwrap(
+            Int(durationTickCount.value as? String ?? ""),
+            durationTickCount.debugDescription
+        )
+        let finalLeafInvalidations = try XCTUnwrap(
+            Int(leafInvalidationCount.value as? String ?? ""),
+            leafInvalidationCount.debugDescription
+        )
+        XCTAssertGreaterThan(finalTickCount, initialTickCount, app.debugDescription)
+        XCTAssertGreaterThan(finalLeafInvalidations, initialLeafInvalidations, app.debugDescription)
+        XCTAssertGreaterThan(
+            Int(settledDurationLeafInvalidationCount.value as? String ?? "") ?? 0,
+            initialSettledLeafInvalidations,
+            app.debugDescription
+        )
+
+        let trace = app.descendants(matching: .any)["history.fast-label-trace"]
+        XCTAssertTrue(waitForExistenceIfNeeded(trace), app.debugDescription)
+        let traceText = trace.value as? String ?? ""
+        let traceRows = try XCTUnwrap(FastLabelTraceRow.parse(traceText), traceText)
+        let firstMotion = try XCTUnwrap(
+            traceRows.firstIndex { $0.event.hasPrefix("motion.begin.phase=") },
+            traceText
+        )
+        let motionEnd = try XCTUnwrap(
+            traceRows[(firstMotion + 1)...].firstIndex { $0.event == "motion.end" },
+            traceText
+        )
+        let motionTicks = traceRows[(firstMotion + 1) ..< motionEnd].filter {
+            $0.event.hasPrefix("duration.tick.phase=")
+        }
+        XCTAssertGreaterThanOrEqual(motionTicks.count, 3, traceText)
+        XCTAssertTrue(
+            motionTicks.allSatisfy {
+                $0.event.contains("userDriven")
+                    || $0.event.contains("decelerating")
+                    || $0.event.contains("aligning")
+            },
+            traceText
+        )
+    }
+
+    @MainActor
+    // swiftlint:disable:next function_body_length
+    func testActiveFastTimelinePillShowsAndAdvancesMultiDayDuration() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_GB")
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/London"))
+        let now = try XCTUnwrap(
+            calendar.date(
+                from: DateComponents(year: 2026, month: 8, day: 27, hour: 10, minute: 0)
+            )
+        )
+        let activeStart = now.addingTimeInterval(-26 * 60 * 60)
+        let app = launchHistory(
+            arguments: UITestLaunchConfiguration(
+                resetData: true,
+                seedOnboarded: true,
+                fixedNow: now,
+                seedActiveFastStart: activeStart,
+                suppressAutomaticLiveActivityOffer: true,
+                startsOnHistory: true,
+                historyClockControlEnabled: true,
+                historyClockAdvance: 1,
+                appleLocale: "en_GB",
+                timeZone: "Europe/London"
+            ).arguments
+        )
+        openHistory(in: app)
+
+        let carousel = app.scrollViews["history.day-carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 5), app.debugDescription)
+        let previousDay = app.buttons["history.previous-day"]
+        XCTAssertTrue(waitForHittable(previousDay, app: app), app.debugDescription)
+        previousDay.tap()
+        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+
+        let durationProbes = app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@",
+                "history.fast-label-rendered-duration-probe."
+            )
+        )
+        let visibleDuration = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                Self.visibleElementsWithMidpoint(in: durationProbes, boundedBy: carousel).count == 1
+            },
+            object: app
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [visibleDuration], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        let durationProbe = try XCTUnwrap(
+            Self.visibleElementWithMidpoint(in: durationProbes, boundedBy: carousel),
+            app.debugDescription
+        )
+        let descriptorID = durationProbe.identifier.replacingOccurrences(
+            of: "history.fast-label-rendered-duration-probe.",
+            with: ""
+        )
+        let labelProbe = app.descendants(matching: .any)[
+            "history.fast-label-probe.\(descriptorID)"
+        ]
+        let labelGroupProbe = app.descendants(matching: .any)[
+            "history.fast-label-group-probe.\(descriptorID)"
+        ]
+        let disclosureProbe = app.descendants(matching: .any)[
+            "history.fast-label-disclosure-probe.\(descriptorID)"
+        ]
+        XCTAssertTrue(waitForExistenceIfNeeded(labelProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(labelGroupProbe), app.debugDescription)
+        XCTAssertTrue(waitForExistenceIfNeeded(disclosureProbe), app.debugDescription)
+        let geometryProbes = FastLabelGeometryProbes(
+            pill: labelProbe,
+            group: labelGroupProbe,
+            duration: durationProbe,
+            disclosure: disclosureProbe
+        )
+        assertCompactLabelGeometry(
+            probes: geometryProbes,
+            app: app
+        )
+        let initialDuration = try XCTUnwrap(durationProbe.value as? String)
+        XCTAssertFalse(initialDuration.isEmpty, app.debugDescription)
+        XCTAssertTrue(initialDuration.contains("d"), app.debugDescription)
+        let geometryEvidence = XCTAttachment(
+            string: "BF-105 pill geometry: pill=\(labelProbe.frame); "
+                + "group=\(labelGroupProbe.frame); renderedDuration=\(durationProbe.frame); "
+                + "disclosure=\(disclosureProbe.frame); duration=\(initialDuration)"
+        )
+        geometryEvidence.name = "BF-105-active-pill-geometry"
+        geometryEvidence.lifetime = .keepAlways
+        add(geometryEvidence)
+
+        let clockAdvance = app.buttons["history.clock-advance"]
+        XCTAssertTrue(waitForHittable(clockAdvance, app: app), app.debugDescription)
+        clockAdvance.tap()
+        let advancedDuration = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                guard let value = durationProbe.value as? String else { return false }
+                return value != initialDuration
+            },
+            object: durationProbe
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [advancedDuration], timeout: 5),
+            .completed,
+            app.debugDescription
+        )
+        XCTAssertNotEqual(durationProbe.value as? String, initialDuration, app.debugDescription)
+    }
+
+    @MainActor
+    private func assertCompactLabelGeometry(
+        probes: FastLabelGeometryProbes,
+        app: XCUIApplication
+    ) {
+        XCTAssertEqual(
+            probes.group.frame.midX,
+            probes.pill.frame.midX,
+            accuracy: 1,
+            app.debugDescription
+        )
+        XCTAssertEqual(
+            probes.disclosure.frame.minX,
+            probes.duration.frame.maxX + 4,
+            accuracy: 1,
+            app.debugDescription
+        )
+        XCTAssertEqual(
+            probes.disclosure.frame.maxX,
+            probes.group.frame.maxX,
+            accuracy: 1,
+            app.debugDescription
+        )
+    }
+
+    @MainActor
+    private func assertStableLabelFrames(
+        initialFrames: FastLabelGeometryFrames,
+        probes: FastLabelGeometryProbes,
+        app: XCUIApplication
+    ) {
+        let current = probes.pill.frame
+        XCTAssertEqual(current.minX, initialFrames.descriptor.minX, accuracy: 1, app.debugDescription)
+        XCTAssertEqual(current.midY, initialFrames.descriptor.midY, accuracy: 1, app.debugDescription)
+        XCTAssertEqual(current.width, initialFrames.descriptor.width, accuracy: 1, app.debugDescription)
+        XCTAssertEqual(current.height, initialFrames.descriptor.height, accuracy: 1, app.debugDescription)
+    }
+}
+
+private struct FastLabelGeometryProbes {
+    let pill: XCUIElement
+    let group: XCUIElement
+    let duration: XCUIElement
+    let disclosure: XCUIElement
+}
+
+private struct FastLabelGeometryFrames {
+    let descriptor: CGRect
+
+    @MainActor
+    init(probes: FastLabelGeometryProbes) {
+        descriptor = probes.pill.frame
+    }
+}
+
 private struct FastLabelTraceRow: Equatable, CustomStringConvertible {
     let sequence: Int
     let event: String

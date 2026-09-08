@@ -5,6 +5,37 @@ import SwiftData
 // swiftlint:disable trailing_comma
 
 extension HistoryPresentationModel {
+    /// Reclassifies an already loaded inferred candidate at its single
+    /// derived cap. This is an in-memory transition; it never queries or
+    /// persists and is called only at a safe settled presentation boundary.
+    @discardableResult
+    func reclassifyCappedInferredFast(at now: Date) -> Bool {
+        var changed = false
+        if let current = historyPresentation {
+            let next = current.reclassifiedInferredItems(at: now)
+            if next != current {
+                historyPresentation = next
+                changed = true
+            }
+        }
+        if let current = motionSnapshot {
+            let nextPresentation = current.presentation.reclassifiedInferredItems(at: now)
+            if nextPresentation != current.presentation {
+                motionSnapshot = HistoryMotionSnapshot(
+                    coverage: current.coverage,
+                    calendar: calendar,
+                    generation: current.generation,
+                    presentation: nextPresentation,
+                    isInitial: current.isInitial,
+                    precedingState: current.precedingState,
+                    followingState: current.followingState
+                )
+                changed = true
+            }
+        }
+        return changed
+    }
+
     var historyDisplayMaximumDay: Date {
         calendar.date(
             byAdding: .day,
@@ -19,18 +50,23 @@ extension HistoryPresentationModel {
             containing: selectedDate,
             calendar: calendar
         )?.interval else { return false }
+        HistoryScrollDiagnosticProbe.recordWindow(requestedWindow)
         do {
-            let data = try SwiftDataHistoryDataProvider(modelContext: modelContext)
-                .fetch(window: requestedWindow)
+            let data = try HistoryScrollDiagnosticProbe.withWork(.exactWindowFetch) {
+                try SwiftDataHistoryDataProvider(modelContext: modelContext)
+                    .fetch(window: requestedWindow)
+            }
             historyData = data
-            historyPresentation = presentationCache.presentation(
-                for: data,
-                locale: locale,
-                calendar: calendar,
-                timeZone: timeZone,
-                referenceNow: referenceNow,
-                textResolver: textResolver
-            )
+            historyPresentation = HistoryScrollDiagnosticProbe.withWork(.exactWindowProjection) {
+                presentationCache.presentation(
+                    for: data,
+                    locale: locale,
+                    calendar: calendar,
+                    timeZone: timeZone,
+                    referenceNow: referenceNow,
+                    textResolver: textResolver
+                )
+            }
         } catch {
             // Retain the last complete projection. A later lifecycle or
             // mutation refresh can replace it atomically.

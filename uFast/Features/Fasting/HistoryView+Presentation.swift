@@ -12,7 +12,7 @@ extension HistoryView {
             dates: dateNavigatorDates,
             selection: selectedDateBinding(source: .dateChip),
             maximumDate: historyDisplayMaximumDay,
-            readOnlyAfterDate: clock.now,
+            readOnlyAfterDate: model.referenceNow,
             showsReadOnlyAppearance: showsFutureReadOnlyAppearance,
             automaticScrollEnabled: !temporalMovementPhase.suppressesAutomaticAlignment && !isDateRailMoving,
             coupledPresentation: coupledScrollPresentation,
@@ -184,7 +184,10 @@ extension HistoryView {
 
     @ViewBuilder
     // swiftlint:disable:next function_body_length
-    func fastHistoryDetails(at now: Date) -> some View {
+    func fastHistoryDetails(
+        at now: Date,
+        durationPulse: HistoryDurationPulse? = nil
+    ) -> some View {
         let visibleFastItems = visibleFastItems(at: now)
         if !visibleFastItems.isEmpty {
             UFastSectionHeading(
@@ -257,7 +260,13 @@ extension HistoryView {
                         let sourceAccessibilityID = item.inferredInterval?.sourceBoundaryReference.id.uuidString
                             ?? item.id.uuidString
                         Button { openVisibleFast(item) } label: {
-                            VisibleFastHistoryRow(item: item, calendar: calendar, locale: locale, timeZone: timeZone)
+                            VisibleFastHistoryRow(
+                                item: item,
+                                calendar: calendar,
+                                locale: locale,
+                                timeZone: timeZone,
+                                durationPulse: durationPulse
+                            )
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("history.fast.\(sourceAccessibilityID)")
@@ -354,8 +363,12 @@ extension HistoryView {
 
     func updateTemporalMovementPhase(_ phase: TemporalCarouselMovementPhase) {
         temporalMovementPhase = phase
+        if phase != .settled {
+            durationPulse.beginArmedTestClockScript()
+        }
         if phase == .settled {
             ensureHistoryDayCoverage(around: selectedDate)
+            consumePendingCapTransitionIfSettled()
         }
     }
 
@@ -376,7 +389,19 @@ extension HistoryView {
         isDateRailMoving = isMoving
         if isMoving {
             coupledScrollPresentation.handle(.end)
+        } else {
+            consumePendingCapTransitionIfSettled()
         }
+    }
+
+    private func consumePendingCapTransitionIfSettled() {
+        guard capTransitionPending,
+              temporalMovementPhase == .settled,
+              !isDateRailMoving
+        else { return }
+        _ = model.reclassifyCappedInferredFast(at: durationPulse.now)
+        capTransitionPending = false
+        syncDurationPulseLifecycle()
     }
 
     func ensureHistoryDayCoverage(around date: Date) {
@@ -544,11 +569,13 @@ extension HistoryView {
         TemporalHistoryCarousel(
             dates: historyDates,
             selection: selectedDateBinding(source: .carousel),
-            intervals: liveHistoryPresentation?.intervals(activeEndingAt: clock.now) ?? [],
+            intervals: liveHistoryPresentation?.loadedIntervals ?? [],
             events: liveHistoryPresentation?.events ?? [],
             motionIntervals: motionIntervalsAtCurrentTime,
             motionEvents: motionSnapshot?.presentation.ribbonEvents
                 ?? historyPresentation?.events ?? [],
+            durationPulse: durationPulse,
+            inputGeneration: motionSnapshot?.generation,
             onSelectInterval: openInterval,
             onSelectEvent: openEvent,
             onSelectEventGroup: { group in
@@ -568,7 +595,7 @@ extension HistoryView {
             allowsEmptySelection: !isFutureSelection,
             showsTimelineDetails: showsSettledHistoryDetails,
             presentationDay: selectedDate,
-            readOnlyFromDate: clock.now,
+            readOnlyFromDate: model.referenceNow,
             onMovementPhaseChange: updateTemporalMovementPhase,
             onCoupledPresentationChange: coupledScrollPresentation.handle,
             onSettledVisibleWindow: { window in

@@ -133,12 +133,31 @@ extension HistoryUITests {
             identifier: stableIdentifier
         )
         XCTAssertEqual(preDrinkFrames.count, 2, app.debugDescription)
+        let descriptorID = stableIdentifier.replacingOccurrences(
+            of: "history.active-fast.",
+            with: ""
+        )
         let activeFastVisualLabel = app.descendants(matching: .any)[
-            "history.fast-label-probe.\(stableIdentifier.replacingOccurrences(of: "history.active-fast.", with: ""))"
+            "history.fast-label-probe.\(descriptorID)"
         ]
         XCTAssertTrue(activeFastVisualLabel.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
-        XCTAssertEqual(activeFastVisualLabel.label, "Active fast", activeFastVisualLabel.debugDescription)
-        XCTAssertFalse(carousel.staticTexts["11:40:00"].exists, app.debugDescription)
+        XCTAssertEqual(
+            activeFastVisualLabel.label,
+            "",
+            "The title is omitted when the duration-only fallback is selected.\n"
+                + activeFastVisualLabel.debugDescription
+        )
+        XCTAssertFalse(carousel.staticTexts["Active fast"].exists, app.debugDescription)
+        let renderedDuration = app.descendants(matching: .any)[
+            "history.fast-label-rendered-duration-probe.\(descriptorID)"
+        ]
+        XCTAssertTrue(renderedDuration.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
+        XCTAssertEqual(renderedDuration.value as? String, "11:40:00", renderedDuration.debugDescription)
+        XCTAssertTrue(
+            Self.isVisibleFrame(renderedDuration.frame, boundedBy: carousel.frame),
+            "The complete duration must be visibly painted inside the carousel.\n"
+                + renderedDuration.debugDescription
+        )
         let preDrinkMarkerIDs = historyMarkerIdentifiers(in: app)
         let preDrinkStructuredLabel = structuredFast.label
         captureScreenshot(named: "history-edited-active-fast-current-day", in: app)

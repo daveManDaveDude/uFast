@@ -42,17 +42,23 @@ extension HistoryUITests {
               ),
               activeFastDetail.exists || activeFastDetail.waitForExistence(timeout: 8)
         else { return nil }
-        let activeFastLabelProbes = app.descendants(matching: .any).matching(
+        let activeFastDescriptorID = HistoryTemporalIdentifiers.activeFast.replacingOccurrences(
+            of: "history.active-fast.",
+            with: ""
+        )
+        let activeFastLabelGroupProbes = app.descendants(matching: .any).matching(
             NSPredicate(
-                format: "identifier BEGINSWITH %@ AND label == %@",
-                "history.fast-label-probe.",
-                "Active fast"
+                format: "identifier == %@",
+                "history.fast-label-group-probe.\(activeFastDescriptorID)"
             )
         )
         if let expectedLabelProbeCount, expectedLabelProbeCount > 0 {
             let labelProbeExpectation = XCTNSPredicateExpectation(
                 predicate: NSPredicate { _, _ in
-                    Self.visibleElements(in: activeFastLabelProbes, boundedBy: carousel).count
+                    Self.visibleElementsWithMidpoint(
+                        in: activeFastLabelGroupProbes,
+                        boundedBy: carousel
+                    ).count
                         == expectedLabelProbeCount
                 },
                 object: app
@@ -61,8 +67,8 @@ extension HistoryUITests {
                 return nil
             }
         }
-        let visibleActiveFastLabelProbe = Self.visibleElements(
-            in: activeFastLabelProbes,
+        let visibleActiveFastLabelGroupProbe = Self.visibleElementsWithMidpoint(
+            in: activeFastLabelGroupProbes,
             boundedBy: carousel
         )
         let noonMarker = visibleNoonElement(
@@ -73,7 +79,7 @@ extension HistoryUITests {
         return SettledSeamState(
             activeFrame: activeFast.frame,
             activeLabel: activeFastDetail.label,
-            labelProbeCount: visibleActiveFastLabelProbe.count,
+            labelProbeCount: visibleActiveFastLabelGroupProbe.count,
             selectedDateLabel: selectedDate.label,
             noonMarkerVisible: noonMarker != nil,
             noonMarkerFrameIntersectsCarousel: noonMarker.map {
@@ -183,41 +189,31 @@ extension HistoryUITests {
         carousel: XCUIElement
     ) -> [XCUIElement] {
         let candidates = app.descendants(matching: .any).matching(
-            NSPredicate(
-                format: "identifier BEGINSWITH %@ AND label == %@",
-                "history.fast-label-probe.",
-                "Active fast"
-            )
+            NSPredicate(format: "identifier BEGINSWITH %@", "history.fast-label-group-probe.")
         )
+        let activeDescriptorIDs = activeFastDescriptorIDs(in: app)
         return Self.visibleElementsWithMidpoint(
             in: candidates,
             boundedBy: carousel
-        )
+        ).filter { activeDescriptorIDs.contains(descriptorID(for: $0)) }
     }
 
     @MainActor
-    func visibleActiveFastLabelProbe(
-        in app: XCUIApplication,
-        carousel: XCUIElement,
-        timeout: TimeInterval
-    ) -> XCUIElement? {
-        let candidates = app.descendants(matching: .any).matching(
-            NSPredicate(
-                format: "identifier BEGINSWITH %@ AND label == %@",
-                "history.fast-label-probe.",
-                "Active fast"
-            )
+    private func activeFastDescriptorIDs(in app: XCUIApplication) -> Set<String> {
+        let activeFastCandidates = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "history.active-fast.")
         )
-        let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate { _, _ in
-                Self.visibleElementWithMidpoint(in: candidates, boundedBy: carousel) != nil
-            },
-            object: app
+        return Set((0 ..< activeFastCandidates.count).map {
+            activeFastCandidates.element(boundBy: $0).identifier
+                .replacingOccurrences(of: "history.active-fast.", with: "")
+        })
+    }
+
+    private func descriptorID(for groupProbe: XCUIElement) -> String {
+        groupProbe.identifier.replacingOccurrences(
+            of: "history.fast-label-group-probe.",
+            with: ""
         )
-        guard XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed else {
-            return nil
-        }
-        return Self.visibleElementWithMidpoint(in: candidates, boundedBy: carousel)
     }
 
     @MainActor

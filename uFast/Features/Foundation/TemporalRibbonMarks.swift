@@ -62,6 +62,9 @@ extension TemporalRibbonView {
                 member: member,
                 metrics: metrics
             )
+            // Keep the visual centred in its bucket even when the larger
+            // tap target is shifted inward at a calendar-page boundary.
+            .offset(x: layout.centerFraction * width - (buttonOffsetX + buttonWidth / 2))
         }
         .buttonStyle(.plain)
         .disabled(!isInteractive)

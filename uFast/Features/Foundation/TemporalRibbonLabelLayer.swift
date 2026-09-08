@@ -2,6 +2,8 @@ import os
 import SwiftUI
 import UIKit
 
+// swiftlint:disable file_length
+
 /// Counts every label-related preparation stage used by UI diagnostics. It is
 /// deliberately inert for production launches and is never read from a
 /// scroll-geometry callback.
@@ -17,6 +19,11 @@ enum HistoryLabelWorkProbe {
     private(set) static var metricsResolutionCount = 0
     private(set) static var descriptorCount = 0
     private(set) static var metricsCount = 0
+    private(set) static var durationTickCount = 0
+    private(set) static var durationLeafInvalidationCount = 0
+    private(set) static var durationTicksDuringMotionCount = 0
+    private(set) static var historyParentBodyEvaluationCount = 0
+    private(set) static var carouselBodyEvaluationCount = 0
     private(set) static var scrollGeometryCallbackCount = 0
     private(set) static var labelWorkDuringCallbackCount = 0
     private(set) static var maxScrollGeometryCallbackDepth = 0
@@ -31,6 +38,9 @@ enum HistoryLabelWorkProbe {
 
     static var isEnabled: Bool {
         ProcessInfo.processInfo.arguments.contains("--ui-testing")
+            && !ProcessInfo.processInfo.arguments.contains(
+                HistoryScrollDiagnosticConfiguration.diagnosticArgument
+            )
     }
 
     static func recordProjection() {
@@ -55,6 +65,42 @@ enum HistoryLabelWorkProbe {
         guard isEnabled else { return }
         recordLabelWorkDuringScrollGeometryCallback()
         metricsResolutionCount += 1
+    }
+
+    static func recordDurationTick(_ phase: TemporalCarouselMovementPhase, now: Date) {
+        guard isEnabled else { return }
+        durationTickCount += 1
+        if phase != .settled {
+            durationTicksDuringMotionCount += 1
+        }
+        recordTrace(
+            "duration.tick.phase=\(String(describing: phase));logicalNow=\(now.timeIntervalSince1970)"
+        )
+    }
+
+    static func recordDurationLeafInvalidation() {
+        guard isEnabled else { return }
+        durationLeafInvalidationCount += 1
+        recordTrace("duration.leaf.invalidate")
+    }
+
+    static func recordMovementPhase(_ phase: TemporalCarouselMovementPhase) {
+        guard isEnabled else { return }
+        if phase == .settled {
+            recordTrace("motion.end")
+        } else {
+            recordTrace("motion.begin.phase=\(String(describing: phase))")
+        }
+    }
+
+    static func recordHistoryParentBodyEvaluation() {
+        guard isEnabled else { return }
+        historyParentBodyEvaluationCount += 1
+    }
+
+    static func recordCarouselBodyEvaluation() {
+        guard isEnabled else { return }
+        carouselBodyEvaluationCount += 1
     }
 
     static func recordOutput(descriptorCount: Int, metricsCount: Int) {
@@ -104,6 +150,10 @@ enum HistoryLabelWorkProbe {
             + "initialOffset=\(initialOffset); selectedDayCenter=\(selectedDayCenter); "
             + "appearedSegments=\(appearedSegmentIDs.count); descriptors=\(descriptorCount); "
             + "metrics=\(metricsCount); scrollCallbacks=\(scrollGeometryCallbackCount); "
+            + "durationTicks=\(durationTickCount); durationLeafInvalidations=\(durationLeafInvalidationCount); "
+            + "durationTicksDuringMotion=\(durationTicksDuringMotionCount); "
+            + "historyParentBodyEvaluations=\(historyParentBodyEvaluationCount); "
+            + "carouselBodyEvaluations=\(carouselBodyEvaluationCount); "
             + "labelWorkDuringScrollCallbacks=\(labelWorkDuringCallbackCount); "
             + "maxScrollCallbackDepth=\(maxScrollGeometryCallbackDepth)"
     }
@@ -220,6 +270,8 @@ struct TemporalRibbonLabelLayer: View {
     let layoutDirection: TemporalHorizontalLayoutDirection
     let textResolver: AppTextResolver
     let appearedSegmentCount: Int
+    let durationPulse: HistoryDurationPulse?
+    let movementPhase: TemporalCarouselMovementPhase
 
     @State private var descriptors: [TemporalRibbonLabelDescriptor] = []
     @State private var generation: TemporalRibbonLabelProjectionGeneration?
@@ -227,19 +279,22 @@ struct TemporalRibbonLabelLayer: View {
     @Environment(\.locale) private var locale
 
     private func resolveLabelInputs() -> [TemporalRibbonLabelInput] {
-        HistoryLabelWorkProbe.withInputResolution {
-            intervals.map { item in
-                let title = HistoryLabelWorkProbe.withTitleResolution {
-                    visualTitle(for: item.kind) ?? ""
+        HistoryScrollDiagnosticProbe.withWork(.labelInputs) {
+            HistoryLabelWorkProbe.withInputResolution {
+                intervals.map { item in
+                    let title = HistoryLabelWorkProbe.withTitleResolution {
+                        visualTitle(for: item.kind) ?? ""
+                    }
+                    return TemporalRibbonLabelInput(
+                        id: item.id,
+                        start: item.start,
+                        end: item.end,
+                        kind: item.kind,
+                        title: title,
+                        glyphName: intervalSymbol(for: item.kind),
+                        duration: item.duration
+                    )
                 }
-                return TemporalRibbonLabelInput(
-                    id: item.id,
-                    start: item.start,
-                    end: item.end,
-                    kind: item.kind,
-                    title: title,
-                    glyphName: intervalSymbol(for: item.kind)
-                )
             }
         }
     }
@@ -253,10 +308,14 @@ struct TemporalRibbonLabelLayer: View {
                 TemporalRibbonLabelDiagnosticsProbe(
                     descriptors: descriptors,
                     layout: layout,
-                    appearedSegmentCount: appearedSegmentCount
+                    appearedSegmentCount: appearedSegmentCount,
+                    textResolver: textResolver,
+                    durationPulse: durationPulse,
+                    movementPhase: movementPhase
                 )
             }
         }
+        .coordinateSpace(name: "history.fast-label-layer")
         .frame(
             width: max(layout.contentWidth, 0),
             height: max(layout.layerHeight, 0),
@@ -304,29 +363,33 @@ struct TemporalRibbonLabelLayer: View {
         )
         guard generation != nextGeneration else { return }
         generation = nextGeneration
-        let metricsByKey = HistoryLabelWorkProbe.withMetricsResolution {
-            Dictionary(uniqueKeysWithValues: Set(inputs.map(\.title)).map { title in
-                let key = TemporalRibbonLabelMetricKey(
-                    title: title,
-                    localeIdentifier: nextGeneration.localeIdentifier,
-                    layoutDirection: nextGeneration.layoutDirection,
-                    dynamicTypeCategory: nextGeneration.dynamicTypeCategory,
-                    font: "caption.semibold"
-                )
-                return (key, title.isEmpty ? measureGlyphOnly(title: title) : measure(title: title))
-            })
+        let metricsByKey = HistoryScrollDiagnosticProbe.withWork(.labelMetrics) {
+            HistoryLabelWorkProbe.withMetricsResolution {
+                Dictionary(uniqueKeysWithValues: Set(inputs.map(\.title)).map { title in
+                    let key = TemporalRibbonLabelMetricKey(
+                        title: title,
+                        localeIdentifier: nextGeneration.localeIdentifier,
+                        layoutDirection: nextGeneration.layoutDirection,
+                        dynamicTypeCategory: nextGeneration.dynamicTypeCategory,
+                        font: "caption.semibold"
+                    )
+                    return (key, title.isEmpty ? measureGlyphOnly(title: title) : measure(title: title))
+                })
+            }
         }
         HistoryLabelWorkProbe.recordMetricsResolution()
         let metrics = Dictionary(uniqueKeysWithValues: metricsByKey.map { ($0.key.title, $0.value) })
-        descriptors = HistoryLabelWorkProbe.withProjection {
-            TemporalRibbonLabelProjector.project(
-                inputs,
-                days: days,
-                contentWidth: layout.contentWidth,
-                calendar: calendar,
-                layoutDirection: layoutDirection,
-                metrics: metrics
-            )
+        descriptors = HistoryScrollDiagnosticProbe.withWork(.labelProjection) {
+            HistoryLabelWorkProbe.withProjection {
+                TemporalRibbonLabelProjector.project(
+                    inputs,
+                    days: days,
+                    contentWidth: layout.contentWidth,
+                    calendar: calendar,
+                    layoutDirection: layoutDirection,
+                    metrics: metrics
+                )
+            }
         }
         HistoryLabelWorkProbe.recordProjection()
         HistoryLabelWorkProbe.recordOutput(
@@ -338,10 +401,12 @@ struct TemporalRibbonLabelLayer: View {
     private func measure(title: String) -> TemporalRibbonLabelMetrics {
         let font = captionSemiboldFont
         let textWidth = (title as NSString).size(withAttributes: [.font: font]).width
+        let durationTemplateWidths = durationTemplateWidths(for: title, font: font)
         return TemporalRibbonLabelMetrics(
             title: title,
             glyphWidth: font.pointSize,
-            textWidth: textWidth
+            textWidth: textWidth,
+            durationTemplateWidths: durationTemplateWidths
         )
     }
 
@@ -350,8 +415,54 @@ struct TemporalRibbonLabelLayer: View {
         return TemporalRibbonLabelMetrics(
             title: title,
             glyphWidth: font.pointSize,
-            textWidth: 0
+            textWidth: 0,
+            durationTemplateWidths: durationTemplateWidths(for: title, font: font)
         )
+    }
+
+    private func durationTemplateWidths(for title: String, font: UIFont) -> [Int: Double] {
+        let daySpace = TemporalContinuousDaySpaceResolver(
+            days: days,
+            contentWidth: layout.contentWidth,
+            calendar: calendar,
+            layoutDirection: layoutDirection
+        )
+        let maximumProjectedBarWidth = intervals
+            .filter { visualTitle(for: $0.kind) == title && $0.duration != nil }
+            .compactMap { daySpace.interval(start: $0.start, end: $0.end)?.width }
+            .max() ?? 0
+        let titleWidth = Double((title as NSString).size(withAttributes: [.font: font]).width)
+        let glyphWidth = Double(font.pointSize)
+        let labelMetrics = TemporalRibbonLabelMetrics(
+            title: title,
+            glyphWidth: glyphWidth,
+            textWidth: titleWidth
+        )
+        var widths: [Int: Double] = [:]
+
+        for dayDigits in 0 ... HistoryDurationValue.maximumDayDigits {
+            let currentTemplate = HistoryTextFormatting.activeTemplate(
+                dayDigits: dayDigits, resolver: textResolver
+            )
+            let completedTemplate = HistoryTextFormatting.compactCompletedTemplate(
+                dayDigits: dayDigits, resolver: textResolver
+            )
+            let currentWidth = Double(
+                (currentTemplate as NSString).size(withAttributes: [.font: font]).width
+            )
+            let completedWidth = Double(
+                (completedTemplate as NSString).size(withAttributes: [.font: font]).width
+            )
+            let durationWidth = max(currentWidth, completedWidth)
+            widths[dayDigits] = durationWidth
+
+            let completeBarWidth = labelMetrics.fullLabelWidth(durationWidth: durationWidth)
+            let durationOnlyBarWidth = durationWidth + 12
+            guard maximumProjectedBarWidth >= completeBarWidth
+                || maximumProjectedBarWidth >= durationOnlyBarWidth
+            else { break }
+        }
+        return widths
     }
 
     private var captionSemiboldFont: UIFont {
@@ -360,30 +471,21 @@ struct TemporalRibbonLabelLayer: View {
     }
 
     private func visualLabel(_ descriptor: TemporalRibbonLabelDescriptor) -> some View {
-        HStack(spacing: 4) {
-            if descriptor.showsGlyph, let glyphName = descriptor.glyphName {
-                Image(systemName: glyphName)
-                    .frame(width: descriptor.glyphWidth)
-            }
-            if descriptor.showsText, let title = descriptor.title {
-                Text(title)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-            if descriptor.showsText {
-                Text(">")
-                    .frame(width: TemporalRibbonLabelMetrics.disclosureWidth)
-            }
-        }
-        .padding(.horizontal, 6)
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(UFastTheme.primary)
-        .frame(width: descriptor.labelWidth, height: labelLaneHeight, alignment: .leading)
-        .position(
-            x: descriptor.labelCenterX,
-            y: labelCenterY(for: descriptor.lane)
-        )
-        .accessibilityHidden(true)
+        visualLabelGroup(descriptor)
+            .padding(.horizontal, 6)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(UFastTheme.primary)
+            // Keep the glyph, title, duration and disclosure as one intrinsic
+            // group. The fixed descriptor frame below is the stable outer
+            // reservation and the only centering wrapper; it must not be
+            // proposed back as HStack width.
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityHidden(!HistoryLabelWorkProbe.isEnabled)
+            .frame(width: descriptor.labelWidth, height: labelLaneHeight, alignment: .center)
+            .position(
+                x: descriptor.labelCenterX,
+                y: labelCenterY(for: descriptor.lane)
+            )
     }
 
     private var labelLaneHeight: Double {
@@ -416,6 +518,133 @@ struct TemporalRibbonLabelLayer: View {
         case .reconstructed: "wand.and.stars"
         case .needsReview: "exclamationmark.triangle"
         case .unknown: "questionmark.circle"
+        }
+    }
+}
+
+private extension TemporalRibbonLabelLayer {
+    func visualLabelGroup(_ descriptor: TemporalRibbonLabelDescriptor) -> some View {
+        HStack(spacing: 4) {
+            if descriptor.showsGlyph, let glyphName = descriptor.glyphName {
+                Image(systemName: glyphName)
+                    .frame(width: descriptor.glyphWidth)
+                    .accessibilityHidden(true)
+            }
+            if descriptor.showsDuration, let duration = descriptor.duration {
+                if descriptor.showsText, let title = descriptor.title {
+                    Text(title)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityHidden(true)
+                }
+                TemporalRibbonLabelDurationLeaf(
+                    descriptorID: descriptor.id,
+                    duration: duration,
+                    resolver: textResolver,
+                    pulse: duration.isCurrent ? durationPulse : nil,
+                    maximumDayDigits: descriptor.durationTemplateDayDigits ?? 0
+                )
+            } else if descriptor.showsText, let title = descriptor.title {
+                Text(title)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityHidden(true)
+            }
+            if descriptor.showsText {
+                ZStack {
+                    Text(">")
+                        .accessibilityHidden(true)
+                    if HistoryLabelWorkProbe.isEnabled {
+                        renderedGeometryProbe(
+                            label: "History fast label disclosure",
+                            identifier: "history.fast-label-disclosure-probe.\(descriptor.id.uuidString)"
+                        )
+                    }
+                }
+                .frame(width: TemporalRibbonLabelMetrics.disclosureWidth)
+            }
+        }
+        // This is the compact intrinsic group centered inside the stable
+        // descriptor frame. Duration reservation remains in descriptor.labelWidth,
+        // not in a frame applied to the painted duration leaf.
+        .fixedSize(horizontal: true, vertical: false)
+        .background {
+            if HistoryLabelWorkProbe.isEnabled {
+                renderedGeometryProbe(
+                    label: "History fast label content group",
+                    identifier: "history.fast-label-group-probe.\(descriptor.id.uuidString)"
+                )
+            }
+        }
+    }
+
+    func renderedGeometryProbe(label: String, identifier: String) -> some View {
+        GeometryReader { proxy in
+            let frame = proxy.frame(in: .named("history.fast-label-layer"))
+            Color.clear
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label)
+                .accessibilityValue(
+                    "center \(frame.midX), "
+                        + "width \(proxy.size.width)"
+                )
+                .accessibilityIdentifier(identifier)
+        }
+    }
+}
+
+private struct TemporalRibbonLabelDurationLeaf: View {
+    let descriptorID: UUID
+    let duration: HistoryDurationSpec
+    let resolver: AppTextResolver
+    let pulse: HistoryDurationPulse?
+    let maximumDayDigits: Int
+
+    private var now: Date {
+        guard duration.observesClock else { return duration.endDate }
+        return pulse?.now ?? duration.startDate
+    }
+
+    private var displayText: String {
+        HistoryTextFormatting.compactDuration(duration, at: now, resolver: resolver)
+    }
+
+    var body: some View {
+        Group {
+            if duration.value(at: now).dayDigits <= maximumDayDigits {
+                Text(displayText)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityHidden(true)
+                    .background {
+                        if HistoryLabelWorkProbe.isEnabled {
+                            renderedDurationProbe
+                        }
+                    }
+            }
+        }
+        .onChange(of: now) { _, _ in
+            guard duration.observesClock, pulse != nil else { return }
+            HistoryLabelWorkProbe.recordDurationLeafInvalidation()
+        }
+    }
+
+    private var renderedDurationProbe: some View {
+        GeometryReader { proxy in
+            let frame = proxy.frame(in: .named("history.fast-label-layer"))
+            Color.clear
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("History fast rendered duration")
+                .accessibilityValue(displayText)
+                .accessibilityIdentifier(
+                    "history.fast-label-rendered-duration-probe.\(descriptorID.uuidString)"
+                )
+                .accessibilityHint(
+                    "center \(frame.midX), width \(proxy.size.width)"
+                )
         }
     }
 }

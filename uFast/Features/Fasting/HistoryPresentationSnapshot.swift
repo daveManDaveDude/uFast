@@ -77,8 +77,25 @@ struct HistoryPresentationSnapshot: Equatable {
         }
     }
 
+    /// The interval descriptors used by the continuous label layer. Their
+    /// dates and semantic metadata are fixed at the presentation generation;
+    /// only the duration leaf reads the live clock.
+    var loadedIntervals: [TemporalRibbonIntervalItem] {
+        fastItems.map(\.ribbonItem)
+    }
+
     func visibleFastItems(activeEndingAt now: Date) -> [HistoryVisibleFastItem] {
-        fastItems.map { $0.kind == .active ? $0.ending(at: now) : $0 }
+        fastItems.map { $0.durationUpdated(at: now) }
+    }
+
+    func reclassifiedInferredItems(at now: Date) -> Self {
+        Self(
+            window: window,
+            fastItems: fastItems.map { $0.reclassifiedIfCapped(at: now) },
+            hiddenInferredFastItems: hiddenInferredFastItems,
+            events: events,
+            textContext: textContext
+        )
     }
 }
 
@@ -97,6 +114,7 @@ struct HistoryMotionIntervalPrimitive: Equatable, Sendable {
     let accessibilityLabel: String?
     let semanticKind: HistoryVisibleFastItem.Kind?
     let inferredInterval: InferredFastInterval?
+    let duration: HistoryDurationSpec?
 
     init(
         id: UUID,
@@ -108,7 +126,8 @@ struct HistoryMotionIntervalPrimitive: Equatable, Sendable {
         detail: String? = nil,
         accessibilityLabel: String? = nil,
         semanticKind: HistoryVisibleFastItem.Kind? = nil,
-        inferredInterval: InferredFastInterval? = nil
+        inferredInterval: InferredFastInterval? = nil,
+        duration: HistoryDurationSpec? = nil
     ) {
         self.id = id
         self.start = start
@@ -120,6 +139,7 @@ struct HistoryMotionIntervalPrimitive: Equatable, Sendable {
         self.accessibilityLabel = accessibilityLabel
         self.semanticKind = semanticKind
         self.inferredInterval = inferredInterval
+        self.duration = duration
     }
 }
 
@@ -220,7 +240,8 @@ struct HistoryMotionPresentation: Equatable, Sendable {
                 detail: $0.detail,
                 accessibilityLabel: $0.accessibilityLabel,
                 semanticKind: $0.kind,
-                inferredInterval: $0.inferredInterval
+                inferredInterval: $0.inferredInterval,
+                duration: $0.durationSpec
             )
         }
         hiddenInferredFastItems = snapshot.hiddenInferredFastItems
@@ -256,6 +277,56 @@ struct HistoryMotionPresentation: Equatable, Sendable {
             visibleInterval: window.start ..< window.end
         ).map { HistoryVisibleFastItem.inferred($0, textContext: textContext).ribbonItem } ?? []
         return (existing + projected).sorted { $0.start < $1.start }
+    }
+
+    var loadedRibbonIntervals: [TemporalRibbonIntervalItem] {
+        intervals.compactMap { primitive in
+            guard primitive.start < primitive.end else { return nil }
+            return TemporalRibbonIntervalItem(
+                id: primitive.id,
+                start: primitive.start,
+                end: primitive.end,
+                title: primitive.title ?? "",
+                detail: primitive.detail ?? "",
+                accessibilityLabel: primitive.accessibilityLabel ?? primitive.title ?? "",
+                kind: primitive.kind,
+                duration: primitive.duration
+            )
+        }
+    }
+
+    func reclassifiedInferredItems(at now: Date) -> Self {
+        Self(
+            window: window,
+            intervals: intervals.map { primitive in
+                guard primitive.semanticKind == .inferred,
+                      let inferred = primitive.inferredInterval,
+                      inferred.isInProgress,
+                      now >= inferred.sourceDate.addingTimeInterval(
+                          InferredFastProjector.maximumDuration(for: inferred.goal)
+                      )
+                else { return primitive }
+                let capped = inferred.refreshed(at: now)
+                let item = HistoryVisibleFastItem.inferred(capped, textContext: textContext)
+                return HistoryMotionIntervalPrimitive(
+                    id: item.ribbonID,
+                    start: item.startDate,
+                    end: item.endDate,
+                    kind: item.ribbonKind,
+                    isActive: false,
+                    title: item.title,
+                    detail: item.detail,
+                    accessibilityLabel: item.accessibilityLabel,
+                    semanticKind: item.kind,
+                    inferredInterval: capped,
+                    duration: item.durationSpec
+                )
+            },
+            events: events,
+            inferredContext: inferredContext,
+            hiddenInferredFastItems: hiddenInferredFastItems,
+            textContext: textContext
+        )
     }
 
     func inferredInterval(for id: UUID, at now: Date) -> InferredFastInterval? {
@@ -307,7 +378,8 @@ private extension HistoryMotionIntervalPrimitive {
                 ?? textContext.textResolver(
                     .historyFastTitle(kind: kind == .active ? .active : .automatic, needsReview: false)
                 ),
-            kind: kind
+            kind: kind,
+            duration: duration
         )
     }
 
@@ -781,6 +853,44 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
         )
     }
 
+    var durationSpec: HistoryDurationSpec {
+        switch kind {
+        case .active:
+            .current(startDate: startDate)
+        case .inferred where inferredInterval?.isInProgress == true:
+            .current(
+                startDate: startDate,
+                capDate: inferredInterval?.sourceDate.addingTimeInterval(
+                    InferredFastProjector.maximumDuration(for: inferredInterval?.goal ?? .default)
+                )
+            )
+        default:
+            .completed(startDate: startDate, endDate: endDate)
+        }
+    }
+
+    func durationUpdated(at now: Date) -> Self {
+        guard durationSpec.isCurrent else { return self }
+        return Self(
+            id: id,
+            startDate: startDate,
+            endDate: durationSpec.resolvedEndDate(at: now),
+            kind: kind,
+            fast: fast,
+            inferredInterval: inferredInterval,
+            textContext: textContext
+        )
+    }
+
+    func reclassifiedIfCapped(at now: Date) -> Self {
+        guard kind == .inferred,
+              let inferredInterval,
+              inferredInterval.isInProgress,
+              let capDate = durationSpec.capDate,
+              now >= capDate else { return self }
+        return .inferred(inferredInterval.refreshed(at: now), textContext: textContext)
+    }
+
     func intersects(_ interval: Range<Date>) -> Bool {
         AutomaticFastProjector.intersects(startDate ..< endDate, interval)
     }
@@ -824,7 +934,8 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
             title: title,
             detail: detail,
             accessibilityLabel: accessibilityLabel,
-            kind: ribbonKind
+            kind: ribbonKind,
+            duration: durationSpec
         )
     }
 
@@ -841,9 +952,9 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
     }
 
     var detail: String {
-        let duration = kind == .active
+        let duration = durationSpec.isCurrent
             ? HistoryTextFormatting.activeAccessibility(
-                seconds: endDate.timeIntervalSince(startDate),
+                seconds: TimeInterval(durationSpec.completedSeconds(at: endDate)),
                 resolver: textContext.textResolver
             )
             : HistoryTextFormatting.duration(
@@ -904,9 +1015,9 @@ struct HistoryVisibleFastItem: Identifiable, Equatable, Sendable {
     }
 
     var accessibilityLabel: String {
-        let duration = kind == .active
+        let duration = durationSpec.isCurrent
             ? HistoryTextFormatting.activeAccessibility(
-                seconds: endDate.timeIntervalSince(startDate),
+                seconds: TimeInterval(durationSpec.completedSeconds(at: endDate)),
                 resolver: textContext.textResolver
             )
             : HistoryTextFormatting.duration(

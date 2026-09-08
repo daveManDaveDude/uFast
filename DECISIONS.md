@@ -998,6 +998,14 @@ is shown.
 - **Consequence:** Future History changes must not restore original-start or
   first-continuation label ownership, fragment-width fallback or a per-second
   visual active-duration timer.
+- **BF-105 bounded amendment (31 August 2026):** A presentation-only duration
+  leaf may accompany the continuous label: completed intervals use a static
+  locale-aware whole-minute value, while current recorded/current inferred
+  intervals use completed seconds from the injected `AppClock`. The leaf keeps
+  the descriptor frame and identity fixed and may not own bar geometry, lanes,
+  projection, measurement, scrolling, fragments, persistence or per-second
+  parent invalidation. All BF-104 ownership and geometry/projection bans remain
+  in force.
 
 ## D-039 Source-bound inferred-fast suppression
 

@@ -69,7 +69,9 @@ struct UITestLaunchConfiguration: Equatable {
         flow: FlowValues(
             suppressAutomaticLiveActivityOffer: true,
             startsOnHistory: true,
-            historyMotionRetryFixture: true
+            historyMotionRetryFixture: true,
+            historyClockControlEnabled: false,
+            historyClockAdvance: nil
         ),
         failures: FailureValues(
             simulateFastSaveFailure: true,
@@ -136,6 +138,8 @@ struct UITestLaunchConfiguration: Equatable {
         suppressAutomaticLiveActivityOffer: Bool = false,
         startsOnHistory: Bool = false,
         historyMotionRetryFixture: Bool = false,
+        historyClockControlEnabled: Bool = false,
+        historyClockAdvance: TimeInterval? = nil,
         simulateFastSaveFailure: Bool = false,
         simulateFastHistoryFailure: Bool = false,
         simulateFoodSaveFailure: Bool = false,
@@ -185,7 +189,9 @@ struct UITestLaunchConfiguration: Equatable {
         flow = FlowValues(
             suppressAutomaticLiveActivityOffer: suppressAutomaticLiveActivityOffer,
             startsOnHistory: startsOnHistory,
-            historyMotionRetryFixture: historyMotionRetryFixture
+            historyMotionRetryFixture: historyMotionRetryFixture,
+            historyClockControlEnabled: historyClockControlEnabled,
+            historyClockAdvance: historyClockAdvance
         )
         failures = FailureValues(
             simulateFastSaveFailure, simulateFastHistoryFailure,
@@ -226,6 +232,8 @@ struct UITestLaunchConfiguration: Equatable {
         "--seed-live-activity-recovery", "--live-activity-release", "--live-activity-build",
         "--suppress-automatic-live-activity-offer", "--simulate-fast-save-failure",
         "--simulate-fast-history-failure", "--ui-testing-history-retry-fixture",
+        "--ui-testing-history-clock",
+        "--ui-testing-history-clock-advance",
         "--simulate-food-save-failure", "--simulate-drink-save-failure",
         "--simulate-favourite-save-failure", "--simulate-goal-save-failure",
         "--simulate-live-activity-settings-save-failure", "--simulate-inferred-fast-detection-save-failure",
@@ -270,6 +278,9 @@ extension UITestLaunchConfiguration {
         }
         if preferredContentSizeCategory?.isEmpty == true {
             return .preferredSizeCategoryMustNotBeEmpty
+        }
+        if let historyClockAdvance, !historyClockAdvance.isFinite || historyClockAdvance <= 0 {
+            return .fixedNowMustBeFinite
         }
         return nil
     }
@@ -316,6 +327,8 @@ extension UITestLaunchConfiguration {
         append("--suppress-automatic-live-activity-offer", when: suppressAutomaticLiveActivityOffer, to: &values)
         append("--ui-testing-start-history", when: startsOnHistory, to: &values)
         append("--ui-testing-history-retry-fixture", when: historyMotionRetryFixture, to: &values)
+        append("--ui-testing-history-clock", when: historyClockControlEnabled, to: &values)
+        append("--ui-testing-history-clock-advance", value: historyClockAdvance, to: &values)
 
         append("--simulate-fast-save-failure", when: simulateFastSaveFailure, to: &values)
         append("--simulate-fast-history-failure", when: simulateFastHistoryFailure, to: &values)

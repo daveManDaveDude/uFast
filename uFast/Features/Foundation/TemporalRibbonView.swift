@@ -119,11 +119,13 @@ extension TemporalRibbonView {
     ) -> [TemporalEventPresentationItem] {
         var presentationCalendar = calendar
         presentationCalendar.timeZone = timeZone
-        return TemporalEventGrouping.project(
-            events.map(\.groupingInput),
-            in: window.interval,
-            calendar: presentationCalendar
-        )
+        return HistoryScrollDiagnosticProbe.withWork(.pageEventPreparation) {
+            TemporalEventGrouping.project(
+                events.map(\.groupingInput),
+                in: window.interval,
+                calendar: presentationCalendar
+            )
+        }
     }
 
     func visualRibbon(
@@ -252,11 +254,13 @@ extension TemporalRibbonView {
         window: TemporalRibbonWindow,
         policy: TemporalRibbonGeometry
     ) -> some View {
-        let geometries = TemporalHistoryPresentation.pageGeometry(
-            intervals.map { TemporalIntervalInput(id: $0.id, start: $0.start, end: $0.end) },
-            in: window,
-            surfaceWidth: policy.contentWidth
-        )
+        let geometries = HistoryScrollDiagnosticProbe.withWork(.pageLanePreparation) {
+            TemporalHistoryPresentation.pageGeometry(
+                intervals.map { TemporalIntervalInput(id: $0.id, start: $0.start, end: $0.end) },
+                in: window,
+                surfaceWidth: policy.contentWidth
+            )
+        }
         return ForEach(geometries) { geometry in
             if let item = intervals.first(where: { $0.id == geometry.id }) {
                 let segment = geometry.segment

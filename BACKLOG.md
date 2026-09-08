@@ -227,6 +227,14 @@ The accepted contract and implementation-ready story are in
 
 ## Sprint-ready product refinements
 
+### History deceleration performance
+
+- BF-106 P1 — Isolate History deceleration jitter. **Ready; bounded discovery
+  contract in [BF-106](docs/BF-106_HISTORY_DECELERATION_DIAGNOSTICS_STORY.md).**
+- BF-107 P1 — Keep fractional History follower updates lightweight. **Draft;
+  depends on BF-106 device evidence. Candidate contract in
+  [BF-107](docs/BF-107_LIGHTWEIGHT_HISTORY_FOLLOWER_STORY.md).**
+
 ### Manual hydration convenience
 
 - OW-D101 P1 — Manage default and custom favourite drinks in Settings. **Ready;

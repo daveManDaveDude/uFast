@@ -2,7 +2,8 @@ import SwiftUI
 
 extension HistoryView {
     var historyBody: some View {
-        ScreenLayout(title: textResolver(.historyCopy(.title)), identifier: "history") {
+        _ = HistoryLabelWorkProbe.recordHistoryParentBodyEvaluation()
+        return ScreenLayout(title: textResolver(.historyCopy(.title)), identifier: "history") {
             ScrollView {
                 VStack(alignment: .leading, spacing: UFastTheme.Spacing.generous) {
                     periodHeader
@@ -12,17 +13,21 @@ extension HistoryView {
                     if isFutureSelection {
                         futureReadOnlyNotice
                     }
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        fastHistoryDetails(at: clock.now)
-                            .opacity(showsSettledHistoryDetails ? 1 : 0)
-                            .allowsHitTesting(showsSettledHistoryDetails)
-                            .accessibilityHidden(!showsSettledHistoryDetails)
-                    }
+                    fastHistoryDetails(
+                        at: clock.now,
+                        durationPulse: showsSettledHistoryDetails ? durationPulse : nil
+                    )
+                    .opacity(showsSettledHistoryDetails ? 1 : 0)
+                    .allowsHitTesting(showsSettledHistoryDetails)
+                    .accessibilityHidden(!showsSettledHistoryDetails)
                 }
                 .padding(.vertical, UFastTheme.Spacing.standard)
                 .padding(.bottom, Self.bottomScrollClearance)
             }
             .accessibilityIdentifier("history.content")
+        }
+        .overlay(alignment: .topLeading) {
+            HistoryTestClockControl(clock: clock, pulse: durationPulse)
         }
         .onAppear {
             model.updateEnvironment(calendar: calendar, locale: locale, timeZone: timeZone, now: clock.now)
@@ -31,42 +36,65 @@ extension HistoryView {
             _ = model.reloadHydrationFavourites()
             _ = model.reloadFoodFavourites()
             _ = model.reloadHistory()
+            syncDurationPulseLifecycle()
         }
         .onChange(of: isTabSelected) { _, isSelected in
-            guard isSelected else { return }
-            resetToCurrentDayIfSelected()
-            _ = model.refreshHistoryAfterCommittedMutation()
+            if isSelected {
+                resetToCurrentDayIfSelected()
+                _ = model.refreshHistoryAfterCommittedMutation()
+            }
+            syncDurationPulseLifecycle()
         }
         .onChange(of: historyInvalidationRevision) { _, _ in
             _ = model.refreshHistoryAfterCommittedMutation()
+            syncDurationPulseLifecycle()
         }
         .onDisappear {
+            durationPulse.stop()
             interruptTemporalMotion()
             model.cancelOutstandingTasks()
         }
         .onChange(of: dynamicTypeSize) { _, _ in interruptTemporalMotion() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                model.updateEnvironment(calendar: calendar, locale: locale, timeZone: timeZone, now: clock.now)
                 _ = model.reloadHistory()
+                syncDurationPulseLifecycle()
             } else {
+                durationPulse.stop()
                 interruptTemporalMotion(); model.cancelOutstandingTasks()
             }
         }
         .onChange(of: presentedHistorySheetID) { _, sheetID in
-            guard sheetID != "none" else { return }
-            interruptTemporalMotion()
+            if sheetID == "none" {
+                syncDurationPulseLifecycle()
+            } else {
+                durationPulse.stop()
+                interruptTemporalMotion()
+            }
+        }
+        .onChange(of: durationPulse.capDeadlineGeneration) { _, _ in
+            if temporalMovementPhase == .settled, !isDateRailMoving {
+                _ = model.reclassifyCappedInferredFast(at: durationPulse.now)
+                syncDurationPulseLifecycle()
+            } else if !capTransitionPending {
+                capTransitionPending = true
+            }
         }
         .onChange(of: locale.identifier) { _, _ in
             model.updateEnvironment(calendar: calendar, locale: locale, timeZone: timeZone, now: clock.now)
             model.rebuildHistoryPresentation()
+            syncDurationPulseLifecycle()
         }
         .onChange(of: timeZone.identifier) { _, _ in
             model.updateEnvironment(calendar: calendar, locale: locale, timeZone: timeZone, now: clock.now)
             model.rebuildHistoryForEnvironmentChange()
+            syncDurationPulseLifecycle()
         }
         .onChange(of: calendar.identifier) { _, _ in
             model.updateEnvironment(calendar: calendar, locale: locale, timeZone: timeZone, now: clock.now)
             model.rebuildHistoryForEnvironmentChange()
+            syncDurationPulseLifecycle()
         }
         .sheet(isPresented: $isCalendarPresented) { calendarSheet }
         .sheet(item: $editor) { completedFastSheet($0) }
@@ -300,5 +328,50 @@ extension HistoryView {
                 refreshGroupSurface(for: original, mutation: mutation)
             }
         )
+    }
+}
+
+private struct HistoryTestClockControl: View {
+    let clock: any AppClock
+    let pulse: HistoryDurationPulse
+    private let advanceBy = AppLaunchConfiguration.current().historyClockAdvance
+
+    var body: some View {
+        if clock is MutableAppClock {
+            VStack(spacing: 0) {
+                Button("Advance History clock") {
+                    pulse.advanceTestClock(by: advanceBy)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("history.clock-advance")
+                Button("Arm History motion clock script") {
+                    pulse.armTestClockScript(steps: 5)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("history.clock-script-arm")
+            }
+            HistoryTestClockProbe(clock: clock, pulse: pulse)
+        }
+    }
+}
+
+private struct HistoryTestClockProbe: View {
+    let clock: any AppClock
+    let pulse: HistoryDurationPulse
+
+    private var now: Date {
+        _ = clock
+        return pulse.now
+    }
+
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("History clock timestamp")
+            .accessibilityValue(String(now.timeIntervalSince1970))
+            .accessibilityIdentifier("history.clock-probe")
     }
 }

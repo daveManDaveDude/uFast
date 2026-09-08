@@ -36,6 +36,8 @@ struct FlowValues: Equatable {
     let suppressAutomaticLiveActivityOffer: Bool
     let startsOnHistory: Bool
     let historyMotionRetryFixture: Bool
+    let historyClockControlEnabled: Bool
+    let historyClockAdvance: TimeInterval?
 }
 
 struct FailureValues: Equatable {
@@ -294,6 +296,14 @@ extension UITestLaunchConfiguration {
 
     var historyMotionRetryFixture: Bool {
         flow.historyMotionRetryFixture
+    }
+
+    var historyClockControlEnabled: Bool {
+        flow.historyClockControlEnabled
+    }
+
+    var historyClockAdvance: TimeInterval? {
+        flow.historyClockAdvance
     }
 
     var simulateFastSaveFailure: Bool {

@@ -23,7 +23,10 @@ struct UFastApp: App {
         appTextResolver = AppTextResolver(
             pseudolocalizationEnabled: launchConfiguration.pseudolocalizationEnabled
         )
-        let configuredClock = AppClockConfiguration.clock(fixedNow: launchConfiguration.fixedNow)
+        let configuredClock = AppClockConfiguration.clock(
+            fixedNow: launchConfiguration.fixedNow,
+            mutableForTesting: launchConfiguration.historyClockControlEnabled
+        )
         clock = configuredClock
         suppressAutomaticLiveActivityOffer = launchConfiguration.suppressAutomaticLiveActivityOffer
         initialDestination = launchConfiguration.startsOnHistory ? .history : .today

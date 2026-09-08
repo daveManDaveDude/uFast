@@ -60,14 +60,35 @@ extension HistoryUITests {
             ),
             app.debugDescription
         )
-        let label = try XCTUnwrap(
-            visibleActiveFastLabelProbe(in: app, carousel: carousel, timeout: 5),
-            app.debugDescription
+        let descriptorID = activeFast.identifier.replacingOccurrences(
+            of: "history.active-fast.",
+            with: ""
         )
-        XCTAssertEqual(label.label, "Active fast", label.debugDescription)
+        let renderedDurationIdentifier =
+            "history.fast-label-rendered-duration-probe.\(descriptorID)"
+        let renderedDuration = app.descendants(matching: .any)[renderedDurationIdentifier]
+        XCTAssertTrue(renderedDuration.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
+        XCTAssertEqual(
+            renderedDuration.identifier,
+            renderedDurationIdentifier,
+            "The rendered duration must correspond to the selected active fast.\n"
+                + renderedDuration.debugDescription
+        )
+        XCTAssertEqual(renderedDuration.value as? String, "09:24:00", renderedDuration.debugDescription)
         XCTAssertTrue(
-            Self.isVisibleFrame(label.frame, boundedBy: carousel.frame),
-            "The complete-bar label should be visible on the containing day.\n\(app.debugDescription)"
+            Self.isVisibleFrame(renderedDuration.frame, boundedBy: carousel.frame),
+            "The complete rendered duration should be visible on the containing day.\n\(app.debugDescription)"
         )
+        let titleProbe = app.descendants(matching: .any)[
+            "history.fast-label-probe.\(descriptorID)"
+        ]
+        XCTAssertTrue(titleProbe.waitForExistenceIfNeeded(timeout: 5), app.debugDescription)
+        XCTAssertEqual(
+            titleProbe.label,
+            "",
+            "The title probe is intentionally unlabeled for duration-only fallback.\n"
+                + titleProbe.debugDescription
+        )
+        XCTAssertFalse(carousel.staticTexts["Active fast"].exists, app.debugDescription)
     }
 }

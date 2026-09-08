@@ -281,37 +281,43 @@ extension TemporalDateNavigator {
                dates.indices.contains(anchorIndex + 1),
                dates[anchorIndex + 1] == preview.trailingDay
             {
-                let lowerBound = max(0, anchorIndex - 8)
-                let upperBound = min(dates.count, anchorIndex + 10)
-                let chronologicalDates = Array(dates[lowerBound ..< upperBound])
-                let isRightToLeft = layoutDirection == .rightToLeft
-                let visibleDates = isRightToLeft
-                    ? Array(chronologicalDates.reversed())
-                    : chronologicalDates
-                let relativeProgress = isRightToLeft
-                    ? CGFloat(upperBound - 1 - anchorIndex) - CGFloat(preview.fraction)
-                    : CGFloat(anchorIndex - lowerBound) + CGFloat(preview.fraction)
-                let anchorX = resolvedCoupledAnchorX(in: proxy.size.width)
-                ZStack(alignment: .topLeading) {
-                    HStack(spacing: 5) {
-                        ForEach(visibleDates, id: \.self) { date in
-                            followerChip(date)
-                        }
+                HistoryScrollDiagnosticProbe.withWork(.followerUpdate) {
+                    let lowerBound = max(0, anchorIndex - 8)
+                    let upperBound = min(dates.count, anchorIndex + 10)
+                    let chronologicalDates = HistoryScrollDiagnosticProbe.withWork(
+                        .chipWindowPreparation
+                    ) {
+                        Array(dates[lowerBound ..< upperBound])
                     }
-                    .offset(
-                        x: anchorX
-                            - (measuredChipStride - 5) / 2
-                            - relativeProgress * measuredChipStride
+                    let isRightToLeft = layoutDirection == .rightToLeft
+                    let visibleDates = isRightToLeft
+                        ? Array(chronologicalDates.reversed())
+                        : chronologicalDates
+                    let relativeProgress = isRightToLeft
+                        ? CGFloat(upperBound - 1 - anchorIndex) - CGFloat(preview.fraction)
+                        : CGFloat(anchorIndex - lowerBound) + CGFloat(preview.fraction)
+                    let anchorX = resolvedCoupledAnchorX(in: proxy.size.width)
+                    return ZStack(alignment: .topLeading) {
+                        HStack(spacing: 5) {
+                            ForEach(visibleDates, id: \.self) { date in
+                                followerChip(date)
+                            }
+                        }
+                        .offset(
+                            x: anchorX
+                                - (measuredChipStride - 5) / 2
+                                - relativeProgress * measuredChipStride
+                        )
+                        .frame(maxHeight: .infinity)
+                    }
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height,
+                        alignment: .topLeading
                     )
-                    .frame(maxHeight: .infinity)
+                    .clipped()
+                    .environment(\.layoutDirection, .leftToRight)
                 }
-                .frame(
-                    width: proxy.size.width,
-                    height: proxy.size.height,
-                    alignment: .topLeading
-                )
-                .clipped()
-                .environment(\.layoutDirection, .leftToRight)
             }
         }
         .frame(height: navigatorHeight)
