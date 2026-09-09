@@ -117,20 +117,9 @@ extension HistoryUITests {
         let nextDay = app.buttons["history.next-day"]
         XCTAssertTrue(nextDay.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(nextDay.isEnabled, nextDay.debugDescription)
+        let previousPublication = settledReconciliationPublicationToken(in: app)
         nextDay.tap()
-        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["history.future-read-only"].waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.buttons["history.add-at-selected-time"].waitForNonExistence(timeout: 5), app.debugDescription)
-
-        let adjacentFoodMarker = app.buttons.matching(
-            NSPredicate(
-                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
-                "history.visual-event.",
-                "Food event"
-            )
-        ).firstMatch
-        XCTAssertTrue(adjacentFoodMarker.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(adjacentFoodMarker.isEnabled, adjacentFoodMarker.debugDescription)
+        assertFutureHistoryIsExactAndReadOnly(in: app, after: previousPublication)
     }
 
     @MainActor

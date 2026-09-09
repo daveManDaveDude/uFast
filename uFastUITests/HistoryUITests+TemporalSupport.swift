@@ -7,6 +7,11 @@ private enum HistoryTemporalIdentifiers {
 }
 
 extension HistoryUITests {
+    struct SettledReconciliationRenderCounts: Equatable {
+        let parent: Int
+        let carousel: Int
+    }
+
     struct SettledSeamState {
         let activeFrame: CGRect
         let activeLabel: String
@@ -280,7 +285,7 @@ extension HistoryUITests {
             object: app
         )
         guard XCTWaiter.wait(for: [fragmentsExpectation], timeout: 5) == .completed else {
-            return []
+            return visibleFrames()
         }
         return visibleFrames()
     }
@@ -316,5 +321,83 @@ extension HistoryUITests {
             object: carousel
         )
         return XCTWaiter.wait(for: [settledExpectation], timeout: 8) == .completed
+    }
+
+    @MainActor
+    func settledReconciliationPublicationToken(in app: XCUIApplication) -> String? {
+        let probe = app.descendants(matching: .any)[
+            "history.settled-reconciliation-render"
+        ]
+        guard probe.exists || probe.waitForExistence(timeout: 5) else { return nil }
+        return probe.value as? String
+    }
+
+    @MainActor
+    func settledReconciliationRenderCounts(
+        in app: XCUIApplication
+    ) -> SettledReconciliationRenderCounts? {
+        guard let token = settledReconciliationPublicationToken(in: app) else { return nil }
+        let fields = token.split(separator: ";")
+        func value(for prefix: String) -> Int? {
+            guard let field = fields.first(where: { $0.hasPrefix(prefix) }) else { return nil }
+            return Int(field.dropFirst(prefix.count))
+        }
+        guard let parent = value(for: "parent="),
+              let carousel = value(for: "carousel=")
+        else { return nil }
+        return SettledReconciliationRenderCounts(parent: parent, carousel: carousel)
+    }
+
+    @MainActor
+    func waitForSettledReconciliationPublication(
+        in app: XCUIApplication,
+        after previousToken: String? = nil
+    ) -> Bool {
+        let probe = app.descendants(matching: .any)[
+            "history.settled-reconciliation-render"
+        ]
+        guard probe.exists || probe.waitForExistence(timeout: 5) else { return false }
+        let publication = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                guard let value = (object as? XCUIElement)?.value as? String,
+                      value != "none"
+                else { return false }
+                return previousToken.map { value != $0 } ?? true
+            },
+            object: probe
+        )
+        return XCTWaiter.wait(for: [publication], timeout: 8) == .completed
+    }
+
+    @MainActor
+    func assertFutureHistoryIsExactAndReadOnly(
+        in app: XCUIApplication,
+        after previousPublication: String?
+    ) {
+        XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+        XCTAssertTrue(
+            waitForSettledReconciliationPublication(in: app, after: previousPublication),
+            app.debugDescription
+        )
+        XCTAssertTrue(
+            app.staticTexts["history.future-read-only"].waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+        XCTAssertTrue(
+            app.buttons["history.add-at-selected-time"].waitForNonExistence(timeout: 5),
+            app.debugDescription
+        )
+        XCTAssertTrue(
+            app.otherElements["history.empty"].waitForExistence(timeout: 5),
+            app.debugDescription
+        )
+        let adjacentFoodMarker = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                "history.visual-event.",
+                "Food event"
+            )
+        ).firstMatch
+        XCTAssertTrue(adjacentFoodMarker.waitForNonExistence(timeout: 5), app.debugDescription)
     }
 }

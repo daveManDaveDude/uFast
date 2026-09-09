@@ -1,6 +1,6 @@
 import SwiftUI
 
-// swiftlint:disable function_body_length opening_brace file_length
+// swiftlint:disable function_body_length opening_brace file_length type_body_length
 
 private struct TemporalAppearedSegmentDatesKey: PreferenceKey {
     static let defaultValue: [Date] = []
@@ -27,6 +27,15 @@ struct TemporalHistoryCarousel: View {
     /// without reading its observable values; only duration leaves observe it.
     let durationPulse: HistoryDurationPulse?
     var inputGeneration: Int?
+    /// The last geometry-derived settled window owned by History. Data-only
+    /// updates and tab re-entry must retain this exact window rather than
+    /// replacing it with the selected day's canonical window.
+    var retainedSettledWindow: TemporalRibbonWindow?
+    /// UI-test-only render handshake for the exact settled reconciliation.
+    /// The probe is emitted from this body after its own evaluation counter is
+    /// incremented, so tests can baseline native invalidation counters after
+    /// the settled publication has actually rendered.
+    var settledReconciliationPublicationToken: String?
     let onSelectInterval: (UUID) -> Void
     let onSelectEvent: (UUID) -> Void
     var onSelectEventGroup: ((TemporalEventGroup) -> Void)?
@@ -50,6 +59,7 @@ struct TemporalHistoryCarousel: View {
     @State var selectedPageHeight: CGFloat?
     @State var lowerMotionInFlight = false
     @State var settledVisibleWindow: TemporalRibbonWindow?
+    @State var nativePositionRecoveryPending = false
     @State var geometrySnapshot = TemporalCarouselGeometrySnapshot()
     @State var prefetchedEdges: Set<HistoryMotionEdge> = []
     @State var viewportWidth: Double = 0
@@ -174,6 +184,11 @@ struct TemporalHistoryCarousel: View {
                         HistoryLabelWorkProbe.recordScrollGeometry(
                             geometry
                         )
+                        if movementPhase == .settled,
+                           !geometrySnapshot.hasActiveMotion
+                        {
+                            recoverNativePositionIfNeeded(for: geometry)
+                        }
                         let direction = layoutDirection == .rightToLeft
                             ? TemporalHorizontalLayoutDirection.rightToLeft
                             : .leftToRight
@@ -200,14 +215,10 @@ struct TemporalHistoryCarousel: View {
                 }
             )
             .onAppear {
-                centeredDay = canonicalSelection
-                settledVisibleWindow = TemporalHistoryPresentation.ribbonWindow(
-                    containing: canonicalSelection,
-                    calendar: calendar
-                )
-                if let settledVisibleWindow {
-                    onSettledVisibleWindow(settledVisibleWindow)
-                }
+                restoreRetainedSettledState()
+            }
+            .onChange(of: retainedSettledWindow?.settlementIdentity) { _, _ in
+                restoreRetainedSettledState()
             }
             .onChange(of: centeredDay) { _, newDay in
                 if movementPhase == .programmatic,
@@ -232,6 +243,7 @@ struct TemporalHistoryCarousel: View {
                 alignToExternalSelection()
             }
             .onDisappear {
+                nativePositionRecoveryPending = false
                 setMovementPhase(.settled)
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -275,6 +287,22 @@ struct TemporalHistoryCarousel: View {
                 )
                 .allowsHitTesting(movementPhase == .settled && allowsRecordActivation)
                 .accessibilityHidden(movementPhase != .settled)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if let token = settledReconciliationPublicationToken,
+               HistoryLabelWorkProbe.isEnabled
+            {
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("History settled reconciliation render")
+                    .accessibilityValue(
+                        token
+                            + ";parent=\(HistoryLabelWorkProbe.historyParentBodyEvaluationCount)"
+                            + ";carousel=\(HistoryLabelWorkProbe.carouselBodyEvaluationCount)"
+                    )
+                    .accessibilityIdentifier("history.settled-reconciliation-render")
             }
         }
         .overlay(alignment: .topLeading) {
@@ -551,14 +579,89 @@ extension TemporalHistoryCarousel {
 
     func alignToExternalSelection() {
         guard dates.contains(canonicalSelection),
-              centeredDay != canonicalSelection,
               !movementPhase.suppressesAutomaticAlignment
         else { return }
+        if centeredDay == canonicalSelection {
+            if !nativePositionMatchesRetainedWindow {
+                requestNativePositionRecovery()
+            }
+            return
+        }
         settledVisibleWindow = TemporalHistoryPresentation.ribbonWindow(
             containing: canonicalSelection,
             calendar: calendar
         )
         centeredDay = canonicalSelection
+    }
+
+    func restoreRetainedSettledState() {
+        guard let retainedSettledWindow,
+              calendar.isDate(retainedSettledWindow.selectedDay, inSameDayAs: canonicalSelection)
+        else {
+            centeredDay = canonicalSelection
+            settledVisibleWindow = TemporalHistoryPresentation.ribbonWindow(
+                containing: canonicalSelection,
+                calendar: calendar
+            )
+            if let settledVisibleWindow {
+                onSettledVisibleWindow(settledVisibleWindow)
+            }
+            return
+        }
+
+        settledVisibleWindow = retainedSettledWindow
+        if centeredDay != canonicalSelection {
+            centeredDay = canonicalSelection
+        } else if !nativePositionMatchesRetainedWindow {
+            requestNativePositionRecovery()
+        }
+    }
+
+    var nativePositionMatchesRetainedWindow: Bool {
+        guard let retainedSettledWindow else { return true }
+        guard let geometry = geometrySnapshot.geometry else { return false }
+        return visibleWindow(for: geometry).map {
+            calendar.isDate($0.selectedDay, inSameDayAs: retainedSettledWindow.selectedDay)
+                && abs($0.interval.start.timeIntervalSince(retainedSettledWindow.interval.start)) <= 1
+                && abs($0.interval.end.timeIntervalSince(retainedSettledWindow.interval.end)) <= 1
+        } ?? false
+    }
+
+    func recoverNativePositionIfNeeded(for _: TemporalContinuousTimelineGeometry) {
+        guard retainedSettledWindow != nil,
+              !nativePositionMatchesRetainedWindow
+        else { return }
+        requestNativePositionRecovery()
+    }
+
+    func requestNativePositionRecovery() {
+        guard !nativePositionRecoveryPending else { return }
+        nativePositionRecoveryPending = true
+        let targetDay = canonicalSelection
+        centeredDay = nil
+        Task { @MainActor in
+            await Task.yield()
+            guard nativePositionRecoveryPending,
+                  targetDay == canonicalSelection
+            else { return }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                centeredDay = targetDay
+            }
+            nativePositionRecoveryPending = false
+        }
+    }
+
+    func visibleWindow(for geometry: TemporalContinuousTimelineGeometry) -> TemporalRibbonWindow? {
+        let direction = layoutDirection == .rightToLeft
+            ? TemporalHorizontalLayoutDirection.rightToLeft
+            : .leftToRight
+        return geometry.visibleWindow(
+            days: dates,
+            calendar: calendar,
+            layoutDirection: direction
+        )
     }
 
     func emitPrefetchIntent(for progress: TemporalDaySpaceProgress) {

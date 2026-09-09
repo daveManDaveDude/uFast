@@ -83,7 +83,7 @@ struct HistoryEventGroupDisclosure: View {
     let deleteFood: (UUID, Bool) throws -> Void
     let saveHydration: (UUID, HydrationEntryDraft, Bool) throws -> Void
     let deleteHydration: (UUID, Bool) throws -> Void
-    let onMutationSucceeded: (TemporalEventGroup, HistoryEventGroupMutation) -> TemporalEventGroup?
+    let onMutationSucceeded: (TemporalEventGroup, HistoryEventGroupMutation) async -> TemporalEventGroup?
 
     init(
         group: TemporalEventGroup,
@@ -98,7 +98,7 @@ struct HistoryEventGroupDisclosure: View {
         deleteFood: @escaping (UUID, Bool) throws -> Void,
         saveHydration: @escaping (UUID, HydrationEntryDraft, Bool) throws -> Void,
         deleteHydration: @escaping (UUID, Bool) throws -> Void,
-        onMutationSucceeded: @escaping (TemporalEventGroup, HistoryEventGroupMutation) -> TemporalEventGroup?
+        onMutationSucceeded: @escaping (TemporalEventGroup, HistoryEventGroupMutation) async -> TemporalEventGroup?
     ) {
         self.group = group
         self.canAddEvent = canAddEvent
@@ -187,22 +187,16 @@ struct HistoryEventGroupDisclosure: View {
                 onSave: { draft, endingActiveFast in
                     try saveFood(presentation.record.id, draft, endingActiveFast)
                     foodEditor = nil
-                    if let refreshed = onMutationSucceeded(
-                        displayedGroup,
+                    applyMutation(
                         .saved(.init(family: .food, id: presentation.record.id))
-                    ) {
-                        displayedGroup = refreshed
-                    }
+                    )
                 },
                 onDelete: { confirmingInferredImpact in
                     try deleteFood(presentation.record.id, confirmingInferredImpact)
                     foodEditor = nil
-                    if let refreshed = onMutationSucceeded(
-                        displayedGroup,
+                    applyMutation(
                         .deleted(.init(family: .food, id: presentation.record.id))
-                    ) {
-                        displayedGroup = refreshed
-                    }
+                    )
                 },
                 onCancel: { foodEditor = nil }
             )
@@ -219,25 +213,31 @@ struct HistoryEventGroupDisclosure: View {
                 onSave: { draft, endingActiveFast in
                     try saveHydration(presentation.record.id, draft, endingActiveFast)
                     hydrationEditor = nil
-                    if let refreshed = onMutationSucceeded(
-                        displayedGroup,
+                    applyMutation(
                         .saved(.init(family: .hydration, id: presentation.record.id))
-                    ) {
-                        displayedGroup = refreshed
-                    }
+                    )
                 },
                 onDelete: { confirmingInferredImpact in
                     try deleteHydration(presentation.record.id, confirmingInferredImpact)
                     hydrationEditor = nil
-                    if let refreshed = onMutationSucceeded(
-                        displayedGroup,
+                    applyMutation(
                         .deleted(.init(family: .hydration, id: presentation.record.id))
-                    ) {
-                        displayedGroup = refreshed
-                    }
+                    )
                 },
                 onCancel: { hydrationEditor = nil }
             )
+        }
+    }
+
+    @MainActor
+    private func applyMutation(_ mutation: HistoryEventGroupMutation) {
+        let original = displayedGroup
+        Task { @MainActor in
+            guard let refreshed = await onMutationSucceeded(original, mutation) else {
+                onDismiss()
+                return
+            }
+            displayedGroup = refreshed
         }
     }
 

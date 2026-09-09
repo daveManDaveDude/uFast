@@ -85,30 +85,6 @@ enum CatchUpRangeResolver {
             days: days
         )
     }
-
-    static func prefilledInstant(
-        on day: Date,
-        now: Date,
-        calendar: Calendar
-    ) -> Date {
-        let time = calendar.dateComponents([.hour, .minute], from: now)
-        var components = calendar.dateComponents([.era, .year, .month, .day], from: day)
-        components.hour = time.hour
-        components.minute = time.minute
-        components.second = 0
-
-        if let exact = calendar.date(from: components), calendar.isDate(exact, inSameDayAs: day) {
-            return exact
-        }
-
-        let start = calendar.startOfDay(for: day)
-        return calendar.nextDate(
-            after: start,
-            matching: DateComponents(hour: 12, minute: 0),
-            matchingPolicy: .nextTime,
-            direction: .forward
-        ).flatMap { calendar.isDate($0, inSameDayAs: day) ? $0 : nil } ?? start
-    }
 }
 
 enum HistoricalEventRangeValidator {

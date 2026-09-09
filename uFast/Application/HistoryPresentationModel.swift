@@ -28,6 +28,7 @@ final class HistoryPresentationModel {
     @ObservationIgnored var initialTask: Task<Void, Never>?
     @ObservationIgnored var extensionTasks: [HistoryMotionEdge: Task<Void, Never>] = [:]
     @ObservationIgnored var refreshTask: Task<Void, Never>?
+    @ObservationIgnored let settledReconciliationCoordinator: HistorySettledReconciliationCoordinator
     @ObservationIgnored var initialLoadAttempted = false
     @ObservationIgnored var initialLoadFailed = false
     @ObservationIgnored var initialLoadRetryByGeneration: [Int: Bool] = [:]
@@ -50,6 +51,12 @@ final class HistoryPresentationModel {
     var motionPriorSelectedDate: Date?
     var motionPendingEnvironmentRebuild = false
     var historyDataRevision = 0
+    /// Keeps the prior projection's actions and accessibility hidden between
+    /// geometry settlement and publication of its matching exact projection.
+    var settledReconciliationPending = false
+    var settledReconciliationPublishedGeneration = 0
+    var settledReconciliationWindow: TemporalRibbonWindow?
+    var settledProjectionIdentity: HistorySettlementWindowIdentity?
     var motionLoadingEdges: Set<HistoryMotionEdge> = []
     var motionFailedEdges: Set<HistoryMotionEdge> = []
     var hydrationFavouriteSnapshots: [HydrationFavouriteSnapshot] = []
@@ -65,7 +72,10 @@ final class HistoryPresentationModel {
         motionConfiguration: HistoryMotionConfiguration = .product,
         diagnosticSink: any DiagnosticEventSink = NoOpDiagnosticEventSink(),
         loadChunk: HistoryMotionChunkLoader? = nil,
-        mergeChunks: HistoryMotionChunkMerger? = nil
+        mergeChunks: HistoryMotionChunkMerger? = nil,
+        settlementScheduler: any HistorySettlementScheduler = MainActorHistorySettlementScheduler(),
+        settledProjectionSource: (any HistorySettledProjectionSource)? = nil,
+        settlementEventSink: @escaping HistorySettlementEventSink = { _ in }
     ) {
         self.modelContext = modelContext
         self.clock = clock
@@ -77,6 +87,13 @@ final class HistoryPresentationModel {
         self.diagnosticSink = diagnosticSink
         referenceNow = clock.now
         selectedDate = clock.now
+        let projectionSource = settledProjectionSource
+            ?? SwiftDataHistorySettledProjectionSource(modelContext: modelContext)
+        settledReconciliationCoordinator = HistorySettledReconciliationCoordinator(
+            scheduler: settlementScheduler,
+            source: projectionSource,
+            eventSink: settlementEventSink
+        )
         let container = modelContext.container
         self.loadChunk = loadChunk ?? { coverage, calendar, referenceNow, textResolver in
             try await SwiftDataHistoryMotionRangeLoader(container: container).load(
@@ -88,6 +105,12 @@ final class HistoryPresentationModel {
         }
         self.mergeChunks = mergeChunks ?? { chunks, window in
             SwiftDataHistoryDataProvider.mergeMotionChunks(chunks, window: window)
+        }
+        settledReconciliationCoordinator.onPublished = { [weak self] projection, request in
+            self?.applySettledReconciliation(projection, request: request)
+        }
+        settledReconciliationCoordinator.onFailed = { [weak self] _ in
+            self?.settledReconciliationPending = false
         }
     }
 
@@ -108,6 +131,16 @@ final class HistoryPresentationModel {
         selectedDate = date
     }
 
+    func invalidateSettledReconciliation() {
+        settledReconciliationCoordinator.invalidate()
+        settledReconciliationPending = false
+    }
+
+    var hasMatchingSettledProjection: Bool {
+        guard let settledReconciliationWindow else { return true }
+        return settledProjectionIdentity == settledReconciliationWindow.settlementIdentity
+    }
+
     func cancelOutstandingTasks() {
         initialTask?.cancel()
         initialTask = nil
@@ -120,6 +153,7 @@ final class HistoryPresentationModel {
         motionPendingTarget = nil
         motionPendingEnvironmentRebuild = false
         motionLoadingEdges.removeAll()
+        invalidateSettledReconciliation()
         publishMotionLoadingState()
         advanceMotionGeneration()
     }

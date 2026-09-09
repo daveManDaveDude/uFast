@@ -989,7 +989,8 @@ is shown.
 
 ## D-038 Continuous History fast-label placement
 
-- **Status:** Proposed by BF-104 implementation; pending independent story review
+- **Status:** Accepted 8 September 2026 after independent Sol review of the
+  BF-104/BF-105 implementation
 - **Decision:** BF-104 supersedes BF-103 only for visual-content ownership and
   placement. A fast interval's visual label is projected once in the complete
   continuous day runway; page fragments retain bar geometry, lanes and hit

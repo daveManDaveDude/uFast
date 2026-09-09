@@ -325,7 +325,7 @@ extension HistoryView {
                 try applicationCommands.deleteHydration(id: id, confirmingInferredImpact: confirmingInferredImpact)
             },
             onMutationSucceeded: { original, mutation in
-                refreshGroupSurface(for: original, mutation: mutation)
+                await refreshGroupSurface(for: original, mutation: mutation)
             }
         )
     }

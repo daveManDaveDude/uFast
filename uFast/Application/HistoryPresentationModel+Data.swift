@@ -5,6 +5,87 @@ import SwiftData
 // swiftlint:disable trailing_comma
 
 extension HistoryPresentationModel {
+    @discardableResult
+    func scheduleSettledReconciliation(
+        for window: TemporalRibbonWindow
+    ) -> HistorySettlementScheduleResult {
+        settledReconciliationWindow = window
+        let result = settledReconciliationCoordinator.schedule(
+            window: window,
+            context: settledProjectionContext()
+        )
+        settledReconciliationPending = result.isPending
+        return result
+    }
+
+    private func scheduleFreshSettledReconciliation(for window: TemporalRibbonWindow) {
+        settledReconciliationWindow = window
+        settledReconciliationPending = true
+        _ = settledReconciliationCoordinator.invalidateAndSchedule(
+            window: window,
+            context: settledProjectionContext()
+        )
+    }
+
+    private func mutationReconciliationWindow(in interval: DateInterval?) -> TemporalRibbonWindow? {
+        if interval == nil, let settledReconciliationWindow {
+            return settledReconciliationWindow
+        }
+        return reconciliationWindow(in: interval)
+    }
+
+    private func settledProjectionContext() -> HistorySettlementProjectionContext {
+        HistorySettlementProjectionContext(
+            locale: locale,
+            calendar: calendar,
+            timeZone: timeZone,
+            referenceNow: referenceNow,
+            textResolver: textResolver
+        )
+    }
+
+    private func reconciliationWindow(in interval: DateInterval?) -> TemporalRibbonWindow? {
+        guard let interval else {
+            return TemporalHistoryPresentation.ribbonWindow(
+                containing: selectedDate,
+                calendar: calendar
+            )
+        }
+        if settledReconciliationWindow?.interval == interval {
+            return settledReconciliationWindow
+        }
+        let selectedDay = calendar.startOfDay(for: selectedDate)
+        guard let selectedDayEnd = calendar.date(byAdding: .day, value: 1, to: selectedDay),
+              interval.start < interval.end
+        else { return nil }
+        return TemporalRibbonWindow(
+            selectedDay: selectedDay,
+            selectedDayInterval: DateInterval(start: selectedDay, end: selectedDayEnd),
+            interval: interval,
+            midnightMarkers: [selectedDay].filter {
+                $0 > interval.start && $0 < interval.end
+            }
+        )
+    }
+
+    func applySettledReconciliation(
+        _ projection: HistorySettledProjection,
+        request: HistorySettledProjectionRequest
+    ) {
+        guard projection.identity == request.identity else { return }
+        if !calendar.isDate(selectedDate, inSameDayAs: request.window.selectedDay) {
+            selectedDate = request.window.selectedDay
+        }
+        historyData = projection.data
+        historyPresentation = projection.presentation
+        historyDataRevision += 1
+        settledReconciliationWindow = request.window
+        settledProjectionIdentity = request.identity
+        settledReconciliationPublishedGeneration = request.generation
+        HistorySettlementPublicationProbe.record(request)
+        settledReconciliationPending = false
+    }
+
     /// Reclassifies an already loaded inferred candidate at its single
     /// derived cap. This is an in-memory transition; it never queries or
     /// persists and is called only at a safe settled presentation boundary.
@@ -73,6 +154,10 @@ extension HistoryPresentationModel {
             return false
         }
         historyDataRevision += 1
+        if let settledWindow = reconciliationWindow(in: requestedWindow) {
+            settledReconciliationWindow = settledWindow
+            settledProjectionIdentity = settledWindow.settlementIdentity
+        }
         if motionSnapshot == nil, !initialLoadFailed {
             _ = ensureMotionRunway(around: selectedDate)
         } else if refreshMotion {
@@ -114,33 +199,15 @@ extension HistoryPresentationModel {
             containing: selectedDate,
             calendar: calendar
         )?.interval else { return false }
+        guard let mutationWindow = mutationReconciliationWindow(in: window)
+            ?? reconciliationWindow(in: requestedWindow)
+        else { return false }
         cancelOutstandingTasks()
-        let currentMotionSnapshot = motionSnapshot
-        var projectionState = HistoryProjectionState(
-            data: historyData,
-            presentation: historyPresentation,
-            motionSnapshot: currentMotionSnapshot,
-            motionChunks: motionChunks,
-            generation: motionGeneration
-        )
-        let nextGeneration = motionGeneration
-        let source = SwiftDataHistoryProjectionDataSource(modelContext: modelContext)
-        let request = HistoryProjectionRefreshRequest(
-            window: requestedWindow,
-            locale: locale,
-            calendar: calendar,
-            timeZone: timeZone,
-            referenceNow: referenceNow,
-            nextGeneration: nextGeneration,
-            textResolver: textResolver
-        )
-        guard HistoryProjectionRefreshBoundary.refresh(
-            state: &projectionState,
-            source: source,
-            request: request
-        ), let data = projectionState.data,
-        let presentation = projectionState.presentation else {
-            return false
+        var freshReconciliationScheduled = false
+        defer {
+            if !freshReconciliationScheduled {
+                scheduleFreshSettledReconciliation(for: mutationWindow)
+            }
         }
         let favouriteSnapshots: [HydrationFavouriteSnapshot]
         do {
@@ -154,30 +221,17 @@ extension HistoryPresentationModel {
         } catch {
             return false
         }
-        presentationCache.invalidate()
-        historyData = data
-        historyPresentation = presentation
         if favouriteSnapshots != hydrationFavouriteSnapshots {
             hydrationFavouriteSnapshots = favouriteSnapshots
         }
         if foodFavouriteSnapshots != self.foodFavouriteSnapshots {
             self.foodFavouriteSnapshots = foodFavouriteSnapshots
         }
-        historyDataRevision += 1
-        motionGeneration = projectionState.generation
-        motionLoadingEdges.removeAll()
-        motionFailedEdges.removeAll()
-        motionInitialLoading = false
-        motionPendingTarget = nil
-        motionPendingEnvironmentRebuild = false
-        motionPriorSnapshot = nil
-        motionPriorChunks.removeAll()
-        motionPriorSelectedDate = nil
-        motionChunks = projectionState.motionChunks
-        motionSnapshot = projectionState.motionSnapshot
-        if currentMotionSnapshot == nil {
+        if motionSnapshot == nil {
             _ = ensureMotionRunway(around: selectedDate, force: true)
         }
+        scheduleFreshSettledReconciliation(for: mutationWindow)
+        freshReconciliationScheduled = true
         return true
     }
 

@@ -562,6 +562,10 @@ extension HistoryUITests {
         )
         openHistory(in: app)
         XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+        XCTAssertTrue(
+            waitForSettledReconciliationPublication(in: app),
+            app.debugDescription
+        )
 
         let durationProbe = app.descendants(matching: .any)[
             "history.fast-label-rendered-duration-probe.10400000-0000-0000-0000-000000000002"
@@ -650,6 +654,16 @@ extension HistoryUITests {
             Double(clockProbe.value as? String ?? ""),
             clockProbe.debugDescription
         )
+        let preMotionPublication = try XCTUnwrap(
+            settledReconciliationPublicationToken(in: app),
+            app.debugDescription
+        )
+        let initialRenderCounts = try XCTUnwrap(
+            settledReconciliationRenderCounts(in: app),
+            app.debugDescription
+        )
+        let initialParentBodyEvaluations = String(initialRenderCounts.parent)
+        let initialCarouselBodyEvaluations = String(initialRenderCounts.carousel)
 
         let clockAdvance = app.buttons["history.clock-advance"]
         XCTAssertTrue(waitForHittable(clockAdvance, app: app), app.debugDescription)
@@ -677,6 +691,16 @@ extension HistoryUITests {
             String(initialCardBodyEvaluations),
             app.debugDescription
         )
+        XCTAssertEqual(
+            parentBodyEvaluationCount.value as? String,
+            initialParentBodyEvaluations,
+            app.debugDescription
+        )
+        XCTAssertEqual(
+            carouselBodyEvaluationCount.value as? String,
+            initialCarouselBodyEvaluations,
+            app.debugDescription
+        )
         let cardAccessibility = "\(card.label) \(card.value as? String ?? "")"
         XCTAssertTrue(
             cardAccessibility.contains("13 hours 34 minutes 1 second"),
@@ -696,6 +720,10 @@ extension HistoryUITests {
         XCTAssertTrue(waitForHittable(carousel, app: app), app.debugDescription)
         carousel.swipeLeft(velocity: .slow)
         XCTAssertTrue(waitForHistoryCarouselToSettle(in: app), app.debugDescription)
+        XCTAssertTrue(
+            waitForSettledReconciliationPublication(in: app, after: preMotionPublication),
+            app.debugDescription
+        )
 
         let finalDuration = XCTNSPredicateExpectation(
             predicate: NSPredicate { object, _ in
@@ -726,8 +754,12 @@ extension HistoryUITests {
         // Capture that settled baseline, then prove a settled cadence pulse
         // does not reevaluate either container body. The five-step script
         // above remains the deterministic pulse-count proof.
-        let settledParentBodyEvaluations = parentBodyEvaluationCount.value as? String
-        let settledCarouselBodyEvaluations = carouselBodyEvaluationCount.value as? String
+        let settledRenderCounts = try XCTUnwrap(
+            settledReconciliationRenderCounts(in: app),
+            app.debugDescription
+        )
+        let settledParentBodyEvaluations = String(settledRenderCounts.parent)
+        let settledCarouselBodyEvaluations = String(settledRenderCounts.carousel)
         clockAdvance.tap()
         let postMotionDuration = XCTNSPredicateExpectation(
             predicate: NSPredicate { object, _ in

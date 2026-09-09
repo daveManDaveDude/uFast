@@ -279,7 +279,24 @@ extension HistoryView {
     }
 
     var showsSettledHistoryDetails: Bool {
-        temporalMovementPhase.showsTimelineDetails && !isDateRailMoving
+        Self.settledHistoryDetailsAreAvailable(
+            movementPhase: temporalMovementPhase,
+            isDateRailMoving: isDateRailMoving,
+            isReconciliationPending: model.settledReconciliationPending,
+            hasMatchingProjection: model.hasMatchingSettledProjection
+        )
+    }
+
+    static func settledHistoryDetailsAreAvailable(
+        movementPhase: TemporalCarouselMovementPhase,
+        isDateRailMoving: Bool,
+        isReconciliationPending: Bool,
+        hasMatchingProjection: Bool
+    ) -> Bool {
+        movementPhase.showsTimelineDetails
+            && !isDateRailMoving
+            && !isReconciliationPending
+            && hasMatchingProjection
     }
 
     var showsFutureReadOnlyAppearance: Bool {
@@ -313,6 +330,9 @@ extension HistoryView {
     }
 
     func selectDay(_ date: Date, source: TemporalDaySelectionSource) {
+        if source != .carousel {
+            model.invalidateSettledReconciliation()
+        }
         if source != .carousel {
             if temporalMovementPhase != .settled || isDateRailMoving {
                 interruptTemporalMotion()
@@ -362,6 +382,9 @@ extension HistoryView {
     }
 
     func updateTemporalMovementPhase(_ phase: TemporalCarouselMovementPhase) {
+        if phase != .settled {
+            model.invalidateSettledReconciliation()
+        }
         temporalMovementPhase = phase
         if phase != .settled {
             durationPulse.beginArmedTestClockScript()
@@ -373,6 +396,7 @@ extension HistoryView {
     }
 
     func interruptTemporalMotion() {
+        model.invalidateSettledReconciliation()
         guard temporalMovementPhase != .settled
             || isDateRailMoving
             || coupledScrollPresentation.preview != nil
@@ -386,6 +410,9 @@ extension HistoryView {
     }
 
     func updateDateRailMovement(_ isMoving: Bool) {
+        if isMoving {
+            model.invalidateSettledReconciliation()
+        }
         isDateRailMoving = isMoving
         if isMoving {
             coupledScrollPresentation.handle(.end)
@@ -465,17 +492,25 @@ extension HistoryView {
         return lower ..< upper
     }
 
+    @MainActor
     func refreshedGroup(
         for original: TemporalEventGroup,
         mutation: HistoryEventGroupMutation
-    ) -> TemporalEventGroup? {
+    ) async -> TemporalEventGroup? {
         guard let visibleInterval = settledVisibleWindow?.interval
             ?? TemporalHistoryPresentation.calendarDayWindow(
                 containing: selectedDate,
                 calendar: calendar
             )?.interval
         else { return nil }
+        let previousPublicationGeneration = model.settledReconciliationPublishedGeneration
         _ = model.reloadHistoryAfterMutation(in: visibleInterval)
+        while model.settledReconciliationPending {
+            await Task.yield()
+        }
+        guard model.settledReconciliationPublishedGeneration != previousPublicationGeneration,
+              model.hasMatchingSettledProjection
+        else { return nil }
         var presentationCalendar = calendar
         presentationCalendar.timeZone = timeZone
         let groups = TemporalEventGrouping.project(
@@ -504,11 +539,12 @@ extension HistoryView {
         }
     }
 
+    @MainActor
     func refreshGroupSurface(
         for original: TemporalEventGroup,
         mutation: HistoryEventGroupMutation
-    ) -> TemporalEventGroup? {
-        guard let refreshed = refreshedGroup(for: original, mutation: mutation) else {
+    ) async -> TemporalEventGroup? {
+        guard let refreshed = await refreshedGroup(for: original, mutation: mutation) else {
             eventGroupDisclosure = nil
             return nil
         }
@@ -566,7 +602,8 @@ extension HistoryView {
 
 extension HistoryView {
     var historyTimeline: some View {
-        TemporalHistoryCarousel(
+        let allowsSettledHistoryInteraction = showsSettledHistoryDetails
+        return TemporalHistoryCarousel(
             dates: historyDates,
             selection: selectedDateBinding(source: .carousel),
             intervals: liveHistoryPresentation?.loadedIntervals ?? [],
@@ -576,6 +613,8 @@ extension HistoryView {
                 ?? historyPresentation?.events ?? [],
             durationPulse: durationPulse,
             inputGeneration: motionSnapshot?.generation,
+            retainedSettledWindow: settledVisibleWindow,
+            settledReconciliationPublicationToken: HistorySettlementPublicationProbe.viewToken,
             onSelectInterval: openInterval,
             onSelectEvent: openEvent,
             onSelectEventGroup: { group in
@@ -591,16 +630,16 @@ extension HistoryView {
             // the visible look-back portion remain ordinary History records.
             // Keep their fast, food, and drink controls active and fully
             // coloured instead of inheriting the future-day disabled state.
-            allowsRecordActivation: true,
-            allowsEmptySelection: !isFutureSelection,
-            showsTimelineDetails: showsSettledHistoryDetails,
+            allowsRecordActivation: allowsSettledHistoryInteraction,
+            allowsEmptySelection: !isFutureSelection && allowsSettledHistoryInteraction,
+            showsTimelineDetails: allowsSettledHistoryInteraction,
             presentationDay: selectedDate,
             readOnlyFromDate: model.referenceNow,
             onMovementPhaseChange: updateTemporalMovementPhase,
             onCoupledPresentationChange: coupledScrollPresentation.handle,
             onSettledVisibleWindow: { window in
                 settledVisibleWindow = window
-                _ = model.reloadHistory(in: window.interval)
+                _ = model.scheduleSettledReconciliation(for: window)
             },
             onPrefetchIntentAt: model.requestMotionExtension
         )
